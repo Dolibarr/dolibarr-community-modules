@@ -791,9 +791,15 @@ while ($i < $imaxinloop) {
 	}
 	// Queue-specific action the module does not provide: link a missing thirdparty to an existing one
 	// (writes the issuer SIREN/SIRET/VAT onto it so the matching finds it). Stays on this page (a form).
-	if ($obj->reason_code == 'THIRDPARTY_NOT_FOUND' && $user->hasRight('societe', 'creer') && (int) $obj->status == EInvoicingSyncPending::STATUS_PENDING) {
-		$tip = dol_escape_htmltag('<b>'.$langs->trans("AssociateExistingThirdpartyShort")."</b>\n".$langs->trans("ActionAssociateThirdpartyHelp"), 1, 1);
-		print '<a class="classfortooltip" href="'.$_SERVER["PHP_SELF"].'?action=linkthirdparty&rowid='.$obj->rowid.'&token='.newToken().$param.'" title="'.$tip.'">'.img_picto('', 'fa-link').'</a>';
+	// It writes onto the thirdparty, so it takes both rights; greyed without them rather than hidden.
+	if ($obj->reason_code == 'THIRDPARTY_NOT_FOUND' && (int) $obj->status == EInvoicingSyncPending::STATUS_PENDING) {
+		if ($permissiontowrite && $user->hasRight('societe', 'creer')) {
+			$tip = dol_escape_htmltag('<b>'.$langs->trans("AssociateExistingThirdpartyShort")."</b>\n".$langs->trans("ActionAssociateThirdpartyHelp"), 1, 1);
+			print '<a class="classfortooltip" href="'.$_SERVER["PHP_SELF"].'?action=linkthirdparty&rowid='.$obj->rowid.'&token='.newToken().$param.'" title="'.$tip.'">'.img_picto('', 'fa-link').'</a>';
+		} else {
+			$tip = dol_escape_htmltag('<b>'.$langs->trans("AssociateExistingThirdpartyShort")."</b>\n".$langs->trans("NotEnoughPermissions"), 1, 1);
+			print '<span class="classfortooltip opacitymedium cursornotallowed" title="'.$tip.'">'.img_picto('', 'fa-link').'</span>';
+		}
 		$hasactions = true;
 	}
 	if (!$hasactions) {
@@ -825,6 +831,15 @@ while ($i < $imaxinloop) {
 		}
 		$tipdelete = dol_escape_htmltag('<b>'.$langs->trans("Delete")."</b>\n".$langs->trans("DeletePendingFlowHelp"), 1, 1);
 		print '<a class="marginrightonly classfortooltip reposition" href="'.$_SERVER["PHP_SELF"].'?action=delete&rowid='.$obj->rowid.'&token='.newToken().$param.'" title="'.$tipdelete.'">'.img_picto('', 'delete', 'class="pictofixedwidth"').'</a>';
+	} else {
+		// Greyed without the right rather than hidden, so the user reads why they cannot be used
+		$tipnoperm = "\n".$langs->trans("NotEnoughPermissions");
+		if ((int) $obj->status != EInvoicingSyncPending::STATUS_RESOLVED) {
+			print '<span class="marginrightonly classfortooltip opacitymedium cursornotallowed" title="'.dol_escape_htmltag('<b>'.$langs->trans("RetrySync").'</b>'.$tipnoperm, 1, 1).'">'.img_picto('', 'refresh', 'class="pictofixedwidth"').'</span>';
+		}
+		$pictostatus = ((int) $obj->status == EInvoicingSyncPending::STATUS_PENDING) ? array('IgnoreFlow', 'fa-ban') : array('ReopenFlow', 'fa-undo');
+		print '<span class="marginrightonly classfortooltip opacitymedium cursornotallowed" title="'.dol_escape_htmltag('<b>'.$langs->trans($pictostatus[0]).'</b>'.$tipnoperm, 1, 1).'">'.img_picto('', $pictostatus[1], 'class="pictofixedwidth"').'</span>';
+		print '<span class="marginrightonly classfortooltip opacitymedium cursornotallowed" title="'.dol_escape_htmltag('<b>'.$langs->trans("Delete").'</b>'.$tipnoperm, 1, 1).'">'.img_picto('', 'delete', 'class="pictofixedwidth"').'</span>';
 	}
 	print '</td>';
 	print '</tr>';
