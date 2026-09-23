@@ -705,35 +705,28 @@ class ActionsStancer
 
 				//check if that customer exists on stancer and/or if prereq are ok (mail / phone)
 				// print "<p>Debug eric: " . json_encode($object) . "</p>";
+				// A Stancer customer needs an email or an international mobile. This
+				// check must be the very one stancerAddCustomerIfNeeded() will make,
+				// otherwise the button is hidden for a payment that would have gone
+				// through: it used to read the thirdparty alone, and the landline
+				// field alone, so a thirdparty whose contacts carried both an address
+				// and a mobile was turned away.
+				dol_include_once('/stancer/lib/stancer_customer.lib.php');
+				$payerIsReachable = false;
 				if ($object->element == 'member') {
-					$errorStancer = 0;
-					if (substr($object->phone, 0, 1) != '+') {
-						$errorStancer++;
-					}
-					if (strpos($object->email, '@') === false) {
-						$errorStancer++;
-					}
-					if ($errorStancer == 2) {
-						$error++;
-						print '<div class="warning"><span class="fa fa-warning"> </span> <span class="clear"> ' . $langs->trans("StancerCompanyMailOrPhoneNewPayment") . '</span></div>';
-					}
+					$memberCountry = empty($object->country_code) ? 'FR' : $object->country_code;
+					$payerIsReachable = (strpos((string) $object->email, '@') !== false)
+						|| (stancerNormalizePhone($object->phone, $memberCountry) !== '');
 				} else {
 					$societe = new Societe($this->db);
-					$socresult = $societe->fetch($object->socid);
-					if ($socresult) {
-						// print "<p>Debug eric: " . json_encode($societe) . "</p>";
-						$errorStancer = 0;
-						if (substr($societe->phone, 0, 1) != '+') {
-							$errorStancer++;
-						}
-						if (strpos($societe->email, '@') === false) {
-							$errorStancer++;
-						}
-						if ($errorStancer == 2) {
-							$error++;
-							print '<div class="warning"><span class="fa fa-warning"> </span> <span class="clear"> ' . $langs->trans("StancerCompanyMailOrPhoneNewPayment") . '</span></div>';
-						}
+					if ($societe->fetch($object->socid) > 0) {
+						$payer = stancerResolvePayerContact($societe, $object);
+						$payerIsReachable = ($payer['email'] !== '' || $payer['mobile'] !== '');
 					}
+				}
+				if (!$payerIsReachable) {
+					$error++;
+					print '<div class="warning"><span class="fa fa-warning"> </span> <span class="clear"> ' . $langs->trans("StancerCompanyMailOrPhoneNewPayment") . '</span></div>';
 				}
 
 				if (empty($error) && in_array($source, $listOfHandledSources)) {
