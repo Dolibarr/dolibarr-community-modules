@@ -1088,10 +1088,11 @@ trait CommonProtocol
 			if (!empty($createParams)) {
 				// The Dolibarr GET firewall (analyseVarsForSqlAndScriptsInjection) rejects " < > in any URL
 				// parameter, so a seller name/address carrying them would 403 before the prefilled creation
-				// form even opens. Drop them from the prefill (a convenience the operator reviews and edits).
+				// form even opens. Use the core helper (replaces " with ' and removes < >, identical from
+				// v18 to v25) to drop them from the prefill - a convenience the operator reviews and edits.
 				foreach ($createParams as $cpKey => $cpVal) {
 					if (is_string($cpVal)) {
-						$createParams[$cpKey] = str_replace(array('"', '<', '>'), array("'", '', ''), $cpVal);
+						$createParams[$cpKey] = dol_string_nospecial($cpVal, "'", array('"'), array('<', '>'));
 					}
 				}
 				$createUrl .= '&' . http_build_query($createParams);
@@ -1547,10 +1548,11 @@ trait CommonProtocol
 			if (!empty($createParams)) {
 				// The Dolibarr GET firewall (analyseVarsForSqlAndScriptsInjection) rejects " < > in any URL
 				// parameter, so a line label/description carrying them would 403 before the prefilled creation
-				// form even opens. Drop them from the prefill (a convenience the operator reviews and edits).
+				// form even opens. Use the core helper (replaces " with ' and removes < >, identical from
+				// v18 to v25) to drop them from the prefill - a convenience the operator reviews and edits.
 				foreach ($createParams as $cpKey => $cpVal) {
 					if (is_string($cpVal)) {
-						$createParams[$cpKey] = str_replace(array('"', '<', '>'), array("'", '', ''), $cpVal);
+						$createParams[$cpKey] = dol_string_nospecial($cpVal, "'", array('"'), array('<', '>'));
 					}
 				}
 				$createUrl .= '&' . http_build_query($createParams);
