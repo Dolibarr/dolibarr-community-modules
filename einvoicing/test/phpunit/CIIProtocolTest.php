@@ -28,10 +28,10 @@
  *                  whatever the timezone of the server that reads it.
  *                  Product reference: an absent one must not be used as a search key, and "0" is a
  *                  reference like any other, in both directions.
- *                  Import (issue #1031): the payment method of the document (BT-81) must reach the
- *                  supplier invoice for every code the dictionary of Dolibarr can answer.
  *                  Import (issue #1050): a line with no product falls back on the default product or the
  *                  default service of the vendor, as the billing framework of the document (BT-23) says.
+ *                  Import (issue #1031): the payment method of the document (BT-81) must reach the
+ *                  supplier invoice for every code the dictionary of Dolibarr can answer.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
