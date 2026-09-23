@@ -554,84 +554,19 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 	private function sendCashedInStatus($invoice, $amount, Translate $langs, $reason = '')
 	{
 		$einvoicing = new EInvoicing($this->db);
-
-		// Ask the boolean question: needEInvoiceManagement() answers with a status code whose ignore values
-		// are truthy. An invoice out of the e-invoicing scope has nothing to report.
-		if (!$einvoicing->mustManageEInvoice($invoice)) {
-			return;
-		}
-
-		if (!$this->needCashedInStatus($invoice)) {
-			return;
-		}
-
-		$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($invoice->id, (string) $invoice->ref);
-		if ($currentStatusDetails['transmitted'] != 1) {	// Nothing to report a payment on if the invoice never reached the platform
-			return;
-		}
-
-		// A deposit the platform refused is not a deposit. 'transmitted' lets STATUS_ERROR through, which
-		// is what an acknowledgement "Error" leaves behind (see getDolibarrStatusCodeFromPdpLabel()).
-		// The platform holds no invoice to attach a cash-in to: it must be corrected, re-sent, and the
-		// cash-in reported by hand afterwards.
-		if ((int) $currentStatusDetails['code'] === EInvoicing::STATUS_ERROR) {
-			dol_syslog(__METHOD__ . ' Cash-in not reported for invoice id=' . $invoice->id . ': the platform refused its deposit (status ' . EInvoicing::STATUS_ERROR . '), there is nothing to report the payment on', LOG_WARNING, 0, '_einvoicing');
-			setEventMessage($langs->trans("ModuleEInvoicingName") . ' : ' . $langs->trans('EInvoiceCashInNotReportedDepositRefused', $invoice->ref), 'warnings');
-			return;
-		}
-
-		$PDPManager = new PDPProviderManager($this->db);
-		$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
-
-		$result = $provider->sendStatusMessage($invoice, 212, '', array('amount' => $amount, 'reason' => $reason));
+		$result = $einvoicing->reportCashIn($invoice, $amount, $reason);
 
 		if ($result['res'] > 0) {
 			$done = $amount < 0 ? 'EInvStatus212PaymentRefunded' : 'EInvStatus212PaymentReceived';
 			setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$langs->trans($done), 'mesgs');
-		} else {
+		} elseif ($result['res'] == -2) {
+			// A deposit the platform refused is not a deposit: correct, re-send, then report the cash-in by hand.
+			dol_syslog(__METHOD__ . ' Cash-in not reported for invoice id=' . $invoice->id . ': the platform refused its deposit (status ' . EInvoicing::STATUS_ERROR . '), there is nothing to report the payment on', LOG_WARNING, 0, '_einvoicing');
+			setEventMessage($langs->trans("ModuleEInvoicingName") . ' : ' . $langs->trans('EInvoiceCashInNotReportedDepositRefused', $invoice->ref), 'warnings');
+		} elseif ($result['res'] < 0) {
 			dol_syslog(__METHOD__ . ' Failed to send paid status (212) to platform for invoice id=' . $invoice->id . ' : ' . $result['message'], LOG_ERR);
 			setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$result['message'], 'errors');
 		}
-	}
-
-	/**
-	 * Tell whether a cash-in on this invoice has to be reported with the status 212 (Encaissee).
-	 *
-	 * The reform only requires the payment data for the operations whose VAT is due on collection, which is
-	 * exactly what the VAT exigibility scheme of the company says. einvoicingVatDueOnCollection() answers
-	 * that from the VAT mode of the Tax/VAT module setup, the one place that holds it, and the generated
-	 * document answers the neighbouring question in BT-8.
-	 *
-	 * @param  Facture $invoice Invoice that has been cashed in
-	 * @return bool             True if the status has to be sent
-	 */
-	private function needCashedInStatus($invoice)
-	{
-		// VAT on a down payment falls due when the down payment is collected, whatever the scheme: the
-		// debits option is set aside by a payment received before the debit, and it may not delay the
-		// exigibility anyway (CGI art. 269-2).
-		if ($invoice->type == Facture::TYPE_DEPOSIT) {
-			return true;
-		}
-
-		if (empty($invoice->lines)) {
-			$invoice->fetch_lines();
-		}
-
-		// Product::TYPE_PRODUCT / TYPE_SERVICE, without requiring the class here. Anything else is a
-		// pseudo-line carrying no VAT (title, subtotal, page break) and is not a kind of operation:
-		// the document builder leaves those out of the same decision.
-		$hasProductLine = false;
-		$hasServiceLine = false;
-		foreach ($invoice->lines as $line) {
-			if ((int) $line->product_type === 1) {
-				$hasServiceLine = true;
-			} elseif ((int) $line->product_type === 0) {
-				$hasProductLine = true;
-			}
-		}
-
-		return einvoicingVatDueOnCollection($hasProductLine, $hasServiceLine);
 	}
 
 	/**
