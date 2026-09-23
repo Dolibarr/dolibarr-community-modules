@@ -771,4 +771,23 @@ class CIIProtocolTest extends CommonClassTest
 		$this->assertSame(CommonInvoice::TYPE_CREDIT_NOTE, $method->invoke($protocol, '381'));
 		$this->assertSame('-1', $method->invoke($protocol, '385'), 'a code the French list does not allow stays refused');
 	}
+
+	/**
+	 * A factored invoice, credit note or corrective invoice (393, 396, 472) is imported as its unfactored
+	 * counterpart (380, 381, 384): factoring changes who is paid, not what the document is.
+	 *
+	 * @return void
+	 */
+	public function testAFactoredDocumentIsImportedAsItsUnfactoredType()
+	{
+		global $db;
+
+		$method = new ReflectionMethod(CIIProtocol::class, 'getDolibarrInvoiceType');
+		$method->setAccessible(true);
+		$protocol = new CIIProtocol($db);
+
+		foreach (array('393' => '380', '396' => '381', '472' => '384') as $factored => $plain) {
+			$this->assertSame($method->invoke($protocol, $plain), $method->invoke($protocol, $factored), $factored);
+		}
+	}
 }
