@@ -148,6 +148,50 @@ class ActionsStancer
 		// dol_syslog("stancer formConfirm object = " . json_encode($object));
 		// dol_syslog("stancer formConfirm action = " . json_encode($action));
 
+		// Confirmation of "send the payment link". Placed before the Facture guard
+		// below on purpose: the button also exists on an order card. Going through
+		// formconfirm() means the mail leaves on a POST carrying a CSRF token, never
+		// on a GET a link prefetch could fire.
+		if ($action == 'stancersendpaylink'
+			&& in_array($parameters['currentcontext'], array('ordercard', 'invoicecard'), true)
+			&& ($object instanceof Commande || $object instanceof Facture) && !empty($object->id)) {
+			dol_include_once('/stancer/lib/stancer_customer.lib.php');
+			$form = new Form($db);
+			$societe = new Societe($db);
+			$recipient = '';
+			$recipientFrom = '';
+			if (!empty($object->socid) && $societe->fetch((int) $object->socid) > 0) {
+				$payer = stancerResolvePayerContact($societe, $object);
+				$recipient = $payer['email'];
+				$recipientFrom = $payer['email_from'];
+			}
+
+			if ($recipient === '') {
+				$message = '<p>' . $langs->trans('StancerSendPayLinkNoRecipient') . '</p>';
+			} else {
+				$type = ($parameters['currentcontext'] == 'invoicecard') ? 'invoice' : 'order';
+				$urlPayment = getOnlinePaymentUrl(0, $type, (string) $object->ref);
+				$message = '<p>' . $langs->trans('StancerSendPayLinkConfirm', $recipient) . '</p>';
+				// Where the address comes from matters: the thirdparty and one of its
+				// contacts are not the same person, and the user is the one who knows.
+				$message .= '<p class="opacitymedium">' . $langs->trans('StancerSendPayLinkSource', $recipientFrom) . '</p>';
+				$message .= '<div><input type="text" class="quatrevingtpercentminusx" value="' . dol_escape_htmltag($urlPayment) . '"></div>';
+			}
+			$this->resprints = $form->formconfirm(
+				$_SERVER["PHP_SELF"] . '?id=' . ((int) $object->id),
+				$langs->trans('StancerSendPayLink'),
+				$message,
+				'confirm_stancersendpaylink',
+				'',
+				'no',
+				1,
+				300,
+				500
+			);
+
+			return 0;
+		}
+
 		// The three actions handled below are only ever triggered from the invoice
 		// card (buttons built by addMoreActionsButtons()), where the core always
 		// hands us a Facture. Anything else means a foreign caller: log and skip.
@@ -538,6 +582,24 @@ class ActionsStancer
 		if ($action == 'stancerFindPaymentInvoice') {
 			dol_syslog("stancer doActions: stancerFindPaymentInvoice action detected, currentcontext=" . ($parameters['currentcontext'] ?? 'NULL'), LOG_DEBUG);
 		}
+		// Confirmed "send the payment link". formconfirm() POSTs with a CSRF token,
+		// which the core has already checked by the time a hook runs.
+		if ($action == 'confirm_stancersendpaylink' && GETPOST('confirm', 'alpha') == 'yes'
+			&& in_array($parameters['currentcontext'], array('ordercard', 'invoicecard'), true)
+			&& is_object($object) && !empty($object->id)) {
+			dol_include_once('/stancer/lib/stancer_mail.lib.php');
+			$type = ($parameters['currentcontext'] == 'invoicecard') ? 'invoice' : 'order';
+			$sent = stancerSendPaymentLink($object, $type);
+			if (!empty($sent['ok'])) {
+				setEventMessages($langs->trans('StancerSendPayLinkSent', $sent['email']), null, 'mesgs');
+			} else {
+				setEventMessages($sent['error'], null, 'errors');
+			}
+			$action = '';
+
+			return 0;
+		}
+
 		if (in_array($parameters['currentcontext'], $this->array_of_handled_context)) {
 			// Skip if the object's bank account is not the one managed by Stancer
 			$stancerBankAccount = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS', '');
@@ -1275,6 +1337,26 @@ class ActionsStancer
 			|| ($currentcontext == 'invoicesuppliercard' && !($object instanceof FactureFournisseur))) {
 			dol_syslog("stancer addMoreActionsButtons: context " . $currentcontext . " received with " . (is_object($object) ? get_class($object) : gettype($object)) . ", no Stancer button added", LOG_ERR);
 			return 0;
+		}
+
+		// "Send the payment link": the payment page is a permanent link that
+		// recomputes what is left to pay and starts a fresh Stancer attempt on
+		// every click, so it can be sent again after a refusal. Only offered for
+		// the two objects the core knows an online payment page for.
+		if (getDolGlobalString('STANCER_ENABLE_CB') && in_array($currentcontext, array('ordercard', 'invoicecard'), true)) {
+			$stillOwesMoney = false;
+			if ($currentcontext == 'invoicecard' && $object instanceof Facture) {
+				// A paid invoice is closed (STATUS_CLOSED), so a validated one still owes money.
+				$stillOwesMoney = ($object->status == Facture::STATUS_VALIDATED);
+			} elseif ($currentcontext == 'ordercard' && $object instanceof Commande) {
+				// Order statuses: 0 draft, 1 validated, 2 in progress, 3 delivered, -1 cancelled.
+				$stillOwesMoney = ($object->status >= Commande::STATUS_VALIDATED);
+			}
+			if ($stillOwesMoney) {
+				print '<div class="inline-block divButAction"><a class="butAction" href="' . $_SERVER["PHP_SELF"]
+					. '?id=' . ((int) $object->id) . '&action=stancersendpaylink&token=' . newToken() . '">'
+					. $langs->trans('StancerSendPayLink') . '</a></div>';
+			}
 		}
 
 		// print json_encode($object);exit;
