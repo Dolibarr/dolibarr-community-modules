@@ -482,6 +482,7 @@ EInvoiceSupplierOrderRefWrongSupplier=A purchase order with reference %s exists 
 EInvoiceBuyerOrderReference=Order reference declared by the supplier
 EInvoiceReimport=Import E-invoice doc again
 EInvoiceReimportConfirm=The draft supplier invoice this document was imported into will be deleted, then the document %s will be imported again from the access point. The document itself is not affected, and nothing is sent to the access point.
+EInvoiceReimportLosesFiles=These files were attached to the draft by hand. They will be deleted with it, and the import does not bring them back:
 EInvoiceReimportDone=The document %s has been imported again.
 EInvoiceReimportFailed=The document %s could not be imported again.
 EInvoiceReimportNotAReceivedInvoice=Only a received invoice can be imported again.

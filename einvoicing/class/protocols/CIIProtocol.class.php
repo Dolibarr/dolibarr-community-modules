@@ -62,6 +62,9 @@ class CIIProtocol extends AbstractProtocol
 	/** @const string Invoice file extension (without the dot, example 'xml') */
 	const INVOICE_FILE_EXTENSION = 'xml';
 
+	/** @const string Description of the files an import attaches: the ECM index tells them apart by it below Dolibarr 21 */
+	const IMPORTED_FILE_DESCRIPTION = 'File imported by the einvoicing module';
+
 	/** @const string Generated invoice file name */
 	const GENERATED_INVOICE_XML_FILE_NAME = 'einvoice.xml';
 
@@ -3635,7 +3638,7 @@ class CIIProtocol extends AbstractProtocol
 			'gen_or_uploaded' => 'imported',
 			'src_object_type' => $supplierInvoice->table_element,
 			'src_object_id' => $supplierInvoice->id,
-			'description' => 'File imported by the einvoicing module'
+			'description' => static::IMPORTED_FILE_DESCRIPTION
 		);
 		$result = dol_move($filePath, $dest_path, '0', 1, 0, 1, $moreinfo);
 		if (!$result) {

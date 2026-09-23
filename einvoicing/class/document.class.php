@@ -802,6 +802,49 @@ class Document extends CommonObject
 	}
 
 	/**
+	 * Files of the draft that reimport() deletes and the import does not write again.
+	 *
+	 * The import attaches its own files again, and what Dolibarr generated describes lines about to
+	 * change: what is left - the files attached by hand - is lost, and the confirmation names it.
+	 *
+	 * @return	string[]	File names, empty when there is no draft or nothing to lose
+	 */
+	public function getFilesLostByReimport()
+	{
+		global $conf;
+
+		require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+		// DOL_DOCUMENT_ROOT is the '..' of install/inc.php for PHPStan, which then cannot find the file.
+		require_once DOL_DOCUMENT_ROOT.'/ecm/class/ecmfiles.class.php'; // @phpstan-ignore requireOnce.fileNotFound
+		require_once __DIR__.'/protocols/CIIProtocol.class.php';
+
+		$invoice = new FactureFournisseur($this->db);
+		if ((int) $this->fk_element_id <= 0 || $invoice->fetch((int) $this->fk_element_id) <= 0) {
+			return array();
+		}
+		// The directory FactureFournisseur::delete() removes.
+		$dir = $conf->fournisseur->facture->dir_output.'/'.get_exdir($invoice->id, 2, 0, 0, $invoice, 'invoice_supplier').dol_sanitizeFileName($invoice->ref);
+		if (!is_dir($dir)) {
+			return array();
+		}
+
+		$lost = array();
+		foreach (dol_dir_list($dir, 'files', 0, '', '(\.meta|_preview.*\.png)$') as $entry) {
+			$ecmfile = new EcmFiles($this->db);
+			$relativepath = preg_replace('/^'.preg_quote(DOL_DATA_ROOT.'/', '/').'/', '', $dir.'/'.$entry['name']);
+			// Below Dolibarr 21 dol_move() drops gen_or_uploaded, an imported file only keeps its description.
+			if ($ecmfile->fetch(0, '', $relativepath) > 0
+				&& (in_array($ecmfile->gen_or_uploaded, array('generated', 'imported')) || $ecmfile->description === CIIProtocol::IMPORTED_FILE_DESCRIPTION)) {
+				continue;
+			}
+			$lost[] = (string) $entry['name'];
+		}
+
+		return $lost;
+	}
+
+	/**
 	 * Give a draft supplier invoice the temporary reference of the draft it replaces.
 	 *
 	 * The core never reads an id back out of a "(PROV1234)" reference, it only tests the prefix, so the

@@ -379,10 +379,17 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 	// Import a received document again
 	if ($action == 'reimport') {
+		$text = $langs->trans('EInvoiceReimportConfirm', $object->flow_id);
+		// The draft goes with its directory: what was attached by hand is not attached again.
+		$lostfiles = $object->getFilesLostByReimport();
+		if (!empty($lostfiles)) {
+			$text .= '<br><br>'.img_warning().' '.$langs->trans('EInvoiceReimportLosesFiles');
+			$text .= '<ul><li>'.implode('</li><li>', array_map('dol_escape_htmltag', $lostfiles)).'</li></ul>';
+		}
 		$formconfirm = $form->formconfirm(
 			$_SERVER["PHP_SELF"].'?id='.$object->id,
 			$langs->trans('EInvoiceReimport'),
-			$langs->trans('EInvoiceReimportConfirm', $object->flow_id),
+			$text,
 			'confirm_reimport',
 			'',
 			0,
