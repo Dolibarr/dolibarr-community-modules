@@ -523,7 +523,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			// a wrong vendor is noticed, and the vendor of an existing supplier invoice cannot be changed.
 			// The action itself lives on the flow card, which is also where a flow whose draft has already
 			// been deleted is picked up again.
-			if (!empty($object->id) && $user->hasRight('einvoicing', 'write')) {
+			// Greyed rather than hidden without the right, so the user reads why it cannot be used.
+			if (!empty($object->id)) {
 				$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_document";
 				$sql .= " WHERE fk_element_type = 'invoice_supplier'";
 				$sql .= " AND fk_element_id = " . ((int) $object->id);
@@ -547,14 +548,17 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					// (Document::reimport() refuses anything else). The reason travels as the entry tooltip, which the dropdown of the core cannot hold before
 					// Dolibarr 22 - there it says "not enough permissions" instead.
 					$reimportofadraft = ((int) $object->status === FactureFournisseur::STATUS_DRAFT);
+					$reimportallowed = $user->hasRight('einvoicing', 'write');
 					$reimportentry = array(
 						'lang' => 'einvoicing',
 						'enabled' => true,
-						'perm' => ($reimportofadraft ? 1 : 0),
+						'perm' => (($reimportallowed && $reimportofadraft) ? 1 : 0),
 						'label' => 'EInvoiceReimport',
 						'url' => dol_buildpath('/einvoicing/document_card.php', 1).'?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken()
 					);
-					if (!$reimportofadraft) {
+					if (!$reimportallowed) {
+						$reimportentry['attr'] = array('title' => $langs->trans('NotEnoughPermissions'));
+					} elseif (!$reimportofadraft) {
 						$reimportentry['attr'] = array('title' => $langs->trans('EInvoiceReimportOnlyOnADraft'));
 					}
 					$url_button[] = $reimportentry;

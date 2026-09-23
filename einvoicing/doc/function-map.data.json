@@ -614,9 +614,9 @@
 			"symbol": "Document::reimport",
 			"label": "Document::reimport()",
 			"chain": "in",
-			"role": "The way out of a bad import: delete the draft, sync the flow again, give the new invoice the reference of the draft it replaces, move the lifecycle history onto it, and adopt the row the import wrote so the flow keeps its line in the list.",
+			"role": "The way out of a bad import: sync the flow again into the same draft, which the import rebuilds in place (lines, header, imported files) so it keeps its reference, the files attached by hand, its events and its notes, then adopt the row the import wrote so the flow keeps its line in the list.",
 			"reads": "flow_direction, fk_element_type, the invoice status",
-			"writes": "FactureFournisseur::delete(), syncFlow(), reuseDraftRef(), moveHistoryToInvoice(), adoptRecordWrittenByImport()"
+			"writes": "AbstractProtocol::$rebuildSupplierInvoiceId, syncFlow(), adoptRecordWrittenByImport()"
 		},
 		"doc.cleanxml": {
 			"symbol": "Document::cleanXmlData",
