@@ -25,7 +25,7 @@ ModuleStancerDesc = Stancer betalingsmodule
 # Dashboard
 #
 StancerDashboard = Stancer Dashboard
-StancerTestModeWarning = Testmodus actief — weergegeven gegevens komen uit de testomgeving
+StancerTestModeWarning = Testmodus actief - weergegeven gegevens komen uit de testomgeving
 StancerDashboardKPI = Maandelijkse indicatoren
 StancerDashboardRevenue = Stancer-ontvangsten
 StancerDashboardPayments = Betalingen
@@ -89,6 +89,8 @@ StancerCBCard = Creditcard
 STANCER_PAY_BUTTON = Betaal met kaart
 STANCER_PAY_BUTTON_MESSAGE = U wordt doorgestuurd naar de Stancer website om de betaling te voltooien
 STANCER_PAY_BUTTON_DEPOSIT = Aanbetaling van %s %% d.w.z. %s
+StancerPaymentFrameTitle = Veilige betaling via Stancer
+StancerSendPayLinkNotSent = De betaallink kon niet naar %s worden verzonden. De reden staat in het logboek.
 STANCER_CB_ORDER_PARTIAL_PAY = Gedeeltelijke betaling voor bestellingen met automatische aanbetalingsfactuur inschakelen
 STANCER_CB_ORDER_PARTIAL_PAYTooltip = Met deze optie kunt u bijvoorbeeld "30%% betaling bij bestelling" instellen. Meer informatie in <a href="https://doc.cap-rel.fr/projet_stancer/versement_d_un_acompte_a_la_commande">de documentatie</a>
 STANCER_CB_PROPAL_PARTIAL_PAY = Gedeeltelijke betaling voor offertes met automatische aanbetalingsfactuur inschakelen
@@ -172,8 +174,8 @@ STANCER_PUBLIC_IBAN_PAGE_FORCETooltip = Hiermee kan uw klant het huidige mandaat
 STANCER_SEPA_CHECK_IBAN = IBAN verifiëren bij het aanmaken van SEPA mandaat
 STANCER_SEPA_CHECK_IBANTooltip = Gebruikt de SEPAMail verificatiedienst van Stancer om te valideren dat de IBAN overeenkomt met de rekeninghouder. Werkt alleen voor Franse en Italiaanse banken.
 StancerSepaCheckSuccess = IBAN verificatie: score %s/100 (classificatie %s)
-StancerSepaCheckWarning = IBAN verificatie: lage score %s/100 (classificatie %s) — controleer de bankgegevens
-StancerSepaCheckPending = IBAN verificatie gestart (id: %s), resultaat in afwachting — mandaat is aangemaakt, resultaat wordt later beschikbaar
+StancerSepaCheckWarning = IBAN verificatie: lage score %s/100 (classificatie %s) - controleer de bankgegevens
+StancerSepaCheckPending = IBAN verificatie gestart (id: %s), resultaat in afwachting - mandaat is aangemaakt, resultaat wordt later beschikbaar
 StancerSepaCheckSkipped = IBAN verificatie niet beschikbaar voor deze relatie (dienst beperkt tot FR/IT banken met wettelijke identificatie)
 StancerSepaCheckError = Fout bij IBAN verificatie: %s
 STANCER_MANDATE_AUTO = Automatisch het SEPA Mandaat genereren in PDF-formaat
@@ -540,3 +542,45 @@ StancerAuditStatus_no_mapping = Unmapped Stancer customer
 StancerAuditStatus_api_unreachable = API unreachable
 StancerAuditStatus_api_not_found = Not found on Stancer
 StancerAuditStatus_api_auth_error = API authentication error
+
+#
+# Betaling zonder 3-D Secure, Stancer-statussen en verzending van de betaallink
+#
+stancer_status_refused = Betaling geweigerd
+stancer_status_failed = Betaling mislukt
+stancer_status_expired = Betaling verlopen
+stancer_status_canceled = Betaling geannuleerd
+stancer_status_disputed = Betaling betwist
+stancer_status_authorized = Betaling geautoriseerd
+stancer_status_captured = Betaling geïnd
+stancer_status_capture_sent = Inning loopt
+ErrorStancerPaymentNotStarted = De betaling kon niet worden gestart. Er is niets afgeschreven. U kunt het zo meteen opnieuw proberen.
+StancerPaymentErrorAuthNotCompleted = De verificatie bij uw bank kon niet worden voltooid, waardoor uw bank nooit is gevraagd deze betaling goed te keuren. Probeer het opnieuw met uw bank-app bij de hand, of gebruik een ander betaalmiddel.
+StancerPaymentErrorBankRefused = Uw bank heeft de betaling geweigerd (code %s).
+StancerPaymentNothingCharged = Er is niets van uw rekening afgeschreven.
+StancerNo3dsFieldLabel = Kaartbetaling zonder 3-D Secure
+StancerNo3dsAllow = Betaling zonder 3-D Secure toestaan
+StancerNo3dsRevoke = 3-D Secure weer vereisen
+StancerNo3dsConfirmTitle = Kaartbetaling zonder 3-D Secure toestaan
+StancerNo3dsConfirmText = Kaartbetalingen van %s worden zonder 3-D Secure-authenticatie verzonden, totdat het document betaald is of totdat 3-D Secure weer vereist wordt. Doe dit alleen voor een klant van wie de kaart zich niet kan authenticeren: de weigering vermeldt dat dan.<br><b>Zonder 3-D Secure komt een frauduleuze terugboeking voor uw rekening, en niet voor die van de kaartuitgever.</b>
+StancerNo3dsBanner = Toegestaan op dit document. Een frauduleuze terugboeking zou voor uw rekening komen. Wie het heeft toegestaan, staat vast in de gebeurtenissen ervan.
+StancerNo3dsAllowed = Kaartbetalingen van dit document worden zonder 3-D Secure verzonden.
+StancerNo3dsWithdrawn = Kaartbetalingen van dit document vereisen weer 3-D Secure.
+StancerNo3dsChangeFailed = De wijziging kon niet worden opgeslagen, er is niets gewijzigd.
+StancerNo3dsNeedsReactivation = Schakel de Stancer-module uit en weer in om de update af te ronden.
+StancerNo3dsEventOn = Kaartbetaling zonder 3-D Secure toegestaan op %s
+StancerNo3dsEventOff = 3-D Secure weer vereist op %s
+STANCER_PAYLINK_ORDER_MAILTYPE = E-mailsjabloon voor de betaallink (bestelling)
+STANCER_PAYLINK_ORDER_MAILTYPETooltip = Sjabloon dat de knop "De betaallink verzenden" op een bestelling gebruikt. Het sjabloon moet __ONLINE_PAYMENT_URL__ bevatten. Zonder gekozen sjabloon wordt in plaats daarvan een eenvoudig bericht verzonden.
+STANCER_PAYLINK_INVOICE_MAILTYPE = E-mailsjabloon voor de betaallink (factuur)
+STANCER_PAYLINK_INVOICE_MAILTYPETooltip = Sjabloon dat de knop "De betaallink verzenden" op een factuur gebruikt. Het sjabloon moet __ONLINE_PAYMENT_URL__ bevatten. Zonder gekozen sjabloon wordt in plaats daarvan een eenvoudig bericht verzonden.
+StancerSendPayLink = De betaallink verzenden
+StancerSendPayLinkConfirm = De online betaallink naar %s verzenden?
+StancerSendPayLinkSource = Adres gevonden bij: %s
+StancerSendPayLinkSent = Betaallink verzonden naar %s
+StancerSendPayLinkNoRecipient = Er is geen e-mailadres gevonden, niet bij deze relatie en niet bij haar contactpersonen. Vul het in bij de relatie of bij een van haar contactpersonen voordat u de link verzendt.
+StancerSendPayLinkNoUrl = Online betalen is niet beschikbaar voor dit document.
+StancerPayLinkMailSubject = Betaallink voor %s
+StancerPayLinkMailIntro = %s nodigt u uit om document %s online te betalen.
+StancerPayLinkMailButton = Online betalen
+StancerPayLinkMailFallback = Werkt de link hierboven niet, kopieer dan dit adres in uw browser:
