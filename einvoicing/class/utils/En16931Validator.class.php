@@ -244,8 +244,8 @@ class En16931Validator
 			}
 			// A commercial invoice must not claim a negative amount due: it means the prepaid
 			// amount recorded exceeds the invoice total (this is how a prepaid double-count bug
-			// materializes). Credit notes (381) are emitted with positive amounts and are skipped.
-			if ($typeCode !== '381' && $duePayable < -self::TOLERANCE) {
+			// materializes). Credit notes (381, and 503 for a deposit) are emitted with positive amounts and are skipped.
+			if (!in_array($typeCode, array('381', '503'), true) && $duePayable < -self::TOLERANCE) {
 				$violations[] = 'BR-CO-16: DuePayableAmount is negative ('.$fmt($duePayable).'); TotalPrepaidAmount ('.$fmt($prepaidTotal).') exceeds GrandTotal ('.$fmt($grandTotal).')';
 			}
 		}
