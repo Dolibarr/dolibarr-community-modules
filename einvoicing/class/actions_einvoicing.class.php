@@ -997,18 +997,20 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					}
 				}
 
-				// Default product for import
-				$routingProductId = GETPOST('routing_product_id', 'aZ09');
-				if ($routingProductId !== '' && $routingProductId !== '-1' && !einvoicingReceptionDisabled()) {
-					$existing = $einvoicing->fetchDefaultRouting($socId, 'product');
-					if (empty($existing)) {
-						$result = $einvoicing->addRouting($socId, $routingProductId, '', 'product');
-					} else {
-						$result = $einvoicing->setDefaultRouting($socId, $routingProductId, '', '', '', 'product');
-					}
-					if ($result < 0) {
-						$error++;
-						setEventMessages($langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error, null, 'errors');
+				// Default product and default service for import
+				foreach (array('product', 'service') as $routingType) {
+					$routingProductId = GETPOST('routing_' . $routingType . '_id', 'aZ09');
+					if ($routingProductId !== '' && $routingProductId !== '-1' && !einvoicingReceptionDisabled()) {
+						$existing = $einvoicing->fetchDefaultRouting($socId, $routingType);
+						if (empty($existing)) {
+							$result = $einvoicing->addRouting($socId, $routingProductId, '', $routingType);
+						} else {
+							$result = $einvoicing->setDefaultRouting($socId, $routingProductId, '', '', '', $routingType);
+						}
+						if ($result < 0) {
+							$error++;
+							setEventMessages($langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error, null, 'errors');
+						}
 					}
 				}
 			}

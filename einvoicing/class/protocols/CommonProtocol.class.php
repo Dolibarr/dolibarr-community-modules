@@ -1284,7 +1284,7 @@ trait CommonProtocol
 	 * flow, if the line is already resolved or not, without importing anything.
 	 *
 	 * @param 	array 	$lineData 	Array containing invoice line data extracted from XML
-	 * @return 	array{res:int, message:string, matchtype?:string}   'res' = ID of the product found, 0 if no product found. 'matchtype' tells how it was resolved ('defaultrouting' when the line fell back on the default product of the vendor).
+	 * @return 	array{res:int, message:string, matchtype?:string, routingtype?:string, actioncode?:string, action?:string, actionurl?:string, actiondata?:array<string,mixed>, allactiondata?:array<string,array<string,mixed>>}   'res' = ID of the product found, 0 if no product found, -1 when a mixed invoice needs a default the setup does not choose. 'matchtype' tells how it was resolved ('defaultrouting' when the line fell back on a default of the vendor, 'routingtype' then says which one).
 	 */
 	public function findProductFromEinvoiceLine($lineData)
 	{
@@ -1392,42 +1392,114 @@ trait CommonProtocol
 			}
 		}
 
-		// If not found, we check by using the default product ID on thirdpary level
-		$resFetchP = $einvoicing->fetchDefaultRouting($lineData['supplierId'] ?? 0, 'product');
-		if (!empty($resFetchP) && $resFetchP != '-1') {
-			$product_id = (string) $resFetchP;		// Can be 'idprod_123' (product id) or '456' (supplier ref id)
-			if (preg_match('/^idprod_/', $product_id)) {
-				$productId = str_replace('idprod_', '', $product_id);
-				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
-				$sql .= " WHERE rowid = '" . (int) $productId . "'";
-				$sql .= " AND entity IN (" . getEntity('product') . ")";
-				$sql .= " LIMIT 1";
-				$resql = $db->query($sql);
-				if ($resql && $db->num_rows($resql) > 0) {
-					$obj = $db->fetch_object($resql);
-					dol_syslog(__METHOD__ . ' Default routing product found for supplier=' . $lineData['supplierId'] . ' product=' . $obj->rowid);
-					return array('res' => $obj->rowid, 'message' => 'Line product not found, but a default routing product ID was found for this supplier', 'matchtype' => 'defaultrouting');
-				}
-			} else {
-				// We search in product supplier prices table.
-				$sql = "SELECT pfp.fk_product";
-				$sql .= " FROM " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp";
-				$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product as p";
-				$sql .= " ON p.rowid = pfp.fk_product";
-				$sql .= " WHERE pfp.rowid = " . ((int) $product_id);
-				$sql .= " AND pfp.fk_soc = " . ((int) $lineData['supplierId']);
-				$sql .= " AND p.entity IN (" . getEntity('product') . ")";
-				$sql .= " LIMIT 1";
-				$resql = $db->query($sql);
-				if ($resql && $db->num_rows($resql) > 0) {
-					$obj = $db->fetch_object($resql);
-					dol_syslog(__METHOD__ . ' Default routing product found for supplier=' . $lineData['supplierId'] . ' product=' . $obj->fk_product);
-					return array('res' => $obj->fk_product, 'message' => 'Line product not found, but a default routing product was found for this supplier', 'matchtype' => 'defaultrouting');
+		// If not found, fall back on the default of the vendor: the default product, or the default service
+		// when the billing framework of the document (BT-23) says it bills services.
+		$supplierId = (int) ($lineData['supplierId'] ?? 0);
+		$routingtype = self::defaultRoutingTypeForFramework($lineData['businessProcessId'] ?? '');
+		if ($routingtype === '') {
+			// A mixed invoice (M) does not say which of the two defaults its lines are: the setup has to.
+			if ($supplierId > 0 && ($this->resolveDefaultRouting($einvoicing, $supplierId, 'product') > 0 || $this->resolveDefaultRouting($einvoicing, $supplierId, 'service') > 0)) {
+				return self::mixedFrameworkUnsetError($supplierId);
+			}
+		} else {
+			// The other default stays a fallback, so a vendor that has only one default keeps using it.
+			foreach (array($routingtype, ($routingtype == 'service' ? 'product' : 'service')) as $type) {
+				$productId = $this->resolveDefaultRouting($einvoicing, $supplierId, $type);
+				if ($productId > 0) {
+					dol_syslog(__METHOD__ . ' Default routing ' . $type . ' found for supplier=' . $supplierId . ' product=' . $productId);
+					return array('res' => $productId, 'message' => 'Line product not found, but a default ' . $type . ' was found for this supplier', 'matchtype' => 'defaultrouting', 'routingtype' => $type);
 				}
 			}
 		}
 
 		return array('res' => 0, 'message' => 'No product found for this e-invoice line');
+	}
+
+	/**
+	 * Which default of the vendor a line falls back on, from the billing framework of the document (BT-23).
+	 * Its first letter is B (goods), S (services) or M (both): EINVOICING_DEFAULT_ROUTING_MIXED decides for M.
+	 *
+	 * @param 	string 	$framework 	BT-23 of the document, empty when absent
+	 * @return 	string 				'product', 'service', or '' for a mixed framework the setup does not decide
+	 */
+	public static function defaultRoutingTypeForFramework($framework)
+	{
+		$letter = strtoupper(substr(trim((string) $framework), 0, 1));
+		if ($letter === 'S') {
+			return 'service';
+		}
+		if ($letter === 'M') {
+			$mixed = getDolGlobalString('EINVOICING_DEFAULT_ROUTING_MIXED');
+			return in_array($mixed, array('product', 'service'), true) ? $mixed : '';
+		}
+
+		return 'product';
+	}
+
+	/**
+	 * Product a default routing of the vendor points at.
+	 *
+	 * @param 	EInvoicing 				$einvoicing 	EInvoicing handler
+	 * @param 	int 					$supplierId 	Vendor id
+	 * @param 	'product'|'service' 	$type 			Which default
+	 * @return 	int 									Product id, 0 when the vendor has no such default or it points at nothing
+	 */
+	private function resolveDefaultRouting($einvoicing, $supplierId, $type)
+	{
+		global $db;
+
+		$value = (string) $einvoicing->fetchDefaultRouting($supplierId, $type);		// 'idprod_123' (product id) or '456' (supplier price id)
+		if ($supplierId <= 0 || $value === '' || $value === '0' || $value === '-1') {
+			return 0;
+		}
+		if (preg_match('/^idprod_([0-9]+)$/', $value, $reg)) {
+			$sql = "SELECT rowid AS fk_product FROM " . MAIN_DB_PREFIX . "product";
+			$sql .= " WHERE rowid = " . ((int) $reg[1]);
+			$sql .= " AND entity IN (" . getEntity('product') . ")";
+		} else {
+			$sql = "SELECT pfp.fk_product";
+			$sql .= " FROM " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp";
+			$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product as p ON p.rowid = pfp.fk_product";
+			$sql .= " WHERE pfp.rowid = " . ((int) $value);
+			$sql .= " AND pfp.fk_soc = " . ((int) $supplierId);
+			$sql .= " AND p.entity IN (" . getEntity('product') . ")";
+		}
+		$sql .= " LIMIT 1";
+		$resql = $db->query($sql);
+		if ($resql && ($obj = $db->fetch_object($resql))) {
+			return (int) $obj->fk_product;
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Error of a mixed invoice (BT-23 in M) whose line needs a default while the setup says none applies.
+	 *
+	 * @param 	int 	$supplierId 	Vendor id
+	 * @return 	array{res:int, message:string, businessmessage:string, actioncode:string, action:string, actionurl:string, actiondata:array<string,mixed>, allactiondata:array<string,array<string,mixed>>}
+	 */
+	private static function mixedFrameworkUnsetError($supplierId)
+	{
+		global $langs, $user;
+
+		$langs->load("einvoicing@einvoicing");
+		$setupUrl = dol_buildpath('/einvoicing/admin/setup_options.php', 1) . '#EINVOICING_DEFAULT_ROUTING_MIXED';
+		$action = $user->admin
+			? '<a class="button small smallpaddingimp" style="display:inline-block;width:auto;" href="' . dol_escape_htmltag($setupUrl) . '" target="_blank">'
+			: '<a class="button disabled classfortooltip small smallpaddingimp" style="display:inline-block;width:auto;" href="#" title="' . dol_escape_htmltag($langs->trans("NotEnoughPermissions")) . '">';
+		$action .= '<i class="fas fa-cog"></i> ' . $langs->trans('SetDefaultRoutingMixed') . '</a>';
+
+		return array(
+			'res' => -1,
+			'message' => $langs->transnoentitiesnoconv('ErrorDefaultRoutingMixedUnset'),
+			'businessmessage' => $langs->trans('ErrorDefaultRoutingMixedUnset'),
+			'actioncode' => 'DEFAULT_ROUTING_MIXED_UNSET',
+			'action' => $action,
+			'actionurl' => $setupUrl,
+			'actiondata' => array('socid' => (int) $supplierId),
+			'allactiondata' => array('setdefaultroutingmixed' => array('label' => $langs->trans('SetDefaultRoutingMixed'), 'url' => $setupUrl, 'actiondata' => array('socid' => (int) $supplierId))),
+		);
 	}
 
 	/**
@@ -1458,9 +1530,9 @@ trait CommonProtocol
 
 		$einvoicing = new EInvoicing($db);
 
-		// Steps 1 to 4: try to find an existing product
+		// Steps 1 to 4: try to find an existing product. A negative answer is an error the user has to solve.
 		$resFind = $this->findProductFromEinvoiceLine($lineData);
-		if ($resFind['res'] > 0) {
+		if ($resFind['res'] != 0) {
 			return $resFind;
 		}
 
