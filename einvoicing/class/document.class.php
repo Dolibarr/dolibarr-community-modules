@@ -813,9 +813,9 @@ class Document extends CommonObject
 	{
 		global $conf;
 
-		require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
-		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
-		// DOL_DOCUMENT_ROOT is the '..' of install/inc.php for PHPStan, which then cannot find the file.
+		// DOL_DOCUMENT_ROOT is the '..' of install/inc.php for PHPStan, which then cannot find the files.
+		require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php'; // @phpstan-ignore requireOnce.fileNotFound
+		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php'; // @phpstan-ignore requireOnce.fileNotFound
 		require_once DOL_DOCUMENT_ROOT.'/ecm/class/ecmfiles.class.php'; // @phpstan-ignore requireOnce.fileNotFound
 		require_once __DIR__.'/protocols/CIIProtocol.class.php';
 
