@@ -30,6 +30,8 @@
  *                  reference like any other, in both directions.
  *                  Import (issue #1031): the payment method of the document (BT-81) must reach the
  *                  supplier invoice for every code the dictionary of Dolibarr can answer.
+ *                  Import (issue #1050): a line with no product falls back on the default product or the
+ *                  default service of the vendor, as the billing framework of the document (BT-23) says.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -733,6 +735,175 @@ class CIIProtocolTest extends CommonClassTest
 		$obj = $db->fetch_object($resql);
 
 		return (int) $obj->freesoc;
+	}
+
+	/**
+	 * A vendor with a default product and, when asked, a default service, each pointing at a product
+	 * created for the test. Returns the ids so a test can tell which default a line fell back on.
+	 *
+	 * @param	bool	$withProduct	Give the vendor a default product
+	 * @param	bool	$withService	Give the vendor a default service
+	 * @return	array{socid:int, product:int, service:int}
+	 */
+	private function vendorWithDefaults($withProduct, $withService)
+	{
+		global $conf, $db;
+
+		// A vendor id free of any price and of any routing, so two vendors of the same test never share one
+		$sql = "SELECT GREATEST((SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "product_fournisseur_price),";
+		$sql .= " (SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "einvoicing_routing)) + 1 as freesoc";
+		$resql = $db->query($sql);
+		$this->assertNotFalse($resql, 'could not find a free vendor id: ' . $db->lasterror());
+		$socid = (int) $db->fetch_object($resql)->freesoc;
+		$ids = array('socid' => $socid, 'product' => 0, 'service' => 0);
+		$einvoicing = new EInvoicing($db);
+		foreach (array('product' => $withProduct, 'service' => $withService) as $type => $wanted) {
+			$sql = "INSERT INTO " . MAIN_DB_PREFIX . "product (entity, datec, ref, label, fk_product_type, tosell, tobuy, tva_tx)";
+			$sql .= " VALUES (" . ((int) $conf->entity) . ", '" . $db->idate(dol_now()) . "'";
+			$sql .= ", 'EI1050-" . $db->escape(uniqid()) . "', 'Default " . $type . " of the bench vendor', " . ($type == 'service' ? 1 : 0) . ", 0, 1, 20)";
+			$this->assertNotFalse($db->query($sql), 'could not create the bench ' . $type . ': ' . $db->lasterror());
+			$ids[$type] = (int) $db->last_insert_id(MAIN_DB_PREFIX . 'product');
+			if ($wanted) {
+				$this->assertGreaterThan(0, $einvoicing->addRouting($socid, 'idprod_' . $ids[$type], '', $type), 'could not set the default ' . $type . ': ' . $einvoicing->error);
+			}
+		}
+
+		return $ids;
+	}
+
+	/**
+	 * Match a line that no product answers, on a document carrying the given billing framework.
+	 *
+	 * @param	int		$socid		Vendor id
+	 * @param	string	$framework	BT-23 of the document
+	 * @param	string	$mixed		EINVOICING_DEFAULT_ROUTING_MIXED for the call
+	 * @return	array<string,mixed>	Answer of findProductFromEinvoiceLine()
+	 */
+	private function matchUnknownLine($socid, $framework, $mixed = '')
+	{
+		global $conf, $db;
+
+		$saved = $conf->global->EINVOICING_DEFAULT_ROUTING_MIXED ?? null;
+		$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = $mixed;
+		try {
+			$protocol = new CIIProtocol($db);
+			return $protocol->findProductFromEinvoiceLine(array(
+				'prodsellerid' => 'NO-SUCH-REF-' . uniqid(),
+				'prodname' => 'A label that matches no product at all ' . uniqid(),
+				'supplierId' => $socid,
+				'businessProcessId' => $framework,
+			));
+		} finally {
+			if ($saved === null) {
+				unset($conf->global->EINVOICING_DEFAULT_ROUTING_MIXED);
+			} else {
+				$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = $saved;
+			}
+		}
+	}
+
+	/**
+	 * The first letter of BT-23 picks the default: B and an absent framework the product, S the service,
+	 * M whatever the setup says, and nothing while it says nothing.
+	 *
+	 * @return void
+	 */
+	public function testBillingFrameworkPicksTheDefaultOfTheVendor()
+	{
+		global $conf;
+
+		$saved = $conf->global->EINVOICING_DEFAULT_ROUTING_MIXED ?? null;
+		try {
+			$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = '';
+			$this->assertSame('product', CIIProtocol::defaultRoutingTypeForFramework('B1'));
+			$this->assertSame('product', CIIProtocol::defaultRoutingTypeForFramework(''));
+			$this->assertSame('service', CIIProtocol::defaultRoutingTypeForFramework('S4'));
+			$this->assertSame('service', CIIProtocol::defaultRoutingTypeForFramework(' s1'));
+			$this->assertSame('', CIIProtocol::defaultRoutingTypeForFramework('M1'));
+			$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = 'service';
+			$this->assertSame('service', CIIProtocol::defaultRoutingTypeForFramework('M2'));
+			$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = 'product';
+			$this->assertSame('product', CIIProtocol::defaultRoutingTypeForFramework('M1'));
+			$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = 'garbage';
+			$this->assertSame('', CIIProtocol::defaultRoutingTypeForFramework('M1'));
+		} finally {
+			if ($saved === null) {
+				unset($conf->global->EINVOICING_DEFAULT_ROUTING_MIXED);
+			} else {
+				$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = $saved;
+			}
+		}
+	}
+
+	/**
+	 * A goods invoice (B) and one with no framework fall back on the default product, a services
+	 * invoice (S) on the default service.
+	 *
+	 * @return void
+	 */
+	public function testALineFallsBackOnTheDefaultTheFrameworkNames()
+	{
+		$ids = $this->vendorWithDefaults(true, true);
+
+		$found = $this->matchUnknownLine($ids['socid'], 'B1');
+		$this->assertSame($ids['product'], (int) $found['res'], 'B1 must use the default product');
+		$this->assertSame('defaultrouting', $found['matchtype'] ?? '');
+		$this->assertSame('product', $found['routingtype'] ?? '');
+
+		$this->assertSame($ids['product'], (int) $this->matchUnknownLine($ids['socid'], '')['res'], 'no BT-23 must use the default product');
+
+		$found = $this->matchUnknownLine($ids['socid'], 'S1');
+		$this->assertSame($ids['service'], (int) $found['res'], 'S1 must use the default service');
+		$this->assertSame('service', $found['routingtype'] ?? '');
+	}
+
+	/**
+	 * A vendor with a single default keeps using it whatever the framework says, as before the default
+	 * service existed.
+	 *
+	 * @return void
+	 */
+	public function testAVendorWithOneDefaultKeepsUsingIt()
+	{
+		$onlyproduct = $this->vendorWithDefaults(true, false);
+		$this->assertSame($onlyproduct['product'], (int) $this->matchUnknownLine($onlyproduct['socid'], 'S1')['res'], 'S1 must fall back on the default product when there is no default service');
+
+		$onlyservice = $this->vendorWithDefaults(false, true);
+		$this->assertSame($onlyservice['service'], (int) $this->matchUnknownLine($onlyservice['socid'], 'B1')['res'], 'B1 must fall back on the default service when there is no default product');
+	}
+
+	/**
+	 * A mixed invoice (M) uses the default the setup chooses, and stops with an error the user can act
+	 * on while the setup chooses none.
+	 *
+	 * @return void
+	 */
+	public function testAMixedInvoiceNeedsTheSetupToChoose()
+	{
+		$ids = $this->vendorWithDefaults(true, true);
+
+		$found = $this->matchUnknownLine($ids['socid'], 'M1', '');
+		$this->assertSame(-1, (int) $found['res'], 'M1 with no choice in the setup must stop');
+		$this->assertSame('DEFAULT_ROUTING_MIXED_UNSET', $found['actioncode'] ?? '');
+		$this->assertStringContainsString('setup_options.php', (string) ($found['actionurl'] ?? ''));
+
+		$this->assertSame($ids['service'], (int) $this->matchUnknownLine($ids['socid'], 'M1', 'service')['res'], 'M1 must use the default service when the setup says so');
+		$this->assertSame($ids['product'], (int) $this->matchUnknownLine($ids['socid'], 'M2', 'product')['res'], 'M2 must use the default product when the setup says so');
+	}
+
+	/**
+	 * A mixed invoice from a vendor with no default at all has nothing to choose between: the line is
+	 * simply not found, as any other line, and no setup error is raised.
+	 *
+	 * @return void
+	 */
+	public function testAMixedInvoiceFromAVendorWithoutDefaultIsNotASetupError()
+	{
+		$ids = $this->vendorWithDefaults(false, false);
+
+		$found = $this->matchUnknownLine($ids['socid'], 'M1', '');
+		$this->assertSame(0, (int) $found['res']);
+		$this->assertArrayNotHasKey('actioncode', $found);
 	}
 
 	/**
