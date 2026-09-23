@@ -846,6 +846,7 @@ IgnoreFlowHelp=Marks this flow as ignored: it disappears from the "Pending" list
 ReopenFlowHelp=Puts this flow back to "Pending" (undoes Ignored / Resolved) so it can be processed again.
 DeletePendingFlowHelp=Permanently deletes this entry from the queue.
 ReasonProductNotFoundShort=Product not found
+ReasonDefaultRoutingMixedUnsetShort=Mixed invoice, no default chosen
 ReasonThirdpartyNotFoundShort=Thirdparty not found
 ReasonBadAmountShort=Different amount
 CreateSupplierShort=Create supplier
