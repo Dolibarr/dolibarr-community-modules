@@ -166,16 +166,20 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 						$result = $protocol->generateInvoice($invoiceObject, $outputlangs, $pdfPath);		// Generate E-invoice (embed into the real generated file)
 
 						if ($result >= 0) {
-							setEventMessages($message, array(), $messagecss);
+							if (!defined('NOLOGIN')) {	// If in backoffice context
+								setEventMessages($message, array(), $messagecss);
+							}
 						}
 
 						if ($result && (!is_numeric($result) || $result > 0)) {
-							// No error
-							setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+							if (!defined('NOLOGIN')) {	// If in backoffice context
+								// No error
+								setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
 
-							// Forward non-blocking size warning from the protocol if any
-							if (!empty($protocol->warnings)) {
-								setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $protocol->warnings, 'warnings');
+								// Forward non-blocking size warning from the protocol if any
+								if (!empty($protocol->warnings)) {
+									setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $protocol->warnings, 'warnings');
+								}
 							}
 
 							// If the precheck is set to auto, we call the precheck function.
@@ -729,10 +733,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $object->id);
 
 					$this->warnings = array_merge($this->warnings, $genresult['warnings']);
-					if (!empty($this->warnings)) {
-						setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');
-					} else {
-						setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+					if (!defined('NOLOGIN')) {	// If in backoffice context
+						if (!empty($this->warnings)) {
+							setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');
+						} else {
+							setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+						}
 					}
 
 					if ($genresult['precheck'] === 1) {
@@ -1170,8 +1176,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 			if ($result['res'] > 0) {
 				$done++;
-				$lines[] = $invoice->ref . ' : ' . $okline
-					. (empty($result['warnings']) ? '' : ' - ' . implode(' - ', $result['warnings']));
+				$lines[] = $invoice->ref . ' : ' . $okline . (empty($result['warnings']) ? '' : ' - ' . implode(' - ', $result['warnings']));
 			} elseif ($result['res'] == 0) {
 				$skipped++;
 				$lines[] = $invoice->ref . ' : ' . $result['reason'];
