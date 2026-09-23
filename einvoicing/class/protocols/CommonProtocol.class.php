@@ -2503,6 +2503,16 @@ trait CommonProtocol
 
 		$orderId = (int) $db->fetch_object($resql)->rowid;
 
+		// A draft imported again is already linked to the order: a second link breaks the unique key of
+		// element_element, and on PostgreSQL the transaction of the whole import with it.
+		$sqlLinked = "SELECT rowid FROM " . MAIN_DB_PREFIX . "element_element";
+		$sqlLinked .= " WHERE fk_source = " . ((int) $orderId) . " AND sourcetype = 'order_supplier'";
+		$sqlLinked .= " AND fk_target = " . ((int) $supplierInvoice->id) . " AND targettype = '" . $db->escape($supplierInvoice->element) . "'";
+		$resqlLinked = $db->query($sqlLinked);
+		if ($resqlLinked && $db->num_rows($resqlLinked) > 0) {
+			return '';
+		}
+
 		$res = $supplierInvoice->add_object_linked('order_supplier', $orderId);
 		if ($res > 0) {
 			$msg = $langs->trans('EInvoiceSupplierInvoiceLinkedToOrder', $orderReference);

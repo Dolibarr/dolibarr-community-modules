@@ -522,7 +522,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			// The action itself lives on the flow card, which is also where a flow whose draft has already
 			// been deleted is picked up again.
 			// TODO Move this in the section of the "Join files".
-			if (!empty($object->id) && $user->hasRight('einvoicing', 'write')) {
+			if (!empty($object->id)) {
 				$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_document";
 				$sql .= " WHERE fk_element_type = 'invoice_supplier'";
 				$sql .= " AND fk_element_id = " . ((int) $object->id);
@@ -534,7 +534,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				$resql = $db->query($sql);
 				if ($resql && ($objdoc = $db->fetch_object($resql))) {
 					$reimporturl = dol_buildpath('/einvoicing/document_card.php', 1) . '?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken();
-					if ((int) $object->status === FactureFournisseur::STATUS_DRAFT) {
+					// Greyed rather than hidden: the user sees the action exists, and the tooltip says why not.
+					if (!$user->hasRight('einvoicing', 'write')) {
+						print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('NotEnoughPermissions')) . '">'
+							. $langs->trans('EInvoiceReimport') . '</span>';
+					} elseif ((int) $object->status === FactureFournisseur::STATUS_DRAFT) {
 						print '<a class="butAction" href="' . $reimporturl . '">' . $langs->trans('EInvoiceReimport') . '</a>';
 					} else {
 						print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('EInvoiceReimportOnlyOnADraft')) . '">'

@@ -30,6 +30,8 @@
  *                  reference like any other, in both directions.
  *                  Import (issue #1031): the payment method of the document (BT-81) must reach the
  *                  supplier invoice for every code the dictionary of Dolibarr can answer.
+ *                  Import made again (issue #1022): the draft is rebuilt in place, what the user added
+ *                  to it stays, and the discounts of the previous import do not stay behind as credit.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -48,8 +50,26 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 }
 
 require_once $dolibarrHtdocs . '/master.inc.php';
+dol_include_once('einvoicing/class/providers/AbstractPDPProvider.class.php');
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
+dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
+require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+require_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
+require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
+require_once DOL_DOCUMENT_ROOT . '/ecm/class/ecmfiles.class.php';
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
+
+if (empty($user->id)) {
+	print "Load permissions for admin user nb 1\n";
+	$user->fetch(1);
+	// User::loadRights() only exists from Dolibarr 19 on, older versions name it getrights()
+	if (method_exists($user, 'loadRights')) {
+		$user->loadRights();
+	} else {
+		$user->getrights();
+	}
+}
 
 /**
  * Class for PHPUnit tests
@@ -62,6 +82,15 @@ class CIIProtocolTest extends CommonClassTest
 {
 	/** @var string	PHP default timezone saved at setUp() */
 	private $savtz;
+
+	/** @var int[] Supplier invoices created by a test, deleted at tearDown() */
+	private $createdInvoiceIds = array();
+
+	/** @var int[] Third parties created by a test, deleted at tearDown() */
+	private $createdThirdpartyIds = array();
+
+	/** @var array<string,mixed> Constants a test changed, put back at tearDown() (null: was not set) */
+	private $savedConstants = array();
 
 	/**
 	 * Call the private CIIProtocol::buildLineItem() through reflection: pure line-level XML
@@ -453,7 +482,34 @@ class CIIProtocolTest extends CommonClassTest
 	 */
 	protected function tearDown(): void
 	{
+		global $conf, $db, $user;
+
 		date_default_timezone_set($this->savtz);
+		AbstractProtocol::$rebuildSupplierInvoiceId = 0;
+
+		foreach ($this->savedConstants as $name => $value) {
+			if ($value === null) {
+				unset($conf->global->$name);
+			} else {
+				$conf->global->$name = $value;
+			}
+		}
+		$this->savedConstants = array();
+
+		foreach ($this->createdInvoiceIds as $id) {
+			$invoice = new FactureFournisseur($db);
+			if ($invoice->fetch($id) > 0) {
+				$invoice->delete($user);
+			}
+		}
+		$this->createdInvoiceIds = array();
+		foreach ($this->createdThirdpartyIds as $id) {
+			$thirdparty = new Societe($db);
+			if ($thirdparty->fetch($id) > 0) {
+				$thirdparty->delete($id, $user);
+			}
+		}
+		$this->createdThirdpartyIds = array();
 
 		parent::tearDown();
 	}
@@ -751,5 +807,142 @@ class CIIProtocolTest extends CommonClassTest
 		$this->assertSame('TRA', $codes['24'] ?? null, 'bill of exchange awaiting acceptance');
 		$this->assertSame('CB', $codes['48'] ?? null, 'bank card');
 		$this->assertSame('PRE', $codes['49'] ?? null, 'direct debit');
+	}
+
+	/**
+	 * The seller of the received fixture, as an instance receiving that document already holds it.
+	 *
+	 * @return	int		Id of the created third party
+	 */
+	private function createFixtureSeller()
+	{
+		global $db, $user;
+
+		$supplier = new Societe($db);
+		$supplier->name = 'EINVOICING REBUILD SELLER';
+		$supplier->fournisseur = 1;
+		$supplier->code_fournisseur = 'auto';
+		$supplier->address = '1 rue du Test';
+		$supplier->zip = '75001';
+		$supplier->town = 'Paris';
+		$supplier->country_id = 1;
+		$supplier->country_code = 'FR';
+		$supplier->accountancy_code_buy = '401EINV1022';
+		$supplier->idprof1 = '999888779';
+		$supplier->idprof2 = '99988877900017';
+		$supplier->tva_intra = 'FR34999888779';
+		$id = $supplier->create($user);
+		$this->assertGreaterThan(0, $id, 'the seller third party is created: ' . $supplier->error . ' ' . implode(', ', (array) $supplier->errors));
+		$this->createdThirdpartyIds[] = (int) $id;
+
+		return (int) $id;
+	}
+
+	/**
+	 * A discount of the vendor, consumed by a line of the invoice the way the import consumes one.
+	 *
+	 * @param	FactureFournisseur	$invoice	Draft consuming it
+	 * @return	int							Id of the discount
+	 */
+	private function consumeADiscount(FactureFournisseur $invoice)
+	{
+		global $db, $user;
+
+		$discount = new DiscountAbsolute($db);
+		// fk_soc up to Dolibarr 19, socid from 20 on (see CIIProtocol::createHeaderDiscounts())
+		$discount->fk_soc = $invoice->socid;
+		$discount->socid = $invoice->socid;
+		$discount->amount_ht = 1;
+		$discount->amount_tva = 0.2;
+		$discount->amount_ttc = 1.2;
+		$discount->total_ht = 1;
+		$discount->total_tva = 0.2;
+		$discount->total_ttc = 1.2;
+		$discount->tva_tx = 20;
+		$discount->fk_user = $user->id;
+		$discount->description = 'PHPUNIT 1022';
+		$discount->discount_type = 1;
+		$id = $discount->create($user);
+		$this->assertGreaterThan(0, $id, (string) $discount->error);
+		$this->assertGreaterThan(0, $invoice->insert_discount($id), (string) $invoice->error);
+
+		return (int) $id;
+	}
+
+	/**
+	 * An import made again into its draft rebuilds it in place: same invoice, same reference, lines and
+	 * imported files replaced rather than added. What the user added - a file, a note - stays; the
+	 * discount of the previous import is deleted, any other consumed discount is freed.
+	 *
+	 * @return void
+	 */
+	public function testAnImportMadeAgainRebuildsTheDraftInPlace()
+	{
+		global $conf, $db, $user;
+
+		// Whether the import creates a product for a line is another subject: the lines of the fixture
+		// are imported as free ones, which every instance can do.
+		foreach (array('EINVOICING_IMPORT_AS_FREE_LINES', 'EINVOICING_PRODUCTS_AUTO_GENERATION') as $name) {
+			$this->savedConstants[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
+		}
+		$conf->global->EINVOICING_IMPORT_AS_FREE_LINES = 1;
+		$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 0;
+
+		$socid = $this->createFixtureSeller();
+		$xml = str_replace('EINV994-0001', 'EINV1022-' . strtoupper(bin2hex(random_bytes(4))), (string) file_get_contents(__DIR__ . '/fixtures/received_documents/cii_rounding_amount.xml'));
+
+		$protocol = new CIIProtocol($db);
+		$first = $protocol->createSupplierInvoiceFromSource($xml, null, 'test1022');
+		$id = (int) ($first['res'] ?? 0);
+		$this->assertGreaterThan(0, $id, 'first import: ' . strip_tags((string) ($first['message'] ?? '')));
+		$this->createdInvoiceIds[] = $id;
+
+		$invoice = new FactureFournisseur($db);
+		$invoice->fetch($id);
+		$this->assertSame($socid, (int) $invoice->socid);
+		$ref = $invoice->ref;
+		$dir = $conf->fournisseur->facture->dir_output . '/' . get_exdir($invoice->id, 2, 0, 0, $invoice, 'invoice_supplier') . dol_sanitizeFileName($ref);
+		$relativedir = preg_replace('/^' . preg_quote(DOL_DATA_ROOT . '/', '/') . '/', '', $dir);
+		$importedFiles = array_column(dol_dir_list($dir, 'files'), 'name');
+		$this->assertNotEmpty($importedFiles, 'the import attached the document');
+
+		// What the user adds to the draft
+		dol_mkdir($dir);
+		file_put_contents($dir . '/delivery_note.pdf', 'by hand');
+		$this->assertGreaterThan(0, addFileIntoDatabaseIndex($dir, 'delivery_note.pdf', 'delivery_note.pdf', 'uploaded', 0, $invoice));
+		$invoice->update_note('written by the user', '_private');
+		$importDiscount = $this->consumeADiscount($invoice);
+		$otherDiscount = $this->consumeADiscount($invoice);
+		$einvoicing = new EInvoicing($db);
+		$einvoicing->insertOrUpdateExtraField($id, $invoice->element, EInvoicing::EXTRAFIELD_IMPORTED_DISCOUNTS, (string) $importDiscount);
+
+		AbstractProtocol::$rebuildSupplierInvoiceId = $id;
+		$again = $protocol->createSupplierInvoiceFromSource($xml, null, 'test1022');
+		AbstractProtocol::$rebuildSupplierInvoiceId = 0;
+
+		$this->assertSame($id, (int) ($again['res'] ?? 0), 'the same invoice: ' . strip_tags((string) ($again['message'] ?? '')));
+		$rebuilt = new FactureFournisseur($db);
+		$rebuilt->fetch($id);
+		$rebuilt->fetch_lines();
+		$this->assertSame($ref, $rebuilt->ref, 'the reference is kept');
+		$this->assertCount(2, $rebuilt->lines, 'the billed line and the rounding, not added to the previous ones');
+		$this->assertEquals(25.47, (float) $rebuilt->total_ttc);
+		$this->assertSame('written by the user', (string) $rebuilt->note_private);
+
+		$files = array_column(dol_dir_list($dir, 'files'), 'name');
+		sort($files);
+		$expected = array_merge($importedFiles, array('delivery_note.pdf'));
+		sort($expected);
+		$this->assertSame($expected, $files, 'the file attached by hand stays, the imported ones are written again');
+		$ecmfile = new EcmFiles($db);
+		$this->assertGreaterThan(0, $ecmfile->fetch(0, '', $relativedir . '/delivery_note.pdf'), 'with its entry of the index');
+
+		$discount = new DiscountAbsolute($db);
+		$this->assertLessThanOrEqual(0, $discount->fetch($importDiscount), 'the discount of the previous import is gone');
+		$discount = new DiscountAbsolute($db);
+		$this->assertGreaterThan(0, $discount->fetch($otherDiscount), 'any other discount is kept');
+		$this->assertEmpty($discount->fk_invoice_supplier_line, 'and freed');
+
+		$this->assertSame($id, SupplierInvoiceHelper::findIdByRef($rebuilt->ref_supplier, $socid), 'and no second invoice carries the document');
 	}
 }
