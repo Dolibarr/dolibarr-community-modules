@@ -177,6 +177,8 @@ class DocumentTest extends CommonClassTest
 	 */
 	public function testOnlyTheFilesAttachedByHandAreNamed()
 	{
+		global $conf;
+
 		list($invoice, $doc) = $this->createReceivedDraft();
 		$this->attach($invoice, 'delivery_note.pdf', 'uploaded');
 		$this->attach($invoice, dol_sanitizeFileName($invoice->ref) . '.pdf', 'generated');
@@ -187,8 +189,11 @@ class DocumentTest extends CommonClassTest
 		$this->assertNotFalse(file_put_contents($this->dirOf($invoice) . '/scan.jpg', 'scan'));
 
 		$lost = $doc->getFilesLostByReimport();
-		sort($lost);
-		$this->assertSame(array('delivery_note.pdf', 'scan.jpg'), $lost);
+		ksort($lost);
+		$this->assertSame(array('delivery_note.pdf', 'scan.jpg'), array_keys($lost));
+		// The path document.php is given, under the directory of supplier invoices.
+		$this->assertStringEndsWith(dol_sanitizeFileName($invoice->ref) . '/scan.jpg', $lost['scan.jpg']);
+		$this->assertFileExists($conf->fournisseur->facture->dir_output . '/' . $lost['scan.jpg']);
 	}
 
 	/**

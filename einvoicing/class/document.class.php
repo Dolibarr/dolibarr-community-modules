@@ -807,7 +807,7 @@ class Document extends CommonObject
 	 * The import attaches its own files again, and what Dolibarr generated describes lines about to
 	 * change: what is left - the files attached by hand - is lost, and the confirmation names it.
 	 *
-	 * @return	string[]	File names, empty when there is no draft or nothing to lose
+	 * @return	array<string,string>	Name => path under the supplier invoice directory, empty when nothing is lost
 	 */
 	public function getFilesLostByReimport()
 	{
@@ -824,7 +824,8 @@ class Document extends CommonObject
 			return array();
 		}
 		// The directory FactureFournisseur::delete() removes.
-		$dir = $conf->fournisseur->facture->dir_output.'/'.get_exdir($invoice->id, 2, 0, 0, $invoice, 'invoice_supplier').dol_sanitizeFileName($invoice->ref);
+		$subdir = get_exdir($invoice->id, 2, 0, 0, $invoice, 'invoice_supplier').dol_sanitizeFileName($invoice->ref);
+		$dir = $conf->fournisseur->facture->dir_output.'/'.$subdir;
 		if (!is_dir($dir)) {
 			return array();
 		}
@@ -838,7 +839,7 @@ class Document extends CommonObject
 				&& (in_array($ecmfile->gen_or_uploaded, array('generated', 'imported')) || $ecmfile->description === CIIProtocol::IMPORTED_FILE_DESCRIPTION)) {
 				continue;
 			}
-			$lost[] = (string) $entry['name'];
+			$lost[(string) $entry['name']] = $subdir.'/'.$entry['name'];
 		}
 
 		return $lost;

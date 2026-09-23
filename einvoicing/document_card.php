@@ -382,9 +382,18 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		$text = $langs->trans('EInvoiceReimportConfirm', $object->flow_id);
 		// The draft goes with its directory: what was attached by hand is not attached again.
 		$lostfiles = $object->getFilesLostByReimport();
+		$height = 0;
 		if (!empty($lostfiles)) {
+			// The dialog does not grow with its text: without room the list sits below the fold.
+			$height = 320 + 24 * count($lostfiles);
 			$text .= '<br><br>'.img_warning().' '.$langs->trans('EInvoiceReimportLosesFiles');
-			$text .= '<ul><li>'.implode('</li><li>', array_map('dol_escape_htmltag', $lostfiles)).'</li></ul>';
+			$text .= '<ul>';
+			foreach ($lostfiles as $name => $relativepath) {
+				// A new tab: the dialog stays open, the user saves the file then answers.
+				$url = DOL_URL_ROOT.'/document.php?modulepart=facture_fournisseur&entity='.((int) $object->entity).'&file='.urlencode($relativepath);
+				$text .= '<li><a href="'.dol_escape_htmltag($url).'" target="_blank" rel="noopener">'.dol_escape_htmltag($name).'</a></li>';
+			}
+			$text .= '</ul>';
 		}
 		$formconfirm = $form->formconfirm(
 			$_SERVER["PHP_SELF"].'?id='.$object->id,
@@ -393,7 +402,8 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			'confirm_reimport',
 			'',
 			0,
-			1
+			1,
+			$height
 		);
 	}
 
