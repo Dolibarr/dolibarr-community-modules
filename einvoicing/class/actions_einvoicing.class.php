@@ -522,7 +522,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			// The action itself lives on the flow card, which is also where a flow whose draft has already
 			// been deleted is picked up again.
 			// TODO Move this in the section of the "Join files".
-			if (!empty($object->id) && $user->hasRight('einvoicing', 'write')) {
+			// Greyed rather than hidden without the right, so the user reads why it cannot be used.
+			if (!empty($object->id)) {
 				$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_document";
 				$sql .= " WHERE fk_element_type = 'invoice_supplier'";
 				$sql .= " AND fk_element_id = " . ((int) $object->id);
@@ -534,7 +535,10 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				$resql = $db->query($sql);
 				if ($resql && ($objdoc = $db->fetch_object($resql))) {
 					$reimporturl = dol_buildpath('/einvoicing/document_card.php', 1) . '?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken();
-					if ((int) $object->status === FactureFournisseur::STATUS_DRAFT) {
+					if (!$user->hasRight('einvoicing', 'write')) {
+						print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('NotEnoughPermissions')) . '">'
+							. $langs->trans('EInvoiceReimport') . '</span>';
+					} elseif ((int) $object->status === FactureFournisseur::STATUS_DRAFT) {
 						print '<a class="butAction" href="' . $reimporturl . '">' . $langs->trans('EInvoiceReimport') . '</a>';
 					} else {
 						print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('EInvoiceReimportOnlyOnADraft')) . '">'
@@ -560,8 +564,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		// Add button to change the entity (multi-company) of a supplier invoice (we test context invoicesuppliercard but also main for old versions of module)
 		if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE') && isModEnabled('multicompany') && in_array($object->element, ['invoice_supplier'])
-			&& !empty($object->id) && $user->hasRight('fournisseur', 'facture', 'creer') && preg_match('/invoicesuppliercard|main/', $parameters['currentcontext'] ?? '')) {
-			if ($object->isEditable()) {
+			&& !empty($object->id) && preg_match('/invoicesuppliercard|main/', $parameters['currentcontext'] ?? '')) {
+			if (!$user->hasRight('fournisseur', 'facture', 'creer')) {
+				print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('NotEnoughPermissions')) . '">'
+					. $langs->trans('ChangeEntity') . '</span>';
+			} elseif ($object->isEditable()) {
 				print '<a class="butAction" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?id=' . $object->id . '&action=change_entity&token=' . newToken() . '">'
 					. $langs->trans('ChangeEntity') . '</a>';
 			} else {
