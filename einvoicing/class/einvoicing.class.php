@@ -2962,6 +2962,62 @@ class EInvoicing
 	}
 
 	/**
+	 * Whether regenerating and sending the e-invoice are refused because it was already transmitted.
+	 *
+	 * The transmitted lock, less the invoice the seller's AP only ever rejected at emission: no copy of it
+	 * exists at the AP, so it may be regenerated and sent again. The invoice itself stays locked.
+	 *
+	 * @param 	int 	$invoiceId 	Invoice id
+	 * @param 	?string $invoiceRef Invoice ref (fallback if id is 0)
+	 * @return 	bool 				True if regenerating and sending must be refused
+	 */
+	public function isSendLocked($invoiceId = 0, $invoiceRef = null)
+	{
+		return $this->isTransmittedLockActive($invoiceId, $invoiceRef) && !$this->isOnlyRejectedAtEmission((int) $invoiceId);
+	}
+
+	/**
+	 * Whether every status an AP gave a customer invoice is a rejection at emission (213 by the seller's AP).
+	 *
+	 * Such an invoice was never deposited (XP Z12-014 annex A 2.2), so its number is still free at the AP: the
+	 * corrected document is accepted under the same BT-1. A DOUBLON, a rejection addressed to the buyer (2.4)
+	 * or any other status means the AP holds a copy, and sending again would only be refused as a duplicate.
+	 *
+	 * @param	int		$invoiceId	Customer invoice id
+	 * @return	bool				True when the invoice may be sent again
+	 */
+	public function isOnlyRejectedAtEmission($invoiceId)
+	{
+		if ($invoiceId <= 0) {
+			return false;
+		}
+
+		$sql = "SELECT lc_status, lc_reason_code, lc_recipient_roles FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
+		$sql .= " WHERE element_type = 'facture' AND element_id = " . ((int) $invoiceId);
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' SQL error: ' . $this->db->lasterror(), LOG_ERR);
+			return false;
+		}
+
+		$rejected = 0;
+		while ($obj = $this->db->fetch_object($resql)) {
+			$roles = array_map('trim', explode(',', strtoupper((string) $obj->lc_recipient_roles)));
+			if ((int) $obj->lc_status !== self::STATUS_REJECTED
+				|| strtoupper(trim((string) $obj->lc_reason_code)) === self::REASON_DUPLICATE
+				|| in_array(self::CDAR_ROLE_BUYER, $roles, true)) {
+				$this->db->free($resql);
+				return false;
+			}
+			$rejected++;
+		}
+		$this->db->free($resql);
+
+		return $rejected > 0;
+	}
+
+	/**
 	 * Gate generation/transmission on the recipient being reachable in the Approved Platforms directory.
 	 *
 	 * Only enforced when EINVOICING_REQUIRE_ROUTABLE_RECIPIENT is on (off by default, opt-in). A recipient
