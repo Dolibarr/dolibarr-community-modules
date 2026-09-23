@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2026 Pierre Grasswill
+ * Copyright (C) 2026      MB Informatique      <info@mb-informatique.fr>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -38,6 +39,7 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 
 require_once $dolibarrHtdocs . '/master.inc.php';
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
+require_once __DIR__ . '/../../class/utils/EmbeddedXmlReader.class.php';
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 
 /**
@@ -131,6 +133,32 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 		$this->assertCount(1, $lines);
 		$this->assertEmpty($lines[0]['linestatusreasoncode'], 'no BT-X-8 in the document, none in the line');
 		$this->assertTrue($this->isDetail($lines[0]), 'a line without a subtype is a regular item');
+	}
+
+	/**
+	 * Factur-X reads line references through EmbeddedXmlReader. The qualifier must survive that path so
+	 * an invoiced object identifier such as a phone number is not mistaken for an invoice reference.
+	 *
+	 * @return	void
+	 */
+	public function testFacturXReaderKeepsTheLineReferenceQualifier()
+	{
+		$xml = $this->documentWithLine('
+      <ram:AssociatedDocumentLineDocument><ram:LineID>000001</ram:LineID></ram:AssociatedDocumentLineDocument>
+      <ram:SpecifiedLineTradeSettlement>
+        <ram:AdditionalReferencedDocument>
+          <ram:IssuerAssignedID>0600000000</ram:IssuerAssignedID>
+          <ram:TypeCode>130</ram:TypeCode>
+          <ram:ReferenceTypeCode>AWV</ram:ReferenceTypeCode>
+        </ram:AdditionalReferencedDocument>
+      </ram:SpecifiedLineTradeSettlement>');
+
+		$documents = (new EmbeddedXmlReader($xml))->getLineAdditionalReferencedDocuments('000001');
+
+		$this->assertCount(1, $documents);
+		$this->assertSame('0600000000', $documents[0]['IssuerAssignedID']);
+		$this->assertSame('130', $documents[0]['typeCode']);
+		$this->assertSame('AWV', $documents[0]['referenceTypeCode']);
 	}
 
 	/**

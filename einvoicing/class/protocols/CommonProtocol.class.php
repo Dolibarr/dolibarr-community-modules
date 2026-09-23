@@ -803,7 +803,7 @@ trait CommonProtocol
 					}
 					$thirdparty->zip = $sellerInfo['sellerpostcode'] ?? $thirdparty->zip;
 					$thirdparty->town = $sellerInfo['sellercity'] ?? $thirdparty->town;
-					$thirdparty->country_code = $sellerInfo['sellercountry'] ?? $thirdparty->country_code;
+					$this->_setThirdpartyCountryFromCode($thirdparty, $sellerInfo['sellercountry'] ?? '');
 					$thirdparty->email = $sellerInfo['sellercontactemailaddr'] ?? $thirdparty->email;
 					if ($sellerPhone !== '') {
 						$thirdparty->phone = $sellerPhone;
@@ -847,8 +847,8 @@ trait CommonProtocol
 					if (empty($thirdparty->town) && !empty($sellerInfo['sellercity'])) {
 						$thirdparty->town = $sellerInfo['sellercity'];
 					}
-					if (empty($thirdparty->country_code) && !empty($sellerInfo['sellercountry'])) {
-						$thirdparty->country_code = $sellerInfo['sellercountry'];
+					if (empty($thirdparty->country_id) && !empty($sellerInfo['sellercountry'])) {
+						$this->_setThirdpartyCountryFromCode($thirdparty, $sellerInfo['sellercountry']);
 					}
 					if (empty($thirdparty->email) && !empty($sellerInfo['sellercontactemailaddr'])) {
 						$thirdparty->email = $sellerInfo['sellercontactemailaddr'];
@@ -987,7 +987,7 @@ trait CommonProtocol
 			}
 			$thirdparty->zip = $sellerInfo['sellerpostcode'] ?? '';
 			$thirdparty->town = $sellerInfo['sellercity'] ?? '';
-			$thirdparty->country_code = $sellerInfo['sellercountry'] ?? '';
+			$this->_setThirdpartyCountryFromCode($thirdparty, $sellerInfo['sellercountry'] ?? '');
 			$thirdparty->email = $sellerInfo['sellercontactemailaddr'] ?? '';
 			$thirdparty->phone = $sellerPhone;
 			$thirdparty->fax = $sellerFax;
@@ -1126,8 +1126,13 @@ trait CommonProtocol
 			$message = $langs->trans("FailedToFindSupplier"). ' ' . $detailsStr . ". \n";
 			$message .= $langs->trans("AutoCreateThirdPartyOffCreateItManually");
 
+			// Creating the thirdparty needs the right on it. Without that right the button stays where it is,
+			// greyed and titled: a button that disappears reads as "create it, but how?", a greyed one names
+			// the permission to ask for.
 			$action = $langs->trans('CreateSupplierManually');
-			$action .= '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+			$action .= $user->hasRight('societe', 'creer')
+				? '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">'
+				: '<a class="butActionRefused classfortooltip small smallpaddingimp" href="#" title="' . dol_escape_htmltag($langs->trans("NotEnoughPermissions")) . '">';
 			$action .= '<i class="fas fa-plus-circle"></i> ';
 			$action .= $langs->trans('CreateSupplier');
 			$action .= '</a>';
@@ -1140,6 +1145,33 @@ trait CommonProtocol
 				'action' => $action,
 				'actiondata' => $actiondata
 			);
+		}
+	}
+
+	/**
+	 * Set the country of a thirdparty from the country code carried by a received document.
+	 *
+	 * The stored country is fk_pays, which the core writes from country_id: up to Dolibarr 19,
+	 * Societe::update() never derives it from country_code, so a thirdparty created by the import
+	 * silently ended up with no country at all (issue #1037). An unknown code is left out.
+	 *
+	 * @param	Societe		$thirdparty		Thirdparty to set the country on
+	 * @param	string		$countrycode	Country code read in the document (BT-40, BT-55...)
+	 * @return	void
+	 */
+	private function _setThirdpartyCountryFromCode($thirdparty, $countrycode)
+	{
+		$countrycode = trim((string) $countrycode);
+		if ($countrycode === '') {
+			return;
+		}
+
+		$countryid = dol_getIdFromCode($this->db, $countrycode, 'c_country', 'code', 'rowid');
+		if ($countryid > 0) {
+			$thirdparty->country_id = $countryid;
+			$thirdparty->country_code = $countrycode;
+		} else {
+			dol_syslog(get_class($this) . '::_setThirdpartyCountryFromCode Unknown country code in document: ' . $countrycode, LOG_WARNING);
 		}
 	}
 
@@ -1576,9 +1608,14 @@ trait CommonProtocol
 			}
 
 			// Third choice: set a default product on the vendor thirdparty (used for future imports when no product is found)
+			// The field lives on the thirdparty card, so this one takes the right to edit it. Greyed without it,
+			// like the button above. "disabled" and not "buttonRefused": the eldy theme dropped the rule for
+			// that class in Dolibarr 24, which would leave the button looking enabled there.
 			if (!empty($vendorId)) {
 				$thirdpartyUrl = dol_buildpath('/societe/card.php', 1) . '?socid=' . ((int) $vendorId) . '&action=edit&highlight=routing_product_id#treinvoicing';
-				$action .= '<a class="button small smallpaddingimp" style="' . $btnStyle . '" href="' . dol_escape_htmltag($thirdpartyUrl) . '" target="_blank">';
+				$action .= $user->hasRight('societe', 'creer')
+					? '<a class="button small smallpaddingimp" style="' . $btnStyle . '" href="' . dol_escape_htmltag($thirdpartyUrl) . '" target="_blank">'
+					: '<a class="button disabled classfortooltip small smallpaddingimp" style="' . $btnStyle . '" href="#" title="' . dol_escape_htmltag($langs->trans("NotEnoughPermissions")) . '">';
 				$action .= '<i class="fas fa-star"></i> ';
 				$action .= $langs->trans('SetDefaultProductForThirdparty');
 				$action .= '</a>';
@@ -2489,15 +2526,24 @@ trait CommonProtocol
 	private static $UNTDID4461_TO_DOLIBARR_PAIEMENT_CODE = [
 		'10' => 'LIQ',	// Cash
 		'20' => 'CHQ',	// Check
+		'21' => 'CHQ',	// Banker's draft
+		'22' => 'CHQ',	// Certified banker's draft
 		'23' => 'TRA',	// Banque check
 		'24' => 'TRA',	// Bill of exchange awaiting acceptance
+		'25' => 'CHQ',	// Certified cheque
+		'26' => 'CHQ',	// Local cheque
 		'30' => 'VIR',	// Bank transfer
+		'31' => 'VIR',	// Debit transfer, a transfer within a giro system network
+		'42' => 'VIR',	// Payment to bank account
 		'45' => 'TIP',	// Referenced home-banking credit transfer
 		'48' => 'CB',	// Bank card, the generic code most senders use rather than 54
 		'49' => 'PRE',	// Direct debit, the generic code most senders use rather than 59
 		'54' => 'CB',	// Credit card
+		'55' => 'CB',	// Debit card, the dictionary of Dolibarr has one code for both cards
+		'58' => 'VIR',	// SEPA credit transfer, which BR-49/BR-50 put on a par with 30
 		'59' => 'PRE',	// SEPA direct debit
 		'68' => 'VAD',	// Online payment
+		'70' => 'LCR',	// Bill drawn by the creditor on the debtor, the French LCR
 		'1' => 'FAC',	// local payment method | not defined
 	];
 

@@ -19,8 +19,8 @@
 /**
  *      \file       test/phpunit/MandatoryThirdpartyExtrafieldTest.php
  *      \ingroup    test
- *      \brief      PHPUnit test for the synchronization of the seller of a received document when the
- *                  base carries a mandatory extrafield on thirdparties.
+ *      \brief      PHPUnit test for the synchronization of the seller of a received document: the
+ *                  country it writes on the vendor, and the mandatory extrafield case below.
  *                  From Dolibarr 20 on, Societe::fetch() pre-fills array_options with a null entry for
  *                  every declared extrafield, and update() hands it to insertExtraFields(), which
  *                  refuses the whole record when one of those fields is mandatory and empty - so every
@@ -100,6 +100,45 @@ class MandatoryThirdpartyExtrafieldTest extends CommonClassTest
 		$extrafields->delete(self::ATTRNAME, 'societe');
 	}
 
+	/** @var array	Options this class overrides, saved at setUp() and put back at tearDown() */
+	private $savedoptions = array();
+
+	/**
+	 * Save the options the tests of this class override, so one test does not steer the next ones.
+	 *
+	 * @return void
+	 */
+	protected function setUp(): void
+	{
+		global $conf;
+
+		parent::setUp();
+
+		foreach (array('EINVOICING_THIRDPARTIES_AUTO_GENERATION', 'EINVOICING_THIRDPARTIES_COMPLETE_INFO') as $option) {
+			$this->savedoptions[$option] = $conf->global->$option ?? null;
+		}
+	}
+
+	/**
+	 * Put the overridden options back.
+	 *
+	 * @return void
+	 */
+	protected function tearDown(): void
+	{
+		global $conf;
+
+		foreach ($this->savedoptions as $option => $value) {
+			if ($value === null) {
+				unset($conf->global->$option);
+			} else {
+				$conf->global->$option = $value;
+			}
+		}
+
+		parent::tearDown();
+	}
+
 	/**
 	 * A vendor as the automatic creation of _syncOrCreateThirdpartyFromEInvoiceSeller() leaves it:
 	 * identified by its SIREN, and holding no extrafield row at all, since a programmatic create()
@@ -147,9 +186,10 @@ class MandatoryThirdpartyExtrafieldTest extends CommonClassTest
 	 * Run the seller synchronization, the private step both protocols call on a received document.
 	 *
 	 * @param	array	$sellerInfo	Seller information
+	 * @param	string	$priority	'dolibarr' or 'pdp'
 	 * @return	array				Answer of _syncOrCreateThirdpartyFromEInvoiceSeller()
 	 */
-	private function syncSeller($sellerInfo)
+	private function syncSeller($sellerInfo, $priority = 'dolibarr')
 	{
 		global $db;
 
@@ -157,7 +197,75 @@ class MandatoryThirdpartyExtrafieldTest extends CommonClassTest
 		$method = new ReflectionMethod(CIIProtocol::class, '_syncOrCreateThirdpartyFromEInvoiceSeller');
 		$method->setAccessible(true);
 
-		return $method->invoke(new CIIProtocol($db), $sellerInfo, 'dolibarr', '');
+		return $method->invoke(new CIIProtocol($db), $sellerInfo, $priority, '');
+	}
+
+	/**
+	 * Read the country actually stored on a thirdparty, straight from the table.
+	 *
+	 * @param	int		$socid	Id of the thirdparty
+	 * @return	string			Country code stored, '' when the row carries no country
+	 */
+	private function storedCountryCode($socid)
+	{
+		global $db;
+
+		$sql = "SELECT c.code FROM " . MAIN_DB_PREFIX . "societe as s";
+		$sql .= " LEFT JOIN " . MAIN_DB_PREFIX . "c_country as c ON s.fk_pays = c.rowid";
+		$sql .= " WHERE s.rowid = " . ((int) $socid);
+
+		$resql = $db->query($sql);
+		$this->assertNotFalse($resql, 'Could not read the stored country: ' . $db->lasterror());
+		$obj = $db->fetch_object($resql);
+
+		return (string) ($obj->code ?? '');
+	}
+
+	/**
+	 * A vendor created by the import must carry the country the document names. The core stores the
+	 * country from country_id only: up to Dolibarr 19 a country_code alone was dropped, and the
+	 * created vendor ended up with no country at all (issue #1037).
+	 *
+	 * @return void
+	 */
+	public function testCreatedVendorGetsTheCountryOfTheDocument()
+	{
+		global $conf;
+
+		$conf->global->EINVOICING_THIRDPARTIES_AUTO_GENERATION = 1;
+
+		$siren = '000000013';
+		$res = $this->syncSeller($this->sellerInfo($siren));
+
+		$this->assertGreaterThan(0, $res['res'], 'The vendor was not created: ' . $res['message']);
+		$this->assertEquals('FR', $this->storedCountryCode($res['res']), 'The created vendor has no country');
+	}
+
+	/**
+	 * A vendor already in Dolibarr but without a country gets the one of the document, as soon as the
+	 * completion of thirdparties is on. Same defect as above on the update path.
+	 *
+	 * @return void
+	 */
+	public function testKnownVendorWithoutCountryGetsTheCountryOfTheDocument()
+	{
+		global $conf, $db;
+
+		$conf->global->EINVOICING_THIRDPARTIES_COMPLETE_INFO = 1;
+
+		$siren = '000000014';
+		$socid = $this->createVendor($siren);
+
+		// Empty the country of the fixture in SQL, to stand for a vendor keyed in without one: from
+		// Dolibarr 20 on, Societe::update() answers ErrorFieldRequired rather than clear fk_pays.
+		$sql = "UPDATE " . MAIN_DB_PREFIX . "societe SET fk_pays = NULL WHERE rowid = " . ((int) $socid);
+		$this->assertNotFalse($db->query($sql), 'Could not empty the country: ' . $db->lasterror());
+		$this->assertEquals('', $this->storedCountryCode($socid), 'The country of the fixture was not emptied');
+
+		$res = $this->syncSeller($this->sellerInfo($siren));
+
+		$this->assertEquals($socid, $res['res'], 'The seller synchronization was refused: ' . $res['message']);
+		$this->assertEquals('FR', $this->storedCountryCode($socid), 'The vendor was left without a country');
 	}
 
 	/**
