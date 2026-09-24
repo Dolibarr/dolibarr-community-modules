@@ -705,13 +705,8 @@ class CdarHandler
 	 */
 	private function getReferencedDocumentTypeCode($object)
 	{
-		$codes = array(
-			CommonInvoice::TYPE_CREDIT_NOTE => CdarHandler::DOC_CREDIT_NOTE,
-			CommonInvoice::TYPE_REPLACEMENT => CdarHandler::DOC_CORRECTIVE_INVOICE,
-			CommonInvoice::TYPE_DEPOSIT => CdarHandler::DOC_PREPAYMENT_INVOICE,
-		);
-
-		return isset($codes[(int) $object->type]) ? $codes[(int) $object->type] : CdarHandler::DOC_INVOICE;
+		// The code the invoice itself was sent with, 503 included for a credit note of a deposit
+		return einvoicingDocumentTypeCode($object, $this->db) ?? CdarHandler::DOC_INVOICE;
 	}
 
 	/**

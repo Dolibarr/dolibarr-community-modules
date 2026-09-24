@@ -1293,6 +1293,41 @@ function einvoicingDiscountRelatedInvoiceRef($discount, $db)
 }
 
 /**
+ * Document type code (BT-3, UNTDID 1001) of an invoice, as the French list of BR-FR-04 names it.
+ *
+ * A credit note whose source is a deposit invoice is an "avoir d'acompte" (503), not a 381. The same code
+ * goes into BT-3, into the type of a document that references it (BT-25) and into its lifecycle (MDT-91).
+ *
+ * @param	Facture|FactureFournisseur	$invoice	Customer or supplier invoice
+ * @param	DoliDB			$db			Database handler
+ * @return	?string						Type code, null for a type the French list has no code for
+ */
+function einvoicingDocumentTypeCode($invoice, $db)
+{
+	$codes = array(
+		CommonInvoice::TYPE_STANDARD => '380',
+		CommonInvoice::TYPE_REPLACEMENT => '384',
+		CommonInvoice::TYPE_CREDIT_NOTE => '381',
+		CommonInvoice::TYPE_DEPOSIT => '386',
+		CommonInvoice::TYPE_SITUATION => '380',		// A situation invoice is transmitted as a commercial invoice
+	);
+	$type = (int) $invoice->type;
+	if (!isset($codes[$type])) {
+		return null;
+	}
+
+	if ($type == CommonInvoice::TYPE_CREDIT_NOTE && (int) $invoice->fk_facture_source > 0) {
+		// The source is of the class of the credit note, whose file is therefore already loaded
+		$source = ($invoice instanceof FactureFournisseur) ? new FactureFournisseur($db) : new Facture($db);
+		if ($source->fetch((int) $invoice->fk_facture_source) > 0 && (int) $source->type == CommonInvoice::TYPE_DEPOSIT) {
+			return '503';
+		}
+	}
+
+	return $codes[$type];
+}
+
+/**
  * Preview picto for a diagnostic file of the module temp directory, opened in the dialog of the core.
  *
  * Those slots belong to no invoice, so no document list of the core shows them and none of them gets the

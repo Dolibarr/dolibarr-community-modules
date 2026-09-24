@@ -191,22 +191,12 @@ trait CommonProtocol
 	/**
 	 * Map type of invoices dolibarr <-> facturx
 	 *
-	 * @param 	CommonInvoice	$object 	The invoice object
+	 * @param 	Facture|FactureFournisseur	$object 	The invoice object
 	 * @return  string|null 				code of invoice type
 	 */
 	private function _getTypeOfInvoice($object)
 	{
-		$map = [
-			CommonInvoice::TYPE_STANDARD        => '380',
-			CommonInvoice::TYPE_REPLACEMENT     => '384',
-			CommonInvoice::TYPE_CREDIT_NOTE     => '381',
-			CommonInvoice::TYPE_DEPOSIT         => '386',
-			CommonInvoice::TYPE_SITUATION       => '380',				// Process situation invoice as common invoice
-		];
-
-		// TODO Manage the credit note of a deposit invoice ?
-
-		return $map[$object->type] ?? null;
+		return einvoicingDocumentTypeCode($object, $this->db);
 	}
 
 

@@ -385,20 +385,15 @@ $invoiceRefDocs = [];
 // A replacement invoice (BT-3 = 384) references the invoice it corrects in the same BG-3 slot as a
 // credit note does, and BR-FR-CO-04 makes that reference mandatory for it, with a "fatal" flag: one
 // sent without it is refused by the access point, and a receiver has nothing to attach it to.
-$refDocTypeCode = '';
-if ($object->type == $object::TYPE_CREDIT_NOTE) {
-	$refDocTypeCode = '381';			// 381 = Credit note
-} elseif ($object->type == $object::TYPE_REPLACEMENT) {
-	$refDocTypeCode = '384';			// 384 = Corrected invoice
-}
-if ($refDocTypeCode !== '' && !empty($object->fk_facture_source)) {
+// The type written with it (EXT-FR-FE-02) is the one of the referenced invoice, not of this document.
+if (in_array($object->type, array($object::TYPE_CREDIT_NOTE, $object::TYPE_REPLACEMENT)) && !empty($object->fk_facture_source)) {
 	$sourceFact = new Facture($this->db);
 	if ($sourceFact->fetch($object->fk_facture_source) > 0) {
 		$sourceFactDate = new DateTime(dol_print_date($sourceFact->date, 'dayrfc', 'tzserver'));
 		$invoiceRefDocs[] = [
 			'ref' => $sourceFact->ref,
 			'date' => $sourceFactDate,
-			'type' => $refDocTypeCode
+			'type' => einvoicingDocumentTypeCode($sourceFact, $this->db) ?? '380'
 		];
 		dol_syslog(get_class($this) . '::generateXML Set source invoice reference ' . $sourceFact->ref . ' for ' . $object->ref);
 	} else {
@@ -408,7 +403,7 @@ if ($refDocTypeCode !== '' && !empty($object->fk_facture_source)) {
 			$invoiceRefDocs[] = [
 				'ref' => $specimenRefDoc,
 				'date' => $sourceFactDate,
-				'type' => $refDocTypeCode
+				'type' => '380'		// The specimen corrects a commercial invoice
 			];
 			dol_syslog(get_class($this) . '::generateXML Set source invoice reference ' . $specimenRefDoc . ' for specimen ' . $object->ref);
 		} else {
@@ -971,7 +966,7 @@ if ($object->element == 'facture' || $object->element == 'invoice') {
 				$invoiceRefDocs[] = [
 					'ref' => $sourceDiscountFact->ref,															// BT-25
 					'date' => new DateTime(dol_print_date($sourceDiscountFact->date, 'dayrfc', 'tzserver')),					// BT-26
-					'type' => $refDocTypeByInvoiceType[(int) $obj->sourcetype]
+					'type' => einvoicingDocumentTypeCode($sourceDiscountFact, $this->db) ?? $refDocTypeByInvoiceType[(int) $obj->sourcetype]
 				];
 				dol_syslog("EInvoicing invoice " . $object->id . " refers to " . $sourceDiscountFact->ref
 					. " for the discount " . $obj->description . " applied on it", LOG_DEBUG);

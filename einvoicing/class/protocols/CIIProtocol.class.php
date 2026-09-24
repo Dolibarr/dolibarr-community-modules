@@ -1230,7 +1230,11 @@ class CIIProtocol extends AbstractProtocol
 						// --------------------------------------------------
 						// Deposit handling
 						// --------------------------------------------------
-						if ($linkedObject->type == FactureFournisseur::TYPE_DEPOSIT) {
+						// The source of a credit note or of a replacement is the invoice it corrects: a deposit
+						// named there is credited, not deducted, and a deposit line would count it twice.
+						$isCorrectedSource = in_array((int) $supplierInvoice->type, array(FactureFournisseur::TYPE_CREDIT_NOTE, FactureFournisseur::TYPE_REPLACEMENT))
+							&& (int) $supplierInvoice->fk_facture_source == (int) $linkedObjectId;
+						if ($linkedObject->type == FactureFournisseur::TYPE_DEPOSIT && !$isCorrectedSource) {
 							$create_deposit_line = 1;
 
 							$depositDiscountRes = $this->getOrCreateDepositDiscount($linkedObject);
