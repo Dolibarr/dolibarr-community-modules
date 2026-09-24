@@ -798,6 +798,7 @@ CheckSyncLogCantRecordSentInvoiceStatus=Nothing to do here: this flow is retried
 
 # Manual-action queue (sync_pending_list.php)
 EInvoiceSyncPending=Sync pending queue
+EInvoiceSyncPendingRemindAfterSync=%s flow(s) could not be imported and are waiting for a manual action to resolve:
 EInvoiceSyncPendingQueue=Flows awaiting a manual action
 EInvoiceSyncPendingHelp=A flow that cannot be synchronized because it needs a manual action (missing product or thirdparty, supplier invoice with a different amount) used to abort the whole synchronization. It is now queued here and the synchronization carries on with the other flows. Do the manual action (create the product or thirdparty) then retry the flow, without re-running the whole synchronization.
 TotalQueuedForManualAction=Total of flows queued for a manual action (missing product or thirdparty, different amount)
@@ -842,10 +843,12 @@ ReasonBadAmountShort=Different amount
 CreateSupplierShort=Create supplier
 AssociateExistingProductShort=Associate to an existing product
 SetDefaultProductShort=Default product for this supplier
+ModifySupplierInvoiceShort=Modify the invoice
 ActionCreateProductHelp=Create the missing product/service in Dolibarr (prefilled form).
 ActionCreateThirdpartyHelp=Create the missing supplier in Dolibarr (prefilled form).
 ActionAssociateProductHelp=Associate the vendor reference to an existing Dolibarr product (mapping), without creating a duplicate.
 ActionSetDefaultProductHelp=Set a default product for this supplier (used when no product matches).
+ActionModifySupplierInvoiceHelp=A supplier invoice with this reference already exists but with a different amount. Open it to reconcile the amount, or change its supplier reference so it is treated as a distinct invoice, then retry the flow.
 Flow=Flow
 AssociateExistingThirdpartyShort=Associate to an existing thirdparty
 ActionAssociateThirdpartyHelp=Associates the flow to an existing Dolibarr thirdparty by writing the issuer's SIREN/SIRET/VAT on it, so the automatic matching finds it afterwards.
