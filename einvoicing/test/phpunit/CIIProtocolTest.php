@@ -811,12 +811,19 @@ class CIIProtocolTest extends CommonClassTest
 
 	/**
 	 * The seller of the received fixture, as an instance receiving that document already holds it.
+	 * Another test importing the same fixture may have left it: it is then reused, since a second
+	 * third party with the same VAT number would make the import refuse the document.
 	 *
-	 * @return	int		Id of the created third party
+	 * @return	int		Id of the third party
 	 */
 	private function createFixtureSeller()
 	{
 		global $db, $user;
+
+		$resql = $db->query("SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE tva_intra = 'FR34999888779' AND entity IN (" . getEntity('societe') . ")");
+		if ($resql && $db->num_rows($resql) == 1) {
+			return (int) $db->fetch_object($resql)->rowid;
+		}
 
 		$supplier = new Societe($db);
 		$supplier->name = 'EINVOICING REBUILD SELLER';
