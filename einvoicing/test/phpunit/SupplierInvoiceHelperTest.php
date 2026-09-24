@@ -936,6 +936,7 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 		global $db;
 
 		$creditNote = new FactureFournisseur($db);
+		$creditNote->type = FactureFournisseur::TYPE_CREDIT_NOTE;
 		$creditNote->total_tva = -20.00;
 		$creditNote->total_ttc = -120.00;
 

@@ -105,15 +105,15 @@ class PrepaidIsADepositTest extends CommonClassTest
 	}
 
 	/**
-	 * A credit note stores its amounts negative while a document announces them positive.
+	 * BT-113 is read with its sign: a negative amount already paid is no deposit the import can attach.
 	 *
 	 * @return	void
 	 */
-	public function testTheAnnouncedAmountIsReadAsAbsolute()
+	public function testANegativeAmountAlreadyPaidIsNoDepositToAttach()
 	{
 		$rule = $this->rule(array('businessProcessId' => 'B1', 'totalPrepaidAmount' => -120.00));
 
-		$this->assertEqualsWithDelta(120.00, $rule, 0.001, 'a negative BT-113 still announces 120 to attach');
+		$this->assertEqualsWithDelta(0.0, $rule, 0.001, 'a negative BT-113 announces nothing to attach');
 	}
 
 	/**
