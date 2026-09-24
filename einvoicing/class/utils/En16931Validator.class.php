@@ -242,10 +242,13 @@ class En16931Validator
 			if (!$eq($expected, $duePayable)) {
 				$violations[] = 'BR-CO-16: DuePayableAmount ('.$fmt($duePayable).') does not equal GrandTotal - TotalPrepaid ('.$fmt($expected).')';
 			}
-			// A commercial invoice must not claim a negative amount due: it means the prepaid
-			// amount recorded exceeds the invoice total (this is how a prepaid double-count bug
-			// materializes). Credit notes (381) are emitted with positive amounts and are skipped.
-			if ($typeCode !== '381' && $duePayable < -self::TOLERANCE) {
+			// A commercial invoice (non-381) must not have a negative DuePayable when the
+			// GrandTotal itself is positive: that can only happen if TotalPrepaidAmount exceeds
+			// GrandTotal, which indicates a prepaid double-count bug in the document.
+			// When GrandTotal is itself negative (e.g. correction invoice with negative line items,
+			// type 380 with DuePayable = GrandTotal and no prepaid), the negative amount is
+			// legitimate and must not be flagged.
+			if ($typeCode !== '381' && $duePayable < -self::TOLERANCE && $grandTotal > self::TOLERANCE) {
 				$violations[] = 'BR-CO-16: DuePayableAmount is negative ('.$fmt($duePayable).'); TotalPrepaidAmount ('.$fmt($prepaidTotal).') exceeds GrandTotal ('.$fmt($grandTotal).')';
 			}
 		}
