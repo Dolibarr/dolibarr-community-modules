@@ -1137,6 +1137,21 @@ trait CommonProtocol
 			$action .= $langs->trans('CreateSupplier');
 			$action .= '</a>';
 
+			// The seller may already exist as a thirdparty under another identity: the professional
+			// identifier of the document can be set on it by hand, and the suppliers list is where to look for it.
+			$searchUrl = DOL_URL_ROOT . '/societe/list.php?type=f';
+			$searchUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
+
+			$action .= ' ' . $langs->trans('OrAssignProfessionalIdToExistingSupplier');
+			// Reading the list needs the right on it, and the same reasoning as for the creation
+			// button above applies: a greyed button names the permission to ask for.
+			$action .= $user->hasRight('societe', 'lire')
+				? '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($searchUrl) . '" target="_blank">'
+				: '<a class="butActionRefused classfortooltip small smallpaddingimp" href="#" title="' . dol_escape_htmltag($langs->trans("NotEnoughPermissions")) . '">';
+			$action .= '<i class="fas fa-search"></i> ';
+			$action .= $langs->trans('SearchAmongSuppliers');
+			$action .= '</a>';
+
 			return array(
 				'res' => -1,
 				'message' => $message,
