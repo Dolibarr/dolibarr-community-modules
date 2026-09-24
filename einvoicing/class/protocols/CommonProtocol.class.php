@@ -1132,10 +1132,8 @@ trait CommonProtocol
 			$action = '<div class="marginbottomonly opacitymedium">'.$langs->trans('CreateSupplierManually');
 			$action .= ' '.$langs->trans('OrAssignProfessionalIdToExistingSupplier').'</div>';
 
-			$action .= '<br>';
-
 			$action .= $user->hasRight('societe', 'creer')
-				? '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">'
+				? '<a class="butAction small smallpaddingimp nomarginleft" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">'
 				: '<a class="butActionRefused classfortooltip small smallpaddingimp" href="#" title="' . dol_escape_htmltag($langs->trans("NotEnoughPermissions")) . '">';
 			$action .= '<i class="fas fa-plus-circle"></i> ';
 			$action .= $langs->trans('CreateSupplier');
