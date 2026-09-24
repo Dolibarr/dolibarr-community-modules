@@ -849,6 +849,7 @@ ActionCreateThirdpartyHelp=Create the missing supplier in Dolibarr (prefilled fo
 ActionAssociateProductHelp=Associate the vendor reference to an existing Dolibarr product (mapping), without creating a duplicate.
 ActionSetDefaultProductHelp=Set a default product for this supplier (used when no product matches).
 ActionModifySupplierInvoiceHelp=A supplier invoice with this reference already exists but with a different amount. Open it to reconcile the amount, or change its supplier reference so it is treated as a distinct invoice, then retry the flow.
+SupplierInvoiceBadAmountDetail=A supplier invoice with reference %s already exists for this vendor totalling %s (incl. tax), but the received e-invoice announces %s (incl. tax). Open it to reconcile the amount, or change its supplier reference so it is treated as a distinct invoice.
 Flow=Flow
 AssociateExistingThirdpartyShort=Associate to an existing thirdparty
 ActionAssociateThirdpartyHelp=Associates the flow to an existing Dolibarr thirdparty by writing the issuer's SIREN/SIRET/VAT on it, so the automatic matching finds it afterwards.

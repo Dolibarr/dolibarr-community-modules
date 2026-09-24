@@ -136,7 +136,8 @@ function einvsp_actionMetaFromUrl($url)
 	// different amount. The action opens the supplier invoice list filtered on that ref. Give it its own
 	// "modify" icon and an explanatory tooltip, otherwise it falls back to a bare plus that looks like a
 	// "create" and carries no help - the operator cannot tell what to do with the blocked flow.
-	if (strpos($url, '/fourn/facture/list.php') !== false && strpos($url, 'search_refsupplier=') !== false) {
+	if (strpos($url, '/fourn/facture/card.php') !== false
+		|| (strpos($url, '/fourn/facture/list.php') !== false && strpos($url, 'search_refsupplier=') !== false)) {
 		return array('label' => 'ModifySupplierInvoiceShort', 'help' => 'ActionModifySupplierInvoiceHelp', 'icon' => 'fa-pen');
 	}
 	return array('label' => '', 'help' => '', 'icon' => '');

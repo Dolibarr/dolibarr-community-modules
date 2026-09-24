@@ -1018,11 +1018,25 @@ class CIIProtocol extends AbstractProtocol
 
 		if ($supplierInvoiceId == -3) {
 			$langs->load("bills");
+			// One existing invoice carries this supplier ref but a different amount. Link straight to its
+			// card so the operator can open it and reconcile, and surface both amounts (the existing one
+			// and the one the received e-invoice announces) so the discrepancy is visible at a glance.
+			$conflicting = SupplierInvoiceHelper::conflictingInvoiceByRef($parsedHeader['documentno'] ?? '', (int) $socId);
+			$conflictingId = $conflicting ? (int) $conflicting['id'] : 0;
+			$conflictingTotal = $conflicting ? (float) $conflicting['total_ttc'] : 0;
+			$modifyurl = $conflictingId > 0
+				? DOL_URL_ROOT.'/fourn/facture/card.php?id='.$conflictingId
+				: DOL_URL_ROOT.'/fourn/facture/list.php?search_refsupplier='.urlencode($parsedHeader['documentno'] ?? '').'&socid='.(int) $socId;
+
 			$action = $langs->trans('FixTheAmountOrModifySupplierRef', $langs->transnoentitiesnoconv("RefSupplierBill"), $parsedHeader['documentno'] ?? '', $langs->trans("Duplicate"));
-			$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT.'/fourn/facture/list.php?search_refsupplier='.urlencode($parsedHeader['documentno'] ?? '').'&socid=' . (int) $socId. '" target="_blank">';
-			$action .= '<i class="fas fa-plus-circle"></i> ';
+			$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . $modifyurl . '" target="_blank">';
+			$action .= '<i class="fas fa-pen"></i> ';
 			$action .= $langs->trans('ModifySupplierInvoice');
 			$action .= '</a>';
+
+			$message = $conflictingId > 0
+				? $langs->trans('SupplierInvoiceBadAmountDetail', $parsedHeader['documentno'] ?? '', price($conflictingTotal), price($announcedTotalTtc))
+				: SupplierInvoiceHelper::refLookupErrorMessage($supplierInvoiceId, $parsedHeader['documentno'] ?? '', 'while checking whether it was already imported');
 
 			// Nothing is stored while the reference stays ambiguous, so the flow is postponed rather
 			// than failed: the amount has to be settled by hand either way, and stopping the batch on it
@@ -1030,11 +1044,11 @@ class CIIProtocol extends AbstractProtocol
 			return [
 				'res' => -1,
 				'postponeflow' => 1,
-				'message' => SupplierInvoiceHelper::refLookupErrorMessage($supplierInvoiceId, $parsedHeader['documentno'] ?? '', 'while checking whether it was already imported'),
+				'message' => $message,
 				'businessmessage' => $langs->trans('SupplierInvoiceFoundButWithdifferentAmount', $parsedHeader['documentno'] ?? '', $parsedHeader['grandTotalAmount'] ?? 0),
 				'actioncode' => 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT',
 				'actionurl' => 'none',
-				'actiondata' => array('supplierref' => $parsedHeader['documentno'], 'socid' => (int) $socId, 'expectedamount' => $announcedTotalTtc),
+				'actiondata' => array('supplierref' => $parsedHeader['documentno'], 'socid' => (int) $socId, 'expectedamount' => $announcedTotalTtc, 'existinginvoiceid' => $conflictingId, 'existingamount' => $conflictingTotal),
 				'action' => $action
 			];
 		}
