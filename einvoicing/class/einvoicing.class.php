@@ -1840,10 +1840,8 @@ class EInvoicing
 
 		$info = $currentStatusInfo['info'] ?? '';
 
+		// Not tied to isEditable(): these fields are still set once the invoice is locked (a 212 after payment).
 		$editenable = $user->hasRight('facture', 'creer');
-		if (method_exists($object, 'isEditable') && !$object->isEditable()) {
-			$editenable = false;
-		}
 		if ($action == 'create') {
 			$editenable = false;
 		}
