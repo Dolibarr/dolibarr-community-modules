@@ -378,7 +378,7 @@ class HelloAssoMemberUtils
 						if ($helloassoformdata->validityType == "Custom") {
 							$date_start_subscription = dol_stringtotime($helloassoformdata->startDate);
 							$date_end_subscription = dol_stringtotime($helloassoformdata->endDate);
-						} else { 
+						} else {
 							$result = $member->fetch_subscriptions();
 							if ($result <= 0) {
 								$this->error = $member->error;
