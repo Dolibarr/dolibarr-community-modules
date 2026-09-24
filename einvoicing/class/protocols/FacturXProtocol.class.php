@@ -133,7 +133,8 @@ class FacturXProtocol extends CIIProtocol
 		// Resolve the source PDF into which the Factur-X XML will be embedded, by priority:
 		//   1. $sourceFilePath from the generation hook (ODT/ODS: the MAIN_ODT_AS_PDF rendition shares the basename);
 		//   2. the most recent <ref>*.pdf already present in the output dir (manual generation, ODT output
-		//      like <ref>_Template.pdf for which last_main_doc is not maintained), excluding our own output;
+		//      like <ref>_Template.pdf for which last_main_doc is not maintained), excluding our own output
+		//      and the files a user uploaded;
 		//   3. legacy <ref>.pdf, regenerated with the default PDF model if missing.
 		$orig_pdf = '';
 		$fromodt = false;
@@ -154,6 +155,9 @@ class FacturXProtocol extends CIIProtocol
 					continue;
 				}
 				if (strpos($cand['name'], $filename) !== 0) {				// must belong to this invoice ref
+					continue;
+				}
+				if ($this->isAttachedFile($cand['fullname'])) {				// a file attached to the invoice is not the invoice
 					continue;
 				}
 				$orig_pdf = $cand['fullname'];								// list is sorted by date desc: newest first
@@ -352,6 +356,26 @@ class FacturXProtocol extends CIIProtocol
 		return $pathfacturxpdf;		// Name of generated Einvoice
 	}
 
+
+	/**
+	 * Tell whether a file of the documents directory was attached to the invoice rather than generated.
+	 *
+	 * Dolibarr prefixes an uploaded file with the object ref, so "<ref>-delivery.pdf" looks like a generated
+	 * document by its name. The index of the files (llx_ecm_files) records the origin: 'uploaded' from the
+	 * page, 'unknown' from the API since Dolibarr 22. A file the index does not know is kept as a candidate.
+	 *
+	 * @param	string	$fullpath	Full path of the file
+	 * @return	bool				True when the file index records an origin other than 'generated'
+	 */
+	private function isAttachedFile($fullpath)
+	{
+		require_once DOL_DOCUMENT_ROOT . '/ecm/class/ecmfiles.class.php';
+
+		$relativepath = preg_replace('/^' . preg_quote(DOL_DATA_ROOT, '/') . '[\\/]*/', '', $fullpath);
+		$ecmfile = new EcmFiles($this->db);
+
+		return $ecmfile->fetch(0, '', $relativepath) > 0 && $ecmfile->gen_or_uploaded !== 'generated';
+	}
 
 	/**
 	 * Check that the produced PDF really is a Factur-X file, and not a PDF with an attachment.
