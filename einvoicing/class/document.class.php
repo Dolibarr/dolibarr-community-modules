@@ -287,6 +287,13 @@ class Document extends CommonObject
 	 */
 	public function create(User $user, $notrigger = 0)
 	{
+		// The label and reason of a lifecycle status are free text in the CDAR, the columns hold 255 characters:
+		// a longer one lost the status. The notes keep the whole text in cdar_reason_detail.
+		foreach (array('cdar_lifecycle_label', 'cdar_reason_desc') as $field) {
+			if (isset($this->$field)) {
+				$this->$field = dol_substr((string) $this->$field, 0, 255);
+			}
+		}
 		$result = $this->createCommon($user, $notrigger);
 
 		// uncomment lines below if you want to validate object after creation

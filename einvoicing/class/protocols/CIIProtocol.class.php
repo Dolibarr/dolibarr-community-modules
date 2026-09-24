@@ -2131,6 +2131,10 @@ class CIIProtocol extends AbstractProtocol
 					$line[$f] = $this->toFloat($line[$f]);
 			}
 			$line['isDepositLine'] = (bool) ($line['isDepositLine'] ?? false);
+			// BT-155 has no maximum length, the columns it is written to and looked up in hold 128 characters.
+			if (isset($line['prodsellerid'])) {
+				$line['prodsellerid'] = dol_substr(trim((string) $line['prodsellerid']), 0, 128);
+			}
 
 			$lines[] = $line;
 		}

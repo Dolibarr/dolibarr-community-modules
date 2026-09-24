@@ -560,6 +560,12 @@ trait CommonProtocol
 	 */
 	private function _syncOrCreateThirdpartyFromEInvoiceSeller($sellerInfo, $priority = 'dolibarr', $flowId = '')
 	{
+		// EN 16931 bounds none of these texts, llx_societe does: a longer one was refused and stopped the import.
+		foreach (array('sellername' => 128, 'sellercity' => 50) as $key => $max) {
+			if (isset($sellerInfo[$key])) {
+				$sellerInfo[$key] = dol_substr((string) $sellerInfo[$key], 0, $max);
+			}
+		}
 		/**
 		 * Scenario to find or create a thirdparty based on E-invoice seller information:
 		 *
@@ -780,6 +786,11 @@ trait CommonProtocol
 		// appel)" in it. Keep the number and leave the sentence out, so the column can hold it. See #943.
 		$sellerPhone = $this->_extractPhoneNumberFromDocument($sellerInfo['sellercontactphoneno'] ?? '');
 		$sellerFax = $this->_extractPhoneNumberFromDocument($sellerInfo['sellercontactfaxno'] ?? '');
+		// A number cut short is a wrong number: one longer than the column (20 up to Dolibarr 21) once the
+		// core has removed its spaces and dots is not saved.
+		$phoneMax = (int) DOL_VERSION >= 22 ? 30 : 20;
+		$sellerPhone = dol_strlen(preg_replace('/[\s.]/', '', $sellerPhone)) > $phoneMax ? '' : $sellerPhone;
+		$sellerFax = dol_strlen(preg_replace('/[\s.]/', '', $sellerFax)) > $phoneMax ? '' : $sellerFax;
 
 		// Step 4: Create or update thirdparty
 
@@ -840,6 +851,7 @@ trait CommonProtocol
 						if (!empty($sellerInfo['sellerlinethree'])) {
 							$thirdparty->address .= "\n" . $sellerInfo['sellerlinethree'];
 						}
+						$thirdparty->address = dol_substr($thirdparty->address, 0, 255);
 					}
 					if (empty($thirdparty->zip) && !empty($sellerInfo['sellerpostcode'])) {
 						$thirdparty->zip = $sellerInfo['sellerpostcode'];
@@ -985,6 +997,7 @@ trait CommonProtocol
 			if (!empty($sellerInfo['sellerlinethree'])) {
 				$thirdparty->address .= "\n" . $sellerInfo['sellerlinethree'];
 			}
+			$thirdparty->address = dol_substr($thirdparty->address, 0, 255);
 			$thirdparty->zip = $sellerInfo['sellerpostcode'] ?? '';
 			$thirdparty->town = $sellerInfo['sellercity'] ?? '';
 			$this->_setThirdpartyCountryFromCode($thirdparty, $sellerInfo['sellercountry'] ?? '');
@@ -1350,7 +1363,7 @@ trait CommonProtocol
 			// 'EI-A1234_10_42' but was looked up as 'EI-A1234|10|42', so the module could never
 			// find back a product it had created itself.
 			$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
-			$sql .= " WHERE ref = 'EI-" . $db->escape(dol_sanitizeFileName($lineData['prodsellerid'])) . "'";
+			$sql .= " WHERE ref = '" . $db->escape(dol_substr('EI-' . dol_sanitizeFileName($lineData['prodsellerid']), 0, 128)) . "'";
 			$sql .= " AND entity IN (" . getEntity('product') . ")";
 			$sql .= " LIMIT 1";
 			$resql = $db->query($sql);
@@ -1363,7 +1376,7 @@ trait CommonProtocol
 
 		// Text Search using prodname
 		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
-		$sql .= " WHERE label = '" . $db->escape($lineData['prodname'] ?? '') . "'";
+		$sql .= " WHERE label = '" . $db->escape(trim(dol_substr((string) ($lineData['prodname'] ?? ''), 0, 255))) . "'";
 		$sql .= " AND entity IN (" . getEntity('product') . ")";
 		$resql = $db->query($sql);
 		if ($resql) {
@@ -1453,10 +1466,12 @@ trait CommonProtocol
 			$product->type 		= $this->_detectProductTypeFromEinvoiceLine($lineData);
 			// The && was inside the empty(), which warns on an absent key instead of being protected by it.
 			$sellerref = trim((string) ($lineData['prodsellerid'] ?? ''));
-			$product->ref 		= 'EI-' . dol_sanitizeFileName($sellerref !== '' ? $sellerref : uniqid());
+			$product->ref 		= dol_substr('EI-' . dol_sanitizeFileName($sellerref !== '' ? $sellerref : uniqid()), 0, 128);
 			$product->ref_ext 	= $sellerref;
+			// BT-153 has no maximum length (EN 16931, BR-FR) and product.label holds 255 characters: a longer
+			// name was refused by the database and stopped the whole synchronization. The line keeps it whole.
 			$product->label 	= !empty($lineData['prodname'])
-				? $lineData['prodname']
+				? trim(dol_substr($lineData['prodname'], 0, 255))
 				: 'Imported product from supplier invoice (Ref: ' . $lineData['parentDocumentNo'] . ')';
 			$product->description = trim($lineData['proddesc'] ?? '');
 			$product->tva_tx 	= (float) ($lineData['rateApplicablePercent'] ?? 0);
