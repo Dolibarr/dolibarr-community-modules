@@ -44,3 +44,8 @@ ALTER TABLE llx_einvoicing_sync_pending ADD INDEX idx_einvoicing_sync_pending_st
 ALTER TABLE llx_einvoicing_call MODIFY COLUMN request_body mediumtext;
 ALTER TABLE llx_einvoicing_call MODIFY COLUMN response mediumtext;
 ALTER TABLE llx_einvoicing_call MODIFY COLUMN processing_result mediumtext;
+
+-- The message of a lifecycle status is the note of the CDAR. A rejection quotes the Schematron
+-- assertions it failed, each with its XPath, so it is well past 255 characters: the INSERT was refused
+-- and the status left no row in the history, while the invoice itself showed it.
+ALTER TABLE llx_einvoicing_lifecycle_msg MODIFY COLUMN lc_status_message text NOT NULL;
