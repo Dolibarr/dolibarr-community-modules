@@ -310,9 +310,11 @@ print '<div class="inline-block valignmiddle paddingright">'.$langs->trans("flow
 // A combo rather than a plain list: it comes with a search field, and a vendor looking for one of
 // its invoices reads the number, not the identifier the platform gave the flow.
 $flowchoices = array();
+$reasonkeys = array('PRODUCT_NOT_FOUND' => 'ReasonProductNotFoundShort', 'THIRDPARTY_NOT_FOUND' => 'ReasonThirdpartyNotFoundShort', 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT' => 'ReasonBadAmountShort');
 foreach (Document::listIncomingFlowsForMapping($db) as $flowchoice) {
+	$reason = $flowchoice['reason'] ? $langs->trans($reasonkeys[$flowchoice['reason']] ?? $flowchoice['reason']) : '';
 	$flowchoices[$flowchoice['flowid']] = implode(' - ', array_filter(array($flowchoice['flowid'], $flowchoice['ref'],
-		$flowchoice['date'] ? dol_print_date($flowchoice['date'], 'day') : '', dol_trunc($flowchoice['socname'], 40), $flowchoice['reason'])));
+		$flowchoice['date'] ? dol_print_date($flowchoice['date'], 'day') : '', dol_trunc($flowchoice['socname'], 40), $reason)));
 }
 // The flow of the URL is always offered, even when neither table holds it any more, so refreshing
 // the page never silently switches the flow being mapped.
