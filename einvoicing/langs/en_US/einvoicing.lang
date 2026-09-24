@@ -792,6 +792,18 @@ DiscountFromExcessReceivedNoSource=Payment in excess deducted
 DiscountFromExcessPaidNoSource=Payment in excess deducted
 FxCheckErrorLinesWithNoName=The following lines have neither a product label nor a description, so the item name of the e-invoice (BT-153) would be empty, which rule BR-25 refuses: %s. Enter a description on each of them (rank in the document, then line id).
 
+# The credentials an installation still stores in clear, and the on-demand encryption of them (setup.php)
+EInvoicingCredentialsInClearTitle=Credentials stored in clear text
+EInvoicingCredentialsInClearText=These values are stored as typed, readable in any database dump: %s. Dolibarr encrypts a setting from the end of its constant name, and the production marker of these ones hides the keyword it looks for.
+EInvoicingCredentialsEncryptNow=Encrypt these values now
+EInvoicingCredentialsEncryptConfirm=Each value is encrypted, then read back and compared with what it was, and the access point is asked for a token. Anything that does not match is put back as it was. Encrypting does not undo the exposure: a value already written in clear is in the backups taken since, so rotate it at your access point.
+EInvoicingCredentialsEncrypted=%s value(s) encrypted, read back unchanged, and the access point still answers.
+EInvoicingCredentialsEncryptedNoCheck=%s value(s) encrypted and read back unchanged. The access point did not answer before the change either, so nothing could be checked against it.
+EInvoicingCredentialsEncryptFailed=Nothing was changed: a value did not read back as it was. The credentials are exactly as they were before.
+EInvoicingCredentialsPlatformRefused=Nothing was kept: the access point stopped answering once the values were encrypted. The credentials are exactly as they were before.
+EInvoicingCredentialsNoKey=These values cannot be encrypted: conf.php carries no instance key (dolibarr_main_instance_unique_id), which is what Dolibarr encrypts with.
+EInvoicingCredentialsLeftInClear=Left in clear: %s. This Dolibarr version does not give back a value that is not plain ASCII once it is encrypted, so encrypting it would make the connection fail (Dolibarr 24 reads it back fine).
+
 # A lifecycle status about an invoice we sent, that this run could not record (flow left unstored, retried later)
 CantRecordTheStatusOfTheInvoiceYouSent=The status of an invoice you sent, carried by flow %s, could not be recorded. Nothing was stored, the flow will be retried on the next synchronization.
 CheckSyncLogCantRecordSentInvoiceStatus=Nothing to do here: this flow is retried automatically on the next synchronization. If it keeps failing, the synchronization log gives the technical reason.
