@@ -2436,6 +2436,9 @@ class EInvoicing
 		if (empty($conf->use_javascript_ajax)) {
 			$expand_display = true;		// We force group to be shown expanded
 		}
+		if (GETPOST('highlight')) {
+			$expand_display = true;		// We force group to be shown expanded
+		}
 
 		$resprints .= '<!-- thirdpartyCardBlockfor objec->element = ' . $object->element . ' -->
         <script nonce="" type="text/javascript">
