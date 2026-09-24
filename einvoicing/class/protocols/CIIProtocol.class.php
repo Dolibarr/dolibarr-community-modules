@@ -380,6 +380,7 @@ class CIIProtocol extends AbstractProtocol
 		 *   documentNotePMD: string,
 		 *   documentNoteAAB: string,
 		 *   documentNoteTXD: string,
+		 *   documentNoteADN: string,
 		 *   vatDueDateTypeCode: string,
 		 *   documentNotes: array,
 		 *   sellername: string,
@@ -399,6 +400,7 @@ class CIIProtocol extends AbstractProtocol
 		 *   sellerCommunicationUriScheme: string,
 		 *   sellerCommunicationUri: string,
 		 *   sellerGlobalIds: list<array{schemeID: string, value: string}>,
+		 *   sellerChorusSiret: string,
 		 *   sellerTaxRegistrations: list<array{type: string, value: string}>,
 		 *   sellervatnumber: string,
 		 *   sellerLegalOrgId: string,
@@ -519,7 +521,7 @@ class CIIProtocol extends AbstractProtocol
 		 */
 		'
 		@phan-var-force Facture 			$object			The $invoice object used in entry on inc file, but completed.
-		@phan-var-force array{documentno:string,documenttypecode:null|string,documentdate:DateTimeInterface,invoiceCurrency:string|array<string>,taxCurrency:null,documentname:null,documentlanguage:string,effectiveSpecifiedPeriod:\'NA\',documentDeliveryDate:DateTimeInterface,invoicingPeriodStart:?DateTimeInterface,invoicingPeriodEnd:?DateTimeInterface,businessProcessId:string,isTestDocument:bool,documentNotePublic:string,documentNotePMT:string,documentNotePMD:string,documentNoteAAB:string,documentNoteTXD:string,documentNotes:array,vatDueDateTypeCode:string,sellername:string,sellerids:string,sellerlineone:string,sellerlinetwo:string,sellerlinethree:string,sellerpostcode:string,sellercity:string,sellercountry:string,sellersubdivision:null,sellercontactpersonname:string,sellercontactdepartmentname:null,sellercontactphoneno:string,sellercontactfaxno:string,sellercontactemailaddr:string,sellerCommunicationUriScheme:string,sellerCommunicationUri:string,sellerGlobalIds:array<array{schemeID:string,value:string}>,sellerTaxRegistrations:array<array{type:string,value:string}>,sellervatnumber:string,sellerLegalOrgId:string,sellerLegalOrgScheme:string,sellerTradingName:string,buyername:string,buyerids:string,buyerlineone:string,buyerlinetwo:string,buyerlinethree:string,buyerpostcode:string,buyercity:string,buyercountry:string,buyersubdivision:null,buyervatnumber:string,buyerGlobalIds:array<array{schemeID:string,value:string}>,buyerRoutingCode:null|string,buyerChorusSiret:string,buyerLegalOrgId:string,buyerLegalOrgScheme:string,buyerTradingName:string,buyerReference:null|string,buyerCommunicationUriScheme:string,buyerCommunicationUri:string,buyercontactpersonname:null,buyercontactemailaddr:null,buyercontactphoneno:null,grandTotalAmount:float|int,duePayableAmount:float|int,lineTotalAmount:float|int,chargeTotalAmount:float,allowanceTotalAmount:float|int,taxBasisTotalAmount:float|int,taxTotalAmount:float|int,roundingAmount:null,totalPrepaidAmount:float|int,iban_id:int,iban:string,bic:string,accountName:string,accountRef:string,accountLabel:string,paymentDueDate:DateTimeInterface,paymentTermsText:string,headerAllowancesCharges:array,invoiceRefDocs:array|array<array{ref:string|int,date:DateTimeInterface,type:string}>,orderReference:string,contractReference:null|string,contractReferenceTypeCode:string,despatchAdviceRef:null,taxBreakdown:array|array<array<string,array>>,_chorus:bool,_depositlines:array|array<array{lineId:int,invoiceRef:string,invoiceDate:DateTimeInterface}>,_globalDiscounts:array|array<array{value:float,reason:string,taxRate:float,categoryVAT:string}>,_customerOrderReferenceList:string[],_project:Project|null,paymentMeansCode?:int,paymentMeansText?:string,_shipFromContactBill?:array{address:null|string,zip:null|string,town:null|string,country:string},_shipFromContactShip?:array{name:string,address:null|string,zip:null|string,town:null|string,country:string}} $invoiceData
+		@phan-var-force array{documentno:string,documenttypecode:null|string,documentdate:DateTimeInterface,invoiceCurrency:string|array<string>,taxCurrency:null,documentname:null,documentlanguage:string,effectiveSpecifiedPeriod:\'NA\',documentDeliveryDate:DateTimeInterface,invoicingPeriodStart:?DateTimeInterface,invoicingPeriodEnd:?DateTimeInterface,businessProcessId:string,isTestDocument:bool,documentNotePublic:string,documentNotePMT:string,documentNotePMD:string,documentNoteAAB:string,documentNoteTXD:string,documentNoteADN:string,documentNotes:array,vatDueDateTypeCode:string,sellername:string,sellerids:string,sellerlineone:string,sellerlinetwo:string,sellerlinethree:string,sellerpostcode:string,sellercity:string,sellercountry:string,sellersubdivision:null,sellercontactpersonname:string,sellercontactdepartmentname:null,sellercontactphoneno:string,sellercontactfaxno:string,sellercontactemailaddr:string,sellerCommunicationUriScheme:string,sellerCommunicationUri:string,sellerGlobalIds:array<array{schemeID:string,value:string}>,sellerChorusSiret:string,sellerTaxRegistrations:array<array{type:string,value:string}>,sellervatnumber:string,sellerLegalOrgId:string,sellerLegalOrgScheme:string,sellerTradingName:string,buyername:string,buyerids:string,buyerlineone:string,buyerlinetwo:string,buyerlinethree:string,buyerpostcode:string,buyercity:string,buyercountry:string,buyersubdivision:null,buyervatnumber:string,buyerGlobalIds:array<array{schemeID:string,value:string}>,buyerRoutingCode:null|string,buyerChorusSiret:string,buyerLegalOrgId:string,buyerLegalOrgScheme:string,buyerTradingName:string,buyerReference:null|string,buyerCommunicationUriScheme:string,buyerCommunicationUri:string,buyercontactpersonname:null,buyercontactemailaddr:null,buyercontactphoneno:null,grandTotalAmount:float|int,duePayableAmount:float|int,lineTotalAmount:float|int,chargeTotalAmount:float,allowanceTotalAmount:float|int,taxBasisTotalAmount:float|int,taxTotalAmount:float|int,roundingAmount:null,totalPrepaidAmount:float|int,iban_id:int,iban:string,bic:string,accountName:string,accountRef:string,accountLabel:string,paymentDueDate:DateTimeInterface,paymentTermsText:string,headerAllowancesCharges:array,invoiceRefDocs:array|array<array{ref:string|int,date:DateTimeInterface,type:string}>,orderReference:string,contractReference:null|string,contractReferenceTypeCode:string,despatchAdviceRef:null,taxBreakdown:array|array<array<string,array>>,_chorus:bool,_depositlines:array|array<array{lineId:int,invoiceRef:string,invoiceDate:DateTimeInterface}>,_globalDiscounts:array|array<array{value:float,reason:string,taxRate:float,categoryVAT:string}>,_customerOrderReferenceList:string[],_project:Project|null,paymentMeansCode?:int,paymentMeansText?:string,_shipFromContactBill?:array{address:null|string,zip:null|string,town:null|string,country:string},_shipFromContactShip?:array{name:string,address:null|string,zip:null|string,town:null|string,country:string}} $invoiceData
 		@phan-var-force array<int,array{lineid:int,linestatuscode:null|string,linestatusreasoncode:null|string,lineNote:null,prodname:string,proddesc:string,prodsellerid:string,prodbuyerid:null|string,prodglobalidtype:null|string,prodglobalid:null|string,prodmultilangs:array,prodClassificationCode:null|string,prodClassificationScheme:null|string,prodOriginCountry:null|string,netpriceamount:float,netpricebasisquantity:null|float,netpricebasisquantityunitcode:null|string,billedquantity:float,billedquantityunitcode:string,chargeFreeQuantity:null|float,chargeFreeQuantityunitcode:null|string,packageQuantity:null|float,packageQuantityunitcode:null|string,lineTotalAmount:float|string,totalAllowanceChargeAmount:null|float,categoryCode:string,typeCode:\'VAT\',rateApplicablePercent:string,tva_tx:float|string,vat_src_code:string,ExemptionReason:string,ExemptionReasonCode:string,calculatedAmount:null|float,lineAllowances:array,lineGrossPriceAllowances:array,lineremisepercent:\'NA\'|float,linePeriodStart:?DateTimeInterface,linePeriodEnd:?DateTimeInterface,additionalRefDocs:array,isDepositLine:bool,depositInvoiceRef:null|string,depositInvoiceDate:?DateTimeInterface,parentDocumentNo:null|string,is_deposit:int<0,1>,fk_remise:null|int,discountPercent:float,grosspriceamount:null|float,grosspricebasisquantity:null|float,grosspricebasisquantityunitcode:null|string}> $linesData
 		@phan-var-force string 				$outputlang		Value of $outputlangs->defaultlang
 		@phan-var-force Account				$account
@@ -2536,6 +2538,12 @@ class CIIProtocol extends AbstractProtocol
 				$note->appendChild($doc->createElement('ram:Content', einvoicingXmlText($invoiceData['documentNoteTXD'])));
 				$note->appendChild($doc->createElement('ram:SubjectCode', 'TXD'));
 			}
+			if (!empty($invoiceData['documentNoteADN'])) {
+				$note = $doc->createElement('ram:IncludedNote');
+				$exDoc->appendChild($note);
+				$note->appendChild($doc->createElement('ram:Content', einvoicingXmlText($invoiceData['documentNoteADN'])));
+				$note->appendChild($doc->createElement('ram:SubjectCode', 'ADN'));
+			}
 		}
 
 		//$root->appendChild($doc->createTextNode("\n "));
@@ -3103,6 +3111,14 @@ class CIIProtocol extends AbstractProtocol
 				// deliberately not declared: BT-29 and BT-46 are optional, and an empty element would
 				// be refused by PEPPOL-EN16931-R008.
 				$node->appendChild($doc->createElement('ram:ID', einvoicingXmlText((string) $data[$prefix . 'ids'])));
+			}
+
+			// SIRET of the seller (BT-29 under scheme 0009) on a B2G invoice, which BR-FR-CPRO-03 and
+			// BR-FR-CPRO-09 require. Kept to the EXTENDED profiles like its buyer twin below.
+			if ($type === 'seller' && $this->isExtendedProfile($profile) && !empty($data['sellerChorusSiret'])) {
+				$siret = $doc->createElement('ram:GlobalID', einvoicingXmlText($data['sellerChorusSiret']));
+				$siret->setAttribute('schemeID', EInvoicing::SCHEME_FR_SIRET);
+				$node->appendChild($siret);
 			}
 
 			// SIRET of the buyer (BT-46 under scheme 0009), which BR-FR-CPRO-10 makes mandatory on a B2G
