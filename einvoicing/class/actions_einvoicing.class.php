@@ -1413,7 +1413,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function formConfirm($parameters, $object, &$action, $hookmanager)
 	{
-		global $conf, $db, $langs, $form;
+		global $conf, $db, $langs, $form, $user;
 
 		if (empty($object->element)) {
 			return 0;
