@@ -76,7 +76,6 @@ include_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
 include_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
 include_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.product.class.php';
 include_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
-include_once __DIR__.'/lib/einvoicing.lib.php';
 include_once __DIR__.'/class/providers/PDPProviderManager.class.php';
 include_once __DIR__.'/class/protocols/ProtocolManager.class.php';
 include_once __DIR__.'/class/document.class.php';
@@ -312,7 +311,8 @@ print '<div class="inline-block valignmiddle paddingright">'.$langs->trans("flow
 // its invoices reads the number, not the identifier the platform gave the flow.
 $flowchoices = array();
 foreach (Document::listIncomingFlowsForMapping($db) as $flowchoice) {
-	$flowchoices[$flowchoice['flowid']] = einvoicingFlowChoiceLabel($flowchoice);
+	$flowchoices[$flowchoice['flowid']] = implode(' - ', array_filter(array($flowchoice['flowid'], $flowchoice['ref'],
+		$flowchoice['date'] ? dol_print_date($flowchoice['date'], 'day') : '', dol_trunc($flowchoice['socname'], 40), $flowchoice['reason'])));
 }
 // The flow of the URL is always offered, even when neither table holds it any more, so refreshing
 // the page never silently switches the flow being mapped.
