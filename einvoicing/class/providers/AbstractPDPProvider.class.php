@@ -1181,6 +1181,8 @@ abstract class AbstractPDPProvider
 		$actioncomm->percentage = -1;
 		$actioncomm->authorid = $user->id;
 		$actioncomm->userownerid = $user->id;
+		// Dolibarr 18 writes fk_element only, 22 and later read elementid: both, or the event is not linked.
+		$actioncomm->fk_element = $object->id;
 		$actioncomm->elementid = $object->id;
 		$actioncomm->elementtype = $object->element;
 
