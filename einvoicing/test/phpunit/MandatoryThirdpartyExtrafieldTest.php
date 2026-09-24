@@ -309,4 +309,95 @@ class MandatoryThirdpartyExtrafieldTest extends CommonClassTest
 		$reread->fetch($socid);
 		$this->assertEquals('KEEP ME', $reread->array_options['options_' . self::ATTRNAME], 'The synchronization lost the stored extrafield value');
 	}
+
+	/**
+	 * The vendor lookup the import runs before anything else, called on its own. product_mapping.php
+	 * names the vendor of a flow with it, so its answer has to stay the answer of the import.
+	 *
+	 * @param	array	$sellerInfo	Seller information
+	 * @return	array				Answer of findThirdpartyFromEInvoiceSeller()
+	 */
+	private function lookupSeller($sellerInfo)
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		return $protocol->findThirdpartyFromEInvoiceSeller($sellerInfo);
+	}
+
+	/**
+	 * Number of thirdparties carrying a SIREN, to tell a lookup that found nothing from one that
+	 * created what it was looking for. The column of idprof1 is named after what it holds in France.
+	 *
+	 * @param	string	$siren	SIREN to count
+	 * @return	int				Number of rows
+	 */
+	private function nbThirdpartiesWithSiren($siren)
+	{
+		global $db;
+
+		$sql = "SELECT COUNT(*) as nb FROM " . MAIN_DB_PREFIX . "societe WHERE siren = '" . $db->escape($siren) . "'";
+		$resql = $db->query($sql);
+		$this->assertNotFalse($resql, 'Could not count the thirdparties: ' . $db->lasterror());
+		$obj = $db->fetch_object($resql);
+
+		return (int) $obj->nb;
+	}
+
+	/**
+	 * The lookup answers the vendor the SIREN of the document identifies.
+	 *
+	 * @return void
+	 */
+	public function testSellerLookupFindsTheVendorByItsLegalIdentifier()
+	{
+		$siren = '000000015';
+		$socid = $this->createVendor($siren);
+
+		$res = $this->lookupSeller($this->sellerInfo($siren));
+
+		$this->assertEquals($socid, $res['res'], 'The lookup did not find the vendor by its SIREN: ' . $res['message']);
+	}
+
+	/**
+	 * An unknown seller is answered with 0, and nothing is created: the lookup is read only, where the
+	 * synchronization around it creates the vendor when the option says so.
+	 *
+	 * @return void
+	 */
+	public function testSellerLookupCreatesNothingWhenTheSellerIsUnknown()
+	{
+		global $conf;
+
+		// On, so a lookup that would go on creating like the synchronization does would be caught here.
+		$conf->global->EINVOICING_THIRDPARTIES_AUTO_GENERATION = 1;
+
+		$siren = '000000016';
+		$this->assertEquals(0, $this->nbThirdpartiesWithSiren($siren), 'The SIREN of the test is already used');
+
+		$res = $this->lookupSeller($this->sellerInfo($siren));
+
+		$this->assertEquals(0, $res['res'], 'The lookup answered a thirdparty for a SIREN nobody carries');
+		$this->assertEquals(0, $this->nbThirdpartiesWithSiren($siren), 'The lookup created the vendor it was only asked about');
+	}
+
+	/**
+	 * A name is not an identity (BT-27 and BT-28 are descriptive): a document carrying no structured
+	 * identifier is not attached to the vendor that merely bears the same name (issue #739).
+	 *
+	 * @return void
+	 */
+	public function testSellerLookupDoesNotMatchOnTheNameAlone()
+	{
+		$siren = '000000017';
+		$this->createVendor($siren);
+
+		$sellerInfo = $this->sellerInfo($siren);
+		unset($sellerInfo['sellerGlobalIds']);
+
+		$res = $this->lookupSeller($sellerInfo);
+
+		$this->assertEquals(0, $res['res'], 'The lookup attached the document to a vendor on its name alone');
+	}
 }
