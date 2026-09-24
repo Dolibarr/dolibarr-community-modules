@@ -2387,9 +2387,9 @@ class EInvoicing
                                 if (data.statusvalidationlabel === "Pending") {
 									countCheckInvoiceStatus++;
 									if (countCheckInvoiceStatus <= 3) {
-		                            	setTimeout(checkInvoiceStatus, 5000);
+		                            	setTimeout(checkSupplierInvoiceStatus, 5000);
 									} else if (countCheckInvoiceStatus <= 5) {
-		                            	setTimeout(checkInvoiceStatus, 10000);
+		                            	setTimeout(checkSupplierInvoiceStatus, 10000);
 									}
                                 }
                             }, "json");
