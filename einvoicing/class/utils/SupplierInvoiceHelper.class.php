@@ -63,6 +63,20 @@ class SupplierInvoiceHelper
 	}
 
 	/**
+	 * Sign that turns the amounts of a supplier invoice into those of the document it was imported from.
+	 *
+	 * Dolibarr stores a credit note negative and the document announces it positive; any other invoice
+	 * carries the sign of its document, a negative one included (BT-3 380 with negative lines).
+	 *
+	 * @param	FactureFournisseur	$invoice	The supplier invoice
+	 * @return	int								-1 for a credit note, 1 otherwise
+	 */
+	public static function documentSign(FactureFournisseur $invoice): int
+	{
+		return ((int) $invoice->type === FactureFournisseur::TYPE_CREDIT_NOTE) ? -1 : 1;
+	}
+
+	/**
 	 * The VAT included total a Dolibarr invoice is expected to carry for a received document (issue #994).
 	 *
 	 * BT-115 is what the buyer owes, and what the invoice totals once BT-114 is carried as a line, so it
@@ -71,7 +85,7 @@ class SupplierInvoiceHelper
 	 * payable of the issuer's own invention must not move the guards that block a bad import.
 	 *
 	 * @param	array<string,mixed>	$parsedHeader	Header data of the received document
-	 * @return	?float								Absolute total, or null when the document announces none
+	 * @return	?float								Total with the sign of the document, or null when it announces none
 	 */
 	public static function announcedTotalTtc(array $parsedHeader)
 	{
@@ -79,11 +93,11 @@ class SupplierInvoiceHelper
 			return null;
 		}
 
-		$rounded = abs((float) $parsedHeader['grandTotalAmount'] + self::documentRoundingAmount($parsedHeader));
+		$rounded = (float) $parsedHeader['grandTotalAmount'] + self::documentRoundingAmount($parsedHeader);
 
 		if (isset($parsedHeader['duePayableAmount'])) {
-			$prepaid = isset($parsedHeader['totalPrepaidAmount']) ? abs((float) $parsedHeader['totalPrepaidAmount']) : 0.0;
-			$due = abs((float) $parsedHeader['duePayableAmount']) + $prepaid;
+			$prepaid = isset($parsedHeader['totalPrepaidAmount']) ? (float) $parsedHeader['totalPrepaidAmount'] : 0.0;
+			$due = (float) $parsedHeader['duePayableAmount'] + $prepaid;
 			if (abs($due - $rounded) < 0.005) {
 				return $due;
 			}
@@ -100,7 +114,7 @@ class SupplierInvoiceHelper
 	 * what the invoice totals is therefore the one plus the other.
 	 *
 	 * @param	array<string,mixed>	$parsedHeader	Header data of the received document
-	 * @return	?float								Absolute total, or null when the document announces none
+	 * @return	?float								Total with the sign of the document, or null when it announces none
 	 */
 	public static function announcedTotalHt(array $parsedHeader)
 	{
@@ -108,7 +122,7 @@ class SupplierInvoiceHelper
 			return null;
 		}
 
-		return abs((float) $parsedHeader['taxBasisTotalAmount'] + self::documentRoundingAmount($parsedHeader));
+		return (float) $parsedHeader['taxBasisTotalAmount'] + self::documentRoundingAmount($parsedHeader);
 	}
 
 	/**
@@ -198,20 +212,19 @@ class SupplierInvoiceHelper
 
 		$amountErrors = [];
 
-		$isCreditNote = ($dolSupplierInvoice->type == FactureFournisseur::TYPE_CREDIT_NOTE);
+		$sign = self::documentSign($dolSupplierInvoice);
 
 		foreach ($calculationRules as $calculationRule => $vatComputeMode) {
 			$details = self::getInvoiceDetailsForComparison($dolSupplierInvoice, $vatComputeMode);
 			$amountErrors[$calculationRule] = [];
 
-			if ($isCreditNote) {
-				$details['total_ht'] = abs($details['total_ht']);
-				$details['total_ttc'] = abs($details['total_ttc']);
-				$details['total_tva'] = abs($details['total_tva']);
-				foreach ($details['vat_by_rate'] as $rate => $rateDetails) {
-					$details['vat_by_rate'][$rate]['vat_amount'] = abs($rateDetails['vat_amount']);
-					$details['vat_by_rate'][$rate]['vat_basis_amount'] = abs($rateDetails['vat_basis_amount']);
-				}
+			// The invoice is put in the sign of its document before anything is compared
+			$details['total_ht'] = $sign * $details['total_ht'];
+			$details['total_ttc'] = $sign * $details['total_ttc'];
+			$details['total_tva'] = $sign * $details['total_tva'];
+			foreach ($details['vat_by_rate'] as $rate => $rateDetails) {
+				$details['vat_by_rate'][$rate]['vat_amount'] = $sign * $rateDetails['vat_amount'];
+				$details['vat_by_rate'][$rate]['vat_basis_amount'] = $sign * $rateDetails['vat_basis_amount'];
 			}
 
 			// VAT excl. and VAT incl. totals. Both are confronted with what the invoice is expected to
@@ -221,16 +234,16 @@ class SupplierInvoiceHelper
 			$announcedTtc = self::announcedTotalTtc($parsedHeader);
 
 			if ($announcedHt !== null && !self::areAmountsEqual($details['total_ht'], $announcedHt)) {
-				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatExclDifference', $announcedHt, floatval($dolSupplierInvoice->total_ht));
+				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatExclDifference', $announcedHt, $details['total_ht']);
 			}
 
 			if ($announcedTtc !== null && !self::areAmountsEqual($details['total_ttc'], $announcedTtc)) {
-				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatInclDifference', $announcedTtc, floatval($dolSupplierInvoice->total_ttc));
+				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatInclDifference', $announcedTtc, $details['total_ttc']);
 			}
 
 			// VAT total
 			if (!self::areAmountsEqual($details['total_tva'], $parsedHeader['taxTotalAmount'])) {
-				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatDifference', $parsedHeader['taxTotalAmount'], floatval($dolSupplierInvoice->total_tva));
+				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatDifference', $parsedHeader['taxTotalAmount'], $details['total_tva']);
 			}
 
 			$dolSupplierInvoiceVatDetails = $details['vat_by_rate'];
@@ -592,15 +605,15 @@ class SupplierInvoiceHelper
 	/**
 	 * Tell whether an invoice totals what the received document announces.
 	 *
-	 * Compared on the absolute values: a credit note is stored negative by Dolibarr while BT-110 and
-	 * BT-112 are always announced positive, the document type being what carries the sign (BR-CO-13
-	 * applies to a credit note as it does to an invoice). What a deposit attached to the invoice deducts
+	 * Compared with their sign: a credit note is stored negative by Dolibarr and announced positive, so
+	 * its totals are negated first; any other invoice carries the sign of its document, a negative
+	 * invoice (BT-3 380 with negative lines) included. What a deposit attached to the invoice deducts
 	 * is added back first, the document announcing its totals before the deduction. The tolerance is there
 	 * for the float representation, not for a difference: the document carries its totals to the cent.
 	 *
 	 * @param	FactureFournisseur	$invoice			The invoice, with its totals as stored
-	 * @param	float				$announcedTva		BT-110 of the received document, absolute value
-	 * @param	float				$announcedTtc		BT-112 of the received document, absolute value
+	 * @param	float				$announcedTva		BT-110 of the received document
+	 * @param	float				$announcedTtc		BT-112 of the received document
 	 * @param	?float				$announcedPrepaid	BT-113 of the received document, or null not to confront it
 	 * @return	bool									True when both totals are the announced ones
 	 */
@@ -612,8 +625,9 @@ class SupplierInvoiceHelper
 		// same footing; it is added signed, so a credit note stored negative comes back to its own total
 		// too. Nothing is attached in the ordinary case and the sums are zero (issue #948).
 		$deposits = self::linkedDepositTotals((int) $invoice->id);
-		$invoiceTva = abs((float) $invoice->total_tva + $deposits['tva']);
-		$invoiceTtc = abs((float) $invoice->total_ttc + $deposits['ttc']);
+		$sign = self::documentSign($invoice);
+		$invoiceTva = $sign * ((float) $invoice->total_tva + $deposits['tva']);
+		$invoiceTtc = $sign * ((float) $invoice->total_ttc + $deposits['ttc']);
 
 		if (abs($invoiceTva - (float) $announcedTva) >= 0.005
 			|| abs($invoiceTtc - (float) $announcedTtc) >= 0.005) {
@@ -628,7 +642,7 @@ class SupplierInvoiceHelper
 			return true;
 		}
 
-		return abs(self::linkedDepositAmount((int) $invoice->id) - abs((float) $announcedPrepaid)) < 0.005;
+		return abs(self::linkedDepositAmount((int) $invoice->id) - (float) $announcedPrepaid) < 0.005;
 	}
 
 	/**
