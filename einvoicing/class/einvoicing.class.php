@@ -3644,7 +3644,7 @@ class EInvoicing
 		$sql .= ($flowId ? "'" . $db->escape($flowId) . "'" : "NULL") . ", ";
 		$sql .= "'" . $db->escape($direction) . "', ";
 		$sql .= (int) $statusCode . ", ";
-		$sql .= "'" . $db->escape($statusMessage) . "', ";
+		$sql .= "'" . $db->escape(dol_substr((string) $statusMessage, 0, 255)) . "', ";
 		$sql .= "'" . $db->escape($validationStatus) . "', ";
 		$sql .= "'" . $db->escape($validationMessage) . "', ";
 		$sql .= "'" . $db->escape($date_creation) . "', ";
