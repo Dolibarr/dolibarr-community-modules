@@ -1130,6 +1130,10 @@ trait CommonProtocol
 			// greyed and titled: a button that disappears reads as "create it, but how?", a greyed one names
 			// the permission to ask for.
 			$action = $langs->trans('CreateSupplierManually');
+			$action .= ' '.$langs->trans('OrAssignProfessionalIdToExistingSupplier');
+
+			$action .= '<br>';
+
 			$action .= $user->hasRight('societe', 'creer')
 				? '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">'
 				: '<a class="butActionRefused classfortooltip small smallpaddingimp" href="#" title="' . dol_escape_htmltag($langs->trans("NotEnoughPermissions")) . '">';
@@ -1142,9 +1146,8 @@ trait CommonProtocol
 			$searchUrl = DOL_URL_ROOT . '/societe/list.php?type=f';
 			$searchUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
 
-			$action .= '<br>';
+			$action .= ' ';
 
-			$action .= $langs->trans('OrAssignProfessionalIdToExistingSupplier');
 			// Reading the list needs the right on it, and the same reasoning as for the creation
 			// button above applies: a greyed button names the permission to ask for.
 			$action .= $user->hasRight('societe', 'lire')
