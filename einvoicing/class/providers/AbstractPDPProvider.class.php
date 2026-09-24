@@ -705,7 +705,7 @@ abstract class AbstractPDPProvider
 			}
 
 			// Neither '_TOKEN' nor '_REFRESH' is in the list dolibarr_set_const() matches, so both would
-			// be stored as received. Reading needs no change, dolDecrypt() is applied to every constant.
+			// be stored as received. They are decrypted when the constants are loaded, and by fetchOAuthTokenDB() in memory.
 			dolibarr_set_const($db, $serviceName.'_TOKEN', self::encryptIfReadable($accessToken), 'chaine', 0, '', $forceentity);
 
 			if ($refreshToken !== null) {
@@ -808,9 +808,11 @@ abstract class AbstractPDPProvider
 				return false;
 			}
 
+			// dolibarr_set_const() leaves in memory the value it stored, encrypted by saveOAuthTokenDB(). dolDecrypt()
+			// returns unchanged a value already in clear (loaded at the start of the page, or read by dolibarr_get_const()).
 			return [
-				'token' => $token,
-				'refresh_token' => $refresh,
+				'token' => dolDecrypt($token),
+				'refresh_token' => dolDecrypt($refresh),
 				'token_expires_at' => $expire
 			];
 		}
