@@ -687,7 +687,9 @@ abstract class AbstractPDPProvider
 	 */
 	public function saveOAuthTokenDB($accessToken, $refreshToken = null, $expiresIn = null)
 	{
-		global $conf, $db;
+		global $conf;
+
+		$db = $this->getTokenStorageDb();
 
 		$now = dol_now();
 
@@ -785,7 +787,7 @@ abstract class AbstractPDPProvider
 	 */
 	public function fetchOAuthTokenDB($forceentity = 0)
 	{
-		global $conf, $db;
+		global $conf;
 
 		// Build service name depending on environment
 		$serviceName = $this->config['dol_prefix'] . '_' . ($this->config['live'] ? 'PROD' : 'TEST');
@@ -799,9 +801,10 @@ abstract class AbstractPDPProvider
 			if ($forceentity) {
 				require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 
-				$token = dolibarr_get_const($this->db, $serviceName.'_TOKEN', (int) $forceentity);
-				$refresh = dolibarr_get_const($this->db, $serviceName.'_REFRESH', (int) $forceentity);
-				$expire = dolibarr_get_const($this->db, $serviceName.'_EXPIRE', (int) $forceentity);
+				$db = $this->getTokenStorageDb();
+				$token = dolibarr_get_const($db, $serviceName.'_TOKEN', (int) $forceentity);
+				$refresh = dolibarr_get_const($db, $serviceName.'_REFRESH', (int) $forceentity);
+				$expire = dolibarr_get_const($db, $serviceName.'_EXPIRE', (int) $forceentity);
 			}
 
 			if (empty($token)) {
@@ -814,6 +817,8 @@ abstract class AbstractPDPProvider
 				'token_expires_at' => $expire
 			];
 		}
+
+		$db = $this->getTokenStorageDb();
 
 		// Prepare SQL
 		$sql = "SELECT tokenstring, tokenstring_refresh, expire_at
@@ -840,6 +845,26 @@ abstract class AbstractPDPProvider
 			'refresh_token' => (string) dolDecrypt((string) $obj->tokenstring_refresh),
 			'token_expires_at' => (string) $db->jdate($obj->expire_at, 'gmt')
 		];
+	}
+
+	/**
+	 * Connection the OAuth token is read and written on, apart from the caller's transaction (same as logCall()).
+	 *
+	 * A refresh rotates the refresh_token on the platform at once: saved in a transaction the caller then rolled
+	 * back (a supplier invoice validation failing after BILL_SUPPLIER_VALIDATE, ...), the new token was lost and
+	 * the old one, already rejected, came back. Read on the same connection, or the caller's snapshot hides it.
+	 *
+	 * @return	DoliDB		Independent connection, or the main one when it cannot be opened
+	 */
+	protected function getTokenStorageDb()
+	{
+		global $conf, $dolibarr_main_db_pass, $dbhistory;
+
+		if (empty($dbhistory)) {
+			$dbhistory = getDoliDBInstance($conf->db->type, $conf->db->host, (string) $conf->db->user, $dolibarr_main_db_pass, (string) $conf->db->name, (int) $conf->db->port);
+		}
+
+		return empty($dbhistory->connected) ? $this->db : $dbhistory;
 	}
 
 
