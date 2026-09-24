@@ -2027,11 +2027,13 @@ class EInvoicing
 						if (!is_object($object->thirdparty ?? null) && !empty($object->socid)) {
 							$object->fetch_thirdparty();
 						}
-						$defaultTarget = (($object->thirdparty ?? null) instanceof Societe) ? $this->getBuyerCommunicationURI($object->thirdparty) : '';
-						$resprints .= '<span class="opacitymedium">' . $langs->trans("InvoiceRoutingOverrideDefault") . '</span>';
+						$buyer = $object->thirdparty ?? null;
+						$defaultTarget = ($buyer instanceof Societe) ? $this->getBuyerCommunicationURI($buyer) : '';
+						$resprints .= '<span class="opacitymedium">' . $langs->trans("InvoiceRoutingOverrideDefault");
 						if ($defaultTarget !== '') {
 							$resprints .= ' (' . dol_escape_htmltag($defaultTarget) . ')';
 						}
+						$resprints .= '</span>';
 					}
 				}
 				$resprints .= '</td>';
