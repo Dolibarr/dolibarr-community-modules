@@ -629,7 +629,24 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	if ($action != 'presend' && $action != 'editline'
 		&& $object->flow_direction == 'In' && $object->fk_element_type == 'invoice_supplier' && !empty($object->flow_id)) {
 		print '<div class="tabsAction">'."\n";
-		print dolGetButtonAction('', $langs->trans('EInvoiceReimport'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=reimport&token='.newToken(), '', $permissiontoadd);
+
+		// The import replaces the invoice this document was booked on, and only a draft can be
+		// replaced (Document::reimport() refuses anything else), so say it here rather than later.
+		$reimportofadraft = true;
+		if (!empty($object->fk_element_id)) {
+			require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
+			$linkedinvoice = new FactureFournisseur($db);
+			if ($linkedinvoice->fetch((int) $object->fk_element_id) > 0
+				&& (int) $linkedinvoice->status !== FactureFournisseur::STATUS_DRAFT) {
+				$reimportofadraft = false;
+			}
+		}
+
+		if ($reimportofadraft) {
+			print dolGetButtonAction('', $langs->trans('EInvoiceReimport'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=reimport&token='.newToken(), '', $permissiontoadd);
+		} else {
+			print '<span class="butActionRefused classfortooltip" title="'.dol_escape_htmltag($langs->trans('EInvoiceReimportOnlyOnADraft')).'">'.$langs->trans('EInvoiceReimport').'</span>';
+		}
 		print '</div>'."\n";
 	}
 
