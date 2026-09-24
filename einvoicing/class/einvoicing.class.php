@@ -2023,7 +2023,15 @@ class EInvoicing
 					if (!empty($currentOverrideRouting)) {
 						$resprints .= dol_escape_htmltag($selectOptions[$currentOverrideRouting]);
 					} else {
+						// Show the address the invoice will really be sent to, as getBuyerCommunicationURI() resolves it.
+						if (!is_object($object->thirdparty ?? null) && !empty($object->socid)) {
+							$object->fetch_thirdparty();
+						}
+						$defaultTarget = (($object->thirdparty ?? null) instanceof Societe) ? $this->getBuyerCommunicationURI($object->thirdparty) : '';
 						$resprints .= '<span class="opacitymedium">' . $langs->trans("InvoiceRoutingOverrideDefault") . '</span>';
+						if ($defaultTarget !== '') {
+							$resprints .= ' (' . dol_escape_htmltag($defaultTarget) . ')';
+						}
 					}
 				}
 				$resprints .= '</td>';
