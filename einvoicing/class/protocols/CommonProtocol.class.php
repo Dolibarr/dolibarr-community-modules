@@ -1129,8 +1129,8 @@ trait CommonProtocol
 			// Creating the thirdparty needs the right on it. Without that right the button stays where it is,
 			// greyed and titled: a button that disappears reads as "create it, but how?", a greyed one names
 			// the permission to ask for.
-			$action = $langs->trans('CreateSupplierManually');
-			$action .= ' '.$langs->trans('OrAssignProfessionalIdToExistingSupplier');
+			$action = '<div class="marginbottomonly opacitymedium">'.$langs->trans('CreateSupplierManually');
+			$action .= ' '.$langs->trans('OrAssignProfessionalIdToExistingSupplier').'</div>';
 
 			$action .= '<br>';
 
