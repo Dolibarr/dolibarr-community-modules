@@ -3701,6 +3701,163 @@ class EInvoicing
 	}
 
 	/**
+	 * Count the status messages of a code this Dolibarr sent for an element, whatever their answer.
+	 *
+	 * @param	int		$elementId		Id of the element
+	 * @param	string	$elementType	Element type ('facture', 'invoice_supplier')
+	 * @param	int		$statusCode		Lifecycle status code (212, ...)
+	 * @return	int						Number of messages sent, -1 on SQL error
+	 */
+	public function countSentStatusMessages($elementId, $elementType, $statusCode)
+	{
+		$sql = "SELECT COUNT(rowid) as nb FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
+		$sql .= " WHERE element_type = '" . $this->db->escape($elementType) . "'";
+		$sql .= " AND element_id = " . (int) $elementId;
+		$sql .= " AND lc_status = " . (int) $statusCode;
+		$sql .= " AND LOWER(direction) = 'out'";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' SQL error: ' . $this->db->lasterror(), LOG_ERR);
+			return -1;
+		}
+		$obj = $this->db->fetch_object($resql);
+		$this->db->free($resql);
+
+		return (int) $obj->nb;
+	}
+
+	/**
+	 * Tell whether a cash-in on a customer invoice has to be reported with the status 212 (Encaissee).
+	 *
+	 * @param	Facture	$invoice	Customer invoice, transmitted or not
+	 * @return	int					1 to report, 0 nothing to report (out of scope, VAT not due on collection, never
+	 *								transmitted), -1 the platform refused the deposit and holds no invoice to report on
+	 */
+	public function getCashInReportState($invoice)
+	{
+		// needEInvoiceManagement() answers with a status code whose ignore values are truthy: ask the boolean question.
+		if (!$this->mustManageEInvoice($invoice) || !$this->isCashInReportDue($invoice)) {
+			return 0;
+		}
+
+		$currentStatusDetails = $this->fetchLastknownInvoiceStatus($invoice->id, (string) $invoice->ref);
+		if ($currentStatusDetails['transmitted'] != 1) {
+			return 0;
+		}
+
+		// 'transmitted' lets STATUS_ERROR through, which is what an acknowledgement "Error" leaves behind:
+		// the invoice must be corrected and re-sent before its cash-in can be reported.
+		if ((int) $currentStatusDetails['code'] === self::STATUS_ERROR) {
+			return -1;
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Tell whether the VAT of this invoice falls due on collection, i.e. whether its cash-ins are reported (212).
+	 *
+	 * The reform only requires the payment data for the operations whose VAT is due on collection, which is exactly
+	 * what the VAT exigibility scheme of the company says (einvoicingVatDueOnCollection()).
+	 *
+	 * @param	Facture	$invoice	Customer invoice
+	 * @return	bool				True if its cash-ins have to be reported
+	 */
+	public function isCashInReportDue($invoice)
+	{
+		// VAT on a down payment falls due when it is collected, whatever the scheme: the debits option is set aside
+		// by a payment received before the debit, and it may not delay the exigibility anyway (CGI art. 269-2).
+		if ($invoice->type == CommonInvoice::TYPE_DEPOSIT) {
+			return true;
+		}
+
+		if (empty($invoice->lines)) {
+			$invoice->fetch_lines();
+		}
+
+		// Product::TYPE_PRODUCT / TYPE_SERVICE. Anything else is a pseudo-line carrying no VAT (title, subtotal,
+		// page break) and is not a kind of operation: the document builder leaves those out of the same decision.
+		$hasProductLine = false;
+		$hasServiceLine = false;
+		foreach ($invoice->lines as $line) {
+			if ((int) $line->product_type === 1) {
+				$hasServiceLine = true;
+			} elseif ((int) $line->product_type === 0) {
+				$hasProductLine = true;
+			}
+		}
+
+		return einvoicingVatDueOnCollection($hasProductLine, $hasServiceLine);
+	}
+
+	/**
+	 * List the payments that moved money on a customer invoice, oldest first: cash-ins, and refunds (negative).
+	 *
+	 * Not CommonInvoice::getListOfPayments(): it gives no payment id, and mixes in the credit notes and
+	 * down payments used, which move no money.
+	 *
+	 * @param	int		$invoiceId	Id of the customer invoice
+	 * @return	array<int,array{ref:string,date:int,amount:float,note:string}>	Payments by id, empty on error
+	 */
+	public function getCashInPayments($invoiceId)
+	{
+		$payments = array();
+
+		$sql = "SELECT p.rowid, p.ref, p.datep, p.note, pf.amount";
+		$sql .= " FROM " . $this->db->prefix() . "paiement_facture as pf";
+		$sql .= " INNER JOIN " . $this->db->prefix() . "paiement as p ON p.rowid = pf.fk_paiement";
+		$sql .= " WHERE pf.fk_facture = " . (int) $invoiceId;
+		$sql .= " AND pf.amount <> 0";
+		$sql .= " AND p.entity IN (" . getEntity('facture') . ")";
+		$sql .= " ORDER BY p.datep ASC, p.rowid ASC";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' SQL error: ' . $this->db->lasterror(), LOG_ERR);
+			return $payments;
+		}
+		while ($obj = $this->db->fetch_object($resql)) {
+			$payments[(int) $obj->rowid] = array('ref' => (string) $obj->ref, 'date' => (int) $this->db->jdate($obj->datep), 'amount' => (float) $obj->amount, 'note' => (string) $obj->note);
+		}
+		$this->db->free($resql);
+
+		return $payments;
+	}
+
+	/**
+	 * Report a cash-in or a refund of a customer invoice to the Approved Platform with the status 212 (Encaissee).
+	 *
+	 * Shared by the payment trigger and the manual action of the invoice card, so both apply the same gates.
+	 *
+	 * @param	Facture	$invoice	Invoice, or credit note, the money moved on
+	 * @param	float	$amount		Amount (TTC) of the payment, reported as the MEN blocks: negative for a refund
+	 * @param	string	$reason		Reason of the cancellation (MDT-126), on a refund only (rule P1.17)
+	 * @return	array{res:int,message:string}	res 1 sent, 0 nothing to report, -2 deposit refused, -1 error
+	 */
+	public function reportCashIn($invoice, $amount, $reason = '')
+	{
+		$state = $this->getCashInReportState($invoice);
+		if ($state === 0) {
+			return array('res' => 0, 'message' => '');
+		}
+		if ($state < 0) {
+			return array('res' => -2, 'message' => '');
+		}
+
+		require_once __DIR__ . '/providers/PDPProviderManager.class.php';
+		$PDPManager = new PDPProviderManager($this->db);
+		$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+		if (!is_object($provider)) {
+			return array('res' => -1, 'message' => 'No Approved Platform configured');
+		}
+
+		$result = $provider->sendStatusMessage($invoice, 212, '', array('amount' => (float) $amount, 'reason' => (string) $reason));
+
+		return array('res' => ($result['res'] > 0 ? 1 : -1), 'message' => (string) $result['message']);
+	}
+
+	/**
 	 * Fetch lifecycle status messages linked to a given flow ID.
 	 *
 	 * @param	string		$flowId		Flow ID (UUID)

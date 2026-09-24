@@ -656,6 +656,9 @@ EInvoiceGeneratedButRecipientReachabilityUnconfirmed=E-invoice generated, but th
 EInvoiceNotSentRecipientReachabilityUnconfirmed=Invoice not sent: the recipient reachability could not be confirmed
 EInvStatus212PaymentRefunded=Refund reported to the platform
 EInvoiceCashInNotReportedDepositRefused=Cash-in of the invoice %s not reported to the Approved Platform: it refused the deposit of that e-invoice, so it holds no invoice to report a payment on. Correct and send the e-invoice again, then report the cash-in.
+EInvoiceReportPayment=Report a payment (212)
+ConfirmReportPayment=Report the payment chosen below of invoice <b>%s</b> to the Approved Platform with the status "Paid" (212)?<br>The invoice has %s payment(s), and %s payment status(es) have already been sent for it: report only a payment that went unreported, or the platform counts it twice.
+EInvoiceNoPaymentToReport=No payment of the invoice %s has to be reported to the Approved Platform: it is out of the e-invoicing scope, its VAT is not due on collection, or it has never been transmitted.
 EINVOICING_JOB_MANUAL_ACTION_REQUIRED=Manual action is required. The job has been interrupted.
 NoPDPProviderConfigured=No Approved Platform configured: nothing to synchronize
 

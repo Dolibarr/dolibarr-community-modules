@@ -422,6 +422,24 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 						'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()
 					);
 				}
+
+				// Report a payment (212) by hand: the payment trigger sends it once, and nothing sends it again
+				// when that fails (platform down, temporary directory not writable...).
+				if (!einvoicingIsSendDisabled()) {
+					'@phan-var-force Facture $object';
+					/** @var Facture $object */
+					$cashInState = $einvoicing->getCashInReportState($object);
+					if ($cashInState !== 0 && count($einvoicing->getCashInPayments($object->id)) > 0) {
+						$url_button[] = array(
+							'lang' => 'einvoicing',
+							'enabled' => true,
+							'perm' => (!$forcedisabling && $cashInState > 0 && $user->hasRight('einvoicing', 'write') && $user->hasRight('facture', 'creer')),
+							'label' => $langs->trans('EInvoiceReportPayment'),
+							'text' => ($cashInState < 0 ? $langs->trans('EInvoiceCashInNotReportedDepositRefused', (string) $object->ref) : $forcedisabling),
+							'url' => '/compta/facture/card.php?id=' . $object->id . '&action=report_payment&token=' . newToken()
+						);
+					}
+				}
 			}
 
 			if (empty($parameters['context']) || !preg_match('/takepospay/', $parameters['context'])) {
@@ -769,6 +787,30 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					setEventMessages($langs->trans("InvoicePrecheckSuccessful"), array(), 'mesgs');
 				} else {
 					setEventMessages($langs->trans("InvoicePrecheckFailed"), array(), 'errors');
+				}
+			}
+
+			// Action to report a payment (212) by hand, with the same gates as the payment trigger
+			if ($action == 'confirm_report_payment' && GETPOST('confirm', 'alpha') == 'yes'
+				&& $permissiontoedit && $user->hasRight('einvoicing', 'write') && !einvoicingIsSendDisabled()) {
+				$payments = $einvoicing->getCashInPayments($object->id);
+				$payment = $payments[GETPOSTINT('paymentid')] ?? null;
+				if ($payment === null) {
+					setEventMessages($langs->trans('ErrorRecordNotFound'), null, 'errors');
+				} else {
+					// Rule P1.17: a cash-out carries the reason of the cancellation (MDT-126), the comment of the payment
+					$reason = ($payment['amount'] < 0 ? trim($payment['note']) : '');
+					$result = $einvoicing->reportCashIn($object, $payment['amount'], $reason);
+					if ($result['res'] > 0) {
+						setEventMessages($langs->trans($payment['amount'] < 0 ? 'EInvStatus212PaymentRefunded' : 'EInvStatus212PaymentReceived'), null, 'mesgs');
+					} elseif ($result['res'] == -2) {
+						setEventMessages($langs->trans('EInvoiceCashInNotReportedDepositRefused', (string) $object->ref), null, 'warnings');
+					} elseif ($result['res'] == 0) {
+						setEventMessages($langs->trans('EInvoiceNoPaymentToReport', (string) $object->ref), null, 'warnings');
+					} else {
+						// Not $error++: the lifecycle rows and the call log the provider wrote must survive the failure
+						setEventMessages($result['message'], null, 'errors');
+					}
 				}
 			}
 
@@ -1371,7 +1413,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function formConfirm($parameters, $object, &$action, $hookmanager)
 	{
-		global $db, $langs, $form;
+		global $conf, $db, $langs, $form, $user;
 
 		if (empty($object->element)) {
 			return 0;
@@ -1384,6 +1426,35 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			return 0;
 		}
 		$langs->load("einvoicing@einvoicing");
+
+		// Confirmation of the payment to report (212) by hand. The count of statuses already sent is what tells
+		// the operator which payment went unreported: none of them names the payment it reports.
+		if (in_array($object->element, ['facture']) && $action == 'report_payment') {
+			$form = new Form($db);
+			'@phan-var-force Facture $object';
+
+			$values = array();
+			$default = '';
+			foreach ($einvoicing->getCashInPayments($object->id) as $paymentId => $payment) {
+				$values[$paymentId] = $payment['ref'] . ' - ' . dol_print_date($payment['date'], 'day') . ' - ' . price($payment['amount'], 0, $langs, 1, -1, -1, $conf->currency);
+				$default = $paymentId;	// The most recent one
+			}
+			$formquestion = array(
+				array('type' => 'select', 'name' => 'paymentid', 'label' => $langs->trans('Payment'), 'values' => $values, 'default' => $default, 'select_show_empty' => 0)
+			);
+			$question = $langs->trans('ConfirmReportPayment', (string) $object->ref, count($values), $einvoicing->countSentStatusMessages($object->id, $object->element, 212));
+
+			$this->resprints .= $form->formconfirm(
+				DOL_URL_ROOT . '/compta/facture/card.php?id=' . $object->id,
+				$langs->trans('EInvoiceReportPayment'),
+				$question,
+				'confirm_report_payment',
+				$formquestion,
+				'yes',
+				1,
+				250
+			);
+		}
 
 		if (in_array($object->element, ['invoice_supplier']) && !einvoicingReceptionDisabled()) {
 			// Clone confirmation
