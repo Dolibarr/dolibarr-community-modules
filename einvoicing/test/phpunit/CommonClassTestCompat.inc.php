@@ -30,6 +30,23 @@ if (!defined('DOL_DOCUMENT_ROOT')) {
 	throw new \RuntimeException('CommonClassTestCompat.inc.php must be included after master.inc.php');
 }
 
+// PHPUnit loads a test file in a function scope and publishes its variables to $GLOBALS only once
+// the file is loaded. The core class declares "global $conf,$user,$langs,$db,$mysoc;" (Dolibarr 25):
+// required from here, that statement rebinds those names to the still empty entries of $GLOBALS and
+// drops what master.inc.php has just built in this scope. $mysoc is the one a test file does not
+// declare itself, so publish it before, or every test reads a null seller.
+if (isset($mysoc) && !isset($GLOBALS['mysoc'])) {
+	$GLOBALS['mysoc'] = $mysoc;
+}
+
+// The assertions read the English wording of the core, and the module ships en_US only, so a test
+// run must not depend on the language of the instance it runs on. Pinned in memory, for this
+// process: the constant of the database is left alone.
+if (isset($conf, $langs) && is_object($langs)) {
+	$conf->global->MAIN_LANG_DEFAULT = 'en_US';
+	$langs->setDefaultLang('en_US');
+}
+
 $coreCommonClassTest = DOL_DOCUMENT_ROOT . '/../test/phpunit/CommonClassTest.class.php';
 
 if (file_exists($coreCommonClassTest)) {
