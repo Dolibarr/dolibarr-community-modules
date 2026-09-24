@@ -586,6 +586,76 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
+	 * A received document carrying several payment means: the accounts it announces (BT-84, BT-85,
+	 * BT-86) are all read, in document order, the same account written twice is kept once, and a
+	 * payment means without an IBAN - a cash payment - announces no account at all. Issue #1031.
+	 *
+	 * @return void
+	 */
+	public function testThePayeeBankAccountsAreReadFromTheDocument()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+		$accounts = $protocol->parsePayeeBankAccounts($this->documentWithPayeeBankAccounts());
+
+		$this->assertCount(2, $accounts, 'the cash payment means and the repeated account must not add an entry');
+
+		$this->assertSame('FR76 3000 6000 0112 3456 7890 189', $accounts[0]['iban'], 'the IBAN is kept as the document writes it');
+		$this->assertSame('AGRIFRPPXXX', $accounts[0]['bic'], 'BT-86 comes from the financial institution of the same payment means');
+		$this->assertSame('ACME SAS', $accounts[0]['accountName'], 'BT-85');
+
+		$this->assertSame('DE89370400440532013000', $accounts[1]['iban'], 'the second account of the document');
+		$this->assertSame('', $accounts[1]['bic'], 'that payment means carries no BIC');
+
+		// parseInvoiceHeader() keeps the first account only, which is what the rest of the import reads
+		$header = $protocol->parseInvoiceHeader($this->documentWithPayeeBankAccounts());
+		$this->assertSame('FR76 3000 6000 0112 3456 7890 189', $header['iban']);
+	}
+
+	/**
+	 * A document with four payment means: one full account, the same IBAN again written without
+	 * spaces, a second account, and a cash payment.
+	 *
+	 * @return string	CII document
+	 */
+	private function documentWithPayeeBankAccounts(): string
+	{
+		return '<?xml version="1.0" encoding="UTF-8"?>
+<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
+	<rsm:SupplyChainTradeTransaction>
+		<ram:ApplicableHeaderTradeSettlement>
+			<ram:SpecifiedTradeSettlementPaymentMeans>
+				<ram:TypeCode>58</ram:TypeCode>
+				<ram:PayeePartyCreditorFinancialAccount>
+					<ram:IBANID>FR76 3000 6000 0112 3456 7890 189</ram:IBANID>
+					<ram:AccountName>ACME SAS</ram:AccountName>
+				</ram:PayeePartyCreditorFinancialAccount>
+				<ram:PayeeSpecifiedCreditorFinancialInstitution>
+					<ram:BICID>AGRIFRPPXXX</ram:BICID>
+				</ram:PayeeSpecifiedCreditorFinancialInstitution>
+			</ram:SpecifiedTradeSettlementPaymentMeans>
+			<ram:SpecifiedTradeSettlementPaymentMeans>
+				<ram:TypeCode>30</ram:TypeCode>
+				<ram:PayeePartyCreditorFinancialAccount>
+					<ram:IBANID>FR7630006000011234567890189</ram:IBANID>
+				</ram:PayeePartyCreditorFinancialAccount>
+			</ram:SpecifiedTradeSettlementPaymentMeans>
+			<ram:SpecifiedTradeSettlementPaymentMeans>
+				<ram:TypeCode>31</ram:TypeCode>
+				<ram:PayeePartyCreditorFinancialAccount>
+					<ram:IBANID>DE89370400440532013000</ram:IBANID>
+				</ram:PayeePartyCreditorFinancialAccount>
+			</ram:SpecifiedTradeSettlementPaymentMeans>
+			<ram:SpecifiedTradeSettlementPaymentMeans>
+				<ram:TypeCode>10</ram:TypeCode>
+			</ram:SpecifiedTradeSettlementPaymentMeans>
+		</ram:ApplicableHeaderTradeSettlement>
+	</rsm:SupplyChainTradeTransaction>
+</rsm:CrossIndustryInvoice>';
+	}
+
+	/**
 	 * What the second argument buys, on the timezone the defect was reported from: left out,
 	 * dol_stringtotime() answers midnight UTC, which idate() writes as the day before.
 	 *
@@ -751,75 +821,5 @@ class CIIProtocolTest extends CommonClassTest
 		$this->assertSame('TRA', $codes['24'] ?? null, 'bill of exchange awaiting acceptance');
 		$this->assertSame('CB', $codes['48'] ?? null, 'bank card');
 		$this->assertSame('PRE', $codes['49'] ?? null, 'direct debit');
-	}
-
-	/**
-	 * A received document carrying several payment means: the accounts it announces (BT-84, BT-85,
-	 * BT-86) are all read, in document order, the same account written twice is kept once, and a
-	 * payment means without an IBAN - a cash payment - announces no account at all. Issue #1031.
-	 *
-	 * @return void
-	 */
-	public function testThePayeeBankAccountsAreReadFromTheDocument()
-	{
-		global $db;
-
-		$protocol = new CIIProtocol($db);
-		$accounts = $protocol->parsePayeeBankAccounts($this->documentWithPayeeBankAccounts());
-
-		$this->assertCount(2, $accounts, 'the cash payment means and the repeated account must not add an entry');
-
-		$this->assertSame('FR76 3000 6000 0112 3456 7890 189', $accounts[0]['iban'], 'the IBAN is kept as the document writes it');
-		$this->assertSame('AGRIFRPPXXX', $accounts[0]['bic'], 'BT-86 comes from the financial institution of the same payment means');
-		$this->assertSame('ACME SAS', $accounts[0]['accountName'], 'BT-85');
-
-		$this->assertSame('DE89370400440532013000', $accounts[1]['iban'], 'the second account of the document');
-		$this->assertSame('', $accounts[1]['bic'], 'that payment means carries no BIC');
-
-		// parseInvoiceHeader() keeps the first account only, which is what the rest of the import reads
-		$header = $protocol->parseInvoiceHeader($this->documentWithPayeeBankAccounts());
-		$this->assertSame('FR76 3000 6000 0112 3456 7890 189', $header['iban']);
-	}
-
-	/**
-	 * A document with four payment means: one full account, the same IBAN again written without
-	 * spaces, a second account, and a cash payment.
-	 *
-	 * @return string	CII document
-	 */
-	private function documentWithPayeeBankAccounts(): string
-	{
-		return '<?xml version="1.0" encoding="UTF-8"?>
-<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
-	<rsm:SupplyChainTradeTransaction>
-		<ram:ApplicableHeaderTradeSettlement>
-			<ram:SpecifiedTradeSettlementPaymentMeans>
-				<ram:TypeCode>58</ram:TypeCode>
-				<ram:PayeePartyCreditorFinancialAccount>
-					<ram:IBANID>FR76 3000 6000 0112 3456 7890 189</ram:IBANID>
-					<ram:AccountName>ACME SAS</ram:AccountName>
-				</ram:PayeePartyCreditorFinancialAccount>
-				<ram:PayeeSpecifiedCreditorFinancialInstitution>
-					<ram:BICID>AGRIFRPPXXX</ram:BICID>
-				</ram:PayeeSpecifiedCreditorFinancialInstitution>
-			</ram:SpecifiedTradeSettlementPaymentMeans>
-			<ram:SpecifiedTradeSettlementPaymentMeans>
-				<ram:TypeCode>30</ram:TypeCode>
-				<ram:PayeePartyCreditorFinancialAccount>
-					<ram:IBANID>FR7630006000011234567890189</ram:IBANID>
-				</ram:PayeePartyCreditorFinancialAccount>
-			</ram:SpecifiedTradeSettlementPaymentMeans>
-			<ram:SpecifiedTradeSettlementPaymentMeans>
-				<ram:TypeCode>31</ram:TypeCode>
-				<ram:PayeePartyCreditorFinancialAccount>
-					<ram:IBANID>DE89370400440532013000</ram:IBANID>
-				</ram:PayeePartyCreditorFinancialAccount>
-			</ram:SpecifiedTradeSettlementPaymentMeans>
-			<ram:SpecifiedTradeSettlementPaymentMeans>
-				<ram:TypeCode>10</ram:TypeCode>
-			</ram:SpecifiedTradeSettlementPaymentMeans>
-		</ram:ApplicableHeaderTradeSettlement>
-	</rsm:SupplyChainTradeTransaction>
-</rsm:CrossIndustryInvoice>';
 	}
 }
