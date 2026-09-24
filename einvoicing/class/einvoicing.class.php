@@ -3676,15 +3676,48 @@ class EInvoicing
 	 */
 	public function hasSentStatusMessage($elementId, $elementType, $statusCode, $onlyAccepted = 0)
 	{
+		return $this->statusMessageExists($elementId, $elementType, $statusCode, $onlyAccepted ? 'accepted' : 'any');
+	}
+
+	/**
+	 * Tell whether a lifecycle status is already live on the platform for an object.
+	 *
+	 * A CDAR the platform rejected ('Error') left nothing behind and may be sent again; anything else -
+	 * accepted, or still being validated - means the vendor has already been answered and a second send
+	 * would only duplicate the flow.
+	 *
+	 * @param	int		$elementId		Id of the invoice
+	 * @param	string	$elementType	Element type ('facture', 'invoice_supplier')
+	 * @param	int		$statusCode		Lifecycle status looked for (200 to 213)
+	 * @return	bool					True if that status is already live on the platform
+	 */
+	public function hasLiveStatusMessage($elementId, $elementType, $statusCode)
+	{
+		return $this->statusMessageExists($elementId, $elementType, $statusCode, 'notrejected');
+	}
+
+	/**
+	 * Tell whether an outbound lifecycle status message exists for an object.
+	 *
+	 * @param	int		$elementId		Id of the invoice
+	 * @param	string	$elementType	Element type ('facture', 'invoice_supplier')
+	 * @param	int		$statusCode		Lifecycle status looked for (200 to 213)
+	 * @param	string	$validation		Sends to count: 'any', 'accepted' (the platform confirmed it) or 'notrejected' (anything it did not refuse)
+	 * @return	bool					True if such a message exists
+	 */
+	private function statusMessageExists($elementId, $elementType, $statusCode, $validation)
+	{
 		$sql = "SELECT rowid FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 		$sql .= " WHERE element_type = '" . $this->db->escape($elementType) . "'";
 		$sql .= " AND element_id = " . (int) $elementId;
 		$sql .= " AND lc_status = " . (int) $statusCode;
 		$sql .= " AND LOWER(direction) = 'out'";
-		if ($onlyAccepted) {
-			// Stored as 'Ok', but compared lowercased like the direction above: on PostgreSQL an equality
-			// on the stored case is a comparison that silently matches nothing.
+		// Stored as 'Ok' / 'Error', but compared lowercased like the direction above: on PostgreSQL an
+		// equality on the stored case is a comparison that silently matches nothing.
+		if ($validation == 'accepted') {
 			$sql .= " AND LOWER(lc_validation_status) = 'ok'";
+		} elseif ($validation == 'notrejected') {
+			$sql .= " AND LOWER(lc_validation_status) <> 'error'";
 		}
 		$sql .= " LIMIT 1";
 
