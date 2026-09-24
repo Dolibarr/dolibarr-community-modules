@@ -245,6 +245,41 @@ function stancerAdminPrepareHead()
 	return $head;
 }
 
+/**
+ * Return the Stancer logo, sized for an inline use (button, frame legend...).
+ *
+ * @param  int    $height Height in pixels
+ * @return string         HTML of the logo
+ */
+function stancerBrandLogo($height = 16)
+{
+	$height = max(8, (int) $height);
+
+	return '<img src="' . dol_buildpath('/stancer/img/object_stancer.png', 1) . '" alt="Stancer" height="' . $height . '" width="' . $height . '" style="vertical-align: middle;">';
+}
+
+/**
+ * Wrap the Stancer payment button in a bordered block so the customer sees at a glance
+ * that this payment method belongs to Stancer, and not to another payment module of the page.
+ *
+ * @param  string $content Inner HTML (button, hidden inputs, scripts)
+ * @return string          HTML of the framed block
+ */
+function stancerPaymentFrame($content)
+{
+	global $langs;
+
+	$out = '<fieldset style="border: 1px solid rgba(128, 128, 128, 0.4); border-radius: 8px; padding: 8px 16px 16px; margin: 1em 0; min-width: 0;">';
+	$out .= '<legend style="padding: 0 8px; font-weight: bold; white-space: nowrap;">';
+	$out .= stancerBrandLogo(16);
+	$out .= '<span style="vertical-align: middle; margin-left: 8px;">' . $langs->trans('StancerPaymentFrameTitle') . '</span>';
+	$out .= '</legend>';
+	$out .= $content;
+	$out .= '</fieldset>';
+
+	return $out;
+}
+
 
 // Sub-library files
 dol_include_once('/stancer/lib/stancer_customer.lib.php');

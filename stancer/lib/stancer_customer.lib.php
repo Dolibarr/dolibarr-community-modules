@@ -358,6 +358,207 @@ function stancerBuildCardAnchorData($socid, $customerID, $objname, $country_code
 }
 
 /**
+ * Turn a phone number into the international form Stancer expects.
+ *
+ * Stancer only accepts a mobile in international form ("+33..."). Dolibarr
+ * stores what the user typed, most often a French national number with spaces
+ * or dots, which the raw comparison "does it start with a + ?" rejects. The
+ * conversion assumes France for a national number, which is what the
+ * ZIPAUTOFILL/company country already assumes elsewhere in Dolibarr.
+ *
+ * @param  string $phone       Number as stored in Dolibarr.
+ * @param  string $countryCode Country of the thirdparty, ISO 3166-1 alpha-2.
+ * @return string              International number, or an empty string when nothing usable.
+ */
+function stancerNormalizePhone($phone, $countryCode = 'FR')
+{
+	$phone = preg_replace('/[^0-9+]/', '', (string) $phone);
+	if ($phone === '') {
+		return '';
+	}
+	// Keep a single leading +, drop any other one.
+	$lead = ($phone[0] === '+') ? '+' : '';
+	$digits = str_replace('+', '', $phone);
+	if ($lead === '+') {
+		return (strlen($digits) >= 8) ? '+' . $digits : '';
+	}
+	// "00" is the other way of writing "+".
+	if (strncmp($digits, '00', 2) === 0 && strlen($digits) > 4) {
+		return '+' . substr($digits, 2);
+	}
+	// National French number: 10 digits starting with 0.
+	if (strtoupper($countryCode) === 'FR' && strlen($digits) === 10 && $digits[0] === '0') {
+		return '+33' . substr($digits, 1);
+	}
+
+	return '';
+}
+
+/**
+ * Tell whether an international number looks like a mobile one.
+ *
+ * Stancer wants a mobile and answers 422 on a landline. Only France can be
+ * told apart here with any confidence (06/07), so every other country is
+ * given the benefit of the doubt and left to Stancer to judge.
+ *
+ * @param  string $phone Number already in international form.
+ * @return bool
+ */
+function stancerLooksLikeMobile($phone)
+{
+	if (strncmp((string) $phone, '+33', 3) !== 0) {
+		return true;
+	}
+
+	return preg_match('/^\+33[67]/', $phone) === 1;
+}
+
+/**
+ * Find an email and a mobile Stancer can attach the payment to.
+ *
+ * A Stancer customer needs an email or an international mobile, and refusing
+ * the payment when the thirdparty carries neither means turning down an order
+ * over a form field nobody filled in - while the contacts of that same
+ * thirdparty usually hold both. The search walks, in this order:
+ *   1. the thirdparty itself;
+ *   2. the billing contact of the paid object, then its other contacts;
+ *   3. the contacts of the thirdparty.
+ * The first usable value wins for each field, so an email may come from the
+ * thirdparty and the mobile from a contact.
+ *
+ * NOTHING IS WRITTEN. The values serve this payment only: the thirdparty and
+ * the contacts are left exactly as they are, and it stays a human decision to
+ * copy an address onto a record.
+ *
+ * @param  Societe     $societe Thirdparty that owes the money.
+ * @param  Object|null $object  Paid object, when there is one.
+ * @return array{email:string,mobile:string,email_from:string,mobile_from:string} Values found, and where.
+ */
+function stancerResolvePayerContact($societe, $object = null)
+{
+	global $db, $langs;
+
+	// The source is shown to the user before the payment link is sent: it must
+	// read like a place they know, not like a row id.
+	$langs->loadLangs(array('companies'));
+
+	$found = array('email' => '', 'mobile' => '', 'email_from' => '', 'mobile_from' => '');
+	if (!is_object($societe)) {
+		return $found;
+	}
+	$countryCode = empty($societe->country_code) ? 'FR' : $societe->country_code;
+
+	// Candidates, best first. Each one is a label plus the two fields it may fill.
+	$candidates = array();
+	$candidates[] = array(
+		'label' => $langs->trans('ThirdParty'),
+		'email' => isset($societe->email) ? $societe->email : '',
+		'phones' => array(
+			isset($societe->phone_mobile) ? $societe->phone_mobile : '',
+			isset($societe->phone) ? $societe->phone : '',
+		),
+	);
+
+	// Which contacts are linked to the paid object, and which of them bills it.
+	// liste_contact() answers the roles but carries no phone number at all: its
+	// rows hold the name, the email and the role, nothing else. Reading a phone
+	// from them silently yielded none, which left the billing contact no better
+	// placed than any other for the mobile.
+	$rankOfContact = array();
+	if (is_object($object) && method_exists($object, 'liste_contact') && !empty($object->id)) {
+		$linked = $object->liste_contact(-1, 'external');
+		if (is_array($linked)) {
+			foreach ($linked as $c) {
+				$contactId = (int) (isset($c['id']) ? $c['id'] : 0);
+				if ($contactId <= 0) {
+					continue;
+				}
+				$rankOfContact[$contactId] = (!empty($c['code']) && $c['code'] === 'BILLING') ? 0 : 1;
+			}
+		}
+	}
+
+	// The numbers come from socpeople, in one query covering the contacts of the
+	// thirdparty and the ones linked to the document, which are not always the same.
+	$people = array();
+	if (!empty($societe->id) || !empty($rankOfContact)) {
+		$sql = "SELECT rowid, lastname, firstname, email, phone, phone_mobile, fk_soc FROM " . MAIN_DB_PREFIX . "socpeople";
+		$sql .= " WHERE (fk_soc = " . ((int) $societe->id);
+		if (!empty($rankOfContact)) {
+			$sql .= " OR rowid IN (" . implode(',', array_map('intval', array_keys($rankOfContact))) . ")";
+		}
+		$sql .= ")";
+		$sql .= " AND statut = 1";
+		$sql .= " AND entity IN (" . getEntity('socpeople') . ")";
+		$sql .= " ORDER BY rowid ASC";
+		$resql = $db->query($sql);
+		if ($resql) {
+			while ($obj = $db->fetch_object($resql)) {
+				$people[(int) $obj->rowid] = $obj;
+			}
+			$db->free($resql);
+		} else {
+			dol_syslog("stancerResolvePayerContact: could not read the contacts of socid=" . ((int) $societe->id) . ": " . $db->lasterror(), LOG_ERR);
+		}
+	}
+
+	// Billing contact of the document first, then its other contacts, then the
+	// remaining contacts of the thirdparty, oldest first (usually the main one).
+	$orderedIds = array();
+	foreach (array(0, 1) as $rank) {
+		foreach ($rankOfContact as $contactId => $contactRank) {
+			if ($contactRank === $rank) {
+				$orderedIds[] = $contactId;
+			}
+		}
+	}
+	foreach ($people as $contactId => $person) {
+		if (!isset($rankOfContact[$contactId]) && (int) $person->fk_soc === (int) $societe->id) {
+			$orderedIds[] = $contactId;
+		}
+	}
+
+	foreach ($orderedIds as $contactId) {
+		if (!isset($people[$contactId])) {
+			continue;
+		}
+		$person = $people[$contactId];
+		$contactName = trim((string) $person->firstname . ' ' . (string) $person->lastname);
+		$candidates[] = array(
+			'label' => $langs->trans('Contact') . ($contactName === '' ? ' #' . $contactId : ' : ' . $contactName),
+			'email' => $person->email,
+			'phones' => array($person->phone_mobile, $person->phone),
+		);
+	}
+
+	foreach ($candidates as $candidate) {
+		if ($found['email'] === '' && strpos((string) $candidate['email'], '@') !== false) {
+			$found['email'] = trim((string) $candidate['email']);
+			$found['email_from'] = $candidate['label'];
+		}
+		if ($found['mobile'] === '') {
+			foreach ($candidate['phones'] as $phone) {
+				$normalized = stancerNormalizePhone($phone, $countryCode);
+				if ($normalized !== '' && stancerLooksLikeMobile($normalized)) {
+					$found['mobile'] = $normalized;
+					$found['mobile_from'] = $candidate['label'];
+					break;
+				}
+			}
+		}
+		if ($found['email'] !== '' && $found['mobile'] !== '') {
+			break;
+		}
+	}
+
+	dol_syslog("stancerResolvePayerContact: socid=" . (int) $societe->id
+		. " email=" . ($found['email'] === '' ? 'none' : 'from ' . $found['email_from'])
+		. " mobile=" . ($found['mobile'] === '' ? 'none' : 'from ' . $found['mobile_from']), LOG_DEBUG);
+
+	return $found;
+}
+
+/**
  * add customer on Stancer if needed
  *
  * @param	object	$object		Thirdparty or member the Stancer customer must be attached to
@@ -382,17 +583,10 @@ function stancerAddCustomerIfNeeded($object)
 	//Si c'est déjà une société
 	if ($object->element == 'societe') {
 		$societe = $object;
-		$email = $societe->email;
-		// Prefer the mobile over the landline (Stancer expects a mobile). Use
-		// isset()/cast so a missing property (incomplete object) never fatals.
-		$phone = "";
-		$phoneMobile = isset($societe->phone_mobile) ? trim((string) $societe->phone_mobile) : "";
-		$phoneFixe   = isset($societe->phone) ? trim((string) $societe->phone) : "";
-		if ($phoneMobile != "") {
-			$phone = $phoneMobile;
-		} elseif ($phoneFixe != "") {
-			$phone = $phoneFixe;
-		}
+		// The thirdparty comes first, its contacts next: see stancerResolvePayerContact().
+		$payer = stancerResolvePayerContact($societe, null);
+		$email = $payer['email'];
+		$phone = $payer['mobile'];
 		$objname = $societe->name;
 		$socid = $object->id;
 		$country_code = $societe->country_code;
@@ -402,8 +596,10 @@ function stancerAddCustomerIfNeeded($object)
 		$societe = new Societe($db);
 		$socresult = $societe->fetch($object->socid);
 		if ($socresult) {
-			$email = $societe->email;
-			$phone = $societe->phone;
+			// Contacts of the paid object are searched too, billing ones first.
+			$payer = stancerResolvePayerContact($societe, $object);
+			$email = $payer['email'];
+			$phone = $payer['mobile'];
 			$objname = $societe->name;
 			$socid = $societe->id;
 			$country_code = $societe->country_code;
@@ -412,7 +608,7 @@ function stancerAddCustomerIfNeeded($object)
 	} elseif ($object->element  == 'member') {
 		//un membre (association)
 		$email = $object->email;
-		$phone = $object->phone;
+		$phone = stancerNormalizePhone($object->phone, empty($object->country_code) ? 'FR' : $object->country_code);
 		$objname = $object->firstname . " " . $object->lastname;
 		$memberid = $object->id;
 		$country_code = $object->country_code;
