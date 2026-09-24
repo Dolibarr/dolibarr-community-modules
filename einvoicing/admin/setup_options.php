@@ -448,8 +448,9 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 
 	// Activate postponeflow
 	// EINVOICING_ENABLE_POSTPONE_FLOWS: This option postpone flow with the action to do so we can do it manually later.
-	// Risk: very dangerous. continuing to process flows means changing the cursor, and when a new record is save, we lost
-	// all postpone flow that were discarded.
+	// A postponed flow is recorded in llx_einvoicing_sync_pending and the next synchronization asks for it by
+	// identifier, before the window: moving the cursor no longer loses it.
+	// EINVOICING_FLOWS_SYNC_REPLAY_SIZE: how many waiting flows one run takes again that way (50 by default).
 }
 
 
