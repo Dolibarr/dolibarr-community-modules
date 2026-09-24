@@ -2520,14 +2520,6 @@ class EInvoicing
 				$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
 				$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
 				$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
-				if (GETPOST('highlight') == 'routing_product_id') {
-					if (getDolGlobalString('PRODUIT_USE_SEARCH_TO_SELECT')) {
-						$resprints .= dol_set_focus('#search_routing_product_id');
-					} else {
-						$resprints .= dol_set_focus('#routing_product_id');
-					}
-				}
-
 				$resprints .= '</td>';
 				$resprints .= '</tr>';
 			}
@@ -2658,6 +2650,14 @@ class EInvoicing
 			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
 			if ($mode == 'edit') {
 				$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
+
+				if (GETPOST('highlight') == 'routing_product_id') {
+					if (getDolGlobalString('PRODUIT_USE_SEARCH_TO_SELECT')) {
+						$resprints .= dol_set_focus('#search_routing_product_id');
+					} else {
+						$resprints .= dol_set_focus('#routing_product_id');
+					}
+				}
 			} else {
 				if ($product_id != '' && $product_id != '-1') {
 					if (preg_match('/^idprod/', $product_id)) {
