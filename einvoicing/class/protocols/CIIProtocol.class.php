@@ -536,7 +536,12 @@ class CIIProtocol extends AbstractProtocol
 		dol_mkdir(dirname($xmlfile), einvoicingDataRoot(dirname($xmlfile)));
 		dol_delete_file($xmlfile);
 
-		$xmlcontent = $this->buildXML($invoiceData, $linesData, $this->getBuildXmlProfile($object), $outputlangs);
+		$profile = $this->getBuildXmlProfile($object);
+		if (getDolGlobalInt('EINVOICING_EMBED_ATTACHED_FILES')) {
+			$invoiceData['_attachedFiles'] = $this->collectAttachedFiles($invoice, $profile);
+		}
+
+		$xmlcontent = $this->buildXML($invoiceData, $linesData, $profile, $outputlangs);
 
 		// Local EN 16931 business rules safety net, and check that the document claims the amount the
 		// invoice claims (warnings, or abort in strict mode)
@@ -547,6 +552,49 @@ class CIIProtocol extends AbstractProtocol
 		dolChmod($xmlfile);
 
 		return $xmlfile;
+	}
+
+
+	/**
+	 * Files of the invoice to embed as additional supporting documents (BG-24): the ones ticked in the tab of the module.
+	 * A file the e-invoice cannot carry is left out with a warning, never silently.
+	 *
+	 * @param	CommonInvoice	$invoice	Customer invoice
+	 * @param	string			$profile	Profile the XML is built with
+	 * @return	list<array{filename:string,mimecode:string,code:string,content:string}>	Content is base64 encoded
+	 */
+	protected function collectAttachedFiles($invoice, $profile)
+	{
+		global $db, $langs;
+
+		dol_include_once('/einvoicing/lib/einvoicing_attachments.lib.php');
+		$langs->load('einvoicing@einvoicing');
+
+		$files = array();
+		$attached = einvoicingFetchAttachedFiles($db, $invoice);
+		if (!empty($attached) && !$this->isEn16931Profile($profile)) {
+			$this->warnings[] = $langs->trans('EInvAttachmentProfileTooLow', $profile);
+			return $files;
+		}
+		$lisible = false;
+		foreach ($attached as $file) {
+			$mimecode = einvoicingAttachmentMimeCode($file['filename']);
+			$content = ($mimecode !== '' && $file['size'] > 0) ? file_get_contents($file['fullname']) : '';
+			if ($content === '' || $content === false) {
+				$this->warnings[] = $langs->trans('EInvAttachmentSkipped', $file['filename']);
+				dol_syslog(__METHOD__.' '.$file['filename'].' not embedded: mime code "'.$mimecode.'", size '.$file['size'], LOG_WARNING);
+				continue;
+			}
+			// BR-FR-18: a second readable view of the invoice goes out without its code
+			$code = $file['code'];
+			if ($code === 'LISIBLE' && $lisible) {
+				$code = '';
+			}
+			$lisible = $lisible || $code === 'LISIBLE';
+			$files[] = array('filename' => $file['filename'], 'mimecode' => $mimecode, 'code' => $code, 'content' => base64_encode($content));
+		}
+
+		return $files;
 	}
 
 
@@ -2640,6 +2688,26 @@ class CIIProtocol extends AbstractProtocol
 				$addRef = $doc->createElement('ram:AdditionalReferencedDocument');
 				$addRef->appendChild($doc->createElement('ram:IssuerAssignedID', einvoicingXmlText($additionalOrderRef)));
 				$addRef->appendChild($doc->createElement('ram:TypeCode', '130'));
+				$agreement->appendChild($addRef);
+			}
+		}
+
+		// Additional supporting documents (BG-24), one node per file of the tab of the module. TypeCode 916 tells
+		// them from the order references above; BT-123 (ram:Name) is only written with a code of BR-FR-17.
+		// Sequence position: same slot as the order references, element order of ReferencedDocumentType.
+		if (!empty($invoiceData['_attachedFiles']) && $this->isEn16931Profile($profile)) {
+			foreach ($invoiceData['_attachedFiles'] as $attachedFile) {
+				$agreement->appendChild($doc->createComment('Additional supporting document (BG-24)'));
+				$addRef = $doc->createElement('ram:AdditionalReferencedDocument');
+				$addRef->appendChild($doc->createElement('ram:IssuerAssignedID', einvoicingXmlText($attachedFile['filename'])));
+				$addRef->appendChild($doc->createElement('ram:TypeCode', '916'));
+				if ($attachedFile['code'] !== '') {
+					$addRef->appendChild($doc->createElement('ram:Name', einvoicingXmlText($attachedFile['code'])));
+				}
+				$binary = $doc->createElement('ram:AttachmentBinaryObject', $attachedFile['content']);
+				$binary->setAttribute('mimeCode', $attachedFile['mimecode']);
+				$binary->setAttribute('filename', $attachedFile['filename']);
+				$addRef->appendChild($binary);
 				$agreement->appendChild($addRef);
 			}
 		}

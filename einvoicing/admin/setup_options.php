@@ -313,6 +313,12 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->fieldAttr['min'] = '0';
 	$item->fieldAttr['step'] = '0.1';
 
+	// Setup conf to embed the files of the "E-invoice attachments" tab as supporting documents (BG-24)
+	$item = $formSetup->newItem('EINVOICING_EMBED_ATTACHED_FILES')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_EMBED_ATTACHED_FILES_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+
 	// The three notices below are never sent empty: the generation falls back on the translations the
 	// placeholders show here, so the page states what will be written instead of keeping a silent
 	// default. Shown to a French seller only: their wording states French law, which is a promise the

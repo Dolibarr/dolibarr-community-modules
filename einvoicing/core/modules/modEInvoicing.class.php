@@ -211,6 +211,7 @@ class modEInvoicing extends DolibarrModules
 		// Don't forget to deactivate/reactivate your module to test your changes
 		$this->tabs = array();
 		$this->tabs[] = array('data' => 'invoice:+EinvoiceEvents:EinvoiceEventsTab:@einvoicing:$user->hasRight("facture","read"):/einvoicing/einvoice_tracking.php?id=__ID__');
+		$this->tabs[] = array('data' => 'invoice:+einvoiceattachments:EInvAttachmentsTab:einvoicing@einvoicing:$user->hasRight("facture","read") && getDolGlobalInt("EINVOICING_EMBED_ATTACHED_FILES"):/einvoicing/invoice_attachments.php?id=__ID__');
 
 		/* END MODULEBUILDER TABS */
 		// Example:
