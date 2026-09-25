@@ -561,7 +561,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// Add button to change the entity (multi-company) of a supplier invoice (we test context invoicesuppliercard but also main for old versions of module)
 		if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE') && isModEnabled('multicompany') && in_array($object->element, ['invoice_supplier'])
 			&& !empty($object->id) && $user->hasRight('fournisseur', 'facture', 'creer') && preg_match('/invoicesuppliercard|main/', $parameters['currentcontext'] ?? '')) {
-			if ($object->isEditable()) {
+			// isEditable() only exists since Dolibarr 23 and answers a negative code when refused. Before, same
+			// rule as the core card offers "Modify" with: no payment and not dispatched in bookkeeping.
+			$editable = method_exists($object, 'isEditable') ? ($object->isEditable() > 0)
+				: ($object->getSommePaiement() == 0 && $object->getVentilExportCompta() == 0);
+			if ($editable) {
 				print '<a class="butAction" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?id=' . $object->id . '&action=change_entity&token=' . newToken() . '">'
 					. $langs->trans('ChangeEntity') . '</a>';
 			} else {
