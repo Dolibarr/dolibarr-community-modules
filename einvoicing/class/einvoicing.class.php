@@ -2166,7 +2166,7 @@ class EInvoicing
 	 */
 	public function supplierInvoiceCardBlock($object, $mode = '', $parameters = array())
 	{
-		global $langs, $form;
+		global $langs, $form, $user;
 		global $action;
 
 		$resprints = '';
@@ -2257,6 +2257,50 @@ class EInvoicing
 			$resprints .= '<tr class="treinvoicing_collapseseparator">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("EInvoiceBuyerOrderReference"), $langs->trans("EInvoiceBuyerOrderReferenceHelp")) . '</td>';
 			$resprints .= '<td>' . dolPrintHTML($buyerOrderReference) . '</td>';
+			$resprints .= '</tr>';
+		}
+
+		// Payment account the received document says the invoice must be paid to (BT-84/85/86). The
+		// import writes it nowhere: an IBAN carried by an incoming invoice is also what an invoice fraud
+		// carries, so it is only shown, compared with the accounts of the vendor, and added on a click.
+		dol_include_once('einvoicing/class/utils/PayeeBankAccountHelper.class.php');
+		$payeeAccounts = PayeeBankAccountHelper::announcedAccounts($this->db, $object);
+		if (!empty($payeeAccounts)) {
+			$langs->load("banks");	// BIC and IbanNotValid belong to the core dictionary of bank accounts
+			$knownAccounts = PayeeBankAccountHelper::thirdpartyAccounts($this->db, (int) $object->socid);
+			$canaddaccount = PayeeBankAccountHelper::addAccountOffered($user);
+
+			$resprints .= '<tr class="treinvoicing_collapseseparator">';
+			$resprints .= '<td>' . $form->textwithpicto($langs->trans("EInvoicePayeeAccount"), $langs->trans("EInvoicePayeeAccountHelp")) . '</td>';
+			$resprints .= '<td>';
+			foreach ($payeeAccounts as $idx => $payeeAccount) {
+				$resprints .= '<div' . ($idx ? ' class="paddingtop"' : '') . '>';
+				// dol_escape_htmltag(), not dolPrintHTML(): these values come from a document written
+				// outside, and the card shows them as they are written, not as markup
+				$resprints .= '<span class="nowraponall">' . dol_escape_htmltag($payeeAccount['iban']) . '</span>';
+				if (!PayeeBankAccountHelper::ibanLooksValid($this->db, $payeeAccount['iban'])) {
+					$resprints .= ' ' . img_picto($langs->trans("IbanNotValid"), 'warning');
+				}
+				if (!empty($payeeAccount['bic'])) {
+					$resprints .= ' <span class="opacitymedium small">' . $langs->trans("BIC") . ' ' . dol_escape_htmltag($payeeAccount['bic']) . '</span>';
+				}
+				if (!empty($payeeAccount['accountName'])) {
+					$resprints .= ' <span class="opacitymedium small">' . dol_escape_htmltag($payeeAccount['accountName']) . '</span>';
+				}
+				$resprints .= '<br>';
+
+				if (PayeeBankAccountHelper::isKnownAccount($payeeAccount, $knownAccounts)) {
+					$resprints .= '<span class="opacitymedium small">' . $langs->trans("EInvoicePayeeAccountKnown") . '</span>';
+				} else {
+					$resprints .= '<span class="small">' . img_picto('', 'warning', 'class="pictofixedwidth"') . $langs->trans("EInvoicePayeeAccountUnknown") . '</span>';
+					if ($canaddaccount && $object->socid > 0) {
+						$url = $_SERVER["PHP_SELF"] . '?id=' . ((int) $object->id) . '&action=einvoice_addpayeeban&payeeaccount=' . ((int) $idx) . '&token=' . newToken();
+						$resprints .= ' <a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($url) . '">' . $langs->trans("EInvoicePayeeAccountAdd") . '</a>';
+					}
+				}
+				$resprints .= '</div>';
+			}
+			$resprints .= '</td>';
 			$resprints .= '</tr>';
 		}
 

@@ -2070,6 +2070,52 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
+	 * Read the payment accounts the document says the invoice must be paid to (BG-17: BT-84 IBAN,
+	 * BT-85 account name, BT-86 BIC).
+	 *
+	 * parseInvoiceHeader() keeps the first one only, where a document may carry one
+	 * ram:SpecifiedTradeSettlementPaymentMeans per account. Accounts without an IBAN are skipped:
+	 * nothing else in there identifies an account well enough to be compared or recorded.
+	 *
+	 * @param  string $rawContent										Raw XML content of the document
+	 * @return array<int,array{iban:string,bic:string,accountName:string}>	One entry per account, in document order
+	 */
+	public function parsePayeeBankAccounts(string $rawContent)
+	{
+		list(, $xpath) = $this->initXPath($rawContent);
+
+		$accounts = array();
+		$seen = array();
+
+		$nodes = $xpath->query('/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans');
+		if (!$nodes) {
+			return $accounts;
+		}
+
+		foreach ($nodes as $node) {
+			$iban = (string) $this->getXPathValue($xpath, 'ram:PayeePartyCreditorFinancialAccount/ram:IBANID', $node);
+			if ($iban === '') {
+				continue;
+			}
+
+			// The same account is often repeated once per payment means
+			$key = strtoupper(preg_replace('/[^0-9A-Za-z]/', '', $iban));
+			if (isset($seen[$key])) {
+				continue;
+			}
+			$seen[$key] = 1;
+
+			$accounts[] = array(
+				'iban' => $iban,
+				'bic' => (string) $this->getXPathValue($xpath, 'ram:PayeeSpecifiedCreditorFinancialInstitution/ram:BICID', $node),
+				'accountName' => (string) $this->getXPathValue($xpath, 'ram:PayeePartyCreditorFinancialAccount/ram:AccountName', $node),
+			);
+		}
+
+		return $accounts;
+	}
+
+	/**
 	 * Parse all invoice line items from CII XML.
 	 *
 	 * @param  string $rawContent Raw file content
