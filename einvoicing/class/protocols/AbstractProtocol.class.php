@@ -45,6 +45,12 @@ abstract class AbstractProtocol
 	/** @var array Non-blocking warning messages */
 	public $warnings = [];
 
+	/**
+	 * @var int Draft supplier invoice the next import rebuilds instead of creating one, 0 for none.
+	 *          Set by Document::reimport() around the synchronization of the flow, reset right after.
+	 */
+	public static $rebuildSupplierInvoiceId = 0;
+
 	/** @const string Invoice file extension (without the dot, example 'xml') */
 	const INVOICE_FILE_EXTENSION = ''; // Must be overridden by subclasses
 
@@ -103,7 +109,7 @@ abstract class AbstractProtocol
 	 * @param  string 			$file                       		Source string file. We use this file to get data of supplier invoice.
 	 * @param  string|null 		$readableViewFile        			Readable view file (PDP Generated readable PDF).e only store it if available.
 	 * @param  string 			$flowId                       		Flow identifier source of the invoice.
-	 * @return array{res:int, message:string, action:string|null}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'action'.
+	 * @return array{res:int, message:string, action:string|null, created?:int}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message', an optional 'action', and 'created' set to 1 only when this call is what imported the invoice.
 	 */
 	abstract public function createSupplierInvoiceFromSource($file, $readableViewFile = null, $flowId = '');
 

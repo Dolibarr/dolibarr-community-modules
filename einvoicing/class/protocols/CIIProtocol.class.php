@@ -62,6 +62,9 @@ class CIIProtocol extends AbstractProtocol
 	/** @const string Invoice file extension (without the dot, example 'xml') */
 	const INVOICE_FILE_EXTENSION = 'xml';
 
+	/** @const string Description of the files an import attaches: the ECM index tells them apart by it below Dolibarr 21 */
+	const IMPORTED_FILE_DESCRIPTION = 'File imported by the einvoicing module';
+
 	/** @const string Generated invoice file name */
 	const GENERATED_INVOICE_XML_FILE_NAME = 'einvoice.xml';
 
@@ -694,7 +697,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param  string 			$file                       		Source string file (XML or PDF string). We use this file to get data of supplier invoice.
 	 * @param  string|null 		$readableViewFile        			Readable view file (PDP Generated readable PDF). We only store it if available.
 	 * @param  string 			$flowId                       		Flow identifier source of the invoice.
-	 * @return array{res:int<-1,1>, message:string, actioncode?: string|null, actionurl?: string|null, action?:string|null}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'actioncode' and 'action'.
+	 * @return array{res:int<-1,1>, message:string, actioncode?: string|null, actionurl?: string|null, action?:string|null, created?:int}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message', an optional 'actioncode' and 'action', and 'created' set to 1 only when this call is what imported the invoice.
 	 */
 	public function createSupplierInvoiceFromSource($file, $readableViewFile = null, $flowId = '')
 	{
@@ -924,7 +927,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param  string			$flowId               Source flow identifier
 	 * @param  string			$tempFile             Unique working file for the received XML
 	 * @param  string			$tempFileReadableView Unique working file for the readable view
-	 * @return array{res:int<-1,1>, message:string, action?:string|null}
+	 * @return array{res:int<-1,1>, message:string, action?:string|null, created?:int}	'created' tells the caller whether this call is what brought the invoice in, or found it already imported
 	 */
 	protected function doCreateSupplierInvoiceFromSource($file, $readableViewFile, $flowId, $tempFile, $tempFileReadableView)
 	{
@@ -1005,7 +1008,9 @@ class CIIProtocol extends AbstractProtocol
 			return ['res' => -1, 'message' => 'Failed to load supplier id ' . $socId];
 		}
 
-		// Check if this invoice has already been imported for this supplier
+		// Check if this invoice has already been imported for this supplier. The draft a reimport rebuilds
+		// is left out: it is the invoice being imported, not one imported before.
+		$rebuildId = (int) AbstractProtocol::$rebuildSupplierInvoiceId;
 		$announcedTotalTtc = SupplierInvoiceHelper::announcedTotalTtc($parsedHeader) ?? 0.0;
 		// The tolerance is BT-114: the same document imported before the rounding line existed totals a
 		// rounding amount more, and it is the invoice this is looking for (issue #994).
@@ -1013,7 +1018,8 @@ class CIIProtocol extends AbstractProtocol
 			$parsedHeader['documentno'] ?? null,
 			(int) $socId,
 			$announcedTotalTtc,
-			abs(SupplierInvoiceHelper::documentRoundingAmount($parsedHeader))
+			abs(SupplierInvoiceHelper::documentRoundingAmount($parsedHeader)),
+			$rebuildId
 		);
 
 		if ($supplierInvoiceId == -3) {
@@ -1079,7 +1085,7 @@ class CIIProtocol extends AbstractProtocol
 				dol_syslog("Temporary 'readable pdf file' not found for attachment", LOG_ERR);
 			}
 
-			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages)];
+			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages), 'created' => 0];
 		}
 
 		// Check if all referenced documents in the invoice exist in Dolibarr for the same supplier, if not return with error since we need them for correct linking in the invoice
@@ -1100,6 +1106,16 @@ class CIIProtocol extends AbstractProtocol
 					continue;
 				}
 			}
+		}
+
+		// Every check has passed: the draft being rebuilt loses what the previous import wrote into it.
+		// The transaction closed by createSupplierInvoiceFromSource() gives it back on a failure below.
+		if ($rebuildId > 0) {
+			$clearRes = $this->clearSupplierInvoiceForRebuild($rebuildId);
+			if ($clearRes['res'] < 0) {
+				return $clearRes;
+			}
+			$supplierInvoice = $clearRes['invoice'];
 		}
 
 		// Set supplier reference
@@ -1167,17 +1183,31 @@ class CIIProtocol extends AbstractProtocol
 		$supplierInvoice->total_tva = $parsedHeader['taxTotalAmount'] ?? 0;
 		$supplierInvoice->total_ttc = $parsedHeader['grandTotalAmount'] ?? 0;
 
-		// Add a note about PDP import ( TODO: add a hook or extrafields to store import details)
-		$supplierInvoice->note_private = "Imported from PDP";
+		// Add a note about PDP import ( TODO: add a hook or extrafields to store import details). A rebuilt
+		// draft keeps its note, the user may have written in it.
+		if ($rebuildId <= 0) {
+			$supplierInvoice->note_private = "Imported from PDP";
+		}
 
 		// TODO : save AAB, PMD, PMT notes (all notes are grouped into documentNotes)
 
-		// Create the invoice
-		$supplierInvoiceId = $supplierInvoice->create($user);
+		// Create the invoice, or write the new header onto the draft being rebuilt
+		if ($rebuildId > 0) {
+			$supplierInvoiceId = $this->updateRebuiltSupplierInvoice($supplierInvoice);
+		} else {
+			$supplierInvoiceId = $supplierInvoice->create($user);
+		}
 
 		if ($supplierInvoiceId < 0) {
 			return ['res' => -1, 'message' => 'Invoice creation error: ' . $supplierInvoice->error];
 		} else {
+			// What the next import of this document deletes before creating it again.
+			if (!empty($globalDiscountIds) || $rebuildId > 0) {
+				if ($einvoicing->insertOrUpdateExtraField($supplierInvoiceId, $supplierInvoice->element, EInvoicing::EXTRAFIELD_IMPORTED_DISCOUNTS, implode(',', $globalDiscountIds)) < 0) {
+					return ['res' => -1, 'message' => 'Failed to record the discounts of supplier invoice ' . $supplierInvoiceId . ': ' . implode(', ', $einvoicing->errors)];
+				}
+			}
+
 			// Keep the order reference the supplier declared (BT-13) whether or not it matches an
 			// order of Dolibarr, so the invoice can be reconciled by hand when it does not. See issue #603.
 			$this->_saveImportedBuyerOrderReference($supplierInvoice, $parsedHeader['orderReference'] ?? '');
@@ -1343,6 +1373,12 @@ class CIIProtocol extends AbstractProtocol
 			$return_messages[] = 'Supplier Invoice created or updated with ID: ' . $supplierInvoiceId;
 
 
+			// The files of the previous import go, whatever they were named after: the files attached by
+			// hand stay. What this import writes comes right after.
+			if ($rebuildId > 0) {
+				$this->deleteImportedFilesOfSupplierInvoice($supplierInvoice);
+			}
+
 			// The files the issuer embedded become attached files of the invoice: nothing here ever read
 			// a binary back out of a received document, so they arrived and were lost (issue #980).
 			$this->storeEmbeddedAttachments($supplierInvoice, $sourceXml, $file, $tempFile, $return_messages);
@@ -1376,7 +1412,7 @@ class CIIProtocol extends AbstractProtocol
 			}
 
 			// TODO : Save receivedFile in supplier invoice attachments
-			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages), 'xml_data' => $sourceXml];
+			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages), 'xml_data' => $sourceXml, 'created' => 1];
 		}
 	}
 
@@ -3635,7 +3671,7 @@ class CIIProtocol extends AbstractProtocol
 			'gen_or_uploaded' => 'imported',
 			'src_object_type' => $supplierInvoice->table_element,
 			'src_object_id' => $supplierInvoice->id,
-			'description' => 'File imported by the einvoicing module'
+			'description' => static::IMPORTED_FILE_DESCRIPTION
 		);
 		$result = dol_move($filePath, $dest_path, '0', 1, 0, 1, $moreinfo);
 		if (!$result) {
@@ -4677,6 +4713,166 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		return $stored;
+	}
+
+	/**
+	 * Clear a draft supplier invoice an import is about to rebuild: its lines, and the discounts its
+	 * previous import created for the document level allowances.
+	 *
+	 * Everything else stays: the invoice keeps its id and reference, and what hangs on them - the files
+	 * attached by hand, the events, the contacts, the notes and the lifecycle statuses of the flow.
+	 *
+	 * @param	int		$invoiceId		Draft supplier invoice
+	 * @return	array{res:int,message?:string,invoice?:FactureFournisseur}	res 1 with the cleared invoice, -1 with a message
+	 */
+	protected function clearSupplierInvoiceForRebuild($invoiceId)
+	{
+		global $db, $user;
+
+		$invoice = new FactureFournisseur($db);
+		if ($invoice->fetch((int) $invoiceId) <= 0) {
+			return ['res' => -1, 'message' => 'Failed to load the supplier invoice ' . ((int) $invoiceId) . ' to import again'];
+		}
+		if ((int) $invoice->status !== FactureFournisseur::STATUS_DRAFT) {
+			return ['res' => -1, 'message' => 'The supplier invoice ' . $invoice->ref . ' is no longer a draft, it cannot be imported again'];
+		}
+
+		// The discounts of the allowances are created again by the import: freed, they would stay
+		// available as credit on the vendor, once per import. Read before the lines that consume them go.
+		$einvoicing = new EInvoicing($db);
+		$recorded = $einvoicing->getExtraFieldValue($invoice->id, $invoice->element, EInvoicing::EXTRAFIELD_IMPORTED_DISCOUNTS);
+		if ($recorded !== null) {
+			$ids = array_filter(array_map('intval', explode(',', (string) $recorded)));
+		} else {
+			$ids = $this->findAllowanceDiscountsOfAnOlderImport($invoice);
+		}
+
+		// deleteLine() frees the discount a line consumed, which is right for a deposit or a credit note:
+		// the rebuild takes it again.
+		foreach ($invoice->lines as $line) {
+			if ($invoice->deleteLine($line->id) < 0) {
+				return ['res' => -1, 'message' => 'Failed to delete line ' . ((int) $line->id) . ' of supplier invoice ' . $invoice->ref . ': ' . $invoice->error];
+			}
+		}
+
+		// Only those still free are deleted.
+		foreach ($ids as $discountId) {
+			$discount = new DiscountAbsolute($db);
+			if ($discount->fetch($discountId) <= 0 || !empty($discount->fk_invoice_supplier_line) || !empty($discount->fk_invoice_supplier)) {
+				continue;
+			}
+			if ($discount->delete($user) < 0) {
+				return ['res' => -1, 'message' => 'Failed to delete discount ' . $discountId . ' of supplier invoice ' . $invoice->ref . ': ' . $discount->error];
+			}
+		}
+
+		// Loaded again: the totals and the list of lines have just changed.
+		$invoice = new FactureFournisseur($db);
+		$invoice->fetch((int) $invoiceId);
+
+		return ['res' => 1, 'invoice' => $invoice];
+	}
+
+	/**
+	 * The discounts an import made before EXTRAFIELD_IMPORTED_DISCOUNTS existed created for the allowances
+	 * of a draft: consumed by one of its lines, taken from no invoice, and created with it - the import
+	 * creates them right before the invoice. A discount the user applied later is older or younger.
+	 *
+	 * @param	FactureFournisseur	$invoice	Draft, with its lines
+	 * @return	int[]							Ids of the discounts
+	 */
+	protected function findAllowanceDiscountsOfAnOlderImport(FactureFournisseur $invoice)
+	{
+		global $db;
+
+		$sql = "SELECT r.rowid, r.datec, f.datec as invoice_datec FROM " . MAIN_DB_PREFIX . "societe_remise_except as r";
+		$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "facture_fourn_det as l ON l.fk_remise_except = r.rowid";
+		$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "facture_fourn as f ON f.rowid = l.fk_facture_fourn";
+		$sql .= " WHERE f.rowid = " . ((int) $invoice->id);
+		$sql .= " AND r.fk_facture_source IS NULL AND r.fk_invoice_supplier_source IS NULL";
+
+		$ids = array();
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' ' . $db->lasterror(), LOG_ERR);
+			return $ids;
+		}
+		while ($obj = $db->fetch_object($resql)) {
+			if (abs((int) $db->jdate($obj->datec) - (int) $db->jdate($obj->invoice_datec)) <= 60) {
+				$ids[] = (int) $obj->rowid;
+			}
+		}
+		$db->free($resql);
+
+		return $ids;
+	}
+
+	/**
+	 * Write the header an import has just read onto the draft it rebuilds.
+	 *
+	 * FactureFournisseur::update() leaves out the currency, and the payment method on Dolibarr 20, so
+	 * the two are written by the setters of the core.
+	 *
+	 * @param	FactureFournisseur	$invoice	Draft, carrying the header of the document
+	 * @return	int								Id of the invoice, -1 on error with $invoice->error set
+	 */
+	protected function updateRebuiltSupplierInvoice(FactureFournisseur $invoice)
+	{
+		global $db, $user;
+
+		if ($invoice->update($user) <= 0) {
+			return -1;
+		}
+		if (!empty($invoice->mode_reglement_id) && $invoice->setPaymentMethods((int) $invoice->mode_reglement_id) < 0) {
+			return -1;
+		}
+
+		$sql = "SELECT multicurrency_code FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE rowid = " . ((int) $invoice->id);
+		$resql = $db->query($sql);
+		$obj = $resql ? $db->fetch_object($resql) : null;
+		if (!empty($invoice->multicurrency_code) && (!$obj || (string) $obj->multicurrency_code !== (string) $invoice->multicurrency_code)) {
+			if ($invoice->setMulticurrencyCode($invoice->multicurrency_code) < 0) {
+				return -1;
+			}
+		}
+
+		return (int) $invoice->id;
+	}
+
+	/**
+	 * Delete the files a previous import attached to a supplier invoice, and only those.
+	 *
+	 * They are told apart by their entry in the ECM index: the origin the import gives them, or, below
+	 * Dolibarr 21 where dol_move() drops that origin, their description.
+	 *
+	 * @param	FactureFournisseur	$invoice	Supplier invoice
+	 * @return	void
+	 */
+	protected function deleteImportedFilesOfSupplierInvoice(FactureFournisseur $invoice)
+	{
+		global $conf, $db;
+
+		// DOL_DOCUMENT_ROOT is the '..' of install/inc.php for PHPStan, which then cannot find the file.
+		require_once DOL_DOCUMENT_ROOT . '/ecm/class/ecmfiles.class.php'; // @phpstan-ignore requireOnce.fileNotFound
+
+		$dir = $conf->fournisseur->facture->dir_output . '/' . get_exdir($invoice->id, 2, 0, 0, $invoice, 'invoice_supplier') . dol_sanitizeFileName($invoice->ref);
+		if (!is_dir($dir)) {
+			return;
+		}
+
+		foreach (dol_dir_list($dir, 'files', 0, '', '(\.meta|_preview.*\.png)$') as $entry) {
+			$ecmfile = new EcmFiles($db);
+			$relativepath = preg_replace('/^' . preg_quote(DOL_DATA_ROOT . '/', '/') . '/', '', $dir . '/' . $entry['name']);
+			if ($ecmfile->fetch(0, '', $relativepath) <= 0) {
+				continue;
+			}
+			if ($ecmfile->gen_or_uploaded !== 'imported' && $ecmfile->description !== static::IMPORTED_FILE_DESCRIPTION) {
+				continue;
+			}
+			if (!dol_delete_file($dir . '/' . $entry['name'], 0, 0, 0, $invoice)) {
+				dol_syslog(__METHOD__ . ' failed to delete ' . $dir . '/' . $entry['name'], LOG_WARNING, 0, '_einvoicing');
+			}
+		}
 	}
 
 	/**

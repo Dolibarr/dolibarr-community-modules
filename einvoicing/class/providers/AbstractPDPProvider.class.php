@@ -1195,6 +1195,34 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
+	 * Write on the timeline of an imported supplier invoice where it comes from (issue #1022): the flow,
+	 * the access point and the build of the module that read it. Same untranslated "EINVOICING - " prefix
+	 * as the status events, so one search on the label finds them all.
+	 *
+	 * @param   FactureFournisseur  $supplierInvoice    The supplier invoice the import created or rebuilt
+	 * @param   Document            $document           The flow record the invoice was imported from
+	 * @return  int                                     Id of the created event, < 0 if KO
+	 */
+	protected function addSupplierInvoiceImportEvent($supplierInvoice, $document)
+	{
+		global $langs;
+
+		$langs->load('einvoicing@einvoicing');
+		// A re-import rebuilds the draft Document::reimport() names for the run. transnoentitiesnoconv():
+		// an event label is stored raw and escaped where it is printed.
+		$prefix = AbstractProtocol::$rebuildSupplierInvoiceId > 0 ? 'EInvoicingEventReimport' : 'EInvoicingEventImport';
+		$label = "EINVOICING - " . $langs->transnoentitiesnoconv($prefix . 'Label', (string) ($supplierInvoice->ref_supplier ?: $supplierInvoice->ref));
+		$message = $langs->transnoentitiesnoconv($prefix . 'Note', (string) $document->flow_id, $this->name, einvoicingModuleStamp());
+
+		$res = $this->addEvent('IMPORT', $label, $message, $supplierInvoice);
+		if ($res < 0) {
+			dol_syslog(__METHOD__ . " Failed to log the import event of supplier invoice " . $supplierInvoice->id, LOG_WARNING);
+		}
+
+		return $res;
+	}
+
+	/**
 	 * Build the return of processIncomingSupplierInvoiceStatus() for a reason this run could not read
 	 * the incoming status that may not be there anymore on the next one (a platform GET failure, an
 	 * empty response body). Nothing is stored, and 'postponeflow' tells syncFlows() to carry on with

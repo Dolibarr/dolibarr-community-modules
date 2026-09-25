@@ -585,6 +585,13 @@ class EInvoicing
 	const EXTRAFIELD_BUYER_ORDER_REFERENCE = 'buyer_order_reference';
 
 	/**
+	 * Name, into llx_einvoicing_extrafields, of the discounts the import created for the document level
+	 * allowances (BG-20) of a received invoice, comma separated. An import made again deletes them before
+	 * creating them anew: only freed, they would stay available as credit on the vendor.
+	 */
+	const EXTRAFIELD_IMPORTED_DISCOUNTS = 'import_discount_ids';
+
+	/**
 	 * Name, into llx_einvoicing_extrafields, of the buyer reference (BT-10): a reference owned by the
 	 * buyer, used to route the invoice inside its own organisation (business unit, service reference,
 	 * internal mailbox...). A plain EN 16931 core term, unrelated to the public sector, so it is kept
