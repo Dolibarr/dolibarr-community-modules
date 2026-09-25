@@ -1491,6 +1491,12 @@ parameters:
 			path: ../../../einvoicing/einvoicingindex.php
 
 		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/invoice_attachments.php
+
+		-
 			message: '#^Expression "''…" on a separate line does not do anything\.$#'
 			identifier: expr.resultUnused
 			count: 1
