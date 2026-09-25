@@ -3552,6 +3552,9 @@ class CIIProtocol extends AbstractProtocol
 		 * 384 – Facture corrective / replacement
 		 * 380 – Facture standard
 		 * 503 - Avoir / Note de crédit sur une facture d'acompte
+		 * 262 - Avoir remise globale (consolidated credit note, BR-FR-CO-03: a contract and a period, no invoice)
+		 * 393 - Facture affacturée, 396 - Avoir affacturé, 472 - Facture rectificative affacturée: the same
+		 *       documents as 380, 381 and 384, only paid to the factor (BT-59, BT-84)
 		 *
 		 * 80  – Note de débit (biens ou services) --- Not used in Dolibarr
 		 * 82  – Facture de services mesurés (ex : gaz, électricité) --- Not used in Dolibarr
@@ -3577,6 +3580,10 @@ class CIIProtocol extends AbstractProtocol
 			'381' => CommonInvoice::TYPE_CREDIT_NOTE,
 			'386' => CommonInvoice::TYPE_DEPOSIT,
 			'503' => CommonInvoice::TYPE_CREDIT_NOTE,
+			'262' => CommonInvoice::TYPE_CREDIT_NOTE,
+			'393' => CommonInvoice::TYPE_STANDARD,
+			'396' => CommonInvoice::TYPE_CREDIT_NOTE,
+			'472' => CommonInvoice::TYPE_REPLACEMENT,
 		];
 
 
