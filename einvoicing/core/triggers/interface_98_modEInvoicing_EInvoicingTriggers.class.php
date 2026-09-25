@@ -95,26 +95,30 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 				}
 			}
 
-			// Default product for import.
+			// Default product and default service for import.
 			// The combo posts '-1' for the empty entry and '' for a cleared ajax input: both mean "no
 			// default any more" and delete the routing. A save that does not carry the field at all (API,
-			// mass action, import) or whose field could not show the current value (routing_product_id_shown)
+			// mass action, import) or whose field could not show the current value (routing_*_id_shown)
 			// must leave it untouched.
-			if (GETPOSTISSET('routing_product_id')) {
-				$routingProductId = GETPOST('routing_product_id', 'aZ09');
+			foreach (array('product', 'service') as $routingType) {
+				$htmlname = 'routing_' . $routingType . '_id';
+				if (!GETPOSTISSET($htmlname)) {
+					continue;
+				}
+				$routingProductId = GETPOST($htmlname, 'aZ09');
 				if ($routingProductId === '-1' || $routingProductId === '0') {
 					$routingProductId = '';
 				}
-				$shownProductId = GETPOST('routing_product_id_shown', 'aZ09');
+				$shownProductId = GETPOST($htmlname . '_shown', 'aZ09');
 				if ($shownProductId === '-1' || $shownProductId === '0') {
 					$shownProductId = '';
 				}
-				$existing = $einvoicing->fetchDefaultRouting($socId, 'product');
+				$existing = $einvoicing->fetchDefaultRouting($socId, $routingType);
 				$result = 0;
 				if ($routingProductId === '') {
 					if ($shownProductId !== '' && !empty($existing)) {
 						// setDefaultRouting() with an empty value only deletes the existing routing
-						$result = $einvoicing->setDefaultRouting($socId, '', '', '', '', 'product');
+						$result = $einvoicing->setDefaultRouting($socId, '', '', '', '', $routingType);
 						if ($result < 0) {
 							$error++;
 							$this->errors[] = $langs->trans('FailedToDeleteRoutingID').' '.$einvoicing->error;
@@ -122,9 +126,9 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 					}
 				} else {
 					if (empty($existing)) {
-						$result = $einvoicing->addRouting($socId, $routingProductId, '', 'product');
+						$result = $einvoicing->addRouting($socId, $routingProductId, '', $routingType);
 					} else {
-						$result = $einvoicing->setDefaultRouting($socId, $routingProductId, '', '', '', 'product');
+						$result = $einvoicing->setDefaultRouting($socId, $routingProductId, '', '', '', $routingType);
 					}
 					if ($result < 0) {
 						$error++;

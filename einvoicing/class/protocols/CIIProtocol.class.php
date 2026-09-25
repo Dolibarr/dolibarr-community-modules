@@ -1401,6 +1401,8 @@ class CIIProtocol extends AbstractProtocol
 		foreach ($parsedLines as $parsedLine) {
 			// Add supplier ID to line for later use in product sync
 			$parsedLine['supplierId'] = $supplierInvoice->socid;
+			// Billing framework (BT-23): tells which default of the vendor a line with no product falls back on
+			$parsedLine['businessProcessId'] = (string) ($parsedHeader['businessProcessId'] ?? '');
 
 			$is_deposit_line = 0;
 			$fk_remise = 0;
@@ -1498,7 +1500,9 @@ class CIIProtocol extends AbstractProtocol
 						'actioncode' => $res['actioncode'] ?? '',
 						'actionurl' => $res['actionurl'] ?? '',
 						'action' => $res['action'] ?? null,
-						'actiondata' => $res['actiondata'] ?? ''
+						'actiondata' => $res['actiondata'] ?? '',
+						'allactiondata' => $res['allactiondata'] ?? array(),
+						'businessmessage' => $res['businessmessage'] ?? ''
 					];
 				}
 				$productId = $res['res'];

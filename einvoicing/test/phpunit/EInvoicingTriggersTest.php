@@ -22,7 +22,7 @@
  *      \brief      PHPUnit test for the triggers of the module: DOCUMENT_DELETE and
  *                  BILL_SUPPLIER_DELETE, which refuse a deletion the module must protect, and
  *                  COMPANY_MODIFY, which stores the default product of a vendor.
- *                  Covers issues #766, #791 and the delete guard of a received e-invoice.
+ *                  Covers issues #766, #791, #1050 and the delete guard of a received e-invoice.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -80,6 +80,8 @@ class EInvoicingTriggersTest extends CommonClassTest
 		unset($_POST['routing_product_id_shown']);
 		unset($_GET['routing_product_id']);
 		unset($_GET['routing_product_id_shown']);
+		unset($_POST['routing_service_id']);
+		unset($_POST['routing_service_id_shown']);
 
 		parent::tearDown();
 	}
@@ -310,6 +312,94 @@ class EInvoicingTriggersTest extends CommonClassTest
 
 		$this->assertEquals(0, $this->saveThirdparty($socid, '-1', ''), 'A vendor without default product got one out of the empty entry');
 		$this->assertEquals('idprod_1234', $this->saveThirdparty($socid, 'idprod_1234', ''), 'The default product was not stored on the first save');
+	}
+
+	/**
+	 * The default service is saved and removed on its own field, without touching the default product.
+	 *
+	 * @return void
+	 */
+	public function testTheDefaultServiceIsSavedApartFromTheDefaultProduct()
+	{
+		global $db, $user, $langs, $conf;
+
+		$socid = $this->createVendorWithDefaultProduct('idprod_1234');
+		$einvoicing = new EInvoicing($db);
+		$thirdparty = new Societe($db);
+		$thirdparty->fetch($socid);
+		$trigger = new InterfaceEInvoicingTriggers($db);
+
+		// The card posts both fields: the product one as drawn, the service one freshly picked
+		$_POST['routing_product_id'] = 'idprod_1234';
+		$_POST['routing_product_id_shown'] = 'idprod_1234';
+		$_POST['routing_service_id'] = 'idprod_5678';
+		$_POST['routing_service_id_shown'] = '';
+		$this->assertGreaterThanOrEqual(0, $trigger->runTrigger('COMPANY_MODIFY', $thirdparty, $user, $langs, $conf), implode(', ', $trigger->errors));
+		$this->assertEquals('idprod_5678', $einvoicing->fetchDefaultRouting($socid, 'service'), 'The default service was not stored');
+		$this->assertEquals('idprod_1234', $einvoicing->fetchDefaultRouting($socid, 'product'), 'Storing the default service changed the default product');
+
+		// Emptying the service leaves the product alone
+		$_POST['routing_service_id'] = '-1';
+		$_POST['routing_service_id_shown'] = 'idprod_5678';
+		$this->assertGreaterThanOrEqual(0, $trigger->runTrigger('COMPANY_MODIFY', $thirdparty, $user, $langs, $conf), implode(', ', $trigger->errors));
+		$this->assertEquals(0, $einvoicing->fetchDefaultRouting($socid, 'service'), 'The default service survived the empty entry of the combo');
+		$this->assertEquals('idprod_1234', $einvoicing->fetchDefaultRouting($socid, 'product'), 'Removing the default service removed the default product');
+	}
+
+	/**
+	 * The combo of the default service only offers services.
+	 *
+	 * @return void
+	 */
+	public function testTheComboOfTheDefaultServiceOnlyOffersServices()
+	{
+		global $db, $conf;
+
+		$author = $this->author();
+		$conf->global->PRODUIT_USE_SEARCH_TO_SELECT = 0;
+
+		$thirdparty = new Societe($db);
+		$thirdparty->name = 'Vendor of the service combo test';
+		$thirdparty->country_code = 'FR';
+		$thirdparty->fournisseur = 1;
+		$thirdparty->code_fournisseur = 'auto';
+		$socid = $thirdparty->create($author);
+		$this->assertGreaterThan(0, $socid, 'Could not create the vendor of the test: ' . $thirdparty->error . ' ' . implode(', ', $thirdparty->errors));
+
+		$pids = array();
+		foreach (array(0, 1) as $type) {
+			$product = new Product($db);
+			$product->ref = 'EINV1050T' . $type . dol_print_date(dol_now(), '%y%m%d%H%M%S');
+			$product->label = 'Item of type ' . $type . ' of the service combo test';
+			$product->type = $type;
+			$product->status = 0;
+			$product->status_buy = 1;
+			$pids[$type] = $product->create($author);
+			$this->assertGreaterThan(0, $pids[$type], 'Could not create the item of the test: ' . $product->error . ' ' . implode(', ', $product->errors));
+		}
+
+		$method = new ReflectionMethod(EInvoicing::class, 'selectVendorProduct');
+		$method->setAccessible(true);
+		// Same notice of the core on 18 and 19 as in testTheComboShowsTheDefaultProductOfTheVendor()
+		set_error_handler(
+			/**
+			 * @param	int		$errno	Level of the error
+			 * @param	string	$errstr	Message of the error
+			 * @return	bool			True to swallow the error, false to hand it back to PHP
+			 */
+			static function ($errno, $errstr) {
+				return strpos($errstr, 'barcode') !== false;
+			},
+			E_WARNING | E_NOTICE
+		);
+		try {
+			$out = $method->invoke(new EInvoicing($db), new Form($db), $socid, '', 'routing_service_id', '1');
+		} finally {
+			restore_error_handler();
+		}
+
+		$this->assertStringContainsString('<option value="idprod_' . $pids[1] . '"', $out, 'The combo does not offer the service');
+		$this->assertStringNotContainsString('<option value="idprod_' . $pids[0] . '"', $out, 'The combo of the default service offers a product');
 	}
 
 	/** @var InterfaceEInvoicingTriggers Trigger of the last delete call above, for its errors */

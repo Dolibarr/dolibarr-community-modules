@@ -310,15 +310,21 @@ if (!empty($parsedLines)) {
 	$nbtomap = 0;
 	$matchresults = array();
 	$defaultrouted = array();
+	$mixedunset = null;
 	foreach ($parsedLines as $idx => $parsedLine) {
 		$hasvendorref = (trim((string) ($parsedLine['prodsellerid'] ?? '')) !== '');
 		$parsedLine['supplierId'] = $socid;
+		$parsedLine['businessProcessId'] = (string) ($parsedHeader['businessProcessId'] ?? '');
 		$matchresults[$idx] = ($socid > 0 && is_object($protocol)) ? $protocol->findProductFromEinvoiceLine($parsedLine) : array('res' => 0, 'message' => '');
 		// The default product of the vendor is a catch-all answering every line nothing was found for, so a
 		// line it caught is routed, not mapped. As long as the line carries a vendor reference it can still
 		// be bound to the right product, and it stays in the lines to map.
 		$defaultrouted[$idx] = (($matchresults[$idx]['matchtype'] ?? '') == 'defaultrouting');
-		if (empty($matchresults[$idx]['res']) || ($defaultrouted[$idx] && $hasvendorref)) {
+		// A mixed invoice whose lines need a default the setup does not choose: the import will stop on it
+		if ($matchresults[$idx]['res'] < 0) {
+			$mixedunset = $matchresults[$idx];
+		}
+		if ($matchresults[$idx]['res'] <= 0 || ($defaultrouted[$idx] && $hasvendorref)) {
 			$nbtomap++;
 		}
 	}
@@ -329,6 +335,10 @@ if (!empty($parsedLines)) {
 	}
 	print $langs->trans("NbOfLines").' : '.count($parsedLines).' - '.$langs->trans("NbOfLinesToMap").' : '.$nbtomap;
 	print '</div><br>';
+
+	if ($mixedunset !== null) {
+		print '<div class="warning">'.dol_escape_htmltag($mixedunset['message']).'<br>'.$mixedunset['action'].'</div><br>';
+	}
 
 	print '<form method="POST" action="'.$_SERVER["PHP_SELF"].'">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
@@ -364,7 +374,7 @@ if (!empty($parsedLines)) {
 		print '<td class="right">'.price((float) ($parsedLine['rateApplicablePercent'] ?? 0)).'%</td>';
 
 		print '<td>';
-		if (!empty($matchresults[$idx]['res']) && empty($defaultrouted[$idx])) {
+		if ($matchresults[$idx]['res'] > 0 && empty($defaultrouted[$idx])) {
 			// Line already resolved by the automatic matching
 			$producttmp = new Product($db);
 			if ($producttmp->fetch($matchresults[$idx]['res']) > 0) {
@@ -380,7 +390,8 @@ if (!empty($parsedLines)) {
 			if (!empty($defaultrouted[$idx])) {
 				$producttmp = new Product($db);
 				$routedto = ($producttmp->fetch($matchresults[$idx]['res']) > 0) ? $producttmp->getNomUrl(1) : $langs->trans("Product").' #'.((int) $matchresults[$idx]['res']);
-				print $form->textwithpicto('<span class="opacitymedium">'.$langs->trans("LineRoutedToDefaultProduct").'</span> '.$routedto, $langs->trans("LineRoutedToDefaultProductHelp"), 1, 'warning');
+				$routedkey = (($matchresults[$idx]['routingtype'] ?? '') == 'service') ? 'LineRoutedToDefaultService' : 'LineRoutedToDefaultProduct';
+				print $form->textwithpicto('<span class="opacitymedium">'.$langs->trans($routedkey).'</span> '.$routedto, $langs->trans("LineRoutedToDefaultProductHelp"), 1, 'warning');
 				print '<br>';
 			}
 			if ($reffourn === '') {

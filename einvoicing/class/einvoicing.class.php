@@ -2498,6 +2498,11 @@ class EInvoicing
 		if (!empty($resFetchP) && $resFetchP != '-1') {
 			$product_id = (string) $resFetchP;		// Can be 'idprod_123' (product id) or '456' (supplier ref id)
 		}
+		$service_id = '';
+		$resFetchS = $this->fetchDefaultRouting($object->id, 'service');
+		if (!empty($resFetchS) && $resFetchS != '-1') {
+			$service_id = (string) $resFetchS;
+		}
 
 		// In create mode only : we show a text input (the thirdparty is not yet in database, no routing line exists)
 		// In edit mode, we show the routing array
@@ -2520,6 +2525,13 @@ class EInvoicing
 				$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
 				$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
 				$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
+				$resprints .= '</td>';
+				$resprints .= '</tr>';
+
+				$resprints .= '<tr class="treinvoicing_collapseseparator trrouting_service_id '.($expand_display ? '' : 'hidden').'">';
+				$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultServiceEBilling"), $langs->trans("DefaultServiceEBillingHelp")) . '</td>';
+				$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
+				$resprints .= $this->selectVendorProduct($form, $object->id, $service_id, 'routing_service_id', '1');
 				$resprints .= '</td>';
 				$resprints .= '</tr>';
 			}
@@ -2643,35 +2655,37 @@ class EInvoicing
 		$resprints .= '</td>';
 		$resprints .= '</tr>';
 
-		// Default product for import (upstream addition). Reception only: meaningless once nothing is ever imported.
+		// Default product and default service for import. Reception only: meaningless once nothing is ever imported.
 		if ($object->fournisseur > 0 && !einvoicingReceptionDisabled()) {
-			$resprints .= '<tr class="treinvoicing_collapseseparator '.($expand_display ? '' : 'hidden').'">';
-			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
-			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
-			if ($mode == 'edit') {
-				$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
+			$defaults = array(
+				array('routing_product_id', $product_id, '', 'DefaultProductEBilling'),
+				array('routing_service_id', $service_id, '1', 'DefaultServiceEBilling'),
+			);
+			foreach ($defaults as $default) {
+				list($htmlname, $selected, $filtertype, $labelkey) = $default;
+				$resprints .= '<tr class="treinvoicing_collapseseparator tr'.$htmlname.' '.($expand_display ? '' : 'hidden').'">';
+				$resprints .= '<td>' . $form->textwithpicto($langs->trans($labelkey), $langs->trans($labelkey.'Help')) . '</td>';
+				$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
+				if ($mode == 'edit') {
+					$resprints .= $this->selectVendorProduct($form, $object->id, $selected, $htmlname, $filtertype);
 
-				if (GETPOST('highlight') == 'routing_product_id') {
-					if (getDolGlobalString('PRODUIT_USE_SEARCH_TO_SELECT')) {
-						$resprints .= dol_set_focus('#search_routing_product_id');
-					} else {
-						$resprints .= dol_set_focus('#routing_product_id');
+					if (GETPOST('highlight') == $htmlname) {
+						if (getDolGlobalString('PRODUIT_USE_SEARCH_TO_SELECT')) {
+							dol_set_focus('#search_'.$htmlname);	// prints its script, returns nothing
+						} else {
+							dol_set_focus('#'.$htmlname);	// prints its script, returns nothing
+						}
 					}
-				}
-			} else {
-				if ($product_id != '' && $product_id != '-1') {
-					if (preg_match('/^idprod/', $product_id)) {
-						$new_product_id = (int) str_replace('idprod_', '', $product_id);
-						$tmpproduct = new Product($this->db);
-						$tmpproduct->fetch($new_product_id);
+				} elseif (preg_match('/^idprod_([0-9]+)$/', $selected, $reg)) {
+					$tmpproduct = new Product($this->db);
+					if ($tmpproduct->fetch((int) $reg[1]) > 0) {
 						$resprints .= $tmpproduct->getNomUrl(1);
-					} else {
-						// TODO Show ref of product price
 					}
 				}
+				// TODO Show ref of product price when the default is a supplier price id
+				$resprints .= '</td>';
+				$resprints .= '</tr>';
 			}
-			$resprints .= '</td>';
-			$resprints .= '</tr>';
 		}
 
 		return $resprints;
@@ -2689,9 +2703,10 @@ class EInvoicing
 	 * @param	int		$socid		Vendor id
 	 * @param	string	$selected	Product currently selected
 	 * @param	string	$htmlname	Name of the html field
+	 * @param	string	$filtertype	'' for products and services, '1' for services only
 	 * @return	string				HTML content of the combo
 	 */
-	private function selectVendorProduct($form, $socid, $selected, $htmlname)
+	private function selectVendorProduct($form, $socid, $selected, $htmlname, $filtertype = '')
 	{
 		global $conf, $status;
 
@@ -2703,16 +2718,16 @@ class EInvoicing
 			if (version_compare(DOL_VERSION, '22.0.0', '<')) {
 				// Before v22, select_produits_fournisseurs() uses print instead of return
 				ob_start();
-				$form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1, 'maxwidth300');
+				$form->select_produits_fournisseurs($socid, $selected, $htmlname, $filtertype, '', array(), 0, 1, 'maxwidth300');
 				$out = ob_get_clean();
 			} else {
-				$out = $form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1, 'maxwidth300', '', 1);
+				$out = $form->select_produits_fournisseurs($socid, $selected, $htmlname, $filtertype, '', array(), 0, 1, 'maxwidth300', '', 1);
 			}
 		} else {
 			// Combo: select_produits_fournisseurs() asks the list without any limit, so it loads every
 			// product of the database. Call the list the way the core calls it for its own combos, with
 			// the number of products the user allowed in a select.
-			$out = $form->select_produits_fournisseurs_list($socid, $selected, $htmlname, '', '', '', $status, 0, getDolGlobalInt('PRODUIT_LIMIT_SIZE', 1000), 1, 'maxwidth300', getDolGlobalInt('SUPPLIER_SHOW_STOCK_IN_PRODUCTS_COMBO'));
+			$out = $form->select_produits_fournisseurs_list($socid, $selected, $htmlname, $filtertype, '', '', $status, 0, getDolGlobalInt('PRODUIT_LIMIT_SIZE', 1000), 1, 'maxwidth300', getDolGlobalInt('SUPPLIER_SHOW_STOCK_IN_PRODUCTS_COMBO'));
 		}
 
 		$status = $savstatus;
@@ -3520,7 +3535,7 @@ class EInvoicing
 	 * Fetch default routing for a thirdparty
 	 *
 	 * @param 	int 		$fk_soc   		Thirdparty ID
-	 * @param 	'thirdparty'|'product' 		$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
+	 * @param 	'thirdparty'|'product'|'service' 		$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' or 'service' to get internal ID of product to use as default product or default service on invoice import)
 	 * @return 	string|int<-1,0>   				Routing ID string if found, 0 if not found, -1 if error
 	 */
 	public function fetchDefaultRouting($fk_soc, $routing_type = 'thirdparty')
@@ -3558,7 +3573,7 @@ class EInvoicing
 	 * Fetch all active routings for a thirdparty
 	 *
 	 * @param  	int    	$fk_soc   		Thirdparty ID
-	 * @param 	'thirdparty'|'product' 	$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
+	 * @param 	'thirdparty'|'product'|'service' 	$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' or 'service' to get internal ID of product to use as default product or default service on invoice import)
 	 * @param	int<0,1>	$active			1=only active routings
 	 * @return 	-1|array<array{rowid:int,routing_id:string,source:string,info:?string,is_default:int}>            		Array of routing rows (assoc), empty array if none, -1 if error
 	 */

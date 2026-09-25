@@ -2083,7 +2083,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 						// flow is retried on demand once the product/thirdparty exists, and it is not lost when it
 						// drifts out of the rolling synchronization window.
 						if (getDolGlobalInt('EINVOICING_ENABLE_MANUAL_ACTION_QUEUE')
-							&& in_array($rescode, array('THIRDPARTY_NOT_FOUND', 'PRODUCT_NOT_FOUND', 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT'))) {
+							&& in_array($rescode, array('THIRDPARTY_NOT_FOUND', 'PRODUCT_NOT_FOUND', 'DEFAULT_ROUTING_MIXED_UNSET', 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT'))) {
 							// Normalize the manual actions the protocol computed (create / associate an existing product / set a default one...) into a compact list the queue renders as icons.
 							$manualactions = array();
 							if (!empty($res['allactiondata']) && is_array($res['allactiondata'])) {
@@ -2140,6 +2140,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 					if (in_array($rescode, array(
 						'THIRDPARTY_NOT_FOUND',
 						'PRODUCT_NOT_FOUND',
+						'DEFAULT_ROUTING_MIXED_UNSET',
 						'THIRDPARTY_DUPLICATE_VAT',
 						'THIRDPARTY_DUPLICATE_SUPPLIER_CODE'
 					))) {
