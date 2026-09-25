@@ -1639,6 +1639,36 @@ parameters:
 			path: ../../../einvoicing/invoice_attachments.php
 
 		-
+			message: '#^Path in include\(\) "\.\./core/actions_linkedfiles\.inc\.php" is not a file or it does not exist\.$#'
+			identifier: include.fileNotFound
+			count: 1
+			path: ../../../einvoicing/invoice_attachments.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./compta/facture/class/facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/invoice_attachments.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/html\.formfile\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/invoice_attachments.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/files\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/invoice_attachments.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/invoice\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/invoice_attachments.php
+
+		-
 			message: '#^Parameter \#1 \$qty of function calcul_price_total expects int, float given\.$#'
 			identifier: argument.type
 			count: 1
