@@ -364,7 +364,7 @@ function fnmapGitShortCommit($moduledir)
 {
 	global $db;
 
-	if (!($db instanceof DoliDB)) {
+	if (!is_object($db)) {
 		return '';
 	}
 
