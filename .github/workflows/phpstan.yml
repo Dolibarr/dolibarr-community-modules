@@ -43,6 +43,10 @@ env:
 jobs:
   # Which cores to analyse against. A pull request answers on the two ends of the supported range,
   # where the drift between core versions shows; what lands on main is analysed on all of them.
+  #
+  # The oldest core stays in the pull request list even when it is also in the push list: an error a
+  # core reports alone is found by whoever can still fix it, rather than on a main nobody is looking
+  # at. It is the cheap half of the matrix - PHPStan indexes the core, it does not analyse it.
   cores:
     name: Cores to analyse against
     runs-on: ubuntu-latest
@@ -52,7 +56,7 @@ jobs:
       - id: pick
         run: |
           all='["18.0.0","24.0.0"]'
-          review='["24.0.0"]'
+          review='["18.0.0","24.0.0"]'
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "matrix=$review" >> "$GITHUB_OUTPUT"
           else
