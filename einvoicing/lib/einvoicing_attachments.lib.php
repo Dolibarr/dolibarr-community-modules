@@ -60,7 +60,7 @@ function einvoicingAttachmentCodes()
  */
 function einvoicingAttachmentMimeCode($filename)
 {
-	$extension = strtolower(pathinfo((string) $filename, PATHINFO_EXTENSION));
+	$extension = dol_strtolower(pathinfo((string) $filename, PATHINFO_EXTENSION));
 	if ($extension === 'jpeg') {
 		$extension = 'jpg';
 	}
