@@ -4,9 +4,9 @@
 # The core is not analysed, only indexed, so any checkout of a supported release works. Point at
 # one with DOLIBARR_HTDOCS, or let the script find one in the usual places.
 #
-#   dev/tools/phpstan/phpstan.sh                                  # analyse
-#   DOLIBARR_HTDOCS=~/git/dolibarr/htdocs dev/tools/phpstan/phpstan.sh
-#   dev/tools/phpstan/phpstan.sh einvoicing/class/document.class.php   # one file
+#   dev/tools/phpstan/phpstan.sh                                  		# analyse all
+#   DOLIBARR_HTDOCS=~/git/dolibarr/htdocs dev/tools/phpstan/phpstan.sh	# analyze all after setting path to Dolibarr core
+#   dev/tools/phpstan/phpstan.sh einvoicing/class/document.class.php   	# one file
 #
 # Any argument is passed on to PHPStan, so --generate-baseline, --error-format and the rest work.
 set -euo pipefail

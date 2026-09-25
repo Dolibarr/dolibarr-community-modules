@@ -343,12 +343,45 @@ function fnmapStamp($moduledir)
 	if (file_exists($moduledir.'/VERSION')) {
 		$version = trim(file_get_contents($moduledir.'/VERSION'));
 	}
-	$commit = trim((string) @shell_exec('git -C '.escapeshellarg($moduledir).' rev-parse --short HEAD 2>/dev/null'));
+	$commit = fnmapGitShortCommit($moduledir);
 	$stamp = 'module '.$version;
 	if ($commit !== '') {
 		$stamp .= ', commit '.$commit;
 	}
 	return $stamp.', generated '.date('Y-m-d');
+}
+
+/**
+ * Short hash of the commit the module directory is at, read through the core Utils::executeCLI().
+ *
+ * executeCLI() merges stderr into its output, and its popen method reports no return code at all,
+ * so only an output that is a hash makes it into the stamp.
+ *
+ * @param	string	$moduledir	Absolute path of the module directory
+ * @return	string				Short commit hash, or an empty string when it cannot be read
+ */
+function fnmapGitShortCommit($moduledir)
+{
+	global $db;
+
+	if (!($db instanceof DoliDB)) {
+		return '';
+	}
+
+	require_once DOL_DOCUMENT_ROOT.'/core/class/utils.class.php';
+	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+
+	$outputfile = DOL_DATA_ROOT.'/temp/einvoicing_function_map_git.tmp';	// Used by the popen method only
+	dol_mkdir(dirname($outputfile));	// May have been removed by a "Clean temporary files" purge
+
+	$utils = new Utils($db);
+	$result = $utils->executeCLI('git -C '.escapeshellarg($moduledir).' rev-parse --short HEAD', $outputfile);
+
+	$commit = trim((string) $result['output']);
+	if ($result['result'] != 0 || !preg_match('/^[0-9a-f]{7,40}$/', $commit)) {
+		return '';
+	}
+	return $commit;
 }
 
 
@@ -1080,6 +1113,42 @@ foreach (array_slice($argv, 1) as $argument) {
 		print "Unknown argument: ".$argument."\n";
 		exit(2);
 	}
+}
+
+// Load Dolibarr environment when one is reachable: the commit of the stamp is read through the core
+// Utils::executeCLI(), which needs it, and without an instance around - the standalone repository
+// checkout - the stamp simply carries no commit. Deployed by symlink into htdocs/custom/einvoicing,
+// the relative paths below resolve inside the repository: DOLIBARR_HTDOCS points at the instance to
+// run against, exactly like scripts/regenerate_einvoicing_fixtures.php already does.
+$fnmapDolibarrLoaded = false;
+$dolibarrHtdocs = rtrim((string) getenv('DOLIBARR_HTDOCS'), '/');
+if ($dolibarrHtdocs !== '' && file_exists($dolibarrHtdocs.'/master.inc.php')) {
+	$_SERVER['DOCUMENT_ROOT'] = $dolibarrHtdocs;
+	chdir($dolibarrHtdocs);
+	$fnmapDolibarrLoaded = ((int) @include $dolibarrHtdocs.'/master.inc.php') === 1;
+}
+// Try master.inc.php into web root known defined into CONTEXT_DOCUMENT_ROOT (not always defined)
+if (!$fnmapDolibarrLoaded && !empty($_SERVER["CONTEXT_DOCUMENT_ROOT"])) {
+	$fnmapDolibarrLoaded = ((int) @include $_SERVER["CONTEXT_DOCUMENT_ROOT"]."/master.inc.php") === 1;
+}
+// Try master.inc.php into web root detected using web root calculated from SCRIPT_FILENAME
+$tmp = empty($_SERVER['SCRIPT_FILENAME']) ? '' : $_SERVER['SCRIPT_FILENAME'];
+$tmp2 = realpath(__FILE__);
+$i = strlen($tmp) - 1;
+$j = strlen($tmp2) - 1;
+while ($i > 0 && $j > 0 && isset($tmp[$i]) && isset($tmp2[$j]) && $tmp[$i] == $tmp2[$j]) {
+	$i--;
+	$j--;
+}
+if (!$fnmapDolibarrLoaded && $i > 0 && file_exists(substr($tmp, 0, ($i + 1))."/master.inc.php")) {
+	$fnmapDolibarrLoaded = ((int) @include substr($tmp, 0, ($i + 1))."/master.inc.php") === 1;
+}
+if (!$fnmapDolibarrLoaded && $i > 0 && file_exists(dirname(substr($tmp, 0, ($i + 1)))."/master.inc.php")) {
+	$fnmapDolibarrLoaded = ((int) @include dirname(substr($tmp, 0, ($i + 1)))."/master.inc.php") === 1;
+}
+if (!$fnmapDolibarrLoaded) {
+	print "No Dolibarr instance reachable: the stamp will carry no commit.\n";
+	print "Set DOLIBARR_HTDOCS to the htdocs of an instance to have it, like the other scripts of the module.\n";
 }
 
 if (!file_exists(FNMAP_DATA_FILE)) {
