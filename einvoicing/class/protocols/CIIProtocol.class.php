@@ -820,7 +820,7 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	protected function depositAnnouncedByDocument(array $parsedHeader)
 	{
-		$announced = abs((float) ($parsedHeader['totalPrepaidAmount'] ?? 0));
+		$announced = (float) ($parsedHeader['totalPrepaidAmount'] ?? 0);
 		if ($announced < 0.005 || in_array((string) ($parsedHeader['businessProcessId'] ?? ''), array('B2', 'S2', 'M2'), true)) {
 			return 0.0;
 		}
@@ -3871,14 +3871,14 @@ class CIIProtocol extends AbstractProtocol
 		if (!isset($parsedHeader['taxTotalAmount']) || !isset($parsedHeader['grandTotalAmount'])) {
 			return;
 		}
-		$announcedTva = abs((float) $parsedHeader['taxTotalAmount']);
+		$announcedTva = (float) $parsedHeader['taxTotalAmount'];
 		// BT-112 plus BT-114, which the invoice carries as a line of its own: what is confronted is what
 		// the buyer owes, BT-115 when the document answers BR-CO-16 (issue #994).
-		$announcedTtc = (float) (SupplierInvoiceHelper::announcedTotalTtc($parsedHeader) ?? abs((float) $parsedHeader['grandTotalAmount']));
+		$announcedTtc = (float) (SupplierInvoiceHelper::announcedTotalTtc($parsedHeader) ?? (float) $parsedHeader['grandTotalAmount']);
 		// BT-113 is what the document says was already paid. It moves neither BT-110 nor BT-112, so the
 		// two totals below agree whether or not it was deducted, and an invoice short of its deduction
 		// used to pass this guard and be paid in full (issue #726).
-		$announcedPrepaid = isset($parsedHeader['totalPrepaidAmount']) ? abs((float) $parsedHeader['totalPrepaidAmount']) : null;
+		$announcedPrepaid = isset($parsedHeader['totalPrepaidAmount']) ? (float) $parsedHeader['totalPrepaidAmount'] : null;
 
 		// A document whose BT-115 does not answer BR-CO-16 says two different things about what has to
 		// be paid, and nothing here can pick one: it is marked like any other document the import
@@ -4000,8 +4000,8 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		// BT-113 is deducted beside the invoice and not from its total, so it is added back on both sides
-		$prepaid = isset($parsedHeader['totalPrepaidAmount']) ? abs((float) $parsedHeader['totalPrepaidAmount']) : 0.0;
-		$announcedDue = abs((float) $parsedHeader['duePayableAmount']) + $prepaid;
+		$prepaid = isset($parsedHeader['totalPrepaidAmount']) ? (float) $parsedHeader['totalPrepaidAmount'] : 0.0;
+		$announcedDue = (float) $parsedHeader['duePayableAmount'] + $prepaid;
 		if (abs($announcedDue - (float) $announcedTtc) < 0.005) {
 			return false;
 		}
@@ -4015,7 +4015,7 @@ class CIIProtocol extends AbstractProtocol
 		$return_messages[] = $langs->trans(
 			'EInvoiceImportPayableMismatch',
 			dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')),
-			price2num(abs((float) $parsedHeader['duePayableAmount']), 'MT'),
+			price2num((float) $parsedHeader['duePayableAmount'], 'MT'),
 			price2num((float) $announcedTtc - $prepaid, 'MT')
 		);
 		$return_messages[] = $langs->trans('EInvoiceImportTotalsMismatchAction');
@@ -4455,13 +4455,13 @@ class CIIProtocol extends AbstractProtocol
 				return false;
 			}
 
-			// A credit note is stored negative by Dolibarr while a document announces positive amounts.
-			$sign = $groups[$rate]['base'] < 0 ? -1 : 1;
-			if (abs($groups[$rate]['base'] - $sign * abs((float) ($tax['basisAmount'] ?? 0))) >= 0.005) {
+			// The document announces BG-23 with its own sign, which a credit note stored negative reverses.
+			$sign = SupplierInvoiceHelper::documentSign($invoice);
+			if (abs($groups[$rate]['base'] - $sign * (float) ($tax['basisAmount'] ?? 0)) >= 0.005) {
 				return false;
 			}
 
-			$difference = round($sign * abs((float) ($tax['calculatedAmount'] ?? 0)) - $groups[$rate]['vat'], 2);
+			$difference = round($sign * (float) ($tax['calculatedAmount'] ?? 0) - $groups[$rate]['vat'], 2);
 			// A rounding convention moves the VAT of a rate by at most a cent per line, each line VAT being
 			// rounded once and their total once more. Beyond that the document says something no convention
 			// explains, and it is reported rather than written in.
