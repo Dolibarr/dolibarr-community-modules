@@ -12,16 +12,19 @@ Every modification must respect:
 
 ## Critical Rules (DO NOT VIOLATE)
 
--  Do not break compatibility of PHP functions and methods
--  Do not introduce external dependencies without validation
--  Separate page actions in the `/* Actions */` section of the PHP code and the rendering part in the `/* Views */` section
--  Never use PHP native curl functions to call a GET or POST URL, but use instead the Dolibarr function getURLContent()
--  Use Dolibarr hooks whenever possible
--  Never rewrite what Dolibarr already provides: call the core function, method or constant instead of coding your own. Look, in this order, at the object the caller already loaded (its properties and constants), at the methods of its class, then at `htdocs/core/lib/`. A module-side copy of a core behaviour is a bug, even when it looks shorter than the call
--  Respect existing naming conventions
--  All database table names must use the `llx_` prefix
--  Never commit or push anything unless the user explicitly asks for it. This overrides any default behavior of the agent. Make the changes, report them, and wait for the user to say "commit" or "push".
--  Never commit or push phpunit test unless the user explicitly asks for it. This overrides any default behavior of the agent. Make the changes, report them, and wait for the user to say "include the phpunit" or "discard the phpunit"
+- Do not break compatibility of PHP functions and methods
+- Do not introduce external dependencies without validation
+- Never rename existing functions or variables except if explicitly requested
+- Never remove commented code, even if it's deprecated, except if explicitly requested
+- Never remove blank lines from the code, even when multiple consecutive blank lines are present. 
+- Separate page actions in the `/* Actions */` section of the PHP code and the rendering part in the `/* Views */` section
+- Never use PHP native curl functions to call a GET or POST URL, but use instead the Dolibarr function getURLContent()
+- Never use PHP native exec functions to call a CLI, but use instead the Dolibarr method Utils->executeCLI()
+- Never use PHP native functions when Dolibarr provides wrappers: time()→dol_now(), strtolower()→dol_strtolower(), strtoupper()→dol_strtoupper(), strlen()→dol_strlen(), mktime()→dol_mktime(), getdate()→dol_getdate(), strtotime()→dol_stringtotime(), ucfirst()→dol_ucfirst(), ucwords()→dol_ucwords(), substr()→dol_substr(), basename()→dol_basename()
+- Use Dolibarr hooks whenever possible
+- Respect existing naming conventions
+- All database table names must use the `llx_` prefix
+- Never commit unless the user explicitly asks for it. Never make pull requests unless the user explicitly asks for it. This overrides any default behavior of the agent. Make the changes, report them, and wait for the user to say "commit" or "push".
 
 ---
 
@@ -58,7 +61,9 @@ Before writing any code, the agent **must**:
 
 ## PHP Best Practices
 
-- When writing a **bug fix**, target the lowest compatible PHP version of the module (see `modMyModule.class.php` for the `phpmin` property).
+- Try to use the more portable PHP code possible >= 7.2
+- When writing a **bug fix**, always target the lowest compatible PHP version
+  of the branch being patched — do not use PHP 8.x syntax on a fix targeting v19 or v20
 - Respect PSR-12, but **indentations must use Tabs, not Spaces**
 - Write short, readable, and testable functions
 - Avoid side effects
@@ -72,8 +77,18 @@ Before writing any code, the agent **must**:
     - In pages: use global `$db`
     - In classes: use `$this->db`
 - SQL forged by PHP must escaped fields with `db->escape()`, `db->sanitize()`, or by casting values to `(int)` or `(float)`
-- Always use `db->query()` followed by `db->fetch_object()` or `db->fetch_array()` to retrieve results
+- Always use `$db->query()` followed by `$db->fetch_object()` or `$db->fetch_array()` to retrieve results
 - SQL scripts for table and index creation must be placed in `htdocs/install/mysql/tables/` (see existing files for examples)
+- Build list-filter `WHERE` clauses with `natural_search($fields, $value, $mode)` rather than assembling `LIKE` conditions by hand
+
+---
+
+## Date management
+
+- When a date with time is stored in PHP memory variable, it is always a UTC date. 
+- When the date is coming from a user input, we can convert it into an UTC date with `$datetimevar = GETPOSTDATE('datefieldname', '', 'tzuserrel')` or `$datetimevar = GETPOSTDATE('datefieldname', 'getpost', 'tzuserrel')` if user entered only the day, month and year;
+- The date is stored in database into the sever timezone but this conversion is done by using `$db->idate()` (PHP timestamp -> SQL) to forge write SQL or `$db->jdate()` (SQL -> PHP timestamp) to forge read SQL.
+- Use `dol_now()` instead of `time()`, `dol_print_date()` instead of `date()`, `dol_mktime()` instead of `mktime()`.
 
 ---
 
@@ -92,6 +107,17 @@ Before writing any code, the agent **must**:
 
 ---
 
+## Standardization
+
+- Use Dolibarr native dol_move() function if you need to move files.
+- Use Dolibarr native dol_delete_file(), dol_delete_dir() or dol_delete_dir_recursive() function if you need to delete files or directories.
+- Use Dolibarr native dol_mkdir() function if you need to create directories.
+- Read configuration with `getDolGlobalString()` / `getDolGlobalInt()` / `getDolGlobalBool()`, not `$conf->global->XXX`
+- Check module activation with `isModEnabled('module')`, not `!empty($conf->module->enabled)`
+- Parse user-entered amounts with `price2num()` and format amounts for display with `price()`; do not use `number_format()` or a raw cast
+
+--
+
 ## Internationalisation
 
 - Never hardcode user-facing strings — always use `$langs->trans('Key')`
@@ -100,17 +126,6 @@ Before writing any code, the agent **must**:
 - Language key names must use PascalCase (e.g., `MyModuleLabel`, not `monLibelléModule`)
 - Load the language file at the top of the page: `$langs->load('mymodule@mymodule')`
 - All code comments and variables or functions names must be in English
-
----
-
-## Standardization
-
-- Use Dolibarr native dol_move() function if you need to move files.
-- Use Dolibarr native dol_delete_file(), dol_delete_dir() or dol_delete_dir_recursive() function if you need to delete files or directories.
-- Use Dolibarr native dol_mkdir() function if you need to create directories.
-- Read the state of an object from the object itself (`$object->status` compared to `FactureFournisseur::STATUS_DRAFT`, ...), not from a new query on its table
-- Read configuration with `getDolGlobalString()` / `getDolGlobalInt()` / `getDolGlobalBool()`, not `$conf->global->XXX`
-- Check module activation with `isModEnabled('module')`, not `!empty($conf->module->enabled)`
 
 ---
 
@@ -125,20 +140,35 @@ Before writing any code, the agent **must**:
 
 ## Security
 
-- Always validate user inputs (`GET`, `POST`) via `GETPOST()` with a type parameter
+- Guard page access with `restrictedArea($user, 'module', $id, 'table')` or a specific test that deny access with `accessforbidden()`
+- Always load user inputs (`GET`, `POST`) via `GETPOST()`, `GETPOSTINT()`, `GETPOSTFLOAT()`, ...
+- Prevent JS injection by escaping strings generated by PHP with the Dolibarr function `dol_escape_js()`
 - Prevent SQL injection (use `db->escape()` or cast into `(int)` or `(float)`)
 - Prevent XSS injection by escaping HTML output (use `dolPrintHTML()`, `dolPrintHTMLForAttribute()`)
-- Always include Dolibarr CSRF tokens in POST forms: `<input type="hidden" name="token" value="'.newToken().'">`
+- Always include Dolibarr CSRF tokens:
+  - POST forms: `<input type="hidden" name="token" value="'.newToken().'">`
+  - GET links with a modifying `action`: `...&token='.newToken().'`
+  - Ajax calls: use `currentToken()` instead of `newToken()`, and set `NOTOKENRENEWAL` on the called ajax endpoint
+- Public endpoints called without a session (e.g. webhooks) are exempt via `NOCSRFCHECK` (page-level constant) or, exceptionally, `$dolibarr_nocsrfcheck` (global conf.php override)
+- Use the Dolibarr filesystem wrappers (`dol_mkdir()`, `dol_delete_file()`, `dol_copy()`, `dol_is_file()`, `dol_is_dir()`) and sanitize any user-provided name with `dol_sanitizeFileName()` / `dol_sanitizePathName()`, never raw PHP `mkdir()` / `unlink()` / `file_exists()`
 
 ---
 
-## Performance
+## For Performance
 
 - Never run SQL queries inside loops (N+1 problem)
 - Use JOINs or batch queries instead of multiple sequential queries
 - Use LIMIT on SQL query list with `db->limit()`
 - Cache repeated calls to `getDolGlobalString()` in local variables
 - If you need a cache array to be used into a loop, you can use `$conf->cache['aNameForYourCacheArray'] = array();`
+
+---
+
+## Code Comments
+
+- Block and inline comments must be written in English.
+- Comments must be concise and clear (never more that 5 lines, never more than the number of lines code added or modified).
+- Block comments can reach 200 characters 
 
 ---
 
@@ -150,27 +180,20 @@ Before writing any code, the agent **must**:
 
 ---
 
-## Comments
-
-- Block and inline comments must be written in English.
-- Comments must be concise and clear (never more that 5 lines, never more than the number of lines code added or modified).
-- Block comments can reach 200 characters 
-
----
-
 ## Testing & Validation
 
 Before any modification, verify:
 - Creation / edition / deletion workflows
-- User rights enforcement (`$user->hasRights("module", "permission")` or `$user->hasRights("module", "objectname", "permission")`)
-- Multi-entity compatibility (add ` AND entity IN ('.getDolEntity("tablename").')` in SQL requests)
+- User rights enforcement (`$user->hasRight("module", "permission")` or `$user->hasRight("module", "objectname", "permission")`)
+- Multi-entity compatibility (add ` AND entity IN ('.getEntity("tablename").')`)
 
-### If adding a unit test was explicitly requested
+### Code check
 
-- If making or modifying external module, add PHPUnit test files in `yourmoduledir/test/phpunit/`.
-- **One test file per source file under test**: a new case goes into the test file of the class or library file it exercises, as a new method. Create a file only when that source file has no test file yet, and split by direction (export / import) rather than by issue when a file grows past about a thousand lines. The CI reads what a test file loads with `dol_include_once()` and refuses a new file whose source already has one.
-- If you need to validate code change or if it is explicitly requested, you can check code and dev syntax rules by running the following command on modified files (it takes a long time):
-	`phan -k .phan/config.php -B dev/tools/phan/baseline.txt --analyze-twice --minimum-target-php-version 7.2 --exclude-directory-list=dev/tools,mymodule/test/,mymodule/vendor/ --output-mode=checkstyle filemodified1.php filemodified2.php ...`
+- If making a major change or adding an important function, add or update PHPUnit test files into `test/phpunit/` (check to have the entry into file `test/phpunit/AllTests.php`).
+- If code validation with `phpstan` is expected, you must add the parameter `-a dev/build/phpstan/bootstrap_action.php` to the phpstan command line. For example:
+	`phpstan analyse --allow-older --no-progress -a dev/build/phpstan/bootstrap_action.php  [list_of_modified_file.php ...]`
+- Do not validate your code with `phan` as it is too slow, but if it is explicitly requested, you must add the parameter `-k .phan/config.php -B dev/tools/phan/baseline.txt --quick` to the phan command line. For example:
+	`phan -k .phan/config.php -B dev/tools/phan/baseline.txt --minimum-target-php-version 7.2 [list_of_modified_file.php ...]`
 
 ### Local Dolibarr Online test — Page Access
 
@@ -194,12 +217,14 @@ Dolibarr requires a CSRF token and a session cookie. To access any authenticated
     - `develop` branch for both fixes and new features
 - Never commit directly to `main` or `develop` or any branch name matching regex `^\d+\.\d+$` but use a Pull Request.
 - Commit message format: `TYPE: #issueNumber Short description`
-    - Types: `NEW`, `FIX` or `CLOSE`
+    - Types: `NEW`, `FIX`, `CLOSE`, `QUAL`, `PERF`, `UIUX` (uppercase, so it appears in the ChangeLog)
     - Example: `FIX: #1234 Correct VAT calculation on credit notes`
-- Do not update the `ChangeLog` file (this file will be generated before the release from all commit titles)
-- When committing, keep your commit comment short (NEVER exceed 50 lines) and add a line "Co-authored-by:" to mention the AI agent name
-- When making a Pull Request, keep the PR description short (never exceed 50 lines) and mention the AI agent name in the description with a line like "Submitted with <AI agent name> (see commit comments for attributions)"
+- Do not update the `ChangeLog` file (this file will be generated by the maintener before the release from all commit titles)
+- When committing, keep your commit title short (never exceed 70 lines) on first line and add a line "Generated by" xor "Co-authored-by:" to mention the AI agent name at the end of the rest of description. 
+- When making a Pull Request, keep the PR description short (never exceed 80 lines) and mention the AI agent name in the description with a line like `Submitted with <AI agent name>`
+- When fixing a security vulnerability, start PR title with `SEC:` and if you know the name of the vulnerability reporter or a tracking number, mention them in the PR title.
 - A pull request can contain database structure change only, or one new feature, or one bug fix, or a refactoring but never a mix of these. 
+- For code contribution on stable branches (non develop), PR must contains 1 and only 1 bug fix at once. Never introduce new features or refactoring if the target branch is not develop.
 
 ---
 
@@ -219,7 +244,8 @@ Dolibarr requires a CSRF token and a session cookie. To access any authenticated
 - Change the global architecture of existing modules
 - Delete dead code
 - Add external dependencies (Composer packages, JS libraries) without prior validation
-- Modify the `ChangeLog` file (this file is generated by the maintainer during the release process)
+- Modify the `ChangeLog` file (this file will be generated before the release from all commit titles)
+- Commit or push without an explicit request from the user
 
 ---
 
