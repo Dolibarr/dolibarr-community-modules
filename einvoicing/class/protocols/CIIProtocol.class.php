@@ -1145,6 +1145,9 @@ class CIIProtocol extends AbstractProtocol
 			dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource ' . $paymentInfoRes['message'], LOG_DEBUG, 0, '_einvoicing');
 		}
 
+		// A vendor billed on a subscription already has a recurring template holding the settings the
+		// operator chose once. Taken before create() so the invoice is written with them (issue #997).
+		$recurringTemplate = $this->_attachSupplierInvoiceToRecurringTemplate($supplierInvoice, (int) $socId, $return_messages);
 
 		$remise_already_used_line_level_ids = array();
 		$supplierPriceEntries = array(); // Collect product/price data to create supplier prices after invoice creation
@@ -1187,6 +1190,11 @@ class CIIProtocol extends AbstractProtocol
 			$orderLinkMessage = $this->_linkSupplierInvoiceToPurchaseOrder($supplierInvoice, $socId, $parsedHeader['orderReference'] ?? '');
 			if ($orderLinkMessage !== '') {
 				$return_messages[] = $orderLinkMessage;
+			}
+
+			// Now that the invoice exists: its extrafields, and the schedule of the template it stands for.
+			if ($recurringTemplate !== null) {
+				$this->_completeRecurringTemplateAttachment($supplierInvoice, $recurringTemplate, $return_messages);
 			}
 
 			// --------------------------------------------------
