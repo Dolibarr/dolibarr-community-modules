@@ -1007,12 +1007,22 @@ class CIIProtocol extends AbstractProtocol
 
 		// Check if this invoice has already been imported for this supplier
 		$announcedTotalTtc = SupplierInvoiceHelper::announcedTotalTtc($parsedHeader) ?? 0.0;
+		// announcedTotalTtc() is unsigned (abs). A refund arrives as a negative document total, or as a
+		// credit-note type code (381/503), and Dolibarr stores the matching document as a negative credit
+		// note. Match on the signed amount, otherwise a credit note looks like a "different amount" against
+		// its own already-imported avoir - a false SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT conflict (a bank
+		// refund booked as a supplier credit note is the real-world case).
+		$signedAnnouncedTtc = $announcedTotalTtc;
+		if ((float) ($parsedHeader['grandTotalAmount'] ?? 0) < 0
+			|| $this->getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null) === CommonInvoice::TYPE_CREDIT_NOTE) {
+			$signedAnnouncedTtc = -$announcedTotalTtc;
+		}
 		// The tolerance is BT-114: the same document imported before the rounding line existed totals a
 		// rounding amount more, and it is the invoice this is looking for (issue #994).
 		$supplierInvoiceId = SupplierInvoiceHelper::findIdByRef(
 			$parsedHeader['documentno'] ?? null,
 			(int) $socId,
-			$announcedTotalTtc,
+			$signedAnnouncedTtc,
 			abs(SupplierInvoiceHelper::documentRoundingAmount($parsedHeader))
 		);
 
