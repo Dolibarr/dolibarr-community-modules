@@ -200,7 +200,7 @@ print dol_get_fiche_end();
 print '<div class="opacitymedium marginbottomonly">'.$langs->trans('EInvAttachmentsTabHelp').'</div>';
 
 // Below EN 16931 the schema has no room for BG-24: say so here rather than let the files vanish at generation
-$profile = strtoupper(trim(getDolGlobalString('EINVOICING_XML_PROFILE')));
+$profile = dol_strtoupper(trim(getDolGlobalString('EINVOICING_XML_PROFILE')));
 if (in_array($profile, array('MINIMUM', 'BASICWL', 'BASIC'), true)) {
 	print info_admin($langs->trans('EInvAttachmentProfileTooLow', $profile), 0, 0, 'warning');
 }
