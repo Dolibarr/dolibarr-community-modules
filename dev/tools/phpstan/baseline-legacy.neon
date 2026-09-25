@@ -931,6 +931,12 @@ parameters:
 			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
 
 		-
+			message: '#^Path in require_once\(\) "\.\./ecm/class/ecmfiles\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
 			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.class\.php" is not a file or it does not exist\.$#'
 			identifier: requireOnce.fileNotFound
 			count: 1
