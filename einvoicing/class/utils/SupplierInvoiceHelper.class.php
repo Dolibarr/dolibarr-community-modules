@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2026       solauv
  * Copyright (C) 2026		MDW	<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2026		Jose Martinez			<jose.martinez@pichinov.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1081,6 +1082,52 @@ class SupplierInvoiceHelper
 		}
 
 		return 0;
+	}
+
+	/**
+	 * Return the supplier invoice that shares a supplier reference with a vendor, whatever its amount.
+	 *
+	 * findIdByRef() answers "which invoice to reuse" and deliberately returns -3 (a conflict, not an id)
+	 * when the only match carries a different amount. This companion answers "which invoice conflicts",
+	 * so the caller can link straight to it and show its amount next to the announced one, instead of
+	 * only telling the operator that a conflict exists.
+	 *
+	 * @param	string	$ref		Supplier reference (document number) to look for
+	 * @param	int		$socId		Vendor thirdparty id
+	 * @return	?array				array('id'=>int, 'total_ttc'=>float) of the exact-ref match, or null
+	 */
+	public static function conflictingInvoiceByRef($ref, int $socId): ?array
+	{
+		global $db;
+
+		$ref = (string) $ref;
+		if ($ref === '' || $socId <= 0) {
+			return null;
+		}
+
+		$sql = "SELECT rowid, total_ttc FROM " . $db->prefix() . "facture_fourn";
+		$sql .= " WHERE ref_supplier = '" . $db->escape($ref) . "'";
+		$sql .= " AND fk_soc = " . ((int) $socId);
+
+		$listofentityids = getEntity('facture_fourn');
+		if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE')) {
+			$listofentityids .= ',' . getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE');
+		}
+		$sql .= " AND entity IN (" . $db->sanitize($listofentityids) . ")";
+		$sql .= " LIMIT 1";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' ' . $db->lasterror(), LOG_ERR);
+			return null;
+		}
+		$obj = $db->fetch_object($resql);
+		$db->free($resql);
+		if ($obj) {
+			return array('id' => (int) $obj->rowid, 'total_ttc' => (float) $obj->total_ttc);
+		}
+
+		return null;
 	}
 
 	/**

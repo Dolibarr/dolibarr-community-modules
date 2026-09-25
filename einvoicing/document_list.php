@@ -393,6 +393,20 @@ if ($action == 'confirm_sync' && !$isSlaveEntity && getDolGlobalString('EINVOICI
 				$syncfromdate = 0;
 			}
 		}
+
+		// After a synchronization, remind the operator of the flows still queued for a manual action:
+		// they are errors to resolve, and are easy to miss once the run reports only its success count.
+		if (getDolGlobalInt('EINVOICING_ENABLE_MANUAL_ACTION_QUEUE')) {
+			$nbpendingqueue = 0;
+			$resqlpendingqueue = $db->query("SELECT COUNT(*) as nb FROM ".MAIN_DB_PREFIX."einvoicing_sync_pending WHERE entity IN (".getEntity('einvoicing').") AND status = 0");	// 0 = STATUS_PENDING
+			if ($resqlpendingqueue) {
+				$objpendingqueue = $db->fetch_object($resqlpendingqueue);
+				$nbpendingqueue = (int) $objpendingqueue->nb;
+			}
+			if ($nbpendingqueue > 0) {
+				setEventMessages($langs->trans("EInvoiceSyncPendingRemindAfterSync", $nbpendingqueue).' <a href="'.dol_buildpath('/einvoicing/sync_pending_list.php', 1).'">'.$langs->trans("EInvoiceSyncPending").'</a>', null, 'warnings');
+			}
+		}
 	} else {
 		setEventMessages($langs->trans("NoPDPProviderConfigured"), null, 'errors');
 	}
@@ -742,6 +756,21 @@ $newcardbutton = '';
 // creation of products is disabled and a synchronization is blocked on an unknown product).
 if (!$isSlaveEntity && getDolGlobalString('EINVOICING_SHOW_MAPPING_TOOL_ON_VENDOR_PRICE_LIST')) {	// Hidden option because editing mapping outside of an import process is discouraged.
 	$newcardbutton .= dolGetButtonTitle($langs->trans('MapEInvoiceProducts'), '', 'fa fa-link', dol_buildpath('/einvoicing/product_mapping.php', 1), '', $permissiontoadd);
+}
+
+// Link to the manual-action queue (error management): the flows a synchronization could not import
+// because they need a manual action (missing product/thirdparty, supplier invoice with a different
+// amount) are listed there. Shown only when the queue is enabled, with the number still pending so a
+// blocked flow is not missed from this screen.
+if (getDolGlobalInt('EINVOICING_ENABLE_MANUAL_ACTION_QUEUE')) {
+	$nbpendingqueue = 0;
+	$resqlpendingqueue = $db->query("SELECT COUNT(*) as nb FROM ".MAIN_DB_PREFIX."einvoicing_sync_pending WHERE entity IN (".getEntity('einvoicing').") AND status = 0");	// 0 = STATUS_PENDING
+	if ($resqlpendingqueue) {
+		$objpendingqueue = $db->fetch_object($resqlpendingqueue);
+		$nbpendingqueue = (int) $objpendingqueue->nb;
+	}
+	$labelpendingqueue = $langs->trans('EInvoiceSyncPending').($nbpendingqueue > 0 ? ' ('.$nbpendingqueue.')' : '');
+	$newcardbutton .= dolGetButtonTitle($labelpendingqueue, '', 'fa fa-hourglass-half', dol_buildpath('/einvoicing/sync_pending_list.php', 1), '', 1);
 }
 
 $providershort = '';

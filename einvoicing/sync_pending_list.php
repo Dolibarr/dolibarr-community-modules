@@ -132,6 +132,14 @@ function einvsp_actionMetaFromUrl($url)
 		}
 		return array('label' => 'CreateProduct', 'help' => 'ActionCreateProductHelp', 'icon' => 'fa-plus-circle');
 	}
+	// SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT: an invoice with this supplier ref already exists but with a
+	// different amount. The action opens the supplier invoice list filtered on that ref. Give it its own
+	// "modify" icon and an explanatory tooltip, otherwise it falls back to a bare plus that looks like a
+	// "create" and carries no help - the operator cannot tell what to do with the blocked flow.
+	if (strpos($url, '/fourn/facture/card.php') !== false
+		|| (strpos($url, '/fourn/facture/list.php') !== false && strpos($url, 'search_refsupplier=') !== false)) {
+		return array('label' => 'ModifySupplierInvoiceShort', 'help' => 'ActionModifySupplierInvoiceHelp', 'icon' => 'fa-pen');
+	}
 	return array('label' => '', 'help' => '', 'icon' => '');
 }
 
@@ -209,7 +217,7 @@ if ($action == 'confirm_retry' && $rowid > 0 && $permissiontowrite && $confirm =
 							$manualactions[] = array('key' => $akey, 'url' => $adata['url'], 'label' => ($adata['label'] ?? ''));
 						}
 					}
-				} elseif (is_array($syncres) && !empty($syncres['actionurl'])) {
+				} elseif (is_array($syncres) && !empty($syncres['actionurl']) && $syncres['actionurl'] !== 'none') {	// 'none' = action carried only by the HTML block (bad-amount "modify invoice" link), not a real URL
 					$manualactions[] = array('key' => ($reason == 'THIRDPARTY_NOT_FOUND' ? 'createthirdparty' : 'create'), 'url' => $syncres['actionurl'], 'label' => '');
 				}
 				$actionhtml = (is_array($syncres) && !empty($syncres['action'])) ? $syncres['action'] : '';
