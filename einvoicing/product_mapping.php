@@ -406,8 +406,13 @@ if (!empty($parsedLines)) {
 	if ($nbtomap == 0 && $socid > 0) {
 		print '<br><div class="ok">'.$langs->trans("AllLinesOfFlowAreMapped").'</div>';
 	}
-	if ($permissiontoadd && $socid > 0 && $nbtomap > 0) {
-		print '<input type="submit" class="button" value="'.$langs->trans("SaveMappingAndCreateVendorRefs").'">';
+	if ($socid > 0 && $nbtomap > 0) {
+		if ($permissiontoadd) {
+			print '<input type="submit" class="button" value="'.$langs->trans("SaveMappingAndCreateVendorRefs").'">';
+		} else {
+			// A link and not a disabled input: a disabled input shows no tooltip. Same form as the button below.
+			print '<a class="button disabled classfortooltip" href="#" title="'.dol_escape_htmltag($langs->trans("NotEnoughPermissions")).'">'.$langs->trans("SaveMappingAndCreateVendorRefs").'</a>';
+		}
 	}
 	// A line without any vendor reference has nothing to be mapped on, and the default product of the vendor
 	// is the only answer for it. Same link as the one the synchronization suggests, so the page is not a
