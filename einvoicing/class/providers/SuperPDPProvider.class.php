@@ -575,72 +575,92 @@ class SuperPDPProvider extends AbstractPDPProvider
 		// new session on the PA each time, whereas refreshing does not. The refresh token is rotated on each
 		// use, so we must persist the new one returned by the server.
 		if (!empty($this->tokenData['refresh_token'])) { // Refresh token is available only for Authorization Code grant, not for Client Credentials grant.
-			$providerconfig = $this->getConf();
+			// Serialize concurrent refreshes for this service (cron, page loads, several browser tabs, ...):
+			// a refresh_token is single-use, so two requests racing on the same one would have the PA accept
+			// one and reject the other - and some providers revoke the whole token family on that reuse,
+			// taking the token the winning request just obtained down with it. See acquireRefreshLock().
+			$lockacquired = $this->acquireRefreshLock();
+			if ($lockacquired) {
+				// Another process may have refreshed (and rotated the refresh_token) while we waited for the lock.
+				$this->tokenData = $this->fetchOAuthTokenDB(getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
+				if (!$this->isTokenExpired()) {
+					$this->releaseRefreshLock();
+					return $this->tokenData['token'];
+				}
+			}
 
-			// "Via partner" (grey-label) client: it holds no client_secret, so it cannot run the
-			// refresh_token grant against the PA directly. Route the refresh through the operator's
-			// proxy, which holds the secret and performs the grant on our behalf, then returns the
-			// rotated tokens. Mirrors the delegated enrolment flow (proxy_oauthcallback.php).
-			$proxyurl = getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER_OAUTH_URL');
-			if (getDolGlobalString('EINVOICING_PDP') == 'SUPERPDPViaPartner'
-				&& getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') != 'proxy'
-				&& !empty($proxyurl)) {
-				require_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
+			try {
+				$providerconfig = $this->getConf();
+
+				// "Via partner" (grey-label) client: it holds no client_secret, so it cannot run the
+				// refresh_token grant against the PA directly. Route the refresh through the operator's
+				// proxy, which holds the secret and performs the grant on our behalf, then returns the
+				// rotated tokens. Mirrors the delegated enrolment flow (proxy_oauthcallback.php).
+				$proxyurl = getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER_OAUTH_URL');
+				if (getDolGlobalString('EINVOICING_PDP') == 'SUPERPDPViaPartner'
+					&& getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') != 'proxy'
+					&& !empty($proxyurl)) {
+					require_once DOL_DOCUMENT_ROOT.'/core/lib/geturl.lib.php';
+
+					$param = array(
+						'action'        => 'refresh',
+						'grant_type'    => 'refresh_token',
+						'refresh_token' => $this->tokenData['refresh_token'],
+					);
+
+					// Allow HTTP and local URLs for testing only if the configuration allows it. Otherwise, only HTTPS is allowed.
+					$allowedprotocols = array('https');
+					$allowlocalurl = 0;
+					if (!empty(getDolGlobalInt('EINVOICING_ALLOW_LOCAL_URL'))) {
+						$allowlocalurl = 2;
+						$allowedprotocols[] = 'http';
+					}
+					$resultget = getURLContent($proxyurl, 'POST', http_build_query($param), 1, array('Content-Type: application/x-www-form-urlencoded'), $allowedprotocols, $allowlocalurl);
+
+					$httpcode = empty($resultget['http_code']) ? 0 : $resultget['http_code'];
+					if (empty($resultget['curl_error_no']) && $httpcode == 200) {
+						$body = json_decode($resultget['content'], true);
+						if (is_array($body) && !empty($body['access_token']) && isset($body['expires_in'])) {
+							$this->saveOAuthTokenDB($body['access_token'], $body['refresh_token'] ?? $this->tokenData['refresh_token'], $body['expires_in']);
+							$this->tokenData = $this->fetchOAuthTokenDB(getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
+							return $body['access_token'];
+						}
+					}
+					// Proxy refresh failed: a via-partner client has no secret to fall back on, so we stop here.
+					// The proxy relays the PA's raw error body (e.g. invalid_grant when the refresh_token was
+					// already rotated away), which curl_error_msg alone does not capture on a clean HTTP error.
+					dol_syslog(__METHOD__." refresh via partner proxy failed http_code=".$httpcode . " error=".$resultget['curl_error_msg'] . " response=".dol_trunc((string) ($resultget['content'] ?? ''), 500), LOG_WARNING, 0, "_einvoicing");
+					// Return a generic error message to avoid leaking the proxy URL in the logs.
+					setEventMessages('FailedToRetrieveAccessToken', null, 'errors');
+					$this->errors[] = 'FailedToRetrieveAccessToken';
+					return null;
+				}
 
 				$param = array(
-					'action'        => 'refresh',
 					'grant_type'    => 'refresh_token',
 					'refresh_token' => $this->tokenData['refresh_token'],
+					'client_id'     => $providerconfig['client_id'],
+					'client_secret' => $providerconfig['client_secret'],
 				);
+				$paramstring = http_build_query($param);
+				$extraHeaders = array('Content-Type' => 'application/x-www-form-urlencoded');
 
-				// Allow HTTP and local URLs for testing only if the configuration allows it. Otherwise, only HTTPS is allowed.
-				$allowedprotocols = array('https');
-				$allowlocalurl = 0;
-				if (!empty(getDolGlobalInt('EINVOICING_ALLOW_LOCAL_URL'))) {
-					$allowlocalurl = 2;
-					$allowedprotocols[] = 'http';
+				$response = $this->callApi("token", "POST", $paramstring, $extraHeaders, 'refresh_access_token');
+				$status_code = $response['status_code'] ?? 0;
+				$body = $response['response'] ?? null;
+
+				if ($status_code == 200 && is_array($body) && isset($body['access_token']) && isset($body['expires_in'])) {
+					// Persist the rotated refresh_token (keep the previous one if the server did not rotate it).
+					$this->saveOAuthTokenDB($body['access_token'], $body['refresh_token'] ?? $this->tokenData['refresh_token'], $body['expires_in']);
+					$this->tokenData = $this->fetchOAuthTokenDB(getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
+					return $body['access_token'];
 				}
-				$resultget = getURLContent($proxyurl, 'POST', http_build_query($param), 1, array('Content-Type: application/x-www-form-urlencoded'), $allowedprotocols, $allowlocalurl);
-
-				$httpcode = empty($resultget['http_code']) ? 0 : $resultget['http_code'];
-				if (empty($resultget['curl_error_no']) && $httpcode == 200) {
-					$body = json_decode($resultget['content'], true);
-					if (is_array($body) && !empty($body['access_token']) && isset($body['expires_in'])) {
-						$this->saveOAuthTokenDB($body['access_token'], $body['refresh_token'] ?? $this->tokenData['refresh_token'], $body['expires_in']);
-						$this->tokenData = $this->fetchOAuthTokenDB(getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
-						return $body['access_token'];
-					}
+				// Refresh failed (refresh token expired or already rotated away): fall through to a full re-auth.
+			} finally {
+				if ($lockacquired) {
+					$this->releaseRefreshLock();
 				}
-				// Proxy refresh failed: a via-partner client has no secret to fall back on, so we stop here.
-				// The proxy relays the PA's raw error body (e.g. invalid_grant when the refresh_token was
-				// already rotated away), which curl_error_msg alone does not capture on a clean HTTP error.
-				dol_syslog(__METHOD__." refresh via partner proxy failed http_code=".$httpcode . " error=".$resultget['curl_error_msg'] . " response=".dol_trunc((string) ($resultget['content'] ?? ''), 500), LOG_WARNING, 0, "_einvoicing");
-				// Return a generic error message to avoid leaking the proxy URL in the logs.
-				setEventMessages('FailedToRetrieveAccessToken', null, 'errors');
-				$this->errors[] = 'FailedToRetrieveAccessToken';
-				return null;
 			}
-
-			$param = array(
-				'grant_type'    => 'refresh_token',
-				'refresh_token' => $this->tokenData['refresh_token'],
-				'client_id'     => $providerconfig['client_id'],
-				'client_secret' => $providerconfig['client_secret'],
-			);
-			$paramstring = http_build_query($param);
-			$extraHeaders = array('Content-Type' => 'application/x-www-form-urlencoded');
-
-			$response = $this->callApi("token", "POST", $paramstring, $extraHeaders, 'refresh_access_token');
-			$status_code = $response['status_code'] ?? 0;
-			$body = $response['response'] ?? null;
-
-			if ($status_code == 200 && is_array($body) && isset($body['access_token']) && isset($body['expires_in'])) {
-				// Persist the rotated refresh_token (keep the previous one if the server did not rotate it).
-				$this->saveOAuthTokenDB($body['access_token'], $body['refresh_token'] ?? $this->tokenData['refresh_token'], $body['expires_in']);
-				$this->tokenData = $this->fetchOAuthTokenDB(getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
-				return $body['access_token'];
-			}
-			// Refresh failed (refresh token expired or already rotated away): fall through to a full re-auth.
 		}
 
 		// No refresh token (e.g. Client Credentials grant, which issues none) or refresh failed: re-authenticate.
