@@ -791,7 +791,7 @@ abstract class AbstractPDPProvider
 		$serviceName = $this->config['dol_prefix'] . '_' . ($this->config['live'] ? 'PROD' : 'TEST');
 
 		// For backward compatibility with Dolibarr versions < 23.0.0
-		if (version_compare(DOL_VERSION, '23.0.0', '<')) {
+		if (version_compare(DOL_VERSION, '23.0.0-alpha', '<')) {
 			$token = getDolGlobalString($serviceName.'_TOKEN');
 			$refresh = getDolGlobalString($serviceName.'_REFRESH');
 			$expire = getDolGlobalString($serviceName.'_EXPIRE');
@@ -858,7 +858,7 @@ abstract class AbstractPDPProvider
 		$serviceName = $this->config['dol_prefix'] . '_' . ($this->config['live'] ? 'PROD' : 'TEST');
 		// For backward compatibility with Dolibarr versions < 23.0.0
 
-		if (version_compare(DOL_VERSION, '23.0.0', '<')) {
+		if (version_compare(DOL_VERSION, '23.0.0-alpha', '<')) {
 			require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 
 			dolibarr_del_const($this->db, $serviceName.'_TOKEN', (int) ($forceentity ? $forceentity : $conf->entity));
