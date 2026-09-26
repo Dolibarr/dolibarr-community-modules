@@ -1094,7 +1094,7 @@ class SupplierInvoiceHelper
 	 *
 	 * @param	string	$ref		Supplier reference (document number) to look for
 	 * @param	int		$socId		Vendor thirdparty id
-	 * @return	?array				array('id'=>int, 'total_ttc'=>float) of the exact-ref match, or null
+	 * @return	?array{id:int,total_ttc:float}	The exact-ref match ('id' and 'total_ttc'), or null
 	 */
 	public static function conflictingInvoiceByRef($ref, int $socId): ?array
 	{
