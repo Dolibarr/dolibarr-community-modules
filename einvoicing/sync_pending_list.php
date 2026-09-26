@@ -760,7 +760,9 @@ while ($i < $imaxinloop) {
 			$tip .= '<br>'.dol_escape_htmltag($rhelp);
 		}
 		if (!empty($obj->reason_message)) {
-			$tip .= '<br><br>'.dol_escape_htmltag($obj->reason_message);
+			// The protocol builds this message with <br> separators (CIIProtocol). Keep them so the tooltip
+			// shows real line breaks instead of literal "<br>"; every other tag stays escaped (only <br> passes).
+			$tip .= '<br><br>'.dol_escape_htmltag($obj->reason_message, 1, 1, 'br');
 		}
 		print $form->textwithpicto('<span class="badge badge-status1 badge-status">'.dol_escape_htmltag($short).'</span>', $tip, 1, 'warning');
 	}
