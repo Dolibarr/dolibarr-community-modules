@@ -3888,6 +3888,8 @@ class CIIProtocol extends AbstractProtocol
 		// TODO Retrieve the ref of the deposit if prepaid amount is due to a deposit by adding a function depositRefAnnouncedByDocument() like depositAnnouncedByDocument()
 		// Reference of deposit can be on line level (like Dolibarr do when generating einvoice, see "if (!empty($line['isDepositLine'])..." in buildLineItem(), or
 		// can be defined globally.
+		// Another solution is to set the $announcedDepositRef to 'UNKNOWN_FORWARNINGONLY' and into the trigger to 'BILL_SUPPLIER_VALIDATE', if $announced['totalprepaidref' has this code,
+		// we accept the approval, instead we show a warning on the card.
 		$announcedDepositRef = null;
 		//$announcedDepositRef = $parsedHeader['invoiceRefDocs'];
 
