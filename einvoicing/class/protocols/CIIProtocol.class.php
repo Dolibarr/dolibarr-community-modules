@@ -614,6 +614,9 @@ class CIIProtocol extends AbstractProtocol
 		$filedir = getMultidirOutputCompat($invoice, '', 1);      // Example '/mydolibarr/documents/facture/FAYYMM-XXXX'
 		$einvoice_path = $filedir . '/' . $filename . '_cii.' . self::INVOICE_FILE_EXTENSION;
 
+		// The invoice directory only exists once a PDF has been built, and dol_copy() does not create it
+		dol_mkdir(dirname($einvoice_path), einvoicingDataRoot(dirname($einvoice_path)));
+
 		if (dol_copy($xmlfile, $einvoice_path) > 0) {
 			dol_syslog(get_class($this) . "::generateInvoice copied XML file to " . $einvoice_path);
 		} else {
