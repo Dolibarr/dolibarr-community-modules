@@ -204,8 +204,6 @@ trait CommonProtocol
 			CommonInvoice::TYPE_SITUATION       => '380',				// Process situation invoice as common invoice
 		];
 
-		// TODO Manage the credit note of a deposit invoice ?
-
 		return $map[$object->type] ?? null;
 	}
 

@@ -1167,7 +1167,7 @@ class CIIProtocol extends AbstractProtocol
 		$supplierInvoice->total_tva = $parsedHeader['taxTotalAmount'] ?? 0;
 		$supplierInvoice->total_ttc = $parsedHeader['grandTotalAmount'] ?? 0;
 
-		// Add a note about PDP import ( TODO: add a hook or extrafields to store import details)
+		// Add a note about PDP import
 		$supplierInvoice->note_private = "Imported from PDP";
 
 		// TODO : save AAB, PMD, PMT notes (all notes are grouped into documentNotes)
@@ -3885,7 +3885,9 @@ class CIIProtocol extends AbstractProtocol
 		if ($announcedPrepaid == 0) {
 			$announcedPrepaid = null;
 		}*/
-		// TODO Retrieve the ref of the deposit if prepaid amount is due to a deposit.
+		// TODO Retrieve the ref of the deposit if prepaid amount is due to a deposit by adding a function depositRefAnnouncedByDocument() like depositAnnouncedByDocument()
+		// Reference of deposit can be on line level (like Dolibarr do when generating einvoice, see "if (!empty($line['isDepositLine'])..." in buildLineItem(), or
+		// can be defined globally.
 		$announcedDepositRef = null;
 		//$announcedDepositRef = $parsedHeader['invoiceRefDocs'];
 
