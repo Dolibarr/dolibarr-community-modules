@@ -3242,12 +3242,14 @@ class EInvoicing
 				$sql .= " AND name = '" . $this->db->escape($name) . "'";
 			}
 		} else {
-			$sql = "INSERT INTO " . $this->db->prefix() . "einvoicing_extrafields";
-			$sql .= " (element_id, element_type, name, value, date_creation, fk_user_creat)";
-			$sql .= " VALUES (" . (int) $elementId . ", '" . $this->db->escape($elementType) . "'";
-			$sql .= ", '" . $this->db->escape($name) . "'";
-			$sql .= ", '" . $this->db->escape($value) . "'";
-			$sql .= ", '" . $this->db->idate(dol_now()) . "', " . (int) $user->id . ")";
+			if ($value !== null && $value !== '') {
+				$sql = "INSERT INTO " . $this->db->prefix() . "einvoicing_extrafields";
+				$sql .= " (element_id, element_type, name, value, date_creation, fk_user_creat)";
+				$sql .= " VALUES (" . (int) $elementId . ", '" . $this->db->escape($elementType) . "'";
+				$sql .= ", '" . $this->db->escape($name) . "'";
+				$sql .= ", '" . $this->db->escape($value) . "'";
+				$sql .= ", '" . $this->db->idate(dol_now()) . "', " . (int) $user->id . ")";
+			}
 		}
 
 		$resql = $this->db->query($sql);
