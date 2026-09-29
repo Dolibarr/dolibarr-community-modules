@@ -3200,7 +3200,7 @@ class EInvoicing
 	 * @param int		$elementId		ID of the element (or of the element line) the property belongs to
 	 * @param string	$elementType	Type of element (property object->element: 'facture', 'invoice_supplier', 'societe', ...)
 	 * @param string	$name			Name of the property ('buyer_order_reference', ...)
-	 * @param string	$value			Value to store ('' stores an empty value, it does not delete the row)
+	 * @param string	$value			Value to store (Value '' delete the row)
 	 * @return int						-1 on error, 1 if an existing row was updated, rowid of the new row otherwise
 	 */
 	public function insertOrUpdateExtraField($elementId, $elementType, $name, $value)
@@ -3228,12 +3228,19 @@ class EInvoicing
 		$this->db->free($resql);
 
 		if ($exists) {
-			$sql = "UPDATE " . $this->db->prefix() . "einvoicing_extrafields SET";
-			$sql .= " value = '" . $this->db->escape($value) . "'";
-			$sql .= ", fk_user_modif = " . (int) $user->id;
-			$sql .= " WHERE element_id = " . (int) $elementId;
-			$sql .= " AND element_type = '" . $this->db->escape($elementType) . "'";
-			$sql .= " AND name = '" . $this->db->escape($name) . "'";
+			if ($value !== null && $value !== '') {
+				$sql = "UPDATE " . $this->db->prefix() . "einvoicing_extrafields SET";
+				$sql .= " value = '" . $this->db->escape($value) . "'";
+				$sql .= ", fk_user_modif = " . (int) $user->id;
+				$sql .= " WHERE element_id = " . (int) $elementId;
+				$sql .= " AND element_type = '" . $this->db->escape($elementType) . "'";
+				$sql .= " AND name = '" . $this->db->escape($name) . "'";
+			} else {
+				$sql = "DELETE FROM " . $this->db->prefix() . "einvoicing_extrafields";
+				$sql .= " WHERE element_id = " . (int) $elementId;
+				$sql .= " AND element_type = '" . $this->db->escape($elementType) . "'";
+				$sql .= " AND name = '" . $this->db->escape($name) . "'";
+			}
 		} else {
 			$sql = "INSERT INTO " . $this->db->prefix() . "einvoicing_extrafields";
 			$sql .= " (element_id, element_type, name, value, date_creation, fk_user_creat)";
