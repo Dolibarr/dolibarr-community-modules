@@ -837,6 +837,7 @@ class CIIProtocol extends AbstractProtocol
 	 * ram:TypeCode cannot arbitrate this: CII-DT-018 forbids it below EXTENDED, so it is always absent.
 	 * A reference repeating the document's own number (BT-1) is settled before BT-113 is even read:
 	 * it can never resolve, so waiting for it is waiting for ever (#927).
+	 * A credit note is settled before BT-113 is read too: its BG-3 is the invoice it cancels, never a deposit.
 	 *
 	 * @param  string					$refDoc           BT-25, the identifier of the referenced document
 	 * @param  array<string,mixed>		$parsedHeader     Parsed document header
@@ -861,6 +862,14 @@ class CIIProtocol extends AbstractProtocol
 				$return_messages[] = 'Document ' . dol_escape_htmltag($documentno) . ' names itself as the invoice it follows; the reference was ignored.';
 			}
 			dol_syslog(get_class($this) . '::resolveMissingReferencedDocument Stepping over self-referencing InvoiceReferencedDocument ref="' . $refDoc . '" for ' . $documentno, LOG_WARNING);
+			return null;
+		}
+
+		if ($this->getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null) === CommonInvoice::TYPE_CREDIT_NOTE) {
+			if ($reportSkip) {
+				$return_messages[] = 'Document ' . dol_escape_htmltag((string) $refDoc) . ', ' . $relation . ' ' . dol_escape_htmltag($documentno) . ', was not found in Dolibarr and was ignored: the received document is a credit note, so the reference is the invoice it cancels, not a deposit to deduct.';
+			}
+			dol_syslog(get_class($this) . '::resolveMissingReferencedDocument Stepping over unresolved InvoiceReferencedDocument ref="' . $refDoc . '" (credit note) for ' . $documentno, LOG_DEBUG);
 			return null;
 		}
 
