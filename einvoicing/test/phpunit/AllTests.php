@@ -87,9 +87,6 @@ require_once DOL_DOCUMENT_ROOT . '/core/lib/admin.lib.php';
 
 print "dolibarrHtdocs=".$dolibarrHtdocs."\n";
 
-// Test there is no webhook enabled
-// TODO
-
 
 
 /**

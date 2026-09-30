@@ -1167,7 +1167,7 @@ class CIIProtocol extends AbstractProtocol
 		$supplierInvoice->total_tva = $parsedHeader['taxTotalAmount'] ?? 0;
 		$supplierInvoice->total_ttc = $parsedHeader['grandTotalAmount'] ?? 0;
 
-		// Add a note about PDP import ( TODO: add a hook or extrafields to store import details)
+		// Add a note about PDP import
 		$supplierInvoice->note_private = "Imported from PDP";
 
 		// TODO : save AAB, PMD, PMT notes (all notes are grouped into documentNotes)
@@ -3875,10 +3875,23 @@ class CIIProtocol extends AbstractProtocol
 		// BT-112 plus BT-114, which the invoice carries as a line of its own: what is confronted is what
 		// the buyer owes, BT-115 when the document answers BR-CO-16 (issue #994).
 		$announcedTtc = (float) (SupplierInvoiceHelper::announcedTotalTtc($parsedHeader) ?? abs((float) $parsedHeader['grandTotalAmount']));
+
 		// BT-113 is what the document says was already paid. It moves neither BT-110 nor BT-112, so the
 		// two totals below agree whether or not it was deducted, and an invoice short of its deduction
 		// used to pass this guard and be paid in full (issue #726).
 		$announcedPrepaid = isset($parsedHeader['totalPrepaidAmount']) ? abs((float) $parsedHeader['totalPrepaidAmount']) : null;
+		// TODO Replace with following line ?
+		/*$announcedPrepaid = $this->depositAnnouncedByDocument($parsedHeader);
+		if ($announcedPrepaid == 0) {
+			$announcedPrepaid = null;
+		}*/
+		// TODO Retrieve the ref of the deposit if prepaid amount is due to a deposit by adding a function depositRefAnnouncedByDocument() like depositAnnouncedByDocument()
+		// Reference of deposit can be on line level (like Dolibarr do when generating einvoice, see "if (!empty($line['isDepositLine'])..." in buildLineItem(), or
+		// can be defined globally.
+		// Another solution is to set the $announcedDepositRef to 'UNKNOWN_FORWARNINGONLY' and into the trigger to 'BILL_SUPPLIER_VALIDATE', if $announced['totalprepaidref' has this code,
+		// we accept the approval, instead we show a warning on the card.
+		$announcedDepositRef = null;
+		//$announcedDepositRef = $parsedHeader['invoiceRefDocs'];
 
 		// A document whose BT-115 does not answer BR-CO-16 says two different things about what has to
 		// be paid, and nothing here can pick one: it is marked like any other document the import
@@ -3915,9 +3928,9 @@ class CIIProtocol extends AbstractProtocol
 		}
 		// The deduction is answered before the totals, and once: no rounding convention explains a deposit
 		// that is not attached, so there is nothing for the conventions below to say about it.
-		if ($announcedPrepaid !== null
+		if ($announcedPrepaid !== null && $announcedDepositRef !== null
 			&& abs(SupplierInvoiceHelper::linkedDepositAmount($supplierInvoiceId) - $announcedPrepaid) >= 0.005) {
-			$this->flagPrepaidMismatch($supplierInvoiceId, $parsedHeader, $announcedTva, $announcedTtc, $announcedPrepaid, $return_messages);
+			$this->flagPrepaidMismatch($supplierInvoiceId, $parsedHeader, $announcedTva, $announcedTtc, $announcedPrepaid, $announcedDepositRef, $return_messages);
 			return;
 		}
 
@@ -4034,19 +4047,20 @@ class CIIProtocol extends AbstractProtocol
 	 * and the same invoice without it. The mark keeps it out of validation and approval, like any other document
 	 * the import could not reproduce (issue #861), and it carries BT-113 so that attaching the deposit lifts it.
 	 *
-	 * @param	int						$supplierInvoiceId	Id of the invoice the import created
-	 * @param	array<string,mixed>		$parsedHeader		The parsed header of the received document
-	 * @param	float					$announcedTva		BT-110 of the document, absolute value
-	 * @param	float					$announcedTtc		BT-112 of the document, absolute value
-	 * @param	float					$announcedPrepaid	BT-113 of the document, absolute value
-	 * @param	array<int,string>		$return_messages	Messages of the import, completed here
+	 * @param	int						$supplierInvoiceId		Id of the invoice the import created
+	 * @param	array<string,mixed>		$parsedHeader			The parsed header of the received document
+	 * @param	float					$announcedTva			BT-110 of the document, absolute value
+	 * @param	float					$announcedTtc			BT-112 of the document, absolute value
+	 * @param	float					$announcedPrepaid		BT-113 of the document, absolute value
+	 * @param	string					$announcedDepositRef	Ref of deposit when prepaid amount is done with such a deposit
+	 * @param	array<int,string>		$return_messages		Messages of the import, completed here
 	 * @return	void
 	 */
-	protected function flagPrepaidMismatch($supplierInvoiceId, array $parsedHeader, $announcedTva, $announcedTtc, $announcedPrepaid, array &$return_messages)
+	protected function flagPrepaidMismatch($supplierInvoiceId, array $parsedHeader, $announcedTva, $announcedTtc, $announcedPrepaid, $announcedDepositRef, array &$return_messages)
 	{
 		global $langs;
 
-		SupplierInvoiceHelper::flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc, $announcedPrepaid);
+		SupplierInvoiceHelper::flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc, $announcedPrepaid, $announcedDepositRef);
 
 		$langs->load('einvoicing@einvoicing');
 		$return_messages[] = $langs->trans(
