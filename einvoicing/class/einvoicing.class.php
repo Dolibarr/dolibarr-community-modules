@@ -1833,7 +1833,7 @@ class EInvoicing
 		$langs->load("suppliers");
 		$resprints .= '<td>';
 		if ($action != 'create') {
-			$resprints .= '<a href="' . $url . '">' . $langs->trans("History") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
+			$resprints .= '<a href="' . $url . '" title="'.$langs->trans("History").'"><i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
 		}
 		$resprints .= '</td>';
 		$resprints .= '</tr>';
@@ -2238,7 +2238,7 @@ class EInvoicing
 				$url = DOL_URL_ROOT . '/fourn/facture/agenda.php?id=' . ((int) $object->id) . '&search_agenda_label=EINVOICING';
 			}
 
-			$resprints .= '<a href="' . $url . '">' . $langs->trans("History") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
+			$resprints .= '<a href="' . $url . '" title="'.$langs->trans("History").'"><i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
 		}
 
 		$resprints .= '</td>';
