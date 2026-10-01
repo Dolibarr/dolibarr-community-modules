@@ -45,6 +45,12 @@ Descriptions of section entries and preferred order
 Maintainers List
 ----------------
 
+CLOUDBACKUP MODULE
+M:	Pierre Grasswill <da.grumpf@gmail.com> / daGrumpf-bxp
+S:	Maintained
+F:	cloudbackup/
+T:	https://github.com/Dolibarr/dolibarr-community-modules.git
+
 DOLISECURE MODULE
 M:	Laurent Bouquet <laurent.bouquet@joliciel.fr> / LaurentBouquet
 S:	Maintained

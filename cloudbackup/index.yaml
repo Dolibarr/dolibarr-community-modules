@@ -1,0 +1,31 @@
+# This is the YAML file to describe the location of a module
+
+packages:
+  - modulename: 'CloudBackup'
+    author: 'Dolibarr community'
+    author_url: 'https://github.com/Dolibarr/dolibarr-community-modules'
+    maintener_email: 'da.grumpf@gmail.com'
+    label:
+      fr: "CloudBackup"
+      en: "CloudBackup"
+    description:
+      fr: "Sauvegarde planifiée et restauration de la base et des documents, vers S3, FTP, SFTP ou un répertoire, en dépôt restic chiffré et incrémental ou en archives simples. Fonctionne sur hébergement mutualisé : sans shell ni paquet système."
+      en: "Scheduled backup and restore of the database and the documents, to S3, FTP, SFTP or a directory, as an encrypted and incremental restic repository or as plain archives. Works on shared hosting: no shell, no system package."
+    status: 'enabled'
+    created_at: '2026-09-28'
+    last_updated_at: 'auto'
+    category: '79'
+    git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/cloudbackup'
+    git-branch: 'main'
+    git-system: 'github'
+    cover: ''
+    current_version: 'auto'
+    dolibarrmin: 'auto'
+    dolibarrmax: 'auto'
+    phpmin: 'auto'
+    phpmax: 'auto'
+    price: 0
+    # direct-download is yes if we can download the module to install it in application
+    direct-download: 'yes'
+    # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
+    dolistore-upload: 'no'
