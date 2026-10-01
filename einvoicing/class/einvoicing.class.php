@@ -2653,9 +2653,9 @@ class EInvoicing
 
 				if (GETPOST('highlight') == 'routing_product_id') {
 					if (getDolGlobalString('PRODUIT_USE_SEARCH_TO_SELECT')) {
-						$resprints .= dol_set_focus('#search_routing_product_id');
+						dol_set_focus('#search_routing_product_id');	// prints its script, returns nothing
 					} else {
-						$resprints .= dol_set_focus('#routing_product_id');
+						dol_set_focus('#routing_product_id');	// prints its script, returns nothing
 					}
 				}
 			} else {
