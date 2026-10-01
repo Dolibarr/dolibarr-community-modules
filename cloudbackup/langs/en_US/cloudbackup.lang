@@ -1,0 +1,202 @@
+# Copyright (C) 2026 Pierre Grasswill <da.grumpf@gmail.com>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+#
+# Module
+#
+ModuleCloudBackupName = CloudBackup
+Module95040Name = CloudBackup
+Module95040Desc = Scheduled backup and restore of the database and the documents, to S3, FTP, SFTP or a directory, as an encrypted restic repository or as plain archives
+CloudBackupDescription = Scheduled backup and restore of the database and the documents, to S3, FTP, SFTP or a directory, as an encrypted restic repository or as plain archives
+CloudBackupDescriptionLong = Backs up the database (with the PHP dump of the backup tool of Dolibarr) and the documents directory, on a schedule or on demand, and restores them from Dolibarr itself. Works on shared hosting: no shell, no system package, only PHP extensions. The restic format is encrypted and deduplicated, and can be read with the restic command line tool.
+CloudBackupMenu = Cloud backup
+CloudBackupJob = CloudBackup: back up the database and the documents
+CloudBackupRightRead = See the backups and their history
+CloudBackupRightRun = Run a backup
+CloudBackupRightRestore = Restore a backup (replaces the database and the documents)
+CloudBackupRightSetup = Configure the backups (storage, password, retention, check)
+
+#
+# Setup
+#
+CloudBackupSetup = CloudBackup setup
+CloudBackupSetupPage = Where and how the database and the documents are backed up. The scheduled job is in Home > Setup > Scheduled jobs; it runs on shared hosting through the cron task of the hosting panel or through an external URL call.
+CloudBackupBackups = Backups
+CloudBackupWhere = Destination
+CloudBackupFormat = Format
+CloudBackupFormatHelp = restic: encrypted, deduplicated (only what changed is sent), readable with the restic tool. Archives: a zip of the documents and a gzipped SQL dump per backup, readable without any tool, not encrypted.
+CloudBackupFormatRestic = restic repository (encrypted, incremental)
+CloudBackupFormatArchive = Plain archives (zip + sql.gz)
+CloudBackupStorage = Storage
+CloudBackupStorageLocal = Directory of the server
+CloudBackupNeeds = needs %s
+CloudBackupServerCheck = This server
+CloudBackupBiggestTable = Biggest table of the database
+CloudBackupMemory = Memory
+CloudBackupMemoryNeeded = the backup needs about %s, memory_limit is %s
+CloudBackupMemoryRaised = The module raises the limit itself during a backup: the host allows it.
+CloudBackupMemoryTooLow = The host does not let the module raise memory_limit: ask for more, or run the backups from the scheduled job (the command line PHP often has no limit). The PHP dump of Dolibarr reads the biggest table in memory.
+CloudBackupTimeHelp = a manual backup from this page may stop there on a big instance, the scheduled job is not limited
+CloudBackupPath = Sub-path for this instance
+CloudBackupPathHelp = Directory (or key prefix in the bucket) inside the storage above, where the backups of this instance go. Use one sub-path per Dolibarr instance.
+CloudBackupS3Endpoint = Endpoint
+CloudBackupS3EndpointHelp = For example https://s3.fr-par.scw.cloud, https://s3.gra.io.cloud.ovh.net, https://s3.eu-west-3.amazonaws.com
+CloudBackupS3Region = Region
+CloudBackupS3Bucket = Bucket
+CloudBackupS3AccessKey = Access key
+CloudBackupS3SecretKey = Secret key
+CloudBackupS3VirtualHost = Virtual host style URLs
+CloudBackupS3VirtualHostHelp = https://bucket.endpoint/ instead of https://endpoint/bucket/. Only for providers that require it.
+CloudBackupHost = Host
+CloudBackupPort = Port
+CloudBackupUser = User
+CloudBackupPassword = Password
+CloudBackupFtpSsl = FTPS (explicit TLS)
+CloudBackupFtpSslHelp = Recommended: without it the password and the data travel in clear. Uses the curl extension of PHP.
+CloudBackupFtpVerify = Check the certificate of the server
+CloudBackupFtpVerifyHelp = Uncheck only for a server with a self-signed certificate you trust
+CloudBackupLocalPath = Local directory
+CloudBackupLocalPathHelp = Absolute path on this server, outside the documents directory %s (a backup must not die with the data it saves) and out of reach of the web. Created when saving.
+CloudBackupLocalPathSuggested = Suggested: %s
+CloudBackupUseIt = Use it
+CloudBackupAllowLocalUrl = Endpoint on a private network
+CloudBackupAllowLocalUrlHelp = Allow an endpoint with a private IP address (a MinIO on the local network). Off by default, as a protection against request forgery.
+CloudBackupKeepValue = (unchanged)
+CloudBackupEncryption = Encryption
+CloudBackupResticPassword = Repository password
+CloudBackupResticPasswordHelp = Encrypts the backups. Keep a copy OUTSIDE Dolibarr: without it no backup can ever be read again, not even by you. At least 12 characters.
+CloudBackupRepeatPassword = Repeat the password
+CloudBackupArchiveNotEncrypted = Plain archives are not encrypted: protect the storage accordingly, or choose the restic format.
+CloudBackupWhat = Content
+CloudBackupWithDatabase = Database
+CloudBackupWithDatabaseHelp = Dump made by the backup tool of Dolibarr, in PHP (no mysqldump needed)
+CloudBackupWithDocuments = Documents directory
+CloudBackupWithDocumentsHelp = Without temporary files, logs, previews and old dumps, like the backup tool of Dolibarr
+CloudBackupWithCustom = External modules (htdocs/custom)
+CloudBackupWithCustomHelp = The code of the installed external modules
+CloudBackupWithConf = conf.php
+CloudBackupWithConfHelp = Its unique id decrypts the passwords stored in the database: without it, a restore on a new server loses them. Stored encrypted, never restored automatically.
+CloudBackupExclude = Excluded paths
+CloudBackupExcludeHelp = One pattern per line, relative to the documents directory, like ecm/videos/* or */big-*.zip
+CloudBackupRetention = Retention
+CloudBackupRetentionEnabled = Delete old backups
+CloudBackupRetentionHelp = After each backup, keep only the backups selected below. Only the backups of this instance are concerned.
+CloudBackupKeepLast = Keep the last N backups
+CloudBackupKeepHourly = Keep one backup per hour for the last N hours
+CloudBackupKeepDaily = Keep one backup per day for the last N days
+CloudBackupKeepWeekly = Keep one backup per week for the last N weeks
+CloudBackupKeepMonthly = Keep one backup per month for the last N months
+CloudBackupKeepYearly = Keep one backup per year for the last N years
+CloudBackupPrune = Free the space
+CloudBackupPruneHelp = Remove from the repository the data no backup uses any more (restic prune)
+CloudBackupTest = Test the connection
+CloudBackupTestOk = Connection OK: an object was written, read back and deleted
+CloudBackupTestFailed = Connection failed: %s
+CloudBackupSchedule = Schedule
+CloudBackupScheduleOn = The scheduled backup is enabled.
+CloudBackupScheduleOff = The scheduled backup is disabled: enable it once the connection test passes.
+CloudBackupNextRun = Next run: %s.
+CloudBackupEditSchedule = Edit the schedule
+CloudBackupScheduleHelp = Scheduled jobs run when something calls the Dolibarr job runner: on shared hosting, add a cron task in the hosting panel with one of these commands (CRON_KEY is the key of Home > Setup > Modules > Scheduled jobs):
+
+#
+# Backups page
+#
+CloudBackupStatus = Status
+CloudBackupLastSuccess = Last successful backup
+CloudBackupNever = Never
+CloudBackupUsage = Space used on the storage
+CloudBackupUsageValue = %s for %s backup(s)
+CloudBackupUsageData = holding %s of saved data
+CloudBackupUsageMeasured = measured on %s
+CloudBackupUsageNever = Measured after the next backup or check of the storage
+CloudBackupRunNow = Back up now
+CloudBackupList = Show all backups
+CloudBackupShowHistory = Show the whole history
+CloudBackupCheck = Check the storage
+CloudBackupCheckData = Check and read all data
+CloudBackupCheckOk = The backups are sound
+CloudBackupCheckFailed = The check found problems
+CloudBackupUnlock = Remove the locks
+CloudBackupConfirmUnlock = Remove all the locks of the repository? Do it only if no backup runs, here or on another machine using the same repository.
+CloudBackupUnlocked = %s lock(s) removed
+CloudBackupOperationLog = Log of the operation
+CloudBackupAvailable = Backups available on the storage
+CloudBackupAvailableLatest = Last %s backups available on the storage
+CloudBackupId = Backup
+CloudBackupContent = Content
+CloudBackupOtherInstance = other instance
+CloudBackupOtherVersion = Made with another Dolibarr version than %s: after restoring the database, run the upgrade of Dolibarr
+CloudBackupRestore = Restore
+CloudBackupDownload = Download
+CloudBackupDownloadFailed = Download failed: %s
+CloudBackupConfirmRestore = Restore the backup %s?
+CloudBackupRestoreWarning = The database is replaced by the one of the backup: everything recorded since is lost. Documents of the backup overwrite the current ones.
+CloudBackupPartDatabase = Database
+CloudBackupPartDocuments = Documents
+CloudBackupPartCustom = External modules
+CloudBackupSafetyBackup = Back up the current state first
+CloudBackupExtraFilesKept = Documents created since the backup are kept: the restored database may not know them any more, they become orphans (see the Orphans tab).
+CloudBackupDeleteExtraFiles = Delete the documents the backup does not have
+CloudBackupNothingToRestore = Choose at least one part to restore
+CloudBackupBackupDone = Backup done
+CloudBackupBackupFailed = Backup failed: %s
+CloudBackupRestoreDone = Restore done
+CloudBackupRestoreFailed = Restore failed: %s
+CloudBackupHistory = History
+CloudBackupHistoryLatest = Last %s history events
+CloudBackupOrigin = Origin
+CloudBackupOriginManual = Manual
+CloudBackupOriginCron = Scheduled
+CloudBackupOriginPrerestore = Before a restore
+CloudBackupFiles = Files
+CloudBackupAdded = Sent
+CloudBackupActionBackup = Backup
+CloudBackupActionRestore = Restore
+CloudBackupActionDownload = Download
+CloudBackupStatusOk = OK
+CloudBackupStatusRunning = Running
+CloudBackupStatusError = Error
+CloudBackupStatusInterrupted = Interrupted
+
+#
+# Errors
+#
+CloudBackupErrorDatabaseType = The backup of a %s database is not supported: only MySQL and MariaDB are
+CloudBackupErrorMissingPhp = PHP extension missing: %s
+CloudBackupErrorNoPassword = No repository password: set one in the setup
+CloudBackupErrorNoStorage = No storage configured
+CloudBackupErrorLocalPath = The local directory must be an absolute path outside the documents directory %s
+CloudBackupErrorLocalPathCreate = Cannot create the directory %s: check the path, or create it with the file manager of the hosting
+CloudBackupErrorLocalPathWritable = PHP cannot write in the directory %s
+CloudBackupWarningLocalPathPublic = The local directory is inside the directory served by the web server: anyone guessing the address could download the backups. Choose a directory outside it.
+CloudBackupErrorAlreadyRunning = A backup or a restore is already running
+CloudBackupErrorSafetyBackup = The backup of the current state failed, nothing was restored: %s
+CloudBackupErrorPasswordMismatch = The two passwords differ
+CloudBackupErrorPasswordShort = The password must have at least 12 characters
+
+# Orphans
+CloudBackupOrphans = Orphans
+CloudBackupOrphanFiles = Documents without object
+CloudBackupOrphanIndexLines = File index without file
+CloudBackupKeptFiles = Kept by the last restore
+CloudBackupOrphanFilesHelp = Documents stored in the directory of an invoice, order, proposal, contract, third party or social contribution that no longer exists in the database. Same rule as the repair tool of Dolibarr.
+CloudBackupOrphanIndexLinesHelp = Lines of the file index of Dolibarr (ecm_files) whose file is not on the disk any more. Deleting a line only removes it from the index.
+CloudBackupKeptFilesHelp = Documents the last restore found on the disk but not in the backup, and kept. The restored database may not know them any more.
+CloudBackupKeptFilesFrom = Restore of %s, backup %s
+CloudBackupMissingObject = Missing object
+CloudBackupNoOrphan = No orphan
+CloudBackupOrphansDeleted = %s deleted
+CloudBackupOrphansNotDeleted = %s could not be deleted
