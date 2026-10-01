@@ -24,7 +24,7 @@
  */
 
 require_once __DIR__ . '/../../lib/einvoicing.lib.php';	// removeAllSpaces(), used to normalize an electronic address
-require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php'; // @phpstan-ignore requireOnce.fileNotFound (DOL_DOCUMENT_ROOT is resolved at runtime; the file exists in every supported core)
 
 
 /**

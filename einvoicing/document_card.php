@@ -636,7 +636,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		// replaced (Document::reimport() refuses anything else), so say it here rather than later.
 		$reimportofadraft = true;
 		if (!empty($object->fk_element_id)) {
-			require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
+			require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php'; // @phpstan-ignore requireOnce.fileNotFound (DOL_DOCUMENT_ROOT is resolved at runtime; the file exists in every supported core)
 			$linkedinvoice = new FactureFournisseur($db);
 			if ($linkedinvoice->fetch((int) $object->fk_element_id) > 0
 				&& (int) $linkedinvoice->status !== FactureFournisseur::STATUS_DRAFT) {

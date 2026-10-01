@@ -368,8 +368,8 @@ function fnmapGitShortCommit($moduledir)
 		return '';
 	}
 
-	require_once DOL_DOCUMENT_ROOT.'/core/class/utils.class.php';
-	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+	require_once DOL_DOCUMENT_ROOT.'/core/class/utils.class.php'; // @phpstan-ignore requireOnce.fileNotFound (DOL_DOCUMENT_ROOT is resolved at runtime; the file exists in every supported core)
+	require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php'; // @phpstan-ignore requireOnce.fileNotFound (DOL_DOCUMENT_ROOT is resolved at runtime; the file exists in every supported core)
 
 	$outputfile = DOL_DATA_ROOT.'/temp/einvoicing_function_map_git.tmp';	// Used by the popen method only
 	dol_mkdir(dirname($outputfile));	// May have been removed by a "Clean temporary files" purge

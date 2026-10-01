@@ -3928,8 +3928,12 @@ class CIIProtocol extends AbstractProtocol
 		}
 		// The deduction is answered before the totals, and once: no rounding convention explains a deposit
 		// that is not attached, so there is nothing for the conventions below to say about it.
-		if ($announcedPrepaid !== null && $announcedDepositRef !== null
-			&& abs(SupplierInvoiceHelper::linkedDepositAmount($supplierInvoiceId) - $announcedPrepaid) >= 0.005) {
+		// announcedDepositRef is intentionally null here - its assignment is commented out above pending
+		// the deposit-ref source; the branch is kept for when it is re-enabled, so these comparisons are
+		// statically always false for now.
+		if (
+			$announcedPrepaid !== null && $announcedDepositRef !== null && abs(SupplierInvoiceHelper::linkedDepositAmount($supplierInvoiceId) - $announcedPrepaid) >= 0.005 // @phpstan-ignore booleanAnd.alwaysFalse, booleanAnd.alwaysFalse, notIdentical.alwaysFalse
+		) {
 			$this->flagPrepaidMismatch($supplierInvoiceId, $parsedHeader, $announcedTva, $announcedTtc, $announcedPrepaid, $announcedDepositRef, $return_messages);
 			return;
 		}
