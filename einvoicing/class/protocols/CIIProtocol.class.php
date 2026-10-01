@@ -809,6 +809,18 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
+	 * Ref of the deposit a received document deducts through BT-113.
+	 *
+	 * @param  array<string,mixed>	$parsedHeader	Parsed header of the received document
+	 * @return string|null						Ref of the deposit, null while it is not read from the document
+	 */
+	protected function depositRefAnnouncedByDocument(array $parsedHeader)
+	{
+		// TODO Read it at line level (see "isDepositLine" in buildLineItem()) or at document level.
+		return null;
+	}
+
+	/**
 	 * Amount the document declares already paid that the import still has to attach (BT-113).
 	 *
 	 * BR-FR-CO-09 reads BT-23 in B2, S2 or M2 as "invoice already paid": BT-113 then equals BT-112 and
@@ -3890,7 +3902,7 @@ class CIIProtocol extends AbstractProtocol
 		// can be defined globally.
 		// Another solution is to set the $announcedDepositRef to 'UNKNOWN_FORWARNINGONLY' and into the trigger to 'BILL_SUPPLIER_VALIDATE', if $announced['totalprepaidref' has this code,
 		// we accept the approval, instead we show a warning on the card.
-		$announcedDepositRef = null;
+		$announcedDepositRef = $this->depositRefAnnouncedByDocument($parsedHeader);
 		//$announcedDepositRef = $parsedHeader['invoiceRefDocs'];
 
 		// A document whose BT-115 does not answer BR-CO-16 says two different things about what has to
