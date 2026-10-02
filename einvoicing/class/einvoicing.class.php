@@ -1833,7 +1833,7 @@ class EInvoicing
 		$langs->load("suppliers");
 		$resprints .= '<td>';
 		if ($action != 'create') {
-			$resprints .= '<a href="' . $url . '">' . $langs->trans("History") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
+			$resprints .= '<a href="' . $url . '" title="'.$langs->trans("History").'"><i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
 		}
 		$resprints .= '</td>';
 		$resprints .= '</tr>';
@@ -2238,7 +2238,7 @@ class EInvoicing
 				$url = DOL_URL_ROOT . '/fourn/facture/agenda.php?id=' . ((int) $object->id) . '&search_agenda_label=EINVOICING';
 			}
 
-			$resprints .= '<a href="' . $url . '">' . $langs->trans("History") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
+			$resprints .= '<a href="' . $url . '" title="'.$langs->trans("History").'"><i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
 		}
 
 		$resprints .= '</td>';
@@ -2653,9 +2653,9 @@ class EInvoicing
 
 				if (GETPOST('highlight') == 'routing_product_id') {
 					if (getDolGlobalString('PRODUIT_USE_SEARCH_TO_SELECT')) {
-						$resprints .= dol_set_focus('#search_routing_product_id');
+						dol_set_focus('#search_routing_product_id');	// prints its script, returns nothing
 					} else {
-						$resprints .= dol_set_focus('#routing_product_id');
+						dol_set_focus('#routing_product_id');	// prints its script, returns nothing
 					}
 				}
 			} else {
@@ -3624,7 +3624,7 @@ class EInvoicing
 	 * @param string 		$flowId                	PDP flow identifier (UUID), if available
 	 * @param string 		$validationStatus      	Validation status: OK, PENDING or ERROR, if status is sent by dolibarr to PDP
 	 * @param string 		$validationMessage     	Validation or error message returned by PDP, if status is sent by dolibarr to PDP
-	 * @param string|null 	$date_creation    		Date of the event, if we want to store a past event (for example when importing lifecycle history from PDP), if null current date will be used
+	 * @param int|null 		$date_creation    		Timestamp of the event, if we want to store a past event (for example when importing lifecycle history from PDP), if null current date will be used
 	 * @param string		$reasonCode				Reason code
 	 * @param string		$recipientRoles			RoleCodes the CDAR addressed the status to ('SE', 'SE,BY'), for a status we received
 	 * @return int  								Rowid inserted or -1 on error

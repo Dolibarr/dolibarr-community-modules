@@ -440,7 +440,7 @@ function stancerBankLineDoesNotExists($stancer_id, $account_id, $amount)
 function stancerBankLineURLDoesNotExists($fk_bank, $url_id, $type)
 {
 	global $langs, $db, $user, $conf;
-	$sql = "SELECT * FROM " . MAIN_DB_PREFIX . "bank_url WHERE fk_bank='" . $db->escape($fk_bank) . "' AND url_id='" . $db->escape($url_id) . "' AND type='" . $db->escape($type) . "'";
+	$sql = "SELECT * FROM " . MAIN_DB_PREFIX . "bank_url WHERE fk_bank = " . ((int) $fk_bank) . " AND url_id = " . ((int) $url_id) . " AND type='" . $db->escape($type) . "'";
 	$resql = $db->query($sql);
 	if ($resql) {
 		$num = $db->num_rows($resql);
