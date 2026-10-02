@@ -20,14 +20,17 @@
  * \file    einvoicing/class/utils/SupplierInvoiceHelper.class.php
  * \ingroup einvoicing
  * \brief   Utility class for supplier invoices.
- * 			This file is mainly used when EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION is set but
- * 			this option is seriously bugged. Do not use it.
  */
 
+dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
 dol_include_once('einvoicing/class/document.class.php');
-dol_include_once('einvoicing/class/utils/PriceHelper.class.php');
+// calcul_price_total(), used below to recompute the totals of a line the way the invoice got them.
+// The core ships install/inc.php, which defines DOL_DOCUMENT_ROOT as '..', and PHPStan resolves the
+// constant against it: the path it reports does not exist, the one used at runtime does.
+require_once DOL_DOCUMENT_ROOT.'/core/lib/price.lib.php';  // @phpstan-ignore requireOnce.fileNotFound
 dol_include_once('fourn/class/fournisseur.facture.class.php');
+dol_include_once('einvoicing/lib/einvoicing.lib.php');
 
 /**
  * Class SupplierInvoiceHelper
@@ -40,6 +43,84 @@ class SupplierInvoiceHelper
 	 * replaced, ...) so it can be reliably excluded from the accountancy transfer screen.
 	 */
 	const CLOSECODE_PDPREFUSED = 'pdp_refused';
+
+	/**
+	 * Special code marking the line an import adds to carry BT-114, the rounding amount of a received
+	 * document. It is the module number, the way Dolibarr tags a line a module created, and it is the
+	 * only line of an imported invoice outside the VAT breakdown: every per-rate comparison skips it.
+	 */
+	const LINE_SPECIAL_CODE_ROUNDING = 95020;
+
+	/**
+	 * BT-114 of a received document, the amount that rounds its total to what is due.
+	 *
+	 * @param	array<string,mixed>	$parsedHeader	Header data of the received document
+	 * @return	float								The rounding amount, 0 when the document carries none
+	 */
+	public static function documentRoundingAmount(array $parsedHeader): float
+	{
+		return isset($parsedHeader['roundingAmount']) ? (float) $parsedHeader['roundingAmount'] : 0.0;
+	}
+
+	/**
+	 * The VAT included total a Dolibarr invoice is expected to carry for a received document (issue #994).
+	 *
+	 * BT-115 is what the buyer owes, and what the invoice totals once BT-114 is carried as a line, so it
+	 * is read in place of BT-112 - plus BT-113, which Dolibarr deducts beside the invoice and not from its
+	 * total. It is checked against BR-CO-16 and dropped for BT-112 + BT-114 when it does not hold: a
+	 * payable of the issuer's own invention must not move the guards that block a bad import.
+	 *
+	 * @param	array<string,mixed>	$parsedHeader	Header data of the received document
+	 * @return	?float								Absolute total, or null when the document announces none
+	 */
+	public static function announcedTotalTtc(array $parsedHeader)
+	{
+		if (!isset($parsedHeader['grandTotalAmount'])) {
+			return null;
+		}
+
+		$rounded = abs((float) $parsedHeader['grandTotalAmount'] + self::documentRoundingAmount($parsedHeader));
+
+		if (isset($parsedHeader['duePayableAmount'])) {
+			$prepaid = isset($parsedHeader['totalPrepaidAmount']) ? abs((float) $parsedHeader['totalPrepaidAmount']) : 0.0;
+			$due = abs((float) $parsedHeader['duePayableAmount']) + $prepaid;
+			if (abs($due - $rounded) < 0.005) {
+				return $due;
+			}
+			dol_syslog(__METHOD__ . ' BT-115 (' . $parsedHeader['duePayableAmount'] . ') does not answer BR-CO-16 on BT-112/BT-113/BT-114, the invoice is confronted with BT-112 instead', LOG_WARNING, 0, '_einvoicing');
+		}
+
+		return $rounded;
+	}
+
+	/**
+	 * The VAT excluded total a Dolibarr invoice is expected to carry for a received document (issue #994).
+	 *
+	 * BT-109 sums the taxable bases and ignores BT-114, which the invoice carries as a line of its own:
+	 * what the invoice totals is therefore the one plus the other.
+	 *
+	 * @param	array<string,mixed>	$parsedHeader	Header data of the received document
+	 * @return	?float								Absolute total, or null when the document announces none
+	 */
+	public static function announcedTotalHt(array $parsedHeader)
+	{
+		if (!isset($parsedHeader['taxBasisTotalAmount'])) {
+			return null;
+		}
+
+		return abs((float) $parsedHeader['taxBasisTotalAmount'] + self::documentRoundingAmount($parsedHeader));
+	}
+
+	/**
+	 * Whether a line is the one an import added to carry BT-114.
+	 *
+	 * @param	object	$line	A line of a supplier invoice
+	 * @return	bool			True when the line carries the rounding amount of a received document
+	 */
+	public static function isRoundingLine($line): bool
+	{
+		return isset($line->special_code) && (int) $line->special_code === self::LINE_SPECIAL_CODE_ROUNDING;
+	}
 
 	/**
 	 * Compare amounts according to a number of digits after decimal point and return true if they are equal.
@@ -133,14 +214,18 @@ class SupplierInvoiceHelper
 				}
 			}
 
-			// VAT excl. total
-			if (!self::areAmountsEqual($details['total_ht'], $parsedHeader['taxBasisTotalAmount'])) {
-				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatExclDifference', $parsedHeader['taxBasisTotalAmount'], floatval($dolSupplierInvoice->total_ht));
+			// VAT excl. and VAT incl. totals. Both are confronted with what the invoice is expected to
+			// carry rather than with BT-109 and BT-112 alone: a document carrying BT-114 is imported with
+			// a rounding line, and its invoice totals BT-115 (issue #994).
+			$announcedHt = self::announcedTotalHt($parsedHeader);
+			$announcedTtc = self::announcedTotalTtc($parsedHeader);
+
+			if ($announcedHt !== null && !self::areAmountsEqual($details['total_ht'], $announcedHt)) {
+				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatExclDifference', $announcedHt, floatval($dolSupplierInvoice->total_ht));
 			}
 
-			// VAT incl. total
-			if (!self::areAmountsEqual($details['total_ttc'], $parsedHeader['grandTotalAmount'])) {
-				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatInclDifference', $parsedHeader['grandTotalAmount'], floatval($dolSupplierInvoice->total_ttc));
+			if ($announcedTtc !== null && !self::areAmountsEqual($details['total_ttc'], $announcedTtc)) {
+				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatInclDifference', $announcedTtc, floatval($dolSupplierInvoice->total_ttc));
 			}
 
 			// VAT total
@@ -204,7 +289,7 @@ class SupplierInvoiceHelper
 	 */
 	private static function getInvoiceDetailsForComparison(FactureFournisseur $supplierInvoice, $vatComputeMode)
 	{
-		global $db;
+		global $conf, $db;
 
 		// If mode 0 => use current supplier invoice data
 		if ($vatComputeMode == 0) {
@@ -231,12 +316,24 @@ class SupplierInvoiceHelper
 			throw new Exception('Seller not found for id : ' . $supplierInvoice->socid);
 		}
 
-		$forceRoundingTotalsPrecision = ($vatComputeMode == 1 ? 'MT' : 'MU');
+		// calcul_price_total() always rounds the totals of a line with 'MT'. That is mode 1
+		// (totalofround): round each line, then sum. Mode 2 (roundoftotal) keeps the unit precision
+		// on the lines and rounds only the sums, further down. It is obtained by lending
+		// MAIN_MAX_DECIMALS_TOT the unit precision for the duration of the loop, the way the core
+		// itself swaps these constants when it recalculates a line in a foreign currency.
+		$roundLinesOnUnitPrecision = ($vatComputeMode != 1);
+		$savMaxDecimalsTot = getDolGlobalString('MAIN_MAX_DECIMALS_TOT');
+		if ($roundLinesOnUnitPrecision) {
+			$conf->global->MAIN_MAX_DECIMALS_TOT = getDolGlobalInt('MAIN_MAX_DECIMALS_UNIT');
+		}
 
 		foreach ($supplierInvoice->lines as $line) {
 			$rate = (string) price2num($line->tva_tx);
+			// BT-114 travels on a line of its own, which counts in the totals of the invoice and in no
+			// taxable base: it opens no rate of its own either (issue #994).
+			$isRoundingLine = self::isRoundingLine($line);
 
-			if (!isset($details['vat_by_rate'][$rate])) {
+			if (!$isRoundingLine && !isset($details['vat_by_rate'][$rate])) {
 				$details['vat_by_rate'][$rate] = array(
 					'vat_basis_amount' => 0,
 					'vat_amount' => 0
@@ -248,14 +345,18 @@ class SupplierInvoiceHelper
 			$remisePercentGlobal = 0;
 			$priceBaseType = 'HT';
 			$infoBits = 0;
-			$localTaxes = array($line->localtax1_type, $line->localtax1_tx, $line->localtax2_type, $line->localtax2_tx);
+			// The types are cast to string because that is what calcul_price_total() reads them as:
+			// it switches on '1' to '6', while the line carries them as integers.
+			$localTaxes = array((string) $line->localtax1_type, $line->localtax1_tx, (string) $line->localtax2_type, $line->localtax2_tx);
 			$progress = (isset($line->situation_percent) ? $line->situation_percent : 100);
 			$multiCurrencyTx = !empty($line->multicurrency_tx) ? $line->multicurrency_tx : 1;
 			$puDevise = 0;
 			$multicurrencyCode = '';
 
-			$lineTotals = PriceHelper::calculatePriceTotal(
-				$line->qty,
+			// The PHPDoc of the core types the quantity as int up to Dolibarr 20, and the two localtax
+			// rates as int|string, while a line carries floats and the function computes with them.
+			$lineTotals = calcul_price_total(
+				$line->qty,  // @phpstan-ignore argument.type
 				$line->subprice,
 				$line->remise_percent,
 				floatval($rate),
@@ -266,24 +367,29 @@ class SupplierInvoiceHelper
 				$infoBits,
 				$line->product_type,
 				$seller,
-				$localTaxes,
+				$localTaxes,  // @phpstan-ignore argument.type
 				$progress,
 				$multiCurrencyTx,
 				$puDevise,
-				$multicurrencyCode,
-				$forceRoundingTotalsPrecision
+				$multicurrencyCode
 			);
 
 			$lineTotalHt = floatval($lineTotals[0]);
 			$lineVatAmount = floatval($lineTotals[1]);
 			$lineTotalTtc = floatval($lineTotals[2]);
 
-			$details['vat_by_rate'][$rate]['vat_basis_amount'] += $lineTotalHt;
-			$details['vat_by_rate'][$rate]['vat_amount'] += $lineVatAmount;
+			if (!$isRoundingLine) {
+				$details['vat_by_rate'][$rate]['vat_basis_amount'] += $lineTotalHt;
+				$details['vat_by_rate'][$rate]['vat_amount'] += $lineVatAmount;
+			}
 
 			$details['total_ht'] += $lineTotalHt;
 			$details['total_ttc'] += $lineTotalTtc;
 			$details['total_tva'] += $lineVatAmount;
+		}
+
+		if ($roundLinesOnUnitPrecision) {
+			$conf->global->MAIN_MAX_DECIMALS_TOT = $savMaxDecimalsTot;
 		}
 
 		$roundPrecision = 'MT';
@@ -312,6 +418,11 @@ class SupplierInvoiceHelper
 		$vatByRate = array();
 
 		foreach ($supplierInvoice->lines as $line) {
+			// BT-114 is carried by a line of its own and belongs to no taxable base (issue #994)
+			if (self::isRoundingLine($line)) {
+				continue;
+			}
+
 			$rate = (string) price2num($line->tva_tx);
 
 			if (!isset($vatByRate[$rate])) {
@@ -479,6 +590,204 @@ class SupplierInvoiceHelper
 	}
 
 	/**
+	 * Tell whether an invoice totals what the received document announces.
+	 *
+	 * Compared on the absolute values: a credit note is stored negative by Dolibarr while BT-110 and
+	 * BT-112 are always announced positive, the document type being what carries the sign (BR-CO-13
+	 * applies to a credit note as it does to an invoice). What a deposit attached to the invoice deducts
+	 * is added back first, the document announcing its totals before the deduction. The tolerance is there
+	 * for the float representation, not for a difference: the document carries its totals to the cent.
+	 *
+	 * @param	FactureFournisseur	$invoice			The invoice, with its totals as stored
+	 * @param	float				$announcedTva		BT-110 of the received document, absolute value
+	 * @param	float				$announcedTtc		BT-112 of the received document, absolute value
+	 * @param	?float				$announcedPrepaid	BT-113 of the received document, or null not to confront it
+	 * @return	bool									True when both totals are the announced ones
+	 */
+	public static function totalsAgreeWithDocument(FactureFournisseur $invoice, $announcedTva, $announcedTtc, $announcedPrepaid = null)
+	{
+		// A deposit the import attached is a negative line of the invoice (insert_discount() writes
+		// total_ht/tva/ttc as -amount_*), so the invoice totals BT-112 minus BT-113 while BT-110 and BT-112
+		// are announced before the deduction. Adding the deduction back is what puts the two sides on the
+		// same footing; it is added signed, so a credit note stored negative comes back to its own total
+		// too. Nothing is attached in the ordinary case and the sums are zero (issue #948).
+		$deposits = self::linkedDepositTotals((int) $invoice->id);
+		$invoiceTva = abs((float) $invoice->total_tva + $deposits['tva']);
+		$invoiceTtc = abs((float) $invoice->total_ttc + $deposits['ttc']);
+
+		if (abs($invoiceTva - (float) $announcedTva) >= 0.005
+			|| abs($invoiceTtc - (float) $announcedTtc) >= 0.005) {
+			return false;
+		}
+
+		// BT-113 does not move BT-110 or BT-112, so the two comparisons above cannot see it: a deposit
+		// the import failed to deduct leaves an invoice that totals exactly what the document announces
+		// and is short of what it says was already paid. Marks written before this check carry no
+		// prepaid amount and are read as null, which keeps them on the two totals alone.
+		if ($announcedPrepaid === null) {
+			return true;
+		}
+
+		return abs(self::linkedDepositAmount((int) $invoice->id) - abs((float) $announcedPrepaid)) < 0.005;
+	}
+
+	/**
+	 * Amount the deposits linked to a supplier invoice deduct from it, VAT included.
+	 *
+	 * The deposit of a received document becomes a DiscountAbsolute the imported lines point at through
+	 * fk_remise_except, and that row is what BT-113 has to be confronted with. Its fk_invoice_supplier_source
+	 * is what tells a deposit from a document level allowance (BT-107), which carries none.
+	 *
+	 * @param	int		$supplierInvoiceId	Id of the supplier invoice
+	 * @return	float						Sum of the deposits linked to it, VAT included
+	 */
+	public static function linkedDepositAmount($supplierInvoiceId)
+	{
+		$totals = self::linkedDepositTotals($supplierInvoiceId);
+
+		return $totals['ttc'];
+	}
+
+	/**
+	 * What the deposits linked to a supplier invoice deduct from it, VAT included and VAT alone.
+	 *
+	 * BT-113 is confronted with the amount including VAT, while putting an invoice back to the totals it
+	 * had before the deduction needs the VAT as well: insert_discount() takes both off, one line carrying
+	 * -amount_ttc and -amount_tva. The two come from the same row, hence the same query.
+	 *
+	 * @param	int								$supplierInvoiceId	Id of the supplier invoice
+	 * @return	array{ttc:float,tva:float}							Amounts deducted, zero when nothing is attached
+	 */
+	public static function linkedDepositTotals($supplierInvoiceId)
+	{
+		global $db;
+
+		$sql = "SELECT SUM(r.amount_ttc) as total, SUM(r.amount_tva) as total_tva";
+		$sql .= " FROM " . MAIN_DB_PREFIX . "societe_remise_except as r";
+		$sql .= " WHERE r.fk_invoice_supplier_source > 0";
+		$sql .= " AND (r.fk_invoice_supplier = " . (int) $supplierInvoiceId;
+		$sql .= " OR r.rowid IN (SELECT d.fk_remise_except FROM " . MAIN_DB_PREFIX . "facture_fourn_det as d";
+		$sql .= " WHERE d.fk_facture_fourn = " . (int) $supplierInvoiceId . " AND d.fk_remise_except > 0))";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' ' . $db->lasterror(), LOG_ERR);
+			return array('ttc' => 0.0, 'tva' => 0.0);
+		}
+		$obj = $db->fetch_object($resql);
+
+		return array(
+			'ttc' => abs((float) ($obj->total ?? 0)),
+			'tva' => abs((float) ($obj->total_tva ?? 0)),
+		);
+	}
+
+	/**
+	 * Mark a supplier invoice as not totalling what the document it was imported from announces.
+	 *
+	 * The announced totals are kept with the mark, so what it blocks can be re-evaluated without the
+	 * document: an operator who corrects the invoice to the figures the vendor bills lifts the block
+	 * by doing so (issue #861).
+	 *
+	 * @param	int		$supplierInvoiceId		Id of the supplier invoice the import created
+	 * @param	float	$announcedTva			BT-110 of the received document, absolute value
+	 * @param	float	$announcedTtc			BT-112 of the received document, absolute value
+	 * @param	?float	$announcedPrepaid		BT-113 of the received document, when it is what the mark is about
+	 * @param	?string	$announcedRefOfDeposit	The ref of the deposit if prepaid is from a deposit
+	 * @return	int								-1 on error, >0 otherwise
+	 */
+	public static function flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc, $announcedPrepaid = null, $announcedRefOfDeposit = null)
+	{
+		global $db;
+
+		$einvoicing = new EInvoicing($db);
+		$value = array('tva' => (float) $announcedTva, 'ttc' => (float) $announcedTtc);
+		if ($announcedPrepaid !== null && $announcedRefOfDeposit !== null) {
+			$value['prepaid'] = (float) $announcedPrepaid;
+			$value['prepaidref'] = (string) $announcedRefOfDeposit;
+		}
+		$value = json_encode($value);
+
+		return $einvoicing->insertOrUpdateExtraField((int) $supplierInvoiceId, 'invoice_supplier', EInvoicing::EXTRAFIELD_TOTALS_MISMATCH, (string) $value);
+	}
+
+	/**
+	 * Read the mark left by an import that could not reproduce the totals of the document.
+	 *
+	 * @param	int		$supplierInvoiceId		Id of the supplier invoice
+	 * @return	?array{tva:float,ttc:float,prepaid?:float}	The totals the document announces, or null when the invoice carries no mark
+	 */
+	public static function totalsMismatch($supplierInvoiceId)
+	{
+		global $db;
+
+		$einvoicing = new EInvoicing($db);
+		$stored = $einvoicing->getExtraFieldValue((int) $supplierInvoiceId, 'invoice_supplier', EInvoicing::EXTRAFIELD_TOTALS_MISMATCH);
+		if ($stored === null || $stored === '') {
+			return null;
+		}
+
+		$decoded = json_decode($stored, true);
+		if (!is_array($decoded) || !isset($decoded['tva']) || !isset($decoded['ttc'])) {
+			return null;
+		}
+
+		$announced = array('tva' => (float) $decoded['tva'], 'ttc' => (float) $decoded['ttc']);
+		// Only a mark written for a missing deduction carries BT-113. Absent, the caller confronts the
+		// two totals alone, which is what every mark written before this one means.
+		if (isset($decoded['prepaid'])) {
+			$announced['prepaid'] = (float) $decoded['prepaid'];
+		}
+		if (isset($decoded['prepaidref'])) {
+			$announced['prepaidref'] = (string) $decoded['prepaidref'];
+		}
+
+		return $announced;
+	}
+
+	/**
+	 * Remove the mark, once the invoice totals what the document announces.
+	 *
+	 * @param	int		$supplierInvoiceId	Id of the supplier invoice
+	 * @return	int							-1 on error, >0 otherwise
+	 */
+	public static function clearTotalsMismatch($supplierInvoiceId)
+	{
+		global $db;
+
+		$einvoicing = new EInvoicing($db);
+
+		return $einvoicing->insertOrUpdateExtraField((int) $supplierInvoiceId, 'invoice_supplier', EInvoicing::EXTRAFIELD_TOTALS_MISMATCH, '');
+	}
+
+	/**
+	 * Tell whether a supplier invoice still disagrees with the document it was imported from.
+	 *
+	 * The mark alone is not the answer: it says the import could not reproduce the document, and the
+	 * invoice may have been corrected since. So the totals are confronted again, and a mark that no
+	 * longer holds blocks nothing.
+	 *
+	 * @param	int		$supplierInvoiceId	Id of the supplier invoice
+	 * @return	bool						True while the invoice does not total what the document announces
+	 */
+	public static function totalsMismatchBlocks($supplierInvoiceId)
+	{
+		global $db;
+
+		$announced = self::totalsMismatch((int) $supplierInvoiceId);
+		if ($announced === null) {
+			return false;
+		}
+
+		$invoice = new FactureFournisseur($db);
+		if ($invoice->fetch((int) $supplierInvoiceId) <= 0) {
+			return true;
+		}
+
+		return !self::totalsAgreeWithDocument($invoice, $announced['tva'], $announced['ttc'], $announced['prepaid'] ?? null);
+	}
+
+	/**
 	 * Tell whether a received supplier invoice is a credit note correcting an invoice we refused.
 	 *
 	 * Refusing a received invoice cancels it, so the credit note the vendor issues to close the matter
@@ -599,7 +908,7 @@ class SupplierInvoiceHelper
 		if (!getDolGlobalString('EINVOICING_SEND_APPROVED_ON_VALIDATION')) {
 			return false;
 		}
-		if (getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		if (einvoicingIsSendDisabled()) {
 			return false;
 		}
 		if (!self::isEInvoice($supplierInvoiceId)) {
@@ -662,6 +971,19 @@ class SupplierInvoiceHelper
 	}
 
 	/**
+	 * Whether the total of an invoice already in base is the one a received document expects.
+	 *
+	 * @param	float	$invoiceTtc		Total of the invoice found, VAT included
+	 * @param	float	$expectedTtc	Total the document announces, VAT included
+	 * @param	float	$tolerance		Difference still read as the same invoice
+	 * @return	bool					True when the two are the same amount
+	 */
+	private static function amountMatchesInvoice(float $invoiceTtc, float $expectedTtc, float $tolerance = 0.0): bool
+	{
+		return abs($invoiceTtc - $expectedTtc) <= abs($tolerance) + 0.004;
+	}
+
+	/**
 	 * Find the supplier invoice of a given supplier whose ref_supplier is the given reference.
 	 *
 	 * Exact match by default: a wrong match silently drops an invoice or links it to the wrong document.
@@ -672,9 +994,10 @@ class SupplierInvoiceHelper
 	 * @param	string|null	$ref		Reference to look for (ExchangedDocument/ID or IssuerAssignedID of the XML)
 	 * @param	int			$socId		Id of the supplier thirdparty
 	 * @param	float		$total_ttc	If set, check that the total amount of the invoice is the expected one. 0 to look the reference up without checking any amount.
+	 * @param	float		$tolerance	Difference still read as the same invoice, on top of the cent the amounts are compared to. BT-114 is passed here: a document carrying a rounding amount was imported without it before the rounding line existed, and it is the same invoice (issue #994).
 	 * @return	int						Invoice id (>0) on a single certain match, 0 when not found, -1 on database error, -2 when several invoices match, -3 when the reference matches but not with the expected amount
 	 */
-	public static function findIdByRef($ref, int $socId, float $total_ttc = 0): int
+	public static function findIdByRef($ref, int $socId, float $total_ttc = 0, float $tolerance = 0.0): int
 	{
 		global $db;
 
@@ -704,7 +1027,7 @@ class SupplierInvoiceHelper
 
 		$db->free($resql);
 		if ($obj) {
-			if ($total_ttc && ($obj->total_ttc != $total_ttc)) {
+			if ($total_ttc && !self::amountMatchesInvoice((float) $obj->total_ttc, $total_ttc, $tolerance)) {
 				dol_syslog(__METHOD__ . ' found a supplier invoice matching the ref "' . $ref . '" for socid ' . ((int) $socId) . ' but not with the expected amount ' . $total_ttc, LOG_WARNING);
 				return -3;
 			}
@@ -751,7 +1074,7 @@ class SupplierInvoiceHelper
 			}
 
 			if (count($matches) == 1) {
-				if ($total_ttc && ($grandTotal != $total_ttc)) {
+				if ($total_ttc && !self::amountMatchesInvoice((float) $grandTotal, $total_ttc, $tolerance)) {
 					dol_syslog(__METHOD__ . ' found a supplier invoice matching the supplier invoice ref "' . $ref . '" for socid ' . ((int) $socId) . ' but not with the expected amount ' . $total_ttc, LOG_WARNING);
 					return -3;
 				}
@@ -793,6 +1116,47 @@ class SupplierInvoiceHelper
 		}
 
 		return 'Database error while looking for a supplier invoice with reference "' . $ref . '" ' . $context . ': ' . dol_escape_htmltag($db->lasterror());
+	}
+
+	/**
+	 * Build the postponed result of a reference lookup findIdByRef() could not answer.
+	 *
+	 * None of these codes is a missing document, and none of them has stored anything: the import runs
+	 * inside the one transaction createSupplierInvoiceFromSource() rolls back whole. Returned bare, the
+	 * failure makes syncFlows() count an error and break, so a database hiccup - or an ambiguity, which
+	 * no retry clears on its own - takes the rest of the batch down with it and every flow behind stays
+	 * unimported for as long as nobody looks. 'postponeflow' keeps this flow pending, reports it with
+	 * what to do about it, and lets the ones behind through.
+	 *
+	 * @param	int			$code		Negative code returned by findIdByRef()
+	 * @param	string|null	$ref		Reference that was looked for
+	 * @param	string		$context	Where that reference comes from, appended to the message
+	 * @param	int			$socId		Supplier the reference was looked up for
+	 * @param	string		$documentno	Reference of the received document being imported
+	 * @return	array{res:int,postponeflow:int,message:string,businessmessage:string,actioncode:string,actionurl:string,actiondata:array<string,mixed>,action:string}	The postponed result
+	 */
+	public static function refLookupPostponedResult(int $code, $ref, string $context, int $socId, string $documentno): array
+	{
+		global $langs;
+
+		$langs->loadLangs(array('bills', 'einvoicing@einvoicing'));
+
+		$action = $langs->trans('CheckTheSupplierInvoicesCarryingTheReference', $ref);
+		$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/list.php?search_refsupplier=' . urlencode((string) $ref) . '&socid=' . $socId . '" target="_blank">';
+		$action .= '<i class="fas fa-search"></i> ';
+		$action .= $langs->trans('ModifySupplierInvoice');
+		$action .= '</a>';
+
+		return array(
+			'res' => -1,
+			'postponeflow' => 1,
+			'message' => self::refLookupErrorMessage($code, $ref, $context),
+			'businessmessage' => $langs->trans('CantResolveReferenceOfTheImportedInvoice', $documentno, (string) $ref),
+			'actioncode' => 'LINKED_INVOICE_LOOKUP_FAILED',
+			'actionurl' => 'none',
+			'actiondata' => array('supplierref' => (string) $ref, 'linkedref' => $documentno, 'socid' => $socId),
+			'action' => $action
+		);
 	}
 
 	/**

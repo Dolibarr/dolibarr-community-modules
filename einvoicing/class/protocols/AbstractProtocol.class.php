@@ -48,6 +48,9 @@ abstract class AbstractProtocol
 	/** @const string Invoice file extension (without the dot, example 'xml') */
 	const INVOICE_FILE_EXTENSION = ''; // Must be overridden by subclasses
 
+	/** @const string What replaces an attachment binary in a stored XML, when the file is kept elsewhere */
+	const ATTACHMENT_REMOVED_NOTE = '[Removed to get a smaller XML]';
+
 	/** @const string Generated invoice XML file name*/
 	const GENERATED_INVOICE_XML_FILE_NAME = ''; // Must be overridden by subclasses
 
@@ -77,6 +80,19 @@ abstract class AbstractProtocol
 	 * @return 	string 							XML representation of the invoice.
 	 */
 	abstract public function generateXML($invoice, $outputlangs = null);
+
+	/**
+	 * Generate the e-invoice file of a given invoice, and return where it was written.
+	 *
+	 * The entry point of a protocol: the hooks and the sample generation of CommonProtocol call it on
+	 * whatever protocol the user selected, so every protocol has to answer to it.
+	 *
+	 * @param	int|Facture		$invoice_id		Invoice id, or invoice object, to process
+	 * @param	?Translate		$outputlangs	Output language
+	 * @param	string			$sourceFilePath	Source document the file is built from, when the format needs one
+	 * @return	-1|string						-1 if ko, path of the generated file if ok
+	 */
+	abstract public function generateInvoice($invoice_id, $outputlangs = null, $sourceFilePath = '');
 
 	/**
 	 * Create a supplier invoice in Dolibarr from Factur-X content.
@@ -152,9 +168,10 @@ abstract class AbstractProtocol
 	/**
 	 * Remove attachment nodes to get a smaller XML
 	 * @param string $xmlData The XML data to process
+	 * @param string $note    What is written in place of the binary, told to whoever reads the XML later
 	 * @return string Cleaned XML
 	 */
-	abstract public static function removeAttachmentFromXml(string $xmlData): string;
+	abstract public static function removeAttachmentFromXml(string $xmlData, string $note = self::ATTACHMENT_REMOVED_NOTE): string;
 
 	/**
 	 * Check if the generated e-invoice file exceeds the configured size limit.

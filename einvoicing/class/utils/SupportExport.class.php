@@ -144,14 +144,14 @@ class SupportExport
 		$stamp = dol_print_date(dol_now(), '%Y%m%d-%H%M%S', 'tzuser');
 		$basename = 'einvoicing-support-'.((int) $conf->entity).'-'.$stamp;
 
-		if (dol_mkdir($destdir) < 0) {
+		if (dol_mkdir($destdir, einvoicingDataRoot($destdir)) < 0) {
 			$this->error = $langs->trans('ErrorFailedToCreateDir', $destdir);
 			return '';
 		}
 		// The archive is built from a directory, so the content is staged next to it and removed
 		// as soon as dol_compress_dir() has read it.
 		$stagingdir = $destdir.'/'.$basename.'.build';
-		if (dol_mkdir($stagingdir) < 0) {
+		if (dol_mkdir($stagingdir, einvoicingDataRoot($stagingdir)) < 0) {
 			$this->error = $langs->trans('ErrorFailedToCreateDir', $stagingdir);
 			return '';
 		}
@@ -308,7 +308,7 @@ class SupportExport
 
 			$identifier = $this->identifierOf($flow, 'flow_id');
 			$dir = $stagingdir.'/flows/'.$identifier;
-			dol_mkdir($dir);
+			dol_mkdir($dir, einvoicingDataRoot($dir));
 
 			// The bodies go to files of their own: they are what a maintainer opens in an editor,
 			// and an XML escaped inside a JSON string is unreadable.
@@ -353,7 +353,7 @@ class SupportExport
 
 			$identifier = $this->identifierOf($call, 'call_id');
 			$dir = $stagingdir.'/calls/'.$identifier;
-			dol_mkdir($dir);
+			dol_mkdir($dir, einvoicingDataRoot($dir));
 
 			// Request and response stay in the row here: they are short enough to read in place,
 			// and keeping them together is what makes a call log readable.

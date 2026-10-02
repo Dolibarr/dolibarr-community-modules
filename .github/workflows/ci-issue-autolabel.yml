@@ -1,0 +1,102 @@
+# Action to label issues according to the Module selected in the issue template
+# Prerequisites (shared with ci-pr-autoassign.yml):
+# - GitHub App "The DoliBear bot for ..." with the secrets/vars below
+# - Secret: PR18_SECRET_KEY (GitHub App private key)
+# - Variable: PR18_APP_ID (GitHub App ID)
+#
+# Behavior:
+# - On issues (opened):
+#     - Generate a GitHub App token
+#     - Parse the issue body to extract the value of the "### Module" section
+#     - Map that value to the corresponding "Module: ..." label (see MAPPING below)
+#     - Add the label to the issue (error-tolerant: log on failure, do not fail the job)
+#     - Skip silently when the module is the placeholder or "other" (no label)
+#
+name: Set label according to issue Module field
+
+permissions:
+  issues: write
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  label-by-module:
+    # Only run on the upstream repo where the GitHub App secrets/vars exist.
+    if: ${{ github.repository == 'Dolibarr/dolibarr-community-modules' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1) Generate a GitHub App token (shared with ci-pr-autoassign.yml)
+      - name: Generate GitHub App token
+        id: generate-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.PR18_APP_ID }}
+          private-key: ${{ secrets.PR18_SECRET_KEY }}
+
+      # 2) Extract the "Module" value from the issue body and map it to a label
+      - name: Extract Module from issue body and map to label
+        id: module
+        env:
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          set -euo pipefail
+
+          # Extract the content between the "### Module" heading and the next
+          # "### " heading, drop blank lines, take the first non-empty line.
+          MODULE=$(printf '%s\n' "$ISSUE_BODY" \
+            | sed -n '/^### Module[[:space:]]*$/,/^### /{ /^### /d; /^$/d; p; }' \
+            | head -n1 \
+            | xargs)
+
+          echo "Detected module: '${MODULE:-<none>}'"
+
+          # Mapping from dropdown values to existing "Module: ..." labels.
+          # Edit here as needed. Empty = no label (skip).
+          case "$MODULE" in
+            einvoicing)
+              LABEL="Module: Einvoicing Generic (FR...)"
+              ;;
+            helloasso)
+              LABEL="Module: HelloAsso"
+              ;;
+            --Please\ select\ a\ module--|other|"")
+              echo "No label to apply for module '${MODULE}'. Skipping."
+              LABEL=""
+              ;;
+            *)
+              echo "Unknown module '${MODULE}'. No label to apply. Skipping."
+              LABEL=""
+              ;;
+          esac
+
+          echo "label=${LABEL}" >> "$GITHUB_OUTPUT"
+
+      # 3) Add the label to the issue (tolerant to errors)
+      - name: Add label to issue
+        if: ${{ steps.module.outputs.label != '' }}
+        env:
+          GH_TOKEN: ${{ steps.generate-token.outputs.token }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          LABEL: ${{ steps.module.outputs.label }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+
+          # Build the JSON labels array safely with jq.
+          LABELS_JS=$(printf '%s' "$LABEL" | jq -R '.' | jq -s '.')
+
+          echo "Adding label '$LABEL' to issue #${ISSUE_NUMBER}"
+          response=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+            -H "Authorization: Bearer ${GH_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/${REPO}/issues/${ISSUE_NUMBER}/labels" \
+            -d "{\"labels\": $LABELS_JS}")
+
+          if [ "$response" -eq 200 ]; then
+            echo "Label added successfully."
+          else
+            echo "Warning: failed to add label '$LABEL' to issue #${ISSUE_NUMBER} (HTTP $response). Continuing."
+          fi

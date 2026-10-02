@@ -5,9 +5,10 @@ the norm makes them **mandatory** or leaves them as a **courtesy**. Right half: 
 module actually does with each one — automatic, behind an option, manual button, or nothing.
 
 Reference: DGFiP *Dossier de spécifications externes B2B* v3.x (AFNOR XP Z12-012 for the semantic
-model). Only **four** statuses are mandatory: **200, 210, 212, 213**. Everything else is optional —
-"strongly recommended" for transparency, but a platform is free not to implement it, and a missing
-optional status proves nothing. Written 2026-08-26 against `main` of the module.
+model, XP Z12-014 annex A — normative — for the use cases and the order of the statuses). Only
+**four** statuses are mandatory: **200, 210, 212, 213**. Everything else is optional — "strongly
+recommended" for transparency, but a platform is free not to implement it, and a missing optional
+status proves nothing. Written 2026-08-26 against `main` of the module.
 
 Wording note: the codes are named here with their official French labels, since that is what the
 platforms return; the module's own English labels (`langs/en_US/einvoicing.lang`) are in the third
@@ -89,7 +90,8 @@ Reading the "Emitted by" column: on a **customer** invoice Dolibarr is the selle
        |                 |                          +-->  back to the buyer's decision
        |                 |
        +--------+--------+
-                |
+                |   the nominal order, not a requirement: the processing statuses above
+                |   can be posted independently of each other (XP Z12-014 A, 2.1)
                 v
           [211] Paiement transmis                         optional   OPTION + MANUAL
           the buyer tells the seller it has paid
@@ -151,8 +153,14 @@ automatism could decide it. Manual button only, with a reason code picked from
 Option **`EINVOICING_SEND_PAYMENT_SENT_STATUS`**, *off by default*: it costs one platform flow per
 invoice and the reform does not require it. When on, `BILL_SUPPLIER_PAYED` sends it once per invoice
 (a payment deleted and re-recorded does not send it twice), only if the paid amount is > 0 and the
-invoice really came from the platform. Also reachable by hand, and it stays offered after a 205 —
-approve then pay is the normal order (issue #548).
+invoice really came from the platform.
+
+Also reachable by hand, and it **needs no prior 205**: only the transmission statuses are ordered,
+the processing ones *« peuvent être posés de façon indépendante »* (XP Z12-014 annex A, normative,
+§ 2.1). Approve then pay is the nominal case (issue #548), not a precondition — and 205 is optional
+anyway, so requiring it would put the button out of reach of anyone who never approves. The manual
+button is hidden in two cases only: after an accepted **210**, which ends the exchange, and on a
+**draft** invoice, which is not in the accounts and cannot have been paid.
 
 ### 212 Encaissée — the only outbound status with no off switch
 Sent on `PAYMENT_CUSTOMER_CREATE`, **once per payment and not once per invoice**: the reform expects

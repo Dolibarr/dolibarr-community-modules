@@ -1,4 +1,4 @@
-.DS_Store 
+.DS_Store
 /.buildpath
 /.project
 /.settings/
@@ -7,6 +7,8 @@
 # ignore .htaccess files
 .htaccess
 /.run-phpstan
+# Local PHPStan overrides; phpstan.neon.dist is the one that is versioned
+/phpstan.neon
 
 # Mistral Vibe
 .vibe
@@ -24,3 +26,4 @@ docs/superpowers/
 
 # Commit stamp written into the package by dev/build/makepack-modules.php
 /*/COMMIT
+/AGENTS.md

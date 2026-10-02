@@ -113,6 +113,8 @@ $form = new Form($db);
 
 $permissiontoread = $user->hasRight('einvoicing', 'read');
 $permissiontoadd = $user->hasRight('einvoicing', 'write') && $user->hasRight('produit', 'creer');
+// The default product of a vendor is a field of its thirdparty card, so it takes the right on the thirdparty.
+$permissiontosetdefaultproduct = $user->hasRight('societe', 'creer');
 
 if (!isModEnabled('einvoicing')) {
 	accessforbidden();
@@ -277,7 +279,14 @@ print '<input type="text" class="width200" name="flowid" value="'.dol_escape_htm
 print '</div>';
 print ' &nbsp; ';
 print '<div class="inline-block valignmiddle paddingright">'.$langs->trans("Supplier").' ';
-print $form->select_company($socid, 'socid', '(s.fournisseur:=:1)', 'SelectThirdParty', 0, 0, array(), 0, 'minwidth200');
+// Form::select_company() does not read this filter the same way on every version. Until Dolibarr 18
+// the criteria is appended to the query as it stands, so it has to be plain SQL; from 18 a criteria
+// holding parentheses is converted by forgeSQLFromUniversalSearchCriteria(), and on 24 that conversion
+// is no longer conditional - every criteria goes through it. Passing the Universal Search syntax to 17
+// therefore ends the page on "DB_ERROR_SYNTAX ... near ':=:1))'", and passing plain SQL to 24 would be
+// mangled the other way round.
+$vendorfilter = ((float) DOL_VERSION < 18) ? 's.fournisseur = 1' : '(s.fournisseur:=:1)';
+print $form->select_company($socid, 'socid', $vendorfilter, 'SelectThirdParty', 0, 0, array(), 0, 'minwidth200');
 print '</div>';
 print '<input type="submit" class="button small" value="'.$langs->trans("Refresh").'">';
 print '</form>';
@@ -297,12 +306,19 @@ if (!empty($parsedLines)) {
 	// Run the matching on each line (read only, nothing is created here)
 	// The matching method comes from the CommonProtocol trait, used by the protocols able to import an invoice.
 	'@phan-var-force ?CIIProtocol $protocol';
+	/** @var ?CIIProtocol $protocol */
 	$nbtomap = 0;
 	$matchresults = array();
+	$defaultrouted = array();
 	foreach ($parsedLines as $idx => $parsedLine) {
+		$hasvendorref = (trim((string) ($parsedLine['prodsellerid'] ?? '')) !== '');
 		$parsedLine['supplierId'] = $socid;
 		$matchresults[$idx] = ($socid > 0 && is_object($protocol)) ? $protocol->findProductFromEinvoiceLine($parsedLine) : array('res' => 0, 'message' => '');
-		if (empty($matchresults[$idx]['res'])) {
+		// The default product of the vendor is a catch-all answering every line nothing was found for, so a
+		// line it caught is routed, not mapped. As long as the line carries a vendor reference it can still
+		// be bound to the right product, and it stays in the lines to map.
+		$defaultrouted[$idx] = (($matchresults[$idx]['matchtype'] ?? '') == 'defaultrouting');
+		if (empty($matchresults[$idx]['res']) || ($defaultrouted[$idx] && $hasvendorref)) {
 			$nbtomap++;
 		}
 	}
@@ -348,7 +364,7 @@ if (!empty($parsedLines)) {
 		print '<td class="right">'.price((float) ($parsedLine['rateApplicablePercent'] ?? 0)).'%</td>';
 
 		print '<td>';
-		if (!empty($matchresults[$idx]['res'])) {
+		if (!empty($matchresults[$idx]['res']) && empty($defaultrouted[$idx])) {
 			// Line already resolved by the automatic matching
 			$producttmp = new Product($db);
 			if ($producttmp->fetch($matchresults[$idx]['res']) > 0) {
@@ -359,15 +375,24 @@ if (!empty($parsedLines)) {
 			print ' '.$form->textwithpicto('', $matchresults[$idx]['message'], 1, 'help');
 		} elseif ($socid <= 0) {
 			print '<span class="opacitymedium">'.$langs->trans("SelectTheSupplierOfThisFlow").'</span>';
-		} elseif ($reffourn === '') {
-			// Without a vendor reference, the mapping has nothing to be stored on
-			print $form->textwithpicto('<span class="opacitymedium">'.$langs->trans("NotMappable").'</span>', $langs->trans("NotMappableBecauseNoVendorRef"), 1, 'warning');
-		} elseif ($permissiontoadd) {
-			// Filter on the purchase status (tobuy): the product of a supplier invoice line is bought, and a
-			// product created by a previous import is not on sale, so filtering on tosell hides them all.
-			print $form->select_produits(0, 'idprod_'.$idx, '', 0, 0, -1, 2, '', 0, array(), 0, '1', 0, 'maxwidth300', 0, '', null, 0, 1);
 		} else {
-			print '<span class="opacitymedium">'.$langs->trans("NotEnoughPermissions").'</span>';
+			// Show the catch-all the line currently falls back on, then still offer to map it properly.
+			if (!empty($defaultrouted[$idx])) {
+				$producttmp = new Product($db);
+				$routedto = ($producttmp->fetch($matchresults[$idx]['res']) > 0) ? $producttmp->getNomUrl(1) : $langs->trans("Product").' #'.((int) $matchresults[$idx]['res']);
+				print $form->textwithpicto('<span class="opacitymedium">'.$langs->trans("LineRoutedToDefaultProduct").'</span> '.$routedto, $langs->trans("LineRoutedToDefaultProductHelp"), 1, 'warning');
+				print '<br>';
+			}
+			if ($reffourn === '') {
+				// Without a vendor reference, the mapping has nothing to be stored on
+				print $form->textwithpicto('<span class="opacitymedium">'.$langs->trans("NotMappable").'</span>', $langs->trans("NotMappableBecauseNoVendorRef"), 1, 'warning');
+			} elseif ($permissiontoadd) {
+				// Filter on the purchase status (tobuy): the product of a supplier invoice line is bought, and a
+				// product created by a previous import is not on sale, so filtering on tosell hides them all.
+				print $form->select_produits(0, 'idprod_'.$idx, '', 0, 0, -1, 2, '', 0, array(), 0, '1', 0, 'maxwidth300', 0, '', null, 0, 1);
+			} else {
+				print '<span class="opacitymedium">'.$langs->trans("NotEnoughPermissions").'</span>';
+			}
 		}
 		print '</td>';
 
@@ -383,6 +408,18 @@ if (!empty($parsedLines)) {
 	}
 	if ($permissiontoadd && $socid > 0 && $nbtomap > 0) {
 		print '<input type="submit" class="button" value="'.$langs->trans("SaveMappingAndCreateVendorRefs").'">';
+	}
+	// A line without any vendor reference has nothing to be mapped on, and the default product of the vendor
+	// is the only answer for it. Same link as the one the synchronization suggests, so the page is not a
+	// dead end - and a button, because it is reached when nothing else on the page can be done. Greyed and
+	// titled without the right on the thirdparty, rather than absent: the user reads why, not "how?".
+	if ($socid > 0) {
+		$defaultproducturl = dol_buildpath('/societe/card.php', 1).'?socid='.((int) $socid).'&action=edit&highlight=routing_product_id#treinvoicing';
+		if ($permissiontosetdefaultproduct) {
+			print '<a class="button" href="'.dol_escape_htmltag($defaultproducturl).'" target="_blank">'.$langs->trans("SetDefaultProductForThirdparty").'</a>';
+		} else {
+			print '<a class="button disabled classfortooltip" href="#" title="'.dol_escape_htmltag($langs->trans("NotEnoughPermissions")).'">'.$langs->trans("SetDefaultProductForThirdparty").'</a>';
+		}
 	}
 	print '<a class="button button-cancel" href="'.dol_buildpath('/einvoicing/document_list.php', 1).'">'.$langs->trans("BackToSynchronization").'</a>';
 	print '</div>';

@@ -150,6 +150,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_CREATE') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';
+			/** @var Facture $object */
 
 			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
 				$einvoicing = new EInvoicing($this->db);
@@ -172,6 +173,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_VALIDATE') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';
+			/** @var Facture $object */
 
 			// Tell the afterPDFCreation() hook that the document rebuild about to happen is the one that
 			// follows a validation. Set unconditionally and before anything else: this only records a fact
@@ -181,27 +183,45 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
 				$einvoicing = new EInvoicing($this->db);
 
-				$result = $einvoicing->fetchLastknownInvoiceStatus($object->id, (string) $object->ref);
+				// The known status and the configuration check are two different answers: keep them in two
+				// variables, the status is still needed after the check to decide what to write.
+				$statusinfo = $einvoicing->fetchLastknownInvoiceStatus($object->id, (string) $object->ref);
 
-				// If $result is $einvoicing::STATUS_IGNORE or STATUS_IGNORE_2, we do nothing.
+				// If $statusinfo is $einvoicing::STATUS_IGNORE or STATUS_IGNORE_2, we do nothing.
 
 				// If einvoice was set to $einvoicing::STATUS_NOT_GENERATED or $einvoicing::STATUS_UNKNOWN, we set it to STATUS_IGNORE (if not qualified for einvoice) or STATUS_NOT_GENERATED (if qualified for einvoice)
-				if ($result['code'] == $einvoicing::STATUS_NOT_GENERATED || $result['code'] == $einvoicing::STATUS_UNKNOWN) {
-					$statustouse = $einvoicing::STATUS_IGNORE;	// default status to use if none of following rules match
+				if ($statusinfo['code'] == $einvoicing::STATUS_NOT_GENERATED || $statusinfo['code'] == $einvoicing::STATUS_UNKNOWN) {
+					if (getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
+						// Check configuration
+						$checkresult = $einvoicing->checkRequiredinformations($object);
+						if ($checkresult['res'] < 0) {
+							$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $checkresult['message'];
+							dol_syslog(__METHOD__ . " " . $message);
 
-					// Test if invoice need to be managed by EInvoice
-					$needEinvoice = $einvoicing->needEInvoiceManagement($object);
-					if ($needEinvoice) {
-						$statustouse = $needEinvoice;
+							if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+								$error++;
+								$this->errors[] = $checkresult['message'];
+								return -1;		// This should generate a rollback
+							}
+						}
 					}
 
-					$newobject = dol_clone($object, 2);
-					$newobject->ref = (string) $object->newref;
+					// Test if invoice need to be managed by EInvoice and set the new status to use
+					if ($statusinfo['code'] == $einvoicing::STATUS_UNKNOWN) {
+						$statustouse = $einvoicing::STATUS_IGNORE;	// default status to use if none of following rules match
+						$needEinvoice = $einvoicing->needEInvoiceManagement($object);
+						if ($needEinvoice) {
+							$statustouse = $needEinvoice;
+						}
 
-					$result = $einvoicing->setEInvoiceStatus($newobject, $statustouse, '');
-					if ($result < 0) {
-						$this->errors = array_merge($this->errors, $einvoicing->errors);
-						return -1;
+						$newobject = dol_clone($object, 2);
+						$newobject->ref = (string) $object->newref;
+
+						$result = $einvoicing->setEInvoiceStatus($newobject, $statustouse, '');
+						if ($result < 0) {
+							$this->errors = array_merge($this->errors, $einvoicing->errors);
+							return -1;
+						}
 					}
 				}
 			}
@@ -210,6 +230,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_UNVALIDATE') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';
+			/** @var Facture $object */
 			$einvoicing = new EInvoicing($this->db);
 
 			// Lock on the REAL PA state (persistent flow_id), not the Dolibarr syncstatus which is reset to
@@ -224,6 +245,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_DELETE') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';
+			/** @var Facture $object */
 			$einvoicing = new EInvoicing($this->db);
 
 			// Lock on the REAL PA state (persistent flow_id), see BILL_UNVALIDATE above.
@@ -236,6 +258,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_MODIFY') {
 			/** @var Facture $object */
 			'@phan-var-force Facture $object';
+			/** @var Facture $object */
 			$einvoicing = new EInvoicing($this->db);
 
 			// Lock on the REAL PA state (persistent flow_id), see BILL_UNVALIDATE above.
@@ -273,17 +296,19 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		// fr:212 (Encaissee) is reported per cash-in, not once when the invoice gets fully paid: the reform
 		// expects the date and the amount of EVERY payment, partial ones included, so a 2-instalment invoice
 		// owes 2 statuses. Hooking the payment creation (and not BILL_PAYED) also covers the invoices that
-		// stay partially paid forever, and skips the write-offs (abandon / bad debt) where nothing is cashed.
+		// stay partially paid forever, the refunds (negative lines, XP Z12-012 rule P1.15), and skips the
+		// write-offs (abandon / bad debt) where nothing moves.
 		if ($action == 'PAYMENT_CUSTOMER_CREATE') {
 			/** @var Paiement $object */
 			'@phan-var-force Paiement $object';
+			/** @var Paiement $object */
 
-			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
+			if (!einvoicingIsSendDisabled()) {		// If sync Dolibarr to AP is on
 				require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
 
 				foreach ($object->amounts as $facid => $amount) {
 					$amount = (float) $amount;
-					if ($amount <= 0) {		// Payment lines with no amount, or a refund line: nothing cashed in
+					if (empty($amount)) {		// A payment line with no amount moves nothing
 						continue;
 					}
 
@@ -293,7 +318,14 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 						continue;
 					}
 
-					$this->sendCashedInStatus($invoice, $amount, $langs);
+					// Rule P1.17: a cash-out carries the reason of the cancellation (MDT-126). The comment
+					// of the payment is what the operator typed about this very refund.
+					$reason = '';
+					if ($amount < 0) {
+						$reason = trim((string) ($object->note_private ?: $object->note_public));
+					}
+
+					$this->sendCashedInStatus($invoice, $amount, $langs, $reason);
 				}
 			}
 		}
@@ -302,6 +334,39 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_SUPPLIER_VALIDATE') {
 			/** @var FactureFournisseur $object */
 			'@phan-var-force FactureFournisseur $object';
+			/** @var FactureFournisseur $object */
+			// An invoice the import could not make total what its document announces never becomes
+			// payable by being validated: the totals are confronted again here, so an invoice corrected
+			// to the figures the vendor bills validates normally and drops the mark (issue #861).
+			$announced = SupplierInvoiceHelper::totalsMismatch((int) $object->id);
+			if ($announced !== null) {
+				// A prepaid amount can be set because of a document referencing the invoice it was paid on (BG-3).
+				$isEinvoicePrepaidSameAsInvoiceDepositsOrDiscounts = SupplierInvoiceHelper::totalsAgreeWithDocument($object, $announced['tva'], $announced['ttc'], $announced['prepaid'] ?? null);
+				if ($isEinvoicePrepaidSameAsInvoiceDepositsOrDiscounts) {
+					// Total prepaid announced is same than the sum of deposits or discounts on the referenced doc.
+					// In this case, we can clear the tag EXTRAFIELD_TOTALS_MISMATCH.
+					SupplierInvoiceHelper::clearTotalsMismatch((int) $object->id);
+				} elseif (isset($announced['prepaid'])
+					&& SupplierInvoiceHelper::totalsAgreeWithDocument($object, $announced['tva'], $announced['ttc'])) {
+					// Totals is correct but deduction missing: saying the invoice does not total the document
+					// would send the operator looking at figures that do match. Name what is missing.
+					$this->errors[] = $langs->trans(
+						'EInvoicePrepaidMismatchBlocksValidation',
+						price2num($announced['prepaid'], 'MT'),
+						price2num(SupplierInvoiceHelper::linkedDepositAmount((int) $object->id), 'MT')
+					);
+					return -1;
+				} else {
+					$this->errors[] = $langs->trans(
+						'EInvoiceTotalsMismatchBlocksValidation',
+						price2num($announced['ttc'], 'MT'),
+						price2num($announced['tva'], 'MT'),
+						price2num(abs((float) $object->total_ttc), 'MT')
+					);
+					return -1;
+				}
+			}
+
 			$duplicate = false;
 			if (getDolGlobalInt('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION') && SupplierInvoiceHelper::isEInvoice($object->id, false, $duplicate)) {
 				if ($duplicate) {
@@ -361,8 +426,9 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_SUPPLIER_PAYED') {
 			/** @var FactureFournisseur $object */
 			'@phan-var-force FactureFournisseur $object';
+			/** @var FactureFournisseur $object */
 
-			if (getDolGlobalInt('EINVOICING_SEND_PAYMENT_SENT_STATUS') && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+			if (getDolGlobalInt('EINVOICING_SEND_PAYMENT_SENT_STATUS') && !einvoicingIsSendDisabled()) {
 				$paidAmount = (float) $object->getSommePaiement();
 
 				// Nothing to tell on a write-off (nothing was paid), nor on an invoice that never came
@@ -394,6 +460,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		if ($action == 'BILL_SUPPLIER_DELETE') {
 			/** @var FactureFournisseur $object */
 			'@phan-var-force FactureFournisseur $object';
+			/** @var FactureFournisseur $object */
 			$duplicate = false;
 			if (SupplierInvoiceHelper::isEInvoice($object->id, true, $duplicate)) {
 				if ($duplicate) {
@@ -434,6 +501,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			 * @var Document $object
 			 */
 			'@phan-var-force Document $object';
+			/** @var Document $object */
 			$duplicate = false;
 
 			// A flow does not always carry a supplier invoice id: a lifecycle message never resolves one,
@@ -474,23 +542,24 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 	}
 
 	/**
-	 * Report a cash-in (status 212 "Encaissee") of a customer invoice to the Approved Platform.
+	 * Report a cash-in or a cash-out (status 212 "Encaissee") of a customer invoice to the Approved Platform.
 	 *
 	 * Errors are never escalated to $this->errors / a negative return: that would roll back the payment
 	 * Dolibarr just recorded (Paiement::create() aborts on a trigger failure). dol_syslog is the only
 	 * channel that surfaces the problem outside an interactive session (cron, API, bank import, ...).
 	 *
-	 * @param  Facture   $invoice Invoice that has been cashed in
-	 * @param  float     $amount  Amount cashed in (TTC) by this payment, reported as the MEN blocks of the CDAR
+	 * @param  Facture   $invoice Invoice, or credit note, the money moved on
+	 * @param  float     $amount  Amount (TTC) of this payment, reported as the MEN blocks of the CDAR: positive for a cash-in, negative for a refund
 	 * @param  Translate $langs   Translate object
+	 * @param  string    $reason  Reason of the cancellation (MDT-126), on a refund only
 	 * @return void
 	 */
-	private function sendCashedInStatus($invoice, $amount, Translate $langs)
+	private function sendCashedInStatus($invoice, $amount, Translate $langs, $reason = '')
 	{
 		$einvoicing = new EInvoicing($this->db);
 
 		// Ask the boolean question: needEInvoiceManagement() answers with a status code whose ignore values
-		// are truthy. An invoice out of the e-invoicing scope has no cash-in to report.
+		// are truthy. An invoice out of the e-invoicing scope has nothing to report.
 		if (!$einvoicing->mustManageEInvoice($invoice)) {
 			return;
 		}
@@ -517,10 +586,11 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		$PDPManager = new PDPProviderManager($this->db);
 		$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 
-		$result = $provider->sendStatusMessage($invoice, 212, '', array('amount' => $amount));
+		$result = $provider->sendStatusMessage($invoice, 212, '', array('amount' => $amount, 'reason' => $reason));
 
 		if ($result['res'] > 0) {
-			setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$langs->trans('EInvStatus212PaymentReceived'), 'mesgs');
+			$done = $amount < 0 ? 'EInvStatus212PaymentRefunded' : 'EInvStatus212PaymentReceived';
+			setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$langs->trans($done), 'mesgs');
 		} else {
 			dol_syslog(__METHOD__ . ' Failed to send paid status (212) to platform for invoice id=' . $invoice->id . ' : ' . $result['message'], LOG_ERR);
 			setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$result['message'], 'errors');

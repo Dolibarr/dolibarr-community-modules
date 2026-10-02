@@ -66,13 +66,14 @@ if (!$res) {
  * @var HookManager $hookmanager
  * @var Translate $langs
  * @var User $user
+ * @var Societe $mysoc
  */
 // Libraries
 require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
-require_once '../lib/einvoicing.lib.php';
-require_once "../class/providers/PDPProviderManager.class.php";
-require_once "../class/protocols/ProtocolManager.class.php";
-require_once "../class/einvoicing.class.php";
+require_once __DIR__.'/../lib/einvoicing.lib.php';
+require_once __DIR__.'/../class/providers/PDPProviderManager.class.php';
+require_once __DIR__.'/../class/protocols/ProtocolManager.class.php';
+require_once __DIR__.'/../class/einvoicing.class.php';
 
 
 // Translations
@@ -186,6 +187,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item = $formSetup->newItem('EINVOICING_ENABLE_API_VALIDATION')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_ENABLE_API_VALIDATION_HELP');
 	$item->defaultFieldValue = '0';
+	//$item->fieldParams['warningifon'] = 1;
 	$item->cssClass = 'minwidth500';
 
 	// Local EN 16931 business rules check (BR, BR-CO, BR-FR subset) on the generated XML.
@@ -202,7 +204,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf to precheck the e-invoice with the Access Point validation service if available.
-	if (getDolGlobalString('EINVOICING_PDP')) {
+	if (getDolGlobalString('EINVOICING_PDP') && !getDolGlobalString('EINVOICING_ONLY_GENERATE')) {
 		$PDPManager = new PDPProviderManager($db);
 
 		$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
@@ -241,23 +243,26 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 
 	// Setup conf to check the recipient reachability in the Approved Platforms directory (annuaire PA) before
 	// sending, and surface it on the invoice card. On by default. A read-only directory lookup: it never blocks.
-	$item = $formSetup->newItem('EINVOICING_PRECHECK_DIRECTORY')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_PRECHECK_DIRECTORY_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
+	// Meaningless once EINVOICING_ONLY_GENERATE is on: nothing is ever sent, so there is no recipient to reach.
+	if (!getDolGlobalString('EINVOICING_ONLY_GENERATE')) {
+		$item = $formSetup->newItem('EINVOICING_PRECHECK_DIRECTORY')->setAsYesNo();
+		$item->helpText = $langs->transnoentities('EINVOICING_PRECHECK_DIRECTORY_HELP');
+		$item->defaultFieldValue = '0';
+		$item->cssClass = 'minwidth500';
 
-	// Setup conf to REQUIRE the recipient to be routable in the directory before generating/sending. Off by
-	// default (opt-in enforcement on top of the read-only pre-check above): blocks reaching a routing reject.
-	// Value 2 blocks the non-conclusive directory answer too (recipient known, status of its reception
-	// address not reported). Formerly a yes/no, whose two values keep their meaning here.
-	$item = $formSetup->newItem('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT')->setAsSelect(array(
-		'0' => $langs->transnoentities('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_OFF'),
-		'1' => $langs->transnoentities('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_ON'),
-		'2' => $langs->transnoentities('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_STRICT'),
-	));
-	$item->helpText = $langs->transnoentities('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
+		// Setup conf to REQUIRE the recipient to be routable in the directory before generating/sending. Off by
+		// default (opt-in enforcement on top of the read-only pre-check above): blocks reaching a routing reject.
+		// Value 2 blocks the non-conclusive directory answer too (recipient known, status of its reception
+		// address not reported). Formerly a yes/no, whose two values keep their meaning here.
+		$item = $formSetup->newItem('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT')->setAsSelect(array(
+			'0' => $langs->transnoentities('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_OFF'),
+			'1' => $langs->transnoentities('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_ON'),
+			'2' => $langs->transnoentities('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_STRICT'),
+		));
+		$item->helpText = $langs->transnoentities('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT_HELP');
+		$item->defaultFieldValue = '0';
+		$item->cssClass = 'minwidth500';
+	}
 
 	// Setup conf to skip e-invoicing for B2C third parties (private individuals): out of the e-invoicing
 	// scope (e-reporting applies instead). Off by default. Company vs individual detection is delegated to
@@ -267,23 +272,38 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 
-	// The VAT regime the generated documents declare in BT-8. Left to the VAT mode above by default;
-	// an explicit value is for a seller whose regime that mode cannot express (issue #419).
-	$item = $formSetup->newItem('EINVOICING_VAT_POINT_DATE_CODE')->setAsSelect(array(
-		'auto' => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_AUTO'),
-		'5'    => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_5'),
-		'29'   => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_29'),
-		'72'   => $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_72'),
-	));
-	$item->helpText = $langs->transnoentities('EINVOICING_VAT_POINT_DATE_CODE_HELP');
-	$item->defaultFieldValue = 'auto';
+	// Setup list of POS modules - Do not generate einvoice
+	$item = $formSetup->newItem('EINVOICING_NAME_OF_MODULESOURCE_THAT_ARE_POS');
+	$item->helpText = $langs->transnoentities('EINVOICING_NAME_OF_MODULESOURCE_THAT_ARE_POS_HELP');
+	$item->defaultFieldValue = getDolGlobalString('EINVOICING_NAME_OF_MODULESOURCE_THAT_ARE_POS', 'takepos');
+	$item->cssClass = 'minwidth500';
+
+	// The scheme the party identifier (BT-29, BT-46) is declared under. A list for a French company,
+	// whose admissible values the specification names, and a free field for any other country, where
+	// the module has no table of registers and would otherwise declare a national identifier as a DUNS.
+	if ($mysoc->country_code == 'FR') {
+		$item = $formSetup->newItem('EINVOICING_PARTY_IDENTIFIER_SCHEME')->setAsSelect(array(
+			'0225' => $langs->transnoentities('EINVOICING_PARTY_IDENTIFIER_SCHEME_0225'),
+			'0009' => $langs->transnoentities('EINVOICING_PARTY_IDENTIFIER_SCHEME_0009'),
+			'none' => $langs->transnoentities('EINVOICING_PARTY_IDENTIFIER_SCHEME_NONE'),
+		));
+		$item->defaultFieldValue = '0225';
+	} else {
+		// Left empty on purpose outside France: an empty value keeps the code the module has always
+		// answered for that country, and 0225 is a French scheme that would be wrong anywhere else.
+		$item = $formSetup->newItem('EINVOICING_PARTY_IDENTIFIER_SCHEME');
+		$item->fieldAttr['placeholder'] = $langs->transnoentities('EINVOICING_PARTY_IDENTIFIER_SCHEME_PLACEHOLDER');
+	}
+	$item->helpText = $langs->transnoentities('EINVOICING_PARTY_IDENTIFIER_SCHEME_HELP');
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf to automatically transmit the e-invoice to the PA right after it is generated (on validation)
-	$item = $formSetup->newItem('EINVOICING_AUTO_SEND_ON_GENERATION')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_AUTO_SEND_ON_GENERATION_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
+	if (!getDolGlobalString('EINVOICING_ONLY_GENERATE')) {
+		$item = $formSetup->newItem('EINVOICING_AUTO_SEND_ON_GENERATION')->setAsYesNo();
+		$item->helpText = $langs->transnoentities('EINVOICING_AUTO_SEND_ON_GENERATION_HELP');
+		$item->defaultFieldValue = '0';
+		$item->cssClass = 'minwidth500';
+	}
 
 	// Setup conf for maximum e-invoice file size (warning if exceeded)
 	$item = $formSetup->newItem('EINVOICING_MAX_FILE_SIZE_MB');
@@ -293,19 +313,35 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->fieldAttr['min'] = '0';
 	$item->fieldAttr['step'] = '0.1';
 
+	// The three notices below are never sent empty: the generation falls back on the translations the
+	// placeholders show here, so the page states what will be written instead of keeping a silent
+	// default. Shown to a French seller only: their wording states French law, which is a promise the
+	// module has no business putting in the mouth of a seller established anywhere else.
+	$isfrenchseller = ($mysoc->country_code == 'FR');
+	$noticedefaulthelp = $isfrenchseller ? ' '.$langs->transnoentities('EINVOICING_LEGAL_NOTICE_DEFAULT_HELP') : '';
+
 	// Setup conf for PMT - Mention regarding recovery fees
 	$item = $formSetup->newItem('EINVOICING_PMT');
-	$item->helpText = $langs->transnoentities('EINVOICING_PMT_HELP');
+	$item->helpText = $langs->transnoentities('EINVOICING_PMT_HELP').$noticedefaulthelp;
+	if ($isfrenchseller) {
+		$item->fieldAttr['placeholder'] = $langs->transnoentities('RecoveryFeesMention');
+	}
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf for PMD - Mention regarding late payment penalties
 	$item = $formSetup->newItem('EINVOICING_PMD');
-	$item->helpText = $langs->transnoentities('EINVOICING_PMD_HELP');
+	$item->helpText = $langs->transnoentities('EINVOICING_PMD_HELP').$noticedefaulthelp;
+	if ($isfrenchseller) {
+		$item->fieldAttr['placeholder'] = $langs->transnoentities('LatePaymentPenaltiesMention');
+	}
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf for AAB - Mention regarding absence of discount for early payment
 	$item = $formSetup->newItem('EINVOICING_AAB');
-	$item->helpText = $langs->transnoentities('EINVOICING_AAB_HELP');
+	$item->helpText = $langs->transnoentities('EINVOICING_AAB_HELP').$noticedefaulthelp;
+	if ($isfrenchseller) {
+		$item->fieldAttr['placeholder'] = $langs->transnoentities('EarlyPaymentDiscountMention');
+	}
 	$item->cssClass = 'minwidth500';
 
 	/*
@@ -320,12 +356,6 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	//$item->enabled = 0;
 	$item->cssClass = 'opacitymedium';
 
-	// Setup conf for PMD - Mention regarding late payment penalties
-	$item = $formSetup->newItem('EINVOICING_NAME_OF_MODULESOURCE_THAT_ARE_POS');
-	$item->helpText = $langs->transnoentities('EINVOICING_NAME_OF_MODULESOURCE_THAT_ARE_POS_HELP');
-	$item->defaultFieldValue = getDolGlobalString('EINVOICING_NAME_OF_MODULESOURCE_THAT_ARE_POS', 'takepos');
-	$item->cssClass = 'minwidth500';
-
 	/*
 	$itemtitle->helpText = $langs->trans('EINVOICING_VAT_EXIGIBILITY_HELP').' <b>'
 			.dol_escape_htmltag($vatexigibility)
@@ -334,7 +364,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 }
 
 
-if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or we are not in a generate only mode
 	// Setup conf for auto generation of objects
 	$itemtitle = $formSetup->newItem('EINVOICING_AUTO_GENERATION');
 	$itemtitle->setAsTitle();
@@ -349,7 +379,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 	$item->fieldParams['warningifon'] = 1;
 
 	// Setup conf to import lines as free description lines when no product is found and no default product exist on supplier
-	// TODO This option is in conflict with EINVOICING_PRODUCTS_AUTO_GENERATION, so should be disabled if EINVOICING_PRODUCTS_AUTO_GENERATION is on
+	// This option is in conflict with EINVOICING_PRODUCTS_AUTO_GENERATION, so it is disabled if EINVOICING_PRODUCTS_AUTO_GENERATION is on
 	if (!getDolGlobalString("EINVOICING_PRODUCTS_AUTO_GENERATION")) {
 		$item = $formSetup->newItem('EINVOICING_IMPORT_AS_FREE_LINES')->setAsYesNo();
 		$item->helpText = $langs->transnoentities('EINVOICING_IMPORT_AS_FREE_LINES_HELP');
@@ -357,6 +387,14 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 		$item->cssClass = 'minwidth500';
 		$item->fieldParams['warningifon'] = 1;
 	}
+
+	// Setup conf to match a vendor product reference written with separators other than the recorded one.
+	// Off by default: the comparison ignores separators, so it is an approximation.
+	$item = $formSetup->newItem('EINVOICING_PRODUCTS_MATCH_CANONICAL_REF')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_PRODUCTS_MATCH_CANONICAL_REF_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+	$item->fieldParams['warningifon'] = 1;
 
 	// Setup conf to choose use of auto generation or not of third parties
 	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_AUTO_GENERATION')->setAsYesNo();
@@ -379,12 +417,14 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 	$item->fieldParams['forcereload'] = 1;
 	*/
 
-	if (getDolGlobalString('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_AVAILABLE')) {
-		// Setup conf to enable or not the consistency check on supplier invoice validation
-		$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION');
-		$item->helpText = $langs->transnoentities('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP');
-		$item->setAsYesNo();
-	}
+	// Setup conf to enable or not the consistency check on supplier invoice validation. Off by default:
+	// it re-checks every e-invoice at validation, including the ones edited by hand afterwards, which is
+	// a wider question than the one the import itself settles.
+	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION');
+	$item->helpText = $langs->transnoentities('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP');
+	$item->setAsYesNo();
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
 
 	// Tell the vendor that its invoice is approved (status 205) when the supplier invoice is validated so approved.
 	// Off by default.
@@ -400,10 +440,20 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
 	$item->helpText = $langs->transnoentities('EINVOICING_SEND_PAYMENT_SENT_STATUS_HELP');
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
+
+
+	// Experimental options
+	// EINVOICING_ENABLE_MANUAL_ACTION_QUEUE: This option log import blocked flow with the action to do so we can do it manually later.
+	// Risk: unblocking action in a different order may result in undesirable side effects.
+
+	// Activate postponeflow
+	// EINVOICING_ENABLE_POSTPONE_FLOWS: This option postpone flow with the action to do so we can do it manually later.
+	// Risk: very dangerous. continuing to process flows means changing the cursor, and when a new record is save, we lost
+	// all postpone flow that were discarded.
 }
 
 
-if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+if (!einvoicingReceptionDisabled() || !einvoicingIsSendDisabled()) {
 	$itemtitle = $formSetup->newItem('EINVOICING_DEBUG')->setAsTitle();
 	$itemtitle->nameText = '<b>'.$langs->trans("Other").'</b>';
 
@@ -421,7 +471,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') || !getDolGlobalSt
 
 	// Setup conf to choose to use Chorus or not
 	$item = $formSetup->newItem('EINVOICING_USE_CHORUS')->setAsYesNo();
-	$item->nameText = $langs->trans("EINVOICING_USE_CHORUS").' <span class="opacitymedium">('.$langs->trans("FeatureNotYetSupported").')</span>';
+	$item->nameText = $langs->trans("EINVOICING_USE_CHORUS").' <span class="opacitymedium">('.$langs->trans("FeatureNotFullyYetSupported").')</span>';
 	$item->helpText = $langs->transnoentities('EINVOICING_USE_CHORUS_HELP');
 	$item->cssClass = 'minwidth500';
 

@@ -98,6 +98,7 @@ $promise_code = $object->array_options['options_d4d_promise_code'] ?? '';
 if ($promise_code == '') {
 	// Dolibarr "Réf. client" holds the customer's purchase order number -> BT-13 (see issue #302).
 	// The property is ref_client on recent versions and ref_customer on some older ones; accept both.
+	// @phan-suppress-next-line PhanDeprecatedProperty  ref_client is the deprecated twin of ref_customer, kept because an invoice built without a fetch may carry only that one.
 	$promise_code = $object->ref_client ?? ($object->ref_customer ?? '');
 }
 if ($promise_code == '' && !empty($customerOrderReferenceList)) {
@@ -114,6 +115,7 @@ if ($object->fk_account > 0) {
 
 $account_proprio = '';
 if ($account->id > 0) {
+	// @phan-suppress-next-line PhanDeprecatedProperty  owner_name only exists from Dolibarr 24 on, the module supports 18: proprio is the one that answers on the whole range.
 	$account_proprio = trim(!empty($account->proprio) ? $account->proprio : $account->owner_name);	// $account->proprio is for old version compatibility
 }
 if ($account_proprio == '') {
@@ -130,10 +132,19 @@ if ($object->thirdparty->tva_assuj && empty($object->thirdparty->tva_intra)) {
 $sellerTaxRegistrations = einvoicingSellerTaxRegistrations($mysoc);
 $myidprof          = idprof($mysoc);
 $mySchemeIdProf    = $this->getIEC6523Code($mysoc->country_code);
-$myGlobalIdProf    = idprof($mysoc);
+// BT-29, whose scheme EINVOICING_PARTY_IDENTIFIER_SCHEME decides. An empty scheme or an empty value
+// means the term is not declared at all: it is optional, and BR-CO-26 is satisfied by BT-30 alone.
+$myGlobalIdProf    = $this->getPartyIdentifierValue($mysoc);
 $mySchemeGlobalIdProf = $this->getIEC6523Code($mysoc->country_code, 1);
+$sellerGlobalIds   = ($mySchemeGlobalIdProf !== '' && $myGlobalIdProf !== '')
+	? array(array('schemeID' => $mySchemeGlobalIdProf, 'value' => $myGlobalIdProf))
+	: array();
 $myUri             = $einvoicing->getSellerCommunicationURI(0);
 $mySchemeUri       = $this->getIEC6523Code($mysoc->country_code, 2);
+// BT-28, the trading name of the seller: "a name by which the seller is known, other than the
+// seller name". The company setup of the core has no such field, so there is nothing to declare
+// here and the term is left out of the document (issue #847).
+$sellerTradingName = trim((string) ($mysoc->name_alias ?? ''));
 
 // Buyer party resolution.
 // The external BILLING contact always fills the buyer contact group (BG-9). Whether it also *replaces*
@@ -193,10 +204,20 @@ if (!empty($billingContactIds) && $object->fetch_contact($billingContactIds[0]) 
 if (!($buyerParty instanceof Societe)) {
 	throw new \RuntimeException('einvoicing: invoice thirdparty is not a valid Societe (invoice id=' . $object->id . ')');
 }
+// BT-45, the trading name of the buyer: Dolibarr keeps it on the third party as name_alias,
+// labelled "Alias name (commercial, trademark, ...)". A term that only repeats the name of the
+// party says nothing, and the norm asks for it only when it differs (issue #847).
+$buyerTradingName  = trim((string) $buyerParty->name_alias);
+if ($buyerTradingName === trim((string) $buyerName)) {
+	$buyerTradingName = '';
+}
 $idprof            = idprof($buyerParty) ?? '';
 $schemeIdProf      = $this->getIEC6523Code($buyerParty->country_code);
-$globalIdProf      = idprof($buyerParty) ?? '';
+$globalIdProf      = $this->getPartyIdentifierValue($buyerParty) ?? '';	// BT-46, see BT-29 above
 $schemeGlobalIdProf = $this->getIEC6523Code($buyerParty->country_code, 1);
+$buyerGlobalIds    = ($schemeGlobalIdProf !== '' && $globalIdProf !== '')
+	? array(array('schemeID' => $schemeGlobalIdProf, 'value' => $globalIdProf))
+	: array();
 $uri               = $einvoicing->getBuyerCommunicationURI($buyerParty, $object);
 $reg = array();
 if (preg_match('/(\d+):(.+)/', $uri, $reg)) {
@@ -263,7 +284,7 @@ $outputlangs->load("einvoicing@einvoicing");
 // invoice to a buyer whose directory record demands a service code is rejected (issue #678).
 // It is a SECOND ram:GlobalID on the buyer party, and the Factur-X EN16931 Schematron caps that element
 // at one occurrence (FX-SCH-A-000164): below EXTENDED the code is not sent and the user is told why.
-$buildProfile = $this->getBuildXmlProfile();
+$buildProfile = $this->getBuildXmlProfile($object);
 $buyerRoutingCode = trim((string) ($object->array_options['options_d4d_service_code'] ?? ''));
 if ($buyerRoutingCode !== '' && $buyerParty->country_code != 'FR') {
 	// Scheme 0224 is the French routing code: it means nothing for a buyer of another country.
@@ -283,6 +304,61 @@ if ($buyerRoutingCode !== '' && !$this->isExtendedProfile($buildProfile)) {
 	$buyerRoutingCode = '';
 }
 
+// SIRET of the buyer (BT-46 under scheme 0009), which BR-FR-CPRO-10 makes mandatory on a B2G invoice:
+// Chorus Pro routes on the establishment, where BT-47 carries the legal entity (SIREN). It is declared on
+// top of the identifier the setup already produces, the way the reference document of Annexe B does
+// (0088, 0009 and 0224 side by side), so it needs the same EXTENDED profile as the routing code.
+// The warnings below are raised only on an invoice that looks B2G - one carrying at least one of the
+// Chorus fields - because Chorus Pro support is a setting of the whole company: a seller that invoices
+// both the public sector and private customers would otherwise be told about a missing SIRET on every
+// private invoice, where no rule asks for one.
+$looksLikeB2GInvoice = $chorus && $this->looksLikeB2GInvoice($object);
+
+$buyerChorusSiret = '';
+if ($chorus && $buyerParty->country_code == 'FR') {
+	// No ?? here: Dolibarr 18 declares idprof2 a plain string and PHPStan reports the coalesce on
+	// that core. The cast is what covers the ?string of the newer ones.
+	$buyerChorusSiret = removeAllSpaces((string) $buyerParty->idprof2);
+	if ($buyerChorusSiret === '') {
+		if ($looksLikeB2GInvoice) {
+			$this->warnings[] = $outputlangs->trans('EInvoiceChorusBuyerSiretMissing', $buyerParty->name);
+		}
+	} elseif (!preg_match('/^\d{14}$/', $buyerChorusSiret)) {
+		// A SIRET is 14 digits. Anything else is a typing mistake, and Chorus Pro refuses the invoice on
+		// the identifier rather than on the field the operator would go and look at.
+		$this->warnings[] = $outputlangs->trans('EInvoiceChorusBuyerSiretMalformed', $buyerParty->idprof2);
+		$buyerChorusSiret = '';
+	} elseif ($schemeGlobalIdProf === EInvoicing::SCHEME_FR_SIRET && $globalIdProf === $buyerChorusSiret) {
+		// EINVOICING_PARTY_IDENTIFIER_SCHEME is already set to 0009: the identifier is there, and emitting
+		// it twice would break FX-SCH-A-000164 on the very profile that allows several of them.
+		$buyerChorusSiret = '';
+	}
+	// No profile guard is needed here, unlike the routing code below: this value is only ever emitted
+	// under isExtendedProfile($profile) (see buildXML()), and getBuildXmlProfile() already raises the
+	// profile to EXTENDED-CTC-FR whenever this invoice looks B2G (see needsExtendedFrProfile()) - the
+	// same test $looksLikeB2GInvoice above uses - so an identifier worth emitting always has room.
+	// The routing code keeps its guard because its extrafield keeps the value that was typed when the
+	// option was on, and the invoice may then be generated with the option off.
+}
+
+// Contract type (EXT-FR-FE-01) of a B2G invoice: the Chorus extrafield the contract reference comes from
+// is the market number, which BR-FR-CPRO-01 qualifies with "GC". An ordinary contract would be "CT", and
+// those are the only two values that rule accepts; the module has no field of its own for that case yet.
+$contractReferenceTypeCode = '';
+if ($chorus && !empty($object->array_options['options_d4d_contract_number'])) {
+	$contractReferenceTypeCode = 'GC';
+}
+
+// BR-FR-CPRO-15 caps the commitment number (BT-13) at 50 characters. It is worth checking because that
+// term does not come from the Chorus extrafield alone: an empty one falls back on the customer reference
+// of the invoice, which Dolibarr stores on 255. Reported rather than truncated - a reference cut in half
+// no longer designates the commitment it names, and only the operator knows which end matters.
+// Its sibling BR-FR-CPRO-14, on the contract reference (BT-12), needs no check here: that one is read from
+// the "Market number" extrafield only, whose own column stops at 50 characters.
+if ($chorus && dol_strlen((string) $promise_code) > 50) {
+	$this->warnings[] = $outputlangs->trans('EInvoiceChorusReferenceTooLong', 'BT-13', dol_strlen((string) $promise_code), $promise_code);
+}
+
 // Buyer reference (BT-10): a reference owned by the buyer, used to route the invoice inside its own
 // organisation. The Chorus Pro service code keeps feeding it when the dedicated property is empty:
 // Annexe A of XP Z12-012 documents BT-10 as the "Service Executant" of the public sector, so that
@@ -298,6 +374,7 @@ if (! ($object->project instanceof Project)) {
 	if (method_exists($object, 'fetchProject')) {
 		$object->fetchProject();
 	} else {
+		// @phan-suppress-next-line PhanDeprecatedFunction  fetchProject() only exists from Dolibarr 24 on, and the branch above is what uses it when it does.
 		$object->fetch_project();
 	}
 }
@@ -317,7 +394,7 @@ if ($object->type == $object::TYPE_CREDIT_NOTE) {
 if ($refDocTypeCode !== '' && !empty($object->fk_facture_source)) {
 	$sourceFact = new Facture($this->db);
 	if ($sourceFact->fetch($object->fk_facture_source) > 0) {
-		$sourceFactDate = new DateTime(dol_print_date($sourceFact->date, 'dayrfc'));
+		$sourceFactDate = new DateTime(dol_print_date($sourceFact->date, 'dayrfc', 'tzserver'));
 		$invoiceRefDocs[] = [
 			'ref' => $sourceFact->ref,
 			'date' => $sourceFactDate,
@@ -327,7 +404,7 @@ if ($refDocTypeCode !== '' && !empty($object->fk_facture_source)) {
 	} else {
 		if ($object->id == 0) { // Specimen case.
 			$specimenRefDoc = $object->fk_facture_source ?? 'FA0000-SPECIMEN';
-			$sourceFactDate = new DateTime(dol_print_date(dol_now() - 100, 'dayrfc'));
+			$sourceFactDate = new DateTime(dol_print_date(dol_now() - 100, 'dayrfc', 'tzserver'));
 			$invoiceRefDocs[] = [
 				'ref' => $specimenRefDoc,
 				'date' => $sourceFactDate,
@@ -351,7 +428,7 @@ if ($object->type == $object::TYPE_SITUATION && !empty($object->situation_counte
 		$prevSituation = end($object->tab_previous_situation_invoice);
 		reset($object->tab_previous_situation_invoice);
 		if ($prevSituation && !empty($prevSituation->ref)) {
-			$prevSituationDate = new DateTime(dol_print_date($prevSituation->date, 'dayrfc'));
+			$prevSituationDate = new DateTime(dol_print_date($prevSituation->date, 'dayrfc', 'tzserver'));
 			$invoiceRefDocs[] = [
 				'ref'  => $prevSituation->ref,
 				'date' => $prevSituationDate,
@@ -369,6 +446,8 @@ $lines_total_ht 	= $lines_total_tva = $lines_total_ttc = 0;
 $grand_total_ht    	= $grand_total_tva = $grand_total_ttc = 0;
 $prepaidAmount     	= 0;
 $depositlines      	= [];
+$lineRowIds        	= [];	// Document line number => llx_facturedet.rowid, for the messages
+$lineDiscountIds   	= [];	// Document line number => llx_facturedet.fk_remise_except, 0 when the line is not a discount
 $globalDiscounts	= [];
 $billing_period    	= [];
 $numligne          	= 1;
@@ -440,7 +519,8 @@ foreach ($object->lines as $line) {
 	// The second method need to use the field BT-113. We don't use it as we use the first method.
 	$depositFactRef  = null;
 	$depositFactDate = null;
-	if ($line->desc == '(DEPOSIT)') {
+	$lineDiscount    = null;	// Discount the line was built from, when it is a discount line
+	if ($line->desc == '(DEPOSIT)' && !empty($line->fk_remise_except)) {
 		$isDepositLine   = 1;
 		$depositFactRef  = "";
 		$depositFactDate = new DateTime();
@@ -450,12 +530,13 @@ foreach ($object->lines as $line) {
 		dol_syslog("Fetch discount " . $line->fk_remise_except . ", res=" . $resdiscount, LOG_DEBUG);
 
 		if ($resdiscount > 0) {
+			$lineDiscount = $discount;
 			$origFact    = new Facture($this->db);
 			$resOrigFact = $origFact->fetch($discount->fk_facture_source);
 			dol_syslog("Fetch origFact " . $discount->fk_facture_source . ", res=" . $resOrigFact, LOG_DEBUG);
 			if ($resOrigFact > 0) {
 				$depositFactRef  = $origFact->ref;
-				$depositFactDate = new DateTime(dol_print_date($origFact->date, 'dayrfc'));
+				$depositFactDate = new DateTime(dol_print_date($origFact->date, 'dayrfc', 'tzserver'));
 			}
 		}
 		$line->qty      = -$line->qty;				// For a deposit, ->qty should be -1.
@@ -483,9 +564,16 @@ foreach ($object->lines as $line) {
 		$resdiscount = $discount->fetch($line->fk_remise_except);
 		dol_syslog("Fetch discount " . $line->fk_remise_except . ", res=" . $resdiscount, LOG_DEBUG);
 
+		$lineDiscount = ($resdiscount > 0 ? $discount : null);
+
+		// BT-97. The description of a discount built from another piece is a sentinel, not a text to
+		// show: resolved here, the customer reads which credit note or which excess payment is deducted
+		// instead of '(CREDIT_NOTE)'. A discount entered by hand keeps the reason that was typed.
+		$discountReason = einvoicingDiscountLabel($lineDiscount, $discount->description ?? '', $outputlangs, einvoicingDiscountRelatedInvoiceRef($lineDiscount, $this->db));
+
 		$globalDiscounts[] = array(
 			'value' => (float) $discount->total_ht,
-			'reason' => $discount->description ?? 'REMISE',
+			'reason' => $discountReason ?: ($discount->description ?? 'REMISE'),
 			'taxRate' => (float) $discount->tva_tx,
 			'categoryVAT' => $categoryVAT,
 		);
@@ -546,6 +634,16 @@ foreach ($object->lines as $line) {
 		if ($libelle == $description) {
 			$description = "";
 		}
+	}
+
+	// A discount line still standing here is a deposit deducted, and its description is the sentinel the
+	// core stores, not a text meant to be read: the customer would read '(DEPOSIT)' in BT-153. Resolved
+	// through einvoicingDiscountLabelOfLine(), which also asks the line for its discount - a line of work
+	// an operator named '(DEPOSIT)', pointing at none, keeps the name it was given.
+	$discountLabel = einvoicingDiscountLabelOfLine($line, $lineDiscount, $outputlangs, einvoicingDiscountRelatedInvoiceRef($lineDiscount, $this->db));
+	if ($discountLabel !== '') {
+		$libelle     = $discountLabel;
+		$description = "";
 	}
 
 	// Billing period of the line
@@ -635,6 +733,12 @@ foreach ($object->lines as $line) {
 	$grand_total_tva += $line_total_tva;
 
 
+
+	// The rowid of the line, kept beside its document line number: the number places the line in the
+	// document, the rowid is what a correction is addressed to, and a message that names only the first
+	// leaves its reader to count the lines to find it.
+	$lineRowIds[$numligne] = (int) $line->id;
+	$lineDiscountIds[$numligne] = (int) ($line->fk_remise_except ?? 0);
 
 	// Filling $linesData (based on $lineTemplate)
 	$linesData[$numligne] = [
@@ -789,6 +893,39 @@ if (!empty($object->situation_counter) && $object->situation_counter > 1
 	}
 }
 
+// Last look for a sentinel that reached a field the customer reads: everything above resolves the four
+// of them, so anything left is a construction path this file does not know about. Reported on a line
+// carrying a discount only - a line of work an operator named (DEPOSIT) is legitimate. The test is an
+// equality, never an inclusion, so 'Reprise (DEPOSIT) du chantier' goes out untouched, and it reports
+// rather than refuses: a marker in an item name is ugly, not invalid.
+$discountSentinels = array_keys(einvoicingDiscountSentinels());
+$linesWithNoName = array();
+foreach ($linesData as $numligne => $vals) {
+	if (trim((string) ($vals['prodname'] ?? '')) === '') {
+		$linesWithNoName[] = $numligne.' (id '.($lineRowIds[$numligne] ?? 0).')';
+	}
+	foreach (array('prodname' => 'BT-153', 'proddesc' => 'BT-154') as $field => $businessTerm) {
+		if (!empty($lineDiscountIds[$numligne]) && in_array((string) ($vals[$field] ?? ''), $discountSentinels, true)) {
+			dol_syslog("EInvoicing: line ".$numligne." of ".$object->ref." carries the unresolved discount marker ".$vals[$field]." in ".$businessTerm.". The line is a discount whose source piece could not be read.", LOG_ERR);
+		}
+	}
+}
+
+foreach ($globalDiscounts as $discountIndex => $vals) {
+	if (in_array((string) ($vals['reason'] ?? ''), $discountSentinels, true)) {
+		dol_syslog("EInvoicing: allowance ".$discountIndex." of ".$object->ref." carries the unresolved discount marker ".$vals['reason']." in BT-97. The discount source piece could not be read.", LOG_ERR);
+	}
+}
+
+// BR-25: a line with no name is refused here rather than after transmission, on a line number the
+// seller would then have to go and find, and every such line is named at once to spare a round trip
+// per line. Same missing data as the pre-check (validateInvoiceConfiguration()). Placed after both
+// halves of the last look above, never between them: a nameless line would otherwise hide the report
+// of an unresolved marker in BT-97, the very case that last look exists to catch.
+if (!empty($linesWithNoName)) {
+	throw new Exception('MISSINGDATA[BR-25]: The line'.(count($linesWithNoName) > 1 ? 's ' : ' ').implode(', ', $linesWithNoName).' of '.$object->ref.' '.(count($linesWithNoName) > 1 ? 'have' : 'has').' no item name (BT-153). Enter a description on the line, or a label on the product it invoices.');
+}
+
 // Rounding convention of the totals: Dolibarr sums the amounts already rounded on each line ("total of
 // round", the default), unless MAIN_ROUNDOFTOTAL_NOT_TOTALOFROUND rounds the sum instead. The loop
 // above always applies the first one, so follow the instance or the document claims a cent less than
@@ -833,7 +970,7 @@ if ($object->element == 'facture' || $object->element == 'invoice') {
 			if ($sourceDiscountFact->fetch($obj->fk_facture_source) > 0) {
 				$invoiceRefDocs[] = [
 					'ref' => $sourceDiscountFact->ref,															// BT-25
-					'date' => new DateTime(dol_print_date($sourceDiscountFact->date, 'dayrfc')),					// BT-26
+					'date' => new DateTime(dol_print_date($sourceDiscountFact->date, 'dayrfc', 'tzserver')),					// BT-26
 					'type' => $refDocTypeByInvoiceType[(int) $obj->sourcetype]
 				];
 				dol_syslog("EInvoicing invoice " . $object->id . " refers to " . $sourceDiscountFact->ref
@@ -883,9 +1020,12 @@ $invoicingPeriodStart = $invoicingPeriod['start'] !== null ? $this->_tsToDateTim
 $invoicingPeriodEnd = $invoicingPeriod['end'] !== null ? $this->_tsToDateTime($invoicingPeriod['end']) : null;
 
 // Delivery date
+// $deliveryDateList already holds 'Y-m-d' days: handing one to dol_print_date(), which expects a
+// timestamp, reached a deprecated branch of the core that reads it back as midnight UTC, so BT-72
+// was emitted one day early on a server west of UTC (issue #853 on the sending side).
 $deliveryDate = !empty($deliveryDateList)
-	? new DateTime(dol_print_date($deliveryDateList[0], 'dayrfc'))
-	: new DateTime(dol_print_date($object->date, 'dayrfc'));
+	? new DateTime($deliveryDateList[0])
+	: new DateTime(dol_print_date($object->date, 'dayrfc', 'tzserver'));
 
 
 
@@ -902,11 +1042,51 @@ $sellerAddressLines = $einvoicing->splitAddressLines($mysoc->address ?? '');
 $buyerAddressLines  = $einvoicing->splitAddressLines($buyerAddress);
 
 // Filling $invoiceData (based on $invoiceTemplate)
+// BR-O-02/03/04 and BR-O-11 to BR-O-14: a document that says an operation is outside the scope of VAT
+// ("Not subject to VAT", BT-118 = O) carries no VAT identifier at all, and cannot describe anything
+// else beside it. The category only ever reaches here from the VAT dictionary of Dolibarr 24 and
+// above - see CommonProtocol::vatCategoryForExemptionCode() - so nothing below changes on an older core.
+$sellerVatNumber = $mysoc->tva_intra ?? 'FRSPECIMEN';
+$buyerVatNumber = $buyerParty->tva_intra ?? '';
+$notSubjectToVatGroups = 0;
+foreach ($taxBreakdown as $tmpbreakdown) {
+	if (($tmpbreakdown['categoryVAT'] ?? '') === 'O') {
+		$notSubjectToVatGroups++;
+	}
+}
+if ($notSubjectToVatGroups > 0 && count($taxBreakdown) > 1) {
+	// Refused here rather than after transmission: the rule points at the document as a whole, so the
+	// message names the categories that cannot sit together instead of a line number.
+	$tmpcategories = array();
+	foreach ($taxBreakdown as $tmpbreakdown) {
+		$tmpcategories[] = (string) ($tmpbreakdown['categoryVAT'] ?? '');
+	}
+	throw new Exception('UNSUPPORTEDVATMIX[BR-O-11]: The invoice ' . $object->ref . ' mixes an operation outside the scope of VAT with taxed or exempt ones (categories ' . implode(', ', array_unique($tmpcategories)) . '). An invoice that declares a "Not subject to VAT" breakdown can carry no other one: issue the operations outside the scope of VAT on their own invoice.');
+}
+if ($notSubjectToVatGroups > 0) {
+	// BT-31, BT-48 and BT-63 must be absent. Dropping them is not enough: a seller that charges VAT has
+	// only a BT-31 to declare, so removing it would leave the party with no tax registration at all -
+	// the very hole issue #560 closed for exempt sellers. Its SIREN takes the place, as BT-32 under
+	// schemeID FC, exactly what einvoicingSellerTaxRegistrations() builds for a seller with no VAT
+	// number. BT-30 carries the same SIREN a few elements above and is not touched by BR-O.
+	$sellerVatNumber = '';
+	$buyerVatNumber = '';
+	// No ?? here: Dolibarr 18 declares idprof1 a plain string and PHPStan reports the coalesce on
+	// that core. The cast is what covers the ?string of the newer ones.
+	$sellerSiren = trim((string) $mysoc->idprof1);
+	$sellerTaxRegistrations = array_values(array_filter($sellerTaxRegistrations, function ($tmpregistration) {
+		return $tmpregistration['type'] !== 'VA';
+	}));
+	if (empty($sellerTaxRegistrations) && $sellerSiren !== '') {
+		$sellerTaxRegistrations[] = array('type' => 'FC', 'value' => $sellerSiren);
+	}
+}
+
 $invoiceData = [
 	// Document part
 	'documentno'           => $object->ref,												// BT-25
 	'documenttypecode'     => $this->_getTypeOfInvoice($object),						// BT-3 Set the type of invoice (standard, deposit, credit note)
-	'documentdate'         => new DateTime(dol_print_date($object->date, 'dayrfc')),	// BT-26
+	'documentdate'         => new DateTime(dol_print_date($object->date, 'dayrfc', 'tzserver')),	// BT-26
 	'invoiceCurrency'      => $object->multicurrency_code,
 	'taxCurrency'          => null,
 	'documentname'         => null,
@@ -944,14 +1124,14 @@ $invoiceData = [
 
 	// Seller part
 	'sellername'                => $mysoc->name,
-	'sellerids'                 => $myidprof,
+	'sellerids'                 => (empty($sellerGlobalIds) ? '' : $myidprof),
 
-	'sellerlineone'             => $sellerAddressLines[0] !== '' ? $sellerAddressLines[0] : 'ADDRESS EMPTY',
+	'sellerlineone'             => $sellerAddressLines[0],
 	'sellerlinetwo'             => $sellerAddressLines[1],
 	'sellerlinethree'           => $sellerAddressLines[2],
-	'sellerpostcode'            => $mysoc->zip          ?? 'ZIP EMPTY',
-	'sellercity'                => $mysoc->town         ?? 'NO TOWN',
-	'sellercountry'             => $mysoc->country_code ?? 'COUNTRY NOT SET',
+	'sellerpostcode'            => $mysoc->zip,
+	'sellercity'                => $mysoc->town,
+	'sellercountry'             => $mysoc->country_code,
 	'sellersubdivision'         => null,
 
 	'sellercontactpersonname'   => $salerepresentative_name,
@@ -963,36 +1143,37 @@ $invoiceData = [
 	'sellerCommunicationUriScheme' => $mySchemeUri,
 	'sellerCommunicationUri'    => $myUri,
 
-	'sellerGlobalIds'           => [['schemeID' => $mySchemeGlobalIdProf, 'value' => $myGlobalIdProf]],
+	'sellerGlobalIds'           => $sellerGlobalIds,
 	// BT-31 or BT-32, whichever the VAT regime of the seller calls for - see
 	// einvoicingSellerTaxRegistrations(). A seller that does not charge VAT has no BT-31 to declare and
 	// must still identify itself, or every exempt line trips BR-E-02 (issue #560).
 	'sellerTaxRegistations'     => $sellerTaxRegistrations,
-	'sellervatnumber'           => $mysoc->tva_intra ?? 'FRSPECIMEN',
+	'sellervatnumber'           => $sellerVatNumber,
 
 	'sellerLegalOrgId'          => $myidprof,
 	'sellerLegalOrgScheme'      => $mySchemeIdProf,
-	'sellerTradingName'         => $mysoc->name ?? 'SPECIMEN',
+	'sellerTradingName'         => $sellerTradingName,
 
 	// Buyer part
-	'buyername'                 =>  $buyerName ?: 'CUSTOMER',
-	'buyerids'                  => $idprof ?: 'IDPROF',
+	'buyername'                 => $buyerName,
+	'buyerids'                  => (empty($buyerGlobalIds) ? '' : $idprof),
 
-	'buyerlineone'              => $buyerAddressLines[0] !== '' ? $buyerAddressLines[0] : 'ADDRESS',
+	'buyerlineone'              => $buyerAddressLines[0],
 	'buyerlinetwo'              => $buyerAddressLines[1],
 	'buyerlinethree'            => $buyerAddressLines[2],
-	'buyerpostcode'             => $buyerZip         ?: 'ZIP',
-	'buyercity'                 => $buyerTown        ?: 'TOWN',
-	'buyercountry'              => $buyerCountryCode ?: 'COUNTRY',
+	'buyerpostcode'             => $buyerZip,
+	'buyercity'                 => $buyerTown,
+	'buyercountry'              => $buyerCountryCode,
 	'buyersubdivision'          => null,
 
-	'buyervatnumber'            => $buyerParty->tva_intra ?? '',
-	'buyerGlobalIds'            => [['schemeID' => $schemeGlobalIdProf, 'value' => $globalIdProf]],
+	'buyervatnumber'            => $buyerVatNumber,
+	'buyerGlobalIds'            => $buyerGlobalIds,
 	'buyerRoutingCode'          => ($buyerRoutingCode !== '' ? $buyerRoutingCode : null),
+	'buyerChorusSiret'          => $buyerChorusSiret,
 
 	'buyerLegalOrgId'           => $idprof,
 	'buyerLegalOrgScheme'       => $schemeIdProf,
-	'buyerTradingName'          => $buyerName,
+	'buyerTradingName'          => $buyerTradingName,
 
 	'buyerReference'            => $buyerReference,
 
@@ -1022,7 +1203,7 @@ $invoiceData = [
 	'accountRef'                => $account->ref,
 	'accountLabel'              => $account->label,
 
-	'paymentDueDate'            => new DateTime(dol_print_date($object->date_lim_reglement, 'dayrfc')),
+	'paymentDueDate'            => new DateTime(dol_print_date($object->date_lim_reglement, 'dayrfc', 'tzserver')),
 	'paymentTermsText'          => $langs->transnoentitiesnoconv("PaymentConditions") . ": " . $langs->transnoentitiesnoconv("PaymentCondition" . $object->cond_reglement_code),
 
 	// Allowances / charges part
@@ -1032,6 +1213,7 @@ $invoiceData = [
 	'invoiceRefDocs'            => $invoiceRefDocs,		// BG-3
 	'orderReference'            => $promise_code,
 	'contractReference'         => $object->array_options['options_d4d_contract_number'] ?? null,
+	'contractReferenceTypeCode' => $contractReferenceTypeCode,
 	'despatchAdviceRef'         => null,
 
 	// VAT breakdown for section ApplicableHeaderTradeSettlement
@@ -1080,8 +1262,11 @@ if ($shipAddress === null && !empty($object->linkedObjectsIds['shipping']) && is
 	require_once DOL_DOCUMENT_ROOT . '/contact/class/contact.class.php';
 	foreach ($object->linkedObjectsIds['shipping'] as $expeditionId) {
 		$tmpexpedition = new Expedition($db);
+		// The use of fk_delivery_address was never supported by the core. This feature was never used.
+		// @phan-suppress-next-line PhanDeprecatedProperty
 		if ($tmpexpedition->fetch($expeditionId) > 0 && !empty($tmpexpedition->fk_delivery_address)) {
 			$shipContact = new Contact($db);
+			// @phan-suppress-next-line PhanDeprecatedProperty
 			if ($shipContact->fetch((int) $tmpexpedition->fk_delivery_address) > 0) {
 				$shipAddress = einvoicingShipToFromContact($shipContact, $object->thirdparty, $outputlangs, $db);
 				break;
@@ -1109,14 +1294,25 @@ if ($shipAddress !== null) {
 
 // Section to control data and throw errors in case of problem, to avoid generating non compliant XML
 // --------------------------------------------------------------------------------------------------
+// The amounts above come from calcul_price_total(), so they are expressed in the accounting currency of
+// the company, while BT-5 announces $object->multicurrency_code. A foreign currency invoice would claim
+// an amount it does not mean, and BR-FR-CO-12 refuses it anyway: BT-5 other than EUR makes the VAT total
+// in accounting currency (BT-6, BT-111) mandatory, and neither is built here.
+if (!empty($object->multicurrency_code) && $object->multicurrency_code != $conf->currency) {
+	throw new Exception('UNSUPPORTEDCURRENCY: The invoice ' . $object->ref . ' is issued in ' . $object->multicurrency_code . ' but the e-invoice can only be built in the accounting currency of your company (' . $conf->currency . ').');
+}
 if (empty($idprof)) {
 	throw new Exception('BADTHIRDPARTYPROFID: The main professional ID of the buyer ' . $buyerParty->name . ' is empty.');
 }
 if (empty($myidprof)) {
 	throw new Exception('BADPROFID: The professional ID of your company is empty. Fix this in your company or module setup page.');
 }
-if ($mySchemeIdProf == "0002" && strlen($myidprof) != 9) {
-	throw new Exception('BADPROFID: The professional ID ' . $myidprof . ' has type SIREN but length is not 9 characters. Fix this in your company or einvoice module setup page.');
+// G1.89 makes the SIREN nine digits and BR-FR-32 refuses, as fatal, any party identifier under scheme
+// 0002 that is not nine of them. Nine digits and not nine characters: the core never validates
+// idprof1 when the record is saved, so a value like "12345678A" is storable and a length test alone
+// lets it reach a document the access point rejects.
+if ($mySchemeIdProf == "0002" && !preg_match('/^\d{9}$/', $myidprof)) {
+	throw new Exception('BADPROFID: The professional ID ' . $myidprof . ' has type SIREN but is not made of exactly 9 digits. Fix this in your company or einvoice module setup page.');
 }
 if ($mysoc->country_code == 'FR' && !empty($mysoc->idprof1) && !empty($mysoc->idprof2)) {
 	if (strpos(removeAllSpaces($mysoc->idprof2), removeAllSpaces($mysoc->idprof1)) !== 0) {
@@ -1133,6 +1329,29 @@ if (!empty($mysoc->tva_intra) && !empty($mysoc->country_code) && substr($mysoc->
 }
 if (!empty($buyerParty->tva_intra) && !empty($buyerParty->country_code) && substr($buyerParty->tva_intra, 0, 2) != $buyerParty->country_code) {
 	throw new Exception('BADVATNUMBER: The VAT number of the thirdparty ' . $buyerParty->name . ' must start with its 2 letter country code.');
+}
+// The buyer registration identifier gets the same control as the seller one above: G1.63 makes the
+// SIREN of both parties mandatory, and BR-FR-32 tests every party carrying scheme 0002, not just the
+// seller. idprof() truncates a SIRET to nine characters, so a SIRET typed into the SIREN field is
+// what reaches this - which the import of a received document can itself produce.
+if ($schemeIdProf == "0002" && !preg_match('/^\d{9}$/', $idprof)) {
+	throw new Exception('BADTHIRDPARTYPROFID: The professional ID ' . $idprof . ' of the customer ' . $buyerParty->name . ' has type SIREN but is not made of exactly 9 digits. Fix this in the record of that third party.');
+}
+// BT-40 and BT-55 are the only mandatory terms of a postal address (BR-09, BR-11), and BT-27 and
+// BT-44 are mandatory too (BR-06, BR-07). One test per party, each naming the record to open: a
+// document refused by the access point on a rule pointing at nothing the user can see is what the
+// placeholders removed above used to produce. trim() rather than empty(), which also refuses "0".
+if (trim((string) $mysoc->country_code) === '') {
+	throw new Exception('BADADDRESS: The country of your company is empty. Fix this in the setup of your company.');
+}
+if (trim((string) $buyerCountryCode) === '') {
+	throw new Exception('BADADDRESS: The country of the customer ' . $buyerParty->name . ' is empty. Fix this in the record of that third party.');
+}
+if (trim((string) $mysoc->name) === '') {
+	throw new Exception('BADPARTYNAME: The name of your company (BT-27) is empty. Fix this in the setup of your company.');
+}
+if (trim((string) $buyerName) === '') {
+	throw new Exception('BADPARTYNAME: The name of the customer (BT-44) is empty. Fix this in the record of that third party.');
 }
 
 

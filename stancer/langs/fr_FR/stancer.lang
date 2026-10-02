@@ -94,6 +94,8 @@ StancerCBCard=Carte Bancaire
 STANCER_PAY_BUTTON = Paiement par CB
 STANCER_PAY_BUTTON_MESSAGE = Vous allez basculer sur le site de Stancer pour procéder au paiement
 STANCER_PAY_BUTTON_DEPOSIT = Paiement de l'acompte de %s %% soit %s
+StancerPaymentFrameTitle = Paiement sécurisé par Stancer
+StancerSendPayLinkNotSent = Le lien de paiement n'a pas pu être envoyé à %s. Le journal en indique la raison.
 STANCER_CB_ORDER_PARTIAL_PAY = Activation du paiement partiel des commandes avec création automatique de facture d'acompte
 STANCER_CB_ORDER_PARTIAL_PAYTooltip = Cette option permet de mettre en place le "paiement de 30%% à la commande" par exemple. Plus d'informations sur <a href="https://doc.cap-rel.fr/projet_stancer/versement_d_un_acompte_a_la_commande">la documentation</a>
 STANCER_CB_PROPAL_PARTIAL_PAY = Activation du paiement partiel des devis avec création automatique de facture d'acompte
@@ -781,3 +783,45 @@ StancerRepairConfirmOverpay = Cette facture est déjà soldée. Confirmer l'ajou
 StancerRepairStaleStatusIntro = %s paiement(s) au statut local obsolète (refusé/annulé côté Stancer ou non confirmé) : exclus des encaissés ci-dessus.
 StancerRepairRealStatus = Statut réel Stancer
 StancerRepairStatusUnknown = non confirmé
+
+#
+# Paiement sans 3-D Secure, statuts Stancer et envoi du lien de paiement
+#
+stancer_status_refused = Paiement refusé
+stancer_status_failed = Paiement en échec
+stancer_status_expired = Paiement expiré
+stancer_status_canceled = Paiement annulé
+stancer_status_disputed = Paiement contesté
+stancer_status_authorized = Paiement autorisé
+stancer_status_captured = Paiement capturé
+stancer_status_capture_sent = Capture en cours
+ErrorStancerPaymentNotStarted = Le paiement n'a pas pu être démarré. Aucun montant n'a été débité. Vous pouvez réessayer dans un instant.
+StancerPaymentErrorAuthNotCompleted = La vérification auprès de votre banque n'a pas pu aboutir : votre banque n'a donc jamais été sollicitée pour autoriser ce paiement. Réessayez avec votre application bancaire à portée de main, ou utilisez un autre moyen de paiement.
+StancerPaymentErrorBankRefused = Votre banque a refusé le paiement (code %s).
+StancerPaymentNothingCharged = Aucun montant n'a été débité de votre compte.
+StancerNo3dsFieldLabel = Paiement par carte sans 3-D Secure
+StancerNo3dsAllow = Autoriser le paiement sans 3-D Secure
+StancerNo3dsRevoke = Exiger à nouveau 3-D Secure
+StancerNo3dsConfirmTitle = Autoriser le paiement par carte sans 3-D Secure
+StancerNo3dsConfirmText = Les paiements par carte de %s seront envoyés sans authentification 3-D Secure, jusqu'à son règlement ou jusqu'à ce que 3-D Secure soit à nouveau exigé. Ne le faites que pour un client dont la carte ne parvient pas à s'authentifier : le refus l'indique alors.<br><b>Sans 3-D Secure, une contestation frauduleuse reste à votre charge, et non à celle de l'émetteur de la carte.</b>
+StancerNo3dsBanner = Autorisé sur ce document. Une contestation frauduleuse serait à votre charge. L'auteur de l'autorisation est enregistré dans ses événements.
+StancerNo3dsAllowed = Les paiements par carte de ce document seront envoyés sans 3-D Secure.
+StancerNo3dsWithdrawn = Les paiements par carte de ce document exigent à nouveau 3-D Secure.
+StancerNo3dsChangeFailed = La modification n'a pas pu être enregistrée, rien n'a été changé.
+StancerNo3dsNeedsReactivation = Désactivez puis réactivez le module Stancer pour terminer sa mise à jour.
+StancerNo3dsEventOn = Paiement par carte sans 3-D Secure autorisé sur %s
+StancerNo3dsEventOff = 3-D Secure à nouveau exigé sur %s
+STANCER_PAYLINK_ORDER_MAILTYPE = Modèle d'email du lien de paiement (commande)
+STANCER_PAYLINK_ORDER_MAILTYPETooltip = Modèle utilisé par le bouton "Envoyer le lien de paiement" sur une commande. Le modèle doit contenir __ONLINE_PAYMENT_URL__. Sans modèle sélectionné, un message simple est envoyé à la place.
+STANCER_PAYLINK_INVOICE_MAILTYPE = Modèle d'email du lien de paiement (facture)
+STANCER_PAYLINK_INVOICE_MAILTYPETooltip = Modèle utilisé par le bouton "Envoyer le lien de paiement" sur une facture. Le modèle doit contenir __ONLINE_PAYMENT_URL__. Sans modèle sélectionné, un message simple est envoyé à la place.
+StancerSendPayLink = Envoyer le lien de paiement
+StancerSendPayLinkConfirm = Envoyer le lien de paiement en ligne à %s ?
+StancerSendPayLinkSource = Adresse trouvée sur : %s
+StancerSendPayLinkSent = Lien de paiement envoyé à %s
+StancerSendPayLinkNoRecipient = Aucune adresse email n'a été trouvée, ni sur ce tiers ni sur ses contacts. Renseignez le tiers ou l'un de ses contacts avant d'envoyer le lien.
+StancerSendPayLinkNoUrl = Le paiement en ligne n'est pas disponible pour ce document.
+StancerPayLinkMailSubject = Lien de paiement pour %s
+StancerPayLinkMailIntro = %s vous invite à régler le document %s en ligne.
+StancerPayLinkMailButton = Payer en ligne
+StancerPayLinkMailFallback = Si le lien ci-dessus ne fonctionne pas, copiez cette adresse dans votre navigateur :

@@ -27,7 +27,7 @@
  */
 
 require_once __DIR__ . '/../protocols/ProtocolManager.class.php';
-dol_include_once('einvoicing/lib/einvoicing.lib.php');	// removeAllSpaces(), used to normalize an electronic address
+require_once __DIR__ . '/../../lib/einvoicing.lib.php';	// removeAllSpaces(), used to normalize an electronic address
 
 
 /**
@@ -37,6 +37,9 @@ abstract class AbstractPDPProvider
 {
 	/** @var DoliDB Database handler */
 	public $db;
+
+	/** @var string Error message */
+	public $error;
 
 	/** @var array Error messages */
 	public $errors = [];
@@ -415,6 +418,26 @@ abstract class AbstractPDPProvider
 
 
 	/**
+	 * Set the setup factory specific to the provider.
+	 *
+	 * Optional: a provider with nothing of its own to configure keeps this empty block, and the setup
+	 * page then simply shows nothing under the common one.
+	 *
+	 * @param FormSetup $formSetup 			The form setup object to initialize
+	 * @param string 	$prefix 			The prefix for configuration keys ('EINVOICING_MYPDP_')
+	 * @param string 	$prefixenv 			'prod' or 'test', depending on EINVOICING_LIVE
+	 * @param array 	$providersConfig 	The array containing providers configuration
+	 * @param array 	$TFieldProtocols 	The array of available protocols to set in the select field
+	 * @param array 	$TFieldProfiles 	The array of available profiles to set in the select field
+	 * @return void
+	 */
+	public function initFormSetup(&$formSetup, $prefix, $prefixenv, $providersConfig, $TFieldProtocols, $TFieldProfiles)
+	{
+		// Nothing to add to the setup page by default.
+	}
+
+
+	/**
 	 * Try to get a flow data from its id and doc type, using API
 	 *
 	 * @param string	$flowId 		The id of the flow
@@ -591,7 +614,7 @@ abstract class AbstractPDPProvider
 	 *
 	 * @param string 						$resource 	    Resource relative URL ('Flows', 'healthcheck' or others)
 	 * @param 'POST'|'GET'|'HEAD'|'PUT'|'PUTALREADYFORMATED'|'POSTALREADYFORMATED'|'DELETE' $method         HTTP method (dolibarr's types)
-	 * @param string|false 	$options 	    Options for the request (JSON encoded)
+	 * @param string|false|array<string,mixed> 	$options 	    Body of the request: a JSON encoded string, or an array carrying a CURLFile for a multipart upload. False when there is none.
 	 * @param array<string, string>         $extraHeaders   Optional additional headers
 	 * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
 	 *
@@ -604,7 +627,7 @@ abstract class AbstractPDPProvider
 	 * @param   int   $syncFromDate     Timestamp from which to start synchronization. If 0, begins from epoch (1970-01-01).
 	 * @param   int   $limit            Maximum number of flows to synchronize. 0 means no limit.
 	 *
-	 * @return 	bool|array{res:int, messages:string[], totalFlows?:?int, alreadyExist?:int, syncedFlows?:int, batchlimit?:int, actions?:array<string,array{actionurl:string,actioncode:string,action:string,businessmessage:string}>, details?:string[]} 	True on success, false on failure along with messages, details for debugging, and suggested optional actions.
+	 * @return 	bool|array{res:int, messages:string[], totalFlows?:?int, alreadyExist?:int, syncedFlows?:int, batchlimit?:int, actions?:array<string,array{actionurl:string,actioncode:string,action:string,businessmessage:string}>, details?:string[], errors?:string[]} 	True on success, false on failure along with messages, details for debugging, the errors that aborted the run, and suggested optional actions.
 	 */
 	abstract public function syncFlows($syncFromDate = 0, $limit = 0);
 
@@ -617,6 +640,42 @@ abstract class AbstractPDPProvider
 	 * @return array{res:int, message:string, action:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and an optional 'action'.
 	 */
 	abstract public function syncFlow($flowId, $call_id = null);
+
+	/**
+	 * Have the value of a setup field stored encrypted, whatever its constant is named.
+	 *
+	 * dolibarr_set_const() decides on the END of the name, and the environment marker of the production
+	 * credentials hides the keyword it matches (#599, #1013). dolEncrypt() returns an already encrypted
+	 * string unchanged, so a core that does encrypt that name still stores a single layer.
+	 *
+	 * @param	FormSetupItem	$item	Setup field holding a credential
+	 * @return	void
+	 */
+	protected function storeThisFieldEncrypted($item)
+	{
+		$item->setSaveCallBack(function (FormSetupItem $credentialitem) {
+			$res = dolibarr_set_const($credentialitem->db, $credentialitem->confKey, AbstractPDPProvider::encryptIfReadable((string) $credentialitem->fieldValue), 'chaine', 0, '', $credentialitem->entity);
+
+			return ($res < 0 ? -1 : 1);
+		});
+	}
+
+	/**
+	 * Encrypt a credential, unless this core would not give it back.
+	 *
+	 * Dolibarr 23 refuses a decrypted value that is not plain ASCII and hands the encrypted string over
+	 * instead (its dolDecrypt() tests ascii_check(), which 24 relaxed to ascii or utf8), so a password
+	 * carrying an accent would come back unusable. Such a value is stored the way it was before.
+	 *
+	 * @param	string	$value	Value of the credential
+	 * @return	string			What to store: encrypted, or the value itself when it would not read back
+	 */
+	public static function encryptIfReadable($value)
+	{
+		$encrypted = dolEncrypt((string) $value);
+
+		return (dolDecrypt($encrypted) === (string) $value) ? $encrypted : (string) $value;
+	}
 
 	/**
 	 * Insert or update OAuth token for the given PDP.
@@ -645,10 +704,12 @@ abstract class AbstractPDPProvider
 				$forceentity = getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP");
 			}
 
-			dolibarr_set_const($db, $serviceName.'_TOKEN', $accessToken, 'chaine', 0, '', $forceentity);
+			// Neither '_TOKEN' nor '_REFRESH' is in the list dolibarr_set_const() matches, so both would
+			// be stored as received. Reading needs no change, dolDecrypt() is applied to every constant.
+			dolibarr_set_const($db, $serviceName.'_TOKEN', self::encryptIfReadable($accessToken), 'chaine', 0, '', $forceentity);
 
 			if ($refreshToken !== null) {
-				dolibarr_set_const($db, $serviceName.'_REFRESH', $refreshToken, 'chaine', 0, '', $forceentity);
+				dolibarr_set_const($db, $serviceName.'_REFRESH', self::encryptIfReadable($refreshToken), 'chaine', 0, '', $forceentity);
 			}
 
 			if ($expire_at !== null) {
@@ -675,9 +736,9 @@ abstract class AbstractPDPProvider
 			if ($db->num_rows($resql) > 0) {
 				// --- Update existing token ---
 				$sql  = "UPDATE ".MAIN_DB_PREFIX."oauth_token SET ";
-				$sql .= "tokenstring = '".$db->escape($accessToken)."'";
+				$sql .= "tokenstring = '".$db->escape(self::encryptIfReadable($accessToken))."'";
 				if ($refreshToken !== null) {
-					$sql .= ", tokenstring_refresh = '".$db->escape($refreshToken)."'";
+					$sql .= ", tokenstring_refresh = '".$db->escape(self::encryptIfReadable($refreshToken))."'";
 				}
 				if ($expire_at !== null) {
 					$sql .= ", expire_at = '".$db->idate($expire_at, 'gmt')."'";
@@ -692,8 +753,8 @@ abstract class AbstractPDPProvider
 				$sql .= $expire_at !== null ? ", expire_at" : "";
 				$sql .= ", entity) VALUES (";
 				$sql .= "'".$db->escape($serviceName)."', ";
-				$sql .= "'".$db->escape($accessToken)."'";
-				$sql .= $refreshToken !== null ? ", '".$db->escape($refreshToken)."'" : "";
+				$sql .= "'".$db->escape(self::encryptIfReadable($accessToken))."'";
+				$sql .= $refreshToken !== null ? ", '".$db->escape(self::encryptIfReadable($refreshToken))."'" : "";
 				$sql .= ", '".$db->idate($now)."'";
 				$sql .= $expire_at !== null ? ", '".$db->idate($expire_at, 'gmt')."'" : "";
 				$sql .= ", ".(int) $forceentity.")";
@@ -772,9 +833,11 @@ abstract class AbstractPDPProvider
 
 		$obj = $db->fetch_object($resql);
 
+		// dolDecrypt() returns unchanged what has no 'dolcrypt:' prefix: a row written in clear by an
+		// earlier version is read as before.
 		return [
-			'token' => (string) $obj->tokenstring,
-			'refresh_token' => (string) $obj->tokenstring_refresh,
+			'token' => (string) dolDecrypt((string) $obj->tokenstring),
+			'refresh_token' => (string) dolDecrypt((string) $obj->tokenstring_refresh),
 			'token_expires_at' => (string) $db->jdate($obj->expire_at, 'gmt')
 		];
 	}
@@ -816,6 +879,19 @@ abstract class AbstractPDPProvider
 		}
 
 		return true;
+	}
+
+
+	/**
+	 * Delete the access token of this provider.
+	 * Called by the setup page only.
+	 *
+	 * @param	int		$forceentity		0=Use current entity, >0=Use specific entity
+	 * @return	bool						True if success, false otherwise
+	 */
+	public function deleteAccessToken($forceentity = 0)
+	{
+		return $this->deleteOAuthTokenDB($forceentity);
 	}
 
 
@@ -880,6 +956,18 @@ abstract class AbstractPDPProvider
 	const LOGCALL_SENSITIVE_KEYS = array('client_secret', 'access_token', 'refresh_token', 'id_token', 'password');
 
 	/**
+	 * Maximum number of bytes of a payload stored in the debug columns of the trace. Beyond it the
+	 * payload is stored truncated: an INSERT refused for one oversized column loses the whole trace
+	 * of the call (issue #995), and 1 MiB is already far more than a diagnosis reads.
+	 */
+	const LOGCALL_MAX_PAYLOAD_SIZE = 1048576;
+
+	/**
+	 * Bytes kept free inside LOGCALL_MAX_PAYLOAD_SIZE for the marker appended to a truncated payload.
+	 */
+	const LOGCALL_TRUNCATION_MARKER_SIZE = 64;
+
+	/**
 	 * Redact known sensitive fields (@see LOGCALL_SENSITIVE_KEYS) from a value before it is
 	 * persisted in the API call log, whatever its shape: PHP array, application/x-www-form-urlencoded
 	 * string (OAuth token requests), JSON string, or plain text (left untouched in that last case).
@@ -941,8 +1029,8 @@ abstract class AbstractPDPProvider
 	 * (llx_einvoicing_call.response, llx_einvoicing_document.response_for_debug).
 	 *
 	 * Some PDP responses carry non-UTF-8 bytes (signed or compressed payloads): stored as-is they raise a
-	 * SQL error 1366 (Incorrect string value) and abort the flow. Valid UTF-8 is kept unchanged; anything
-	 * else is base64-encoded behind a marker.
+	 * SQL error 1366 (Incorrect string value) and abort the flow. Valid UTF-8 is kept as is, anything else
+	 * is base64-encoded behind a marker, and what exceeds LOGCALL_MAX_PAYLOAD_SIZE is truncated (issue #995).
 	 *
 	 * @param   string|null $payload    Raw payload, possibly binary
 	 * @return  string                  UTF-8-safe representation
@@ -953,9 +1041,46 @@ abstract class AbstractPDPProvider
 			return (string) $payload;
 		}
 		if (preg_match('//u', $payload)) {	// already valid UTF-8
+			return self::truncateDebugPayload($payload);
+		}
+		// Encode only what fits: base64 grows by a third, and cutting the result afterwards would
+		// leave an undecodable tail (4 characters carry 3 bytes).
+		$room = self::LOGCALL_MAX_PAYLOAD_SIZE - self::LOGCALL_TRUNCATION_MARKER_SIZE - strlen('[base64] ');
+		$fits = intdiv($room, 4) * 3;
+		if (strlen($payload) <= $fits) {
+			return '[base64] ' . base64_encode($payload);
+		}
+		return '[base64] ' . base64_encode(substr($payload, 0, $fits)) . self::debugPayloadTruncationMarker(strlen($payload) - $fits);
+	}
+
+	/**
+	 * Keep a UTF-8 payload within LOGCALL_MAX_PAYLOAD_SIZE bytes, cutting on a character boundary:
+	 * a multi-byte character left in half makes the whole column invalid UTF-8 (SQL error 1366).
+	 *
+	 * @param   string  $payload    Valid UTF-8 payload
+	 * @return  string              Payload, truncated and marked as such when it was too long
+	 */
+	protected static function truncateDebugPayload($payload)
+	{
+		if (strlen($payload) <= self::LOGCALL_MAX_PAYLOAD_SIZE) {
 			return $payload;
 		}
-		return '[base64] ' . base64_encode($payload);
+		$kept = substr($payload, 0, self::LOGCALL_MAX_PAYLOAD_SIZE - self::LOGCALL_TRUNCATION_MARKER_SIZE);
+		while ($kept !== '' && !preg_match('//u', $kept)) {	// step back over a character cut in half
+			$kept = substr($kept, 0, -1);
+		}
+		return $kept . self::debugPayloadTruncationMarker(strlen($payload) - strlen($kept));
+	}
+
+	/**
+	 * Marker appended to a payload stored truncated, so the trace says what it does not hold.
+	 *
+	 * @param   int     $dropped    Number of bytes left out
+	 * @return  string              Marker, shorter than LOGCALL_TRUNCATION_MARKER_SIZE
+	 */
+	protected static function debugPayloadTruncationMarker($dropped)
+	{
+		return "\n[truncated: " . ((int) $dropped) . " more bytes]";
 	}
 
 	/**
@@ -1010,6 +1135,8 @@ abstract class AbstractPDPProvider
 		$call->provider = $this->name;
 		$call->entity = $conf->entity;
 		$call->status = ($statusCode == 200 || $statusCode == 202) ? 1 : 0;
+
+		$call->context['statusCode'] = $statusCode;
 
 		if ($call->create($user) > 0) {
 			$dbhistory->commit();
@@ -1068,6 +1195,343 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
+	 * Build the return of processIncomingSupplierInvoiceStatus() for a reason this run could not read
+	 * the incoming status that may not be there anymore on the next one (a platform GET failure, an
+	 * empty response body). Nothing is stored, and 'postponeflow' tells syncFlows() to carry on with
+	 * the flows behind it instead of aborting the whole batch.
+	 *
+	 * @param	string	$flowId		Flow identifier of the lifecycle message
+	 * @param	string	$message	Technical detail for the synchronization log
+	 * @return	array{res:int, postponeflow:int, message:string, actioncode:string, actionurl:string, action:string, businessmessage:string}
+	 */
+	protected function postponeIncomingSupplierInvoiceStatus($flowId, $message)
+	{
+		global $langs;
+
+		$langs->load('einvoicing@einvoicing');
+
+		return array(
+			'res' => -1,
+			'postponeflow' => 1,
+			'message' => $message,
+			'actioncode' => 'CANT_READ_INCOMING_LIFECYCLE_STATUS',
+			'actionurl' => '',
+			'action' => $langs->trans('CheckAccessPointCantReadIncomingStatus'),
+			'businessmessage' => $langs->trans('CantReadTheStatusSentByTheVendor', $flowId)
+		);
+	}
+
+	/**
+	 * Record a lifecycle status the vendor issued about one of its invoices, onto the supplier
+	 * invoice it refers to.
+	 *
+	 * A status this Dolibarr instance cannot attach to an invoice (refused, an unparseable CDAR, or an
+	 * access point account shared with another system) is not worth retrying: the flow is stored with
+	 * res=0 so the synchronization does not stall on it run after run. A negative result is reserved for
+	 * a transient failure of the platform call itself - the caller must NOT store the flow in that case
+	 * (return instead of break) so this flowId is retried on the next run instead of being lost for good;
+	 * it carries 'postponeflow' so syncFlows() carries on with the flows behind it instead of aborting.
+	 *
+	 * Shared by every provider (moved out of SuperPDPProvider, issue: EsalinkPDPProvider's
+	 * "SupplierInvoiceLC" case had no equivalent guard and always fell through to the
+	 * fetchStatusMessages() path built for the flows WE send, which an incoming status is not).
+	 *
+	 * @param	string		$flowId			Flow identifier of the lifecycle message
+	 * @param	Document	$document		Flow document being built, completed here with the CDAR data
+	 * @param	EInvoicing	$einvoicing		E-invoicing helper of the running synchronization
+	 * @return	array{res:int, message:string, postponeflow?:int, actioncode?:string, actionurl?:string, action?:string, businessmessage?:string}	1 attached, 0 resolved but stored without attaching, negative (with postponeflow) on a transient platform failure that must not be stored
+	 */
+	protected function processIncomingSupplierInvoiceStatus($flowId, $document, $einvoicing)
+	{
+		global $db, $langs;
+
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+		dol_include_once('einvoicing/class/utils/CdarHandler.class.php');
+
+		$langs->load('einvoicing@einvoicing');
+
+		// On some platforms (verified on Hubtimize) an incoming flow's own trackingId is the flowId of
+		// the flow of the invoice the status comments on - the received supplier invoice itself, already
+		// booked in llx_einvoicing_document with fk_element_type = 'invoice_supplier'. Not an outgoing
+		// SupplierInvoiceLC we sent: an incoming status never has one, that is the whole point of #857.
+		// An exact link to try below, before it is overwritten with the CDAR's IssuerAssignedID.
+		$flowTrackingId = (string) $document->tracking_idref;
+
+		$flowResponse = $this->fetchFlowData($flowId, 'Original');
+		if ($flowResponse['status_code'] != 200) {
+			// Some flows have no 'Original' on the access point, only the converted copy. Both carry
+			// the same CDAR, so fall back rather than fail the flow (and every flow behind it).
+			$flowResponse = $this->fetchFlowData($flowId, 'Converted');
+		}
+		if ($flowResponse['status_code'] != 200) {
+			return $this->postponeIncomingSupplierInvoiceStatus($flowId, "Failed to retrieve flow details for flowId: " . $flowId);
+		}
+		if ($flowResponse['response'] === '') {
+			// A 200 with nothing to serve: the document is not materialized on the access point yet.
+			// Unlike a malformed body below, this can resolve on its own on a later run.
+			return $this->postponeIncomingSupplierInvoiceStatus($flowId, "FlowId " . $flowId . " - Empty flow document body");
+		}
+
+		$cdarHandler = new CdarHandler($db);
+		try {
+			$cdarDocument = $cdarHandler->readFromString($flowResponse['response']);
+		} catch (Exception $e) {
+			// Malformed XML this run received (a JSON error body, an HTML page): unlike the empty body
+			// above, this will not parse any better on retry.
+			dol_syslog(__METHOD__ . " FlowId " . $flowId . " - " . $e->getMessage(), LOG_WARNING);
+			$cdarDocument = array();
+		}
+		// Every value of a parsed CDAR may be empty, but the array itself never is (parseReferencedDocument()
+		// always returns its seven keys): test the code this function is here to record, not the array.
+		if (empty($cdarDocument['AcknowledgementDocument']['ReferenceReferencedDocument']['ProcessConditionCode'])) {
+			// Not transient, unlike the empty body above: a CDAR that does not parse, or that parses but
+			// carries no lifecycle code, never will. Stored so the synchronization does not read it again.
+			dol_syslog(__METHOD__ . " FlowId " . $flowId . " carries no readable CDAR", LOG_WARNING);
+			return array('res' => 0, 'message' => "FlowId: " . $flowId . " - Failed to parse CDAR document");
+		}
+
+		$refDoc = $cdarDocument['AcknowledgementDocument']['ReferenceReferencedDocument'];
+
+		$document->cdar_lifecycle_code = $refDoc['ProcessConditionCode'];
+		$document->cdar_lifecycle_label = isset($refDoc['ProcessCondition']) ? $refDoc['ProcessCondition'] : '';
+		$document->cdar_reason_code = isset($refDoc['StatusReasonCode']) ? $refDoc['StatusReasonCode'] : '';
+		$document->cdar_reason_desc = isset($refDoc['StatusReason']) ? $refDoc['StatusReason'] : '';
+		$document->cdar_reason_detail = isset($refDoc['StatusIncludedNoteContent']) ? $refDoc['StatusIncludedNoteContent'] : '';
+		$recipientRoles = CdarHandler::recipientRoles($cdarDocument);
+
+		// The referenced document is the vendor invoice, identified the way its issuer numbered it:
+		// that is our ref_supplier, and the issuing party is the vendor it belongs to.
+		$vendorReference = isset($refDoc['IssuerAssignedID']) ? (string) $refDoc['IssuerAssignedID'] : '';
+		$vendorLegalId = isset($refDoc['IssuerTradeParty']['GlobalID']) ? (string) $refDoc['IssuerTradeParty']['GlobalID'] : '';
+
+		$document->tracking_idref = $vendorReference;
+
+		// Exact match first: no reference matching involved once the flow is found. Not guaranteed on
+		// every platform (on SuperPDP trackingId may hold an invoice reference instead), so a miss here
+		// falls back to the vendor reference below rather than failing the flow.
+		$flowMatchedSupplierInvoiceId = $this->findSupplierInvoiceByFlowId($flowTrackingId);
+		$supplierInvoiceId = $flowMatchedSupplierInvoiceId;
+
+		if ($supplierInvoiceId <= 0 && $vendorReference === '') {
+			dol_syslog(__METHOD__ . " FlowId " . $flowId . " carries no IssuerAssignedID, nothing to attach the status to", LOG_WARNING);
+			return array('res' => 0, 'message' => "FlowId " . $flowId . " - Vendor lifecycle status with no invoice reference");
+		}
+
+		if ($supplierInvoiceId <= 0 && $vendorReference !== '') {
+			$supplierInvoiceId = $this->findSupplierInvoiceByVendorReference($vendorReference, $vendorLegalId);
+		}
+		if ($supplierInvoiceId <= 0) {
+			dol_syslog(__METHOD__ . " No supplier invoice found for vendor reference " . $vendorReference . " (vendor " . $vendorLegalId . "), flowId " . $flowId, LOG_WARNING);
+			return array('res' => 0, 'message' => "FlowId " . $flowId . " - No supplier invoice matching the vendor reference " . $vendorReference);
+		}
+
+		$supplierInvoice = new FactureFournisseur($this->db);
+		if ($supplierInvoice->fetch($supplierInvoiceId) <= 0) {
+			// Only worth retrying when this id came from the exact flow match above: when it came from
+			// findSupplierInvoiceByVendorReference() instead, calling it again with the same two arguments
+			// can only return the same id whose fetch() just failed. fetch() only scopes by entity when it
+			// searches by ref, not by rowid (core: "Don't use entity if you use rowid"), so an invoice moved
+			// to another entity is fetched fine - this only covers a row deleted without going through the
+			// trigger that clears fk_element_id (isEInvoice() false, a hand-made delete).
+			$retryId = ($flowMatchedSupplierInvoiceId > 0 && $vendorReference !== '')
+				? $this->findSupplierInvoiceByVendorReference($vendorReference, $vendorLegalId)
+				: 0;
+			if ($retryId <= 0 || $supplierInvoice->fetch($retryId) <= 0) {
+				return array('res' => 0, 'message' => "FlowId " . $flowId . " - Failed to load supplier invoice id " . $supplierInvoiceId);
+			}
+		}
+
+		$document->fk_element_id = $supplierInvoice->id;
+		$document->tracking_idref = $supplierInvoice->ref;
+
+		$statusComment = $document->cdar_reason_detail ? $document->cdar_reason_detail : $document->cdar_reason_desc;
+
+		// What the vendor reports in figures (MDG-43): the amount cashed in of a 212 above all, which is
+		// the only thing telling a cash-in from the refund of a credit note (both are a 212).
+		$amountsReported = empty($refDoc['StatusCharacteristics'])
+			? ''
+			: CdarHandler::describeStatusCharacteristics($refDoc['StatusCharacteristics'], $langs);
+		if ($amountsReported !== '') {
+			$statusComment = $statusComment ? $amountsReported . ' - ' . $statusComment : $amountsReported;
+		}
+
+		$db->begin();
+
+		// Neither write throws: a SQL failure comes back as -1, so the rollback below is only reachable
+		// if the two results are read.
+		// The flow_id of the link is left alone on purpose: on a supplier invoice it points at the
+		// received invoice document, which stays the source of its XML. Only the status moves.
+		// 0 leaves the status the invoice already carries untouched: a duplicate rejection refuses the
+		// new delivery, not the invoice the platform already holds and this status quotes (issue #985).
+		$statusToRecord = $einvoicing->isTransmissionOnlyRejection($supplierInvoice->id, $supplierInvoice->element, $document->cdar_lifecycle_code, $document->cdar_reason_code)
+			? 0 : $document->cdar_lifecycle_code;
+
+		$resExtLink = $einvoicing->insertOrUpdateExtLink($supplierInvoice->id, $supplierInvoice->element, '', $statusToRecord, '', $statusComment);
+
+		$resStatusMessage = ($resExtLink > 0 ? $einvoicing->storeStatusMessage(
+			$supplierInvoice->id,
+			$supplierInvoice->element,
+			$document->cdar_lifecycle_code,
+			$statusComment,
+			$document->flow_direction,
+			$flowId,
+			$document->ack_status,
+			$document->ack_info,
+			$document->submittedat,
+			$document->cdar_reason_code,
+			$recipientRoles
+		) : -1);
+
+		if ($resExtLink <= 0 || $resStatusMessage <= 0) {
+			$db->rollback();
+			dol_syslog(__METHOD__ . " FlowId " . $flowId . " - failed to record the vendor status: " . $db->lasterror(), LOG_ERR);
+			return array('res' => 0, 'message' => "FlowId " . $flowId . " - Failed to record the vendor status on supplier invoice " . $supplierInvoice->ref);
+		}
+
+		$db->commit();
+
+		$statusLabel = $document->cdar_lifecycle_label ? $document->cdar_lifecycle_label : $document->cdar_lifecycle_code;
+		$reasonDetail = $statusComment ? " - " . $statusComment : '';
+		$this->addEvent('STATUS', "EINVOICING - Status: " . $statusLabel, "EINVOICING - Status: " . $statusLabel . $reasonDetail, $supplierInvoice);
+
+		return array('res' => 1, 'message' => "FlowId " . $flowId . " - Vendor status " . $document->cdar_lifecycle_code . ($amountsReported !== '' ? " (" . $amountsReported . ")" : '') . " recorded on supplier invoice " . $supplierInvoice->ref);
+	}
+
+	/**
+	 * Find the supplier invoice already booked on the flow a vendor lifecycle status carries as its own
+	 * trackingId - the flow of the invoice itself, the received supplier invoice flow, on a platform
+	 * that sets it that way (verified on Hubtimize). Not the flowId of an outgoing SupplierInvoiceLC we
+	 * sent: an incoming status this exists for never has one.
+	 *
+	 * @param	string	$flowTrackingId		trackingId carried by the incoming flow's own metadata, empty when unusable
+	 * @return	int							Supplier invoice id, 0 when that flow is not booked on one (or the trackingId does not identify a flow)
+	 */
+	protected function findSupplierInvoiceByFlowId($flowTrackingId)
+	{
+		global $db;
+
+		if ($flowTrackingId === '') {
+			return 0;
+		}
+
+		$sql = "SELECT fk_element_id FROM " . $db->prefix() . "einvoicing_document";
+		$sql .= " WHERE flow_id = '" . $db->escape($flowTrackingId) . "'";
+		$sql .= " AND fk_element_type = 'invoice_supplier'";
+		$sql .= " AND fk_element_id > 0";
+		$sql .= " AND entity IN (" . $db->sanitize(getEntity('document')) . ")";
+		$sql .= " ORDER BY rowid DESC";
+		$sql .= $db->plimit(1);
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . " " . $db->lasterror(), LOG_ERR);
+			return 0;
+		}
+
+		$obj = $db->fetch_object($resql);
+		$db->free($resql);
+
+		return $obj ? (int) $obj->fk_element_id : 0;
+	}
+
+	/**
+	 * Whether a vendor's legal identifier, as carried by a CDAR GlobalID, matches a third party's own
+	 * SIREN, SIRET or intra-community VAT number.
+	 *
+	 * The VAT number is compared the way the rest of the module already does for a seller match
+	 * (CommonProtocol::_syncOrCreateThirdpartyFromEInvoiceSeller(), removeAllSpaces() both sides), since
+	 * a third party can be keyed in with spaces where a CDAR never carries any. A GlobalID under scheme
+	 * 0002 (SIREN) is also tried against the first 9 digits of the SIRET, since a third party recorded
+	 * with only its SIRET filled in still carries the same SIREN (verified on the Hubtimize case behind
+	 * #857: GlobalID '908544638' under scheme 0002).
+	 *
+	 * @param	string	$vendorLegalId	Legal identifier carried by the CDAR, empty when it carries none
+	 * @param	string	$siren			Third party SIREN
+	 * @param	string	$siret			Third party SIRET
+	 * @param	string	$tvaIntra		Third party intra-community VAT number
+	 * @return	bool
+	 */
+	protected function matchesVendorLegalId($vendorLegalId, $siren, $siret, $tvaIntra)
+	{
+		if ($vendorLegalId === '') {
+			return false;
+		}
+
+		if ($vendorLegalId === (string) $siren || $vendorLegalId === (string) $siret) {
+			return true;
+		}
+		if ((string) $siret !== '' && $vendorLegalId === substr((string) $siret, 0, 9)) {
+			return true;
+		}
+
+		return removeAllSpaces($vendorLegalId) === removeAllSpaces($tvaIntra);
+	}
+
+	/**
+	 * Find the supplier invoice a vendor lifecycle status refers to.
+	 *
+	 * A vendor reference is only unique per vendor, never globally, so it is only trusted alone when it
+	 * matches exactly one invoice AND, if the CDAR carries a legal identifier, that invoice's vendor is
+	 * the one it names - one match in this Dolibarr is not one match for this vendor: a generic supplier
+	 * numbering (e.g. "2026-001") can just as well belong to a vendor this instance never received
+	 * anything from. When several vendors happen to use the same numbering, the legal identifier settles
+	 * it the same way; when it cannot, no invoice is returned rather than the wrong one.
+	 *
+	 * @param	string	$vendorReference	Invoice number as assigned by the vendor (BT-1 of the referenced invoice)
+	 * @param	string	$vendorLegalId		Legal identifier of the issuing party, empty when the CDAR carries none
+	 * @return	int							Supplier invoice id, 0 when there is no single certain match
+	 */
+	protected function findSupplierInvoiceByVendorReference($vendorReference, $vendorLegalId)
+	{
+		global $db;
+
+		$sql = "SELECT f.rowid, s.siren, s.siret, s.tva_intra";
+		$sql .= " FROM " . $db->prefix() . "facture_fourn as f";
+		$sql .= " INNER JOIN " . $db->prefix() . "societe as s ON s.rowid = f.fk_soc";
+		$sql .= " WHERE f.ref_supplier = '" . $db->escape($vendorReference) . "'";
+
+		$listofentityids = getEntity('facture_fourn');
+		if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE')) {
+			$listofentityids .= ','.getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE');
+		}
+		$sql .= " AND f.entity IN (" . $db->sanitize($listofentityids) . ")";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . " " . $db->lasterror(), LOG_ERR);
+			return 0;
+		}
+
+		$candidates = array();
+		while ($obj = $db->fetch_object($resql)) {
+			$candidates[] = $obj;
+		}
+		$db->free($resql);
+
+		if (count($candidates) == 1) {
+			$candidate = $candidates[0];
+			if ($vendorLegalId === '' || $this->matchesVendorLegalId($vendorLegalId, $candidate->siren, $candidate->siret, $candidate->tva_intra)) {
+				return (int) $candidate->rowid;
+			}
+
+			return 0;
+		}
+		if (empty($candidates) || $vendorLegalId === '') {
+			return 0;
+		}
+
+		// Several invoices carry that number: only the one whose vendor is the issuer of the status.
+		$matches = array();
+		foreach ($candidates as $candidate) {
+			if ($this->matchesVendorLegalId($vendorLegalId, $candidate->siren, $candidate->siret, $candidate->tva_intra)) {
+				$matches[] = (int) $candidate->rowid;
+			}
+		}
+
+		return count($matches) == 1 ? $matches[0] : 0;
+	}
+
+	/**
 	 * Send an electronic invoice.
 	 *
 	 * This function send an invoice to PDP
@@ -1083,7 +1547,7 @@ abstract class AbstractPDPProvider
 	 * @param mixed $object Invoice object (CustomerInvoice or SupplierInvoice)
 	 * @param int $statusCode   Status code to send (see class constants for available codes)
 	 * @param string $reasonCode Reason code to send (optional)
-	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>} $paymentData Cashed amount (TTC) for status 212 (Encaissee), mandatory content of the CDAR (rule BR-FR-CDV-14)
+	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>,reason?:string} $paymentData Amount (TTC) moved for status 212 (Encaissee), negative on a refund, with the reason of the cancellation (rules BR-FR-CDV-14, P1.17)
 	 *
 	 * @return array{res:int, message:string}       Returns array with 'res' (1 on success, -1 on failure) with a 'message'.
 	 */

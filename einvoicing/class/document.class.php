@@ -26,6 +26,9 @@
 
 // Put here all includes required by your class file
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
+// getNomUrl() calls dolPrintHTMLForAttribute(), added to the core in Dolibarr 19: the backport is loaded here
+// because a caller outside this module has no reason to know this class needs it.
+require_once __DIR__ . '/../compat/functions.lib.php';
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 
@@ -138,7 +141,7 @@ class Document extends CommonObject
 		"flow_direction" => array("type" => "varchar(10)", "label" => "flow_direction", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "1", "comment" => "In or Out", 'csslist' => 'center'),
 		"flow_syntax" => array("type" => "varchar(50)", "label" => "flow_syntax", "enabled" => "1", 'position' => 60, 'notnull' => 0, "visible" => "-1", "comment" => "Document syntax (Factur-X, CII, UBL, etc.)"),
 		"flow_profile" => array("type" => "varchar(50)", "label" => "flow_profile", "enabled" => "1", 'position' => 70, 'notnull' => 0, "visible" => "-1", "comment" => "Profile used (Basic, Cius, etc.)"),
-		"processing_rule" => array("type" => "varchar(50)", "label" => "processing_rule", "enabled" => "1", 'position' => 75, 'notnull' => 0, "visible" => "-1", "comment" => "Rule the platform computed for the flow (B2B, B2BInt, NotApplicable, ...)"),
+		"processing_rule" => array("type" => "varchar(50)", "label" => "ProcessingRule", "enabled" => "1", 'position' => 75, 'notnull' => 0, "visible" => "-1", "help" => "ProcessingRuleHelp", "comment" => "Rule the platform computed for the flow (B2B, B2BInt, NotApplicable, ...)"),
 		"document_body" => array("type" => "text", "label" => "document_body", "enabled" => "1", 'position' => 110, 'notnull' => 0, "visible" => "0", "comment" => "Full document content XML"),
 		"fk_element_type" => array("type" => "varchar(100)", "label" => "fk_element_type", "enabled" => "1", 'position' => 120, 'notnull' => 0, "visible" => "1",),
 		"fk_element_id" => array("type" => "integer", "label" => "fk_element_id", "enabled" => "1", 'position' => 130, 'notnull' => 0, "visible" => "-1",),
@@ -324,9 +327,13 @@ class Document extends CommonObject
 		//foreach($this->lines as $line)
 		//	$line->fetch_optionals();
 
-		// Reset some properties
+		// Reset some properties. unset() rather than an empty value is what the core does in its own
+		// createFromClone(): createCommon() below builds the INSERT from the properties that are set.
+		// @phan-suppress-next-line PhanTypeObjectUnsetDeclaredProperty
 		unset($object->id);
+		// @phan-suppress-next-line PhanTypeObjectUnsetDeclaredProperty
 		unset($object->fk_user_creat);
+		// @phan-suppress-next-line PhanTypeObjectUnsetDeclaredProperty
 		unset($object->import_key);
 
 		// Clear fields
@@ -376,7 +383,7 @@ class Document extends CommonObject
 
 		if (!$error) {
 			// copy external contacts if same company
-			if (!empty($object->socid) && ((property_exists($this, 'fk_soc') && ($this->fk_soc == $object->socid)) || (property_exists($this, 'socid') && ($this->socid == $object->socid)))) {	// @phpstan-ignore-line
+			if (!empty($object->socid) && ((property_exists($this, 'fk_soc') && ($this->fk_soc == $object->socid)) || (property_exists($this, 'socid') && ($this->socid == $object->socid)))) {	// @phpstan-ignore-line @phan-suppress-current-line PhanUndeclaredProperty
 				if ($this->copy_linked_contact($object, 'external') < 0) {
 					$error++;
 				}
@@ -941,12 +948,9 @@ class Document extends CommonObject
 
 		$this->db->begin();
 
-		// Define new ref
-		if (preg_match('/^[\(]?PROV/i', $this->ref) || empty($this->ref)) { // empty should not happened, but when it occurs, the test save life
-			$num = $this->getNextNumRef();
-		} else {
-			$num = (string) $this->ref;
-		}
+		// The object has no ref column and the module ships no numbering model: fetchCommon() fills
+		// $this->ref with the row id, and the reference the user sees is tracking_idref.
+		$num = (string) $this->ref;
 		$this->newref = $num;
 
 		if (!empty($num)) {
@@ -1249,6 +1253,75 @@ class Document extends CommonObject
 	}
 
 	/**
+	 * Return a link to the card of the Dolibarr object the flow was exchanged for.
+	 *
+	 * tracking_idref only holds the reference as it was when the flow was exchanged, so an invoice sent while
+	 * still a draft keeps its "(PROV552)" there for good. The link is built from fk_element_type/fk_element_id,
+	 * which follow the object through its renaming, and the stored text is only the fallback label.
+	 *
+	 * @param	int		$withvendorref	1=Add the vendor reference of a supplier invoice on a second line
+	 * @return	string					Link to the object card, or the stored reference when there is no object to link
+	 */
+	public function getElementNomUrl($withvendorref = 0)
+	{
+		$out = dol_escape_htmltag((string) $this->tracking_idref);
+
+		if (empty($this->fk_element_type) || empty($this->fk_element_id)) {
+			return $out;
+		}
+
+		// The core ships install/inc.php, which defines DOL_DOCUMENT_ROOT as '..'; PHPStan
+		// resolves the constant against it and looks for the file next to the module.
+		if ($this->fk_element_type === 'facture') {
+			// @phpstan-ignore requireOnce.fileNotFound
+			require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+			$linkedobject = new Facture($this->db);
+		} elseif ($this->fk_element_type === 'invoice_supplier') {
+			// @phpstan-ignore requireOnce.fileNotFound
+			require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
+			$linkedobject = new FactureFournisseur($this->db);
+		} else {
+			return $out;
+		}
+
+		if ($linkedobject->fetch((int) $this->fk_element_id) <= 0) {
+			return $out;
+		}
+
+		$out = $linkedobject->getNomUrl(1);
+
+		if ($withvendorref && $linkedobject instanceof FactureFournisseur && !empty($linkedobject->ref_supplier)) {
+			$out = '<div class="tdoverflowmax200 inline-block lineheightsmall">'.$out;
+			// The vendor reference is a field of the received document, escaped like the rest of it.
+			$out .= '<br><span class="spantitle small">'.dol_escape_htmltag($linkedobject->ref_supplier).'</span>';
+			$out .= '</div>';
+		}
+
+		return $out;
+	}
+
+	/**
+	 * Return HTML string to show a field into a page, overridden to link the reference of the object to its card
+	 *
+	 * @param	array<string,mixed>	$val			Array of properties of field to show
+	 * @param	string				$key			Key of attribute
+	 * @param	string				$value			Preselected value to show
+	 * @param	string				$moreparam		To add more parameters on html tag
+	 * @param	string				$keysuffix		Prefix string to add into name and id of field
+	 * @param	string				$keyprefix		Suffix string to add into name and id of field
+	 * @param	mixed				$morecss		Value for CSS to use (Old usage: May also be a numeric to define a size)
+	 * @return	string
+	 */
+	public function showOutputField($val, $key, $value, $moreparam = '', $keysuffix = '', $keyprefix = '', $morecss = '')
+	{
+		if ($key === 'tracking_idref') {
+			return $this->getElementNomUrl();
+		}
+
+		return parent::showOutputField($val, $key, $value, $moreparam, $keysuffix, $keyprefix, $morecss);
+	}
+
+	/**
 	 *	Return a thumb for kanban views
 	 *
 	 *	@param	string	    			$option		Where point the link (0=> main card, 1,2 => shipment, 'nolink'=>No link)
@@ -1452,62 +1525,6 @@ class Document extends CommonObject
 	}
 
 	/**
-	 *  Returns the reference to the following non used object depending on the active numbering module.
-	 *
-	 *  @return	string      		Object free reference
-	 */
-	public function getNextNumRef()
-	{
-		global $langs, $conf;
-		$langs->load("einvoicing@einvoicing");
-
-		if (!getDolGlobalString('EINVOICING_MYOBJECT_ADDON')) {
-			$conf->global->EINVOICING_MYOBJECT_ADDON = 'mod_document_standard';
-		}
-
-		if (getDolGlobalString('EINVOICING_MYOBJECT_ADDON')) {
-			$mybool = false;
-
-			$file = getDolGlobalString('EINVOICING_MYOBJECT_ADDON').".php";
-			$classname = getDolGlobalString('EINVOICING_MYOBJECT_ADDON');
-
-			// Include file with class
-			$dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
-			foreach ($dirmodels as $reldir) {
-				$dir = dol_buildpath($reldir."core/modules/einvoicing/");
-
-				// Load file with numbering class (if found)
-				$mybool = $mybool || @include_once $dir.$file;
-			}
-
-			if (!$mybool) {
-				dol_print_error(null, "Failed to include file ".$file);
-				return '';
-			}
-
-			if (class_exists($classname)) {
-				$obj = new $classname();
-				'@phan-var-force ModeleNumRefDocument $obj';
-				$numref = $obj->getNextValue($this);
-
-				if ($numref != '' && $numref != '-1') {
-					return $numref;
-				} else {
-					$this->error = $obj->error;
-					//dol_print_error($this->db,get_class($this)."::getNextNumRef ".$obj->error);
-					return "";
-				}
-			} else {
-				print $langs->trans("Error")." ".$langs->trans("ClassNotFound").' '.$classname;
-				return "";
-			}
-		} else {
-			print $langs->trans("ErrorNumberingModuleNotSetup", $this->element);
-			return "";
-		}
-	}
-
-	/**
 	 *  Create a document onto disk according to template module.
 	 *
 	 *  @param	string		$modele			Force template to use ('' to not force)
@@ -1563,9 +1580,8 @@ class Document extends CommonObject
 
 
 	/**
-	 * Action executed by scheduler
-	 * CAN BE A CRON TASK. In such a case, parameters come from the schedule job setup field 'Parameters'
-	 * Use public function doScheduledJob($param1, $param2, ...) to get parameters
+	 * Action executed by scheduler. This is the only cron job of the module, declared by
+	 * modEInvoicing::$cronjobs. It takes no parameter from the 'Parameters' setup field.
 	 *
 	 * @return	int			0 if OK, <>0 if KO (this function is used also by cron so only 0 is OK)
 	 */
@@ -1583,14 +1599,21 @@ class Document extends CommonObject
 		// a fatal the scheduler reports as a plain failed job.
 		require_once __DIR__ . '/providers/PDPProviderManager.class.php';
 
-		if (getDolGlobalString('EINVOICING_PDP')) {
+		// Generation-only mode: nothing is ever sent or received, so the sync job must not reach the
+		// network even if a real provider is still selected in EINVOICING_PDP.
+		if (getDolGlobalString('EINVOICING_PDP') && !getDolGlobalString('EINVOICING_ONLY_GENERATE')) {
 			$providerManager = new PDPProviderManager($this->db);
 			$provider = $providerManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 		}
 
 		if (isset($provider)) {
-			$syncFromDate = $provider->getLastSyncDate();
-			$maxflows = getDolGlobalInt('EINVOICING_FLOWS_SYNC_CALL_SIZE', 100);
+			// A flow postponed on one run (nothing stored for it) is only re-listed by a later run if the
+			// cursor still reaches back to it - a margin, applied here since the manual sync of
+			// document_list.php can already be re-run with a hand-picked date, the cron cannot. The flows
+			// it re-lists that are already stored are cheaply discarded by the alreadyProcessedFlowIds
+			// pre-check in syncFlows(), which queries only the flowIds of the current listing.
+			$syncFromDate = $provider->getLastSyncDate(getDolGlobalInt('EINVOICING_SYNC_MARGIN_TIME_HOURS'));
+			$maxflows = getDolGlobalInt('EINVOICING_FLOWS_SYNC_CRON_SIZE', 100);
 
 			// Sync all flows
 			$sync_result = $provider->syncFlows($syncFromDate, $maxflows);
@@ -1601,21 +1624,42 @@ class Document extends CommonObject
 
 			if ($sync_result['res'] <= 0) {
 				$error++;
-				$errortype = 'errors';
+				// The scheduler builds what it shows from $this->error and $this->errors, never from
+				// $this->output. Leaving both empty is what turns a precise cause into the bare
+				// "Unknown error" the job card ends up displaying.
 				if (!empty($sync_result['actions'])) {
-					$errortype = 'warnings';
-					$this->output .= '<br>' . $langs->trans("EINVOICING_JOB_MANUAL_ACTION_REQUIRED") . '<br>';
+					// A business error already carries a message written for a human, and the technical
+					// line with it, inside the tooltip its picto opens on the card. Handing the transcript
+					// to the scheduler as well would print that same line a second time and in clear,
+					// under the very action the operator is being asked to carry out. What is missing here
+					// is a cause, not a copy of one: give the sentence that closes the list, and stop
+					// writing it above them.
+					$this->output .= '<br>';
 					foreach ($sync_result['actions'] as $action) {
 						$this->output .= "---<br>";
 						$this->output .= $action['businessmessage'] . '<br>';
 					}
-					$this->output = rtrim($this->output, '<br>');
+					// Not rtrim($output, '<br>'): rtrim strips characters, not a string, so it eats into
+					// the closing tags of the business message and leaves broken markup behind.
+					$this->output = preg_replace('/<br>$/', '', $this->output);
+					$this->error = $langs->trans("EINVOICING_JOB_MANUAL_ACTION_REQUIRED");
+				} else {
+					// Everything else has no message written for a human, so the transcript is what the
+					// operator gets. A third-party provider may only fill the older 'details' key, so fall
+					// back on it rather than on nothing.
+					$this->errors = $sync_result['errors'] ?? ($sync_result['details'] ?? array());
+
+					// The early returns of syncFlows() - the access point answering something other than
+					// 200, the lookup of the already-processed flows failing - put their one message in
+					// both keys. The scheduler prints output and then the cause, so leaving it in both
+					// shows it twice.
+					$this->output = implode('<br>', array_diff($sync_result['messages'] ?? array(), $this->errors));
 				}
-				//$this->output = $langs->trans("FailedToSyncADocument").($errortype ? '<br>'.$langs->trans("FailedToSyncADocumentMore") : '');
 			}
 		} else {
 			$error++;
-			$this->output = $langs->trans("NoPDPProviderConfigured");
+			// Set on error only, not on output: the scheduler concatenates the two and would show it twice.
+			$this->error = $langs->trans("NoPDPProviderConfigured");
 		}
 
 		$this->output = trim($this->output);
@@ -1642,6 +1686,11 @@ class Document extends CommonObject
 	/**
 	 * Clean XML data by removing or replacing specific contents like :
 	 * - attachments
+	 *
+	 * Not optional: this column is a MEDIUMTEXT capped at 16 Mo by checkXmlDataMaxSize(), and one
+	 * embedded PDF is enough to pass it - a document too big is then not stored at all.
+	 * EINVOICING_SPLIT_XML_WITH_EMBEDDED_PDF_IN_TWO_FILES only concerns the file kept on disk beside
+	 * the supplier invoice, which is otherwise the document the access point returned, byte for byte.
 	 *
 	 * @param ?string $xmlData The XML data to clean
 	 * @return ?string The cleaned XML data

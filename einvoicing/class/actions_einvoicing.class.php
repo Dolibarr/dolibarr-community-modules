@@ -111,20 +111,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT	// Never generate/transmit an e-invoice for a DRAFT (note: at validation the invoice has already status VALIDATED when Dolibarr regenerates the final PDF, so the legitimate flow is preserved).
 						&& !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')
 						&& getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
-						// Call function to create Factur-X document
-						require_once __DIR__ . '/protocols/ProtocolManager.class.php';
-
-						$usedProtocols = getDolGlobalString('EINVOICING_PROTOCOL');
-						$ProtocolManager = new ProtocolManager($db);
-						$protocol = $ProtocolManager->getProtocol($usedProtocols);
-
 						$messagecss = '';
 						$message = '';
+
 						// Check configuration
 						$result = $einvoicing->checkRequiredinformations($invoiceObject);
 						if ($result['res'] < 0) {			// Error case
 							$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
-
 							dol_syslog(__METHOD__ . " " . $message);
 
 							if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
@@ -148,6 +141,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 							//setEventMessages($message, array(), $messagecss);
 						}
 
+						require_once __DIR__ . '/protocols/ProtocolManager.class.php';
+
 						// Recipient directory reachability (opt-in): a recipient that is not routable does not make
 						// the e-invoice document invalid, only undeliverable, so keep generating it and only warn.
 						// The actual transmission is what gets blocked, by the send_to_pdp gate below.
@@ -162,24 +157,34 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 							$this->warnings[] = $warnmsg;
 						}
 
+
+						// Generate the einvoice
+						$usedProtocols = getDolGlobalString('EINVOICING_PROTOCOL');
+						$ProtocolManager = new ProtocolManager($db);
+						$protocol = $ProtocolManager->getProtocol($usedProtocols);
+
 						$result = $protocol->generateInvoice($invoiceObject, $outputlangs, $pdfPath);		// Generate E-invoice (embed into the real generated file)
 
 						if ($result >= 0) {
-							setEventMessages($message, array(), $messagecss);
+							if (!defined('NOLOGIN')) {	// If in backoffice context
+								setEventMessages($message, array(), $messagecss);
+							}
 						}
 
 						if ($result && (!is_numeric($result) || $result > 0)) {
-							// No error
-							setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+							if (!defined('NOLOGIN')) {	// If in backoffice context
+								// No error
+								setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
 
-							// Forward non-blocking size warning from the protocol if any
-							if (!empty($protocol->warnings)) {
-								setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $protocol->warnings, 'warnings');
+								// Forward non-blocking size warning from the protocol if any
+								if (!empty($protocol->warnings)) {
+									setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $protocol->warnings, 'warnings');
+								}
 							}
 
 							// If the precheck is set to auto, we call the precheck function.
 							$precheckresult = 0; // 0 = skipped , 1 = success, -1 = failed
-							if (getDolGlobalString('EINVOICING_PDP') && getDolGlobalString('EINVOICING_AP_PRECHECK') === 'auto') {
+							if (getDolGlobalString('EINVOICING_PDP') && getDolGlobalString('EINVOICING_AP_PRECHECK') === 'auto' && !einvoicingIsSendDisabled()) {
 								$PDPManager = new PDPProviderManager($db);
 								$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 								$precheckAvailable = $provider->hasValidator();
@@ -202,7 +207,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 							// Restricted to the generation following a validation: the other PDF rebuilds (payment,
 							// Generate button, mass/cron) must not deposit the invoice at the PA. The flow_id lock is
 							// the reliable guard, as generateInvoice() just reset the syncstatus to GENERATED above.
-							if (getDolGlobalString('EINVOICING_AUTO_SEND_ON_GENERATION') && EInvoicing::isInvoiceValidatedInThisRequest($invoiceObject->id)
+							if (getDolGlobalString('EINVOICING_AUTO_SEND_ON_GENERATION') && !einvoicingIsSendDisabled() && EInvoicing::isInvoiceValidatedInThisRequest($invoiceObject->id)
 								&& empty($currentStatusDetails['transmitted'])
 								&& !$einvoicing->isTransmittedLockActive($invoiceObject->id, $invoiceObject->ref) && $precheckresult >= 0) {
 								dol_syslog("actions_einvoicing: Invoice seems not yet transmitted and EINVOICING_AUTO_SEND_ON_GENERATION is on, so we try to send it");
@@ -227,22 +232,34 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 								}
 							}
 						} else {
+							// What the hook hands back reaches the user only sometimes: up to Dolibarr 22
+							// pdf_sponge copies ->error/->errors and then answers "no error", so the core
+							// reports a success; and $object->warnings is displayed by the "Generate document"
+							// button alone, from 24, never on the validation path. So say it here, except
+							// where the core prints it on its own already: ->errors, from 23 up.
+							if ((float) DOL_VERSION < 23 || !getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+								$failcss = getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS') ? 'errors' : 'warnings';
+								setEventMessages($langs->trans("EInvoiceNotGenerated"), $protocol->errors, $failcss);
+							}
+
 							if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
 								// If einvoice fails here, it must be always an error
 								$this->errors = array_merge($this->errors, $protocol->errors);
 								return -1;
 							} else {
 								if ($result < 0) {
-									// A hook can only report a warning where the core carries one back. That chain -
-									// HookManager collecting $actionclassinstance->warnings, the document generator
-									// copying $hookmanager->warnings, and commonGenerateDocument() copying $obj->warnings
-									// onto the object - appears whole in Dolibarr 23 and is absent in 22. Below it the
-									// warning would be reported nowhere, so the failure is raised as an error instead.
-									if ((float) DOL_VERSION < 23) {
-										$this->errors = array_merge($this->errors, $protocol->errors);
+									// Whether the user is told at all is decided by the core: up to 22 pdf_sponge answers
+									// "no error" whatever the hook returned, and $object->warnings is displayed in one
+									// place only, core/actions_builddoc.inc.php, which has it from 24. So up to 23 the
+									// failure is raised as an error - the only channel that reaches the screen there -
+									// with the warnings collected above merged in, so that none of them is dropped.
+									if ((float) DOL_VERSION < 24) {
+										$this->errors = array_merge($this->errors, $this->warnings, $protocol->errors);
 										$this->warnings = array();
 									} else {
-										$this->warnings = array_merge($this->errors, $protocol->errors);	// We want to return the error as a warning.
+										// Append to the warnings already collected above (configuration, routability, auto-send),
+										// which starting the merge from $this->errors used to drop.
+										$this->warnings = array_merge($this->warnings, $protocol->errors);	// We want to return the error as a warning.
 									}
 									return -1;
 								} else {
@@ -301,7 +318,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		$forcedisabling = '';
 		// Add buttons in invoice card (we test context invoicescard but also main for old versions of module)
-		if (in_array($object->element, ['facture']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') && preg_match('/invoicecard|main/', $parameters['currentcontext'] ?? '')) {
+		if (in_array($object->element, ['facture']) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || getDolGlobalString('EINVOICING_ONLY_GENERATE')) && preg_match('/invoicecard|main/', $parameters['currentcontext'] ?? '')) {
 			// Get current status of e-invoice
 			$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($object->id, $object->ref);
 
@@ -364,7 +381,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				);
 
 				// If the e-invoice is generated, display the button to precheck the e-invoice with the Access Point validation service if available.
-				if (getDolGlobalString('EINVOICING_PDP') && getDolGlobalString('EINVOICING_AP_PRECHECK') === 'manuel') {
+				if (getDolGlobalString('EINVOICING_PDP') && getDolGlobalString('EINVOICING_AP_PRECHECK') === 'manuel' && !einvoicingIsSendDisabled()) {
 					$PDPManager = new PDPProviderManager($db);
 					$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 					$precheckAvailable = $provider->hasValidator();
@@ -379,20 +396,24 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					}
 				}
 
-				// If the e-invoice is generated but not sent, or if it was sent and a validation error was received,
-				// display the button to regenerate the e-invoice
-				// Re-send is offered for not-yet-transmitted states, plus AWAITING_* as a deliberate retry
-				// affordance. Once REALLY transmitted (persistent flow_id), it is locked by default unless
-				// EINVOICING_ALLOW_RESEND_TRANSMITTED is set ($locked already accounts for that opt-out).
-				if (!$locked && in_array($currentStatusDetails['code'], [
+				// If the e-invoice is generated but not sent, or if it was sent and a validation error was
+				// received, display the button to (re)send the e-invoice.
+				// Re-send is offered for not-yet-transmitted states, plus AWAITING_*/REJECTED as a deliberate
+				// retry/correction affordance. Once REALLY transmitted (persistent flow_id) it is locked, and the
+				// only opt-out is the option EINVOICING_ALLOW_RESEND_TRANSMITTED. That option is read in a single
+				// place, EInvoicing::isTransmittedLockActive() (assigned to $locked above: it returns false as
+				// soon as EINVOICING_ALLOW_RESEND_TRANSMITTED is set), which the server-side send_to_pdp gate
+				// uses too, so the button visibility here and the real enforcement can never drift apart.
+				if (!$locked && !einvoicingIsSendDisabled() && in_array($currentStatusDetails['code'], [
 					$einvoicing::STATUS_GENERATED,
 					$einvoicing::STATUS_ERROR,
 					$einvoicing::STATUS_UNKNOWN,
 					$einvoicing::STATUS_AWAITING_VALIDATION,		// retry affordance (PA will refuse a duplicate)
-					$einvoicing::STATUS_AWAITING_ACK				// retry affordance (PA will refuse a duplicate)
+					$einvoicing::STATUS_AWAITING_ACK,				// retry affordance (PA will refuse a duplicate)
+					$einvoicing::STATUS_REJECTED					// resend after correcting a rejected e-invoice (gated by EINVOICING_ALLOW_RESEND_TRANSMITTED)
 				])) {
 					$resend = false;
-					if (in_array($currentStatusDetails['code'], [$einvoicing::STATUS_AWAITING_VALIDATION, $einvoicing::STATUS_AWAITING_ACK])) {
+					if (in_array($currentStatusDetails['code'], [$einvoicing::STATUS_AWAITING_VALIDATION, $einvoicing::STATUS_AWAITING_ACK, $einvoicing::STATUS_REJECTED])) {
 						$resend = true;
 					}
 					$url_button[] = array(
@@ -441,7 +462,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 
 		// Add buttons in supplier invoice card (we test context invoicesuppliercard but also main for old versions of module)
-		if (in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') && preg_match('/invoicesuppliercard|main/', $parameters['currentcontext'] ?? '')) {
+		if (in_array($object->element, ['invoice_supplier']) && !einvoicingReceptionDisabled() && preg_match('/invoicesuppliercard|main/', $parameters['currentcontext'] ?? '')) {
 			$url_button = array();
 
 			// Check if this invoice is present into einvoicing_extlinks table to know if it is an imported invoice from PDP or not
@@ -504,7 +525,6 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			// a wrong vendor is noticed, and the vendor of an existing supplier invoice cannot be changed.
 			// The action itself lives on the flow card, which is also where a flow whose draft has already
 			// been deleted is picked up again.
-			// TODO Move this in the section of the "Join files".
 			if (!empty($object->id) && $user->hasRight('einvoicing', 'write')) {
 				$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_document";
 				$sql .= " WHERE fk_element_type = 'invoice_supplier'";
@@ -516,13 +536,30 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 				$resql = $db->query($sql);
 				if ($resql && ($objdoc = $db->fetch_object($resql))) {
-					$reimporturl = dol_buildpath('/einvoicing/document_card.php', 1) . '?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken();
-					if ((int) $object->status === FactureFournisseur::STATUS_DRAFT) {
-						print '<a class="butAction" href="' . $reimporturl . '">' . $langs->trans('EInvoiceReimport') . '</a>';
-					} else {
-						print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('EInvoiceReimportOnlyOnADraft')) . '">'
-							. $langs->trans('EInvoiceReimport') . '</span>';
+					// The separator line between the lifecycle statuses and the reimport entry: the core dropdown has no divider of its own, so the line travels as the label
+					// of a disabled entry (no translation exists for '<hr>', so trans() returns it as is, and it is rendered as the HTML it is). The tooltip of a disabled
+					// entry is silenced on Dolibarr 22+ only (the 'attr' key, ignored by older cores); the polyfill of einvoicing.lib.php prints the line itself below 18.
+					if (!empty($url_button)) {
+						$dividerentry = array('divider' => 1, 'enabled' => true, 'perm' => 0, 'label' => '-----', 'labelhtml' => '<span class="opacitymedium">-----</span>', 'url' => '#');
+						$dividerentry['attr'] = array('title' => '');
+						$url_button[] = $dividerentry;
 					}
+
+					// The reimport itself, last entry of the list, grayed on the same rule as the flow card shows the button with: only a draft can be imported again
+					// (Document::reimport() refuses anything else). The reason travels as the entry tooltip, which the dropdown of the core cannot hold before
+					// Dolibarr 22 - there it says "not enough permissions" instead.
+					$reimportofadraft = ((int) $object->status === FactureFournisseur::STATUS_DRAFT);
+					$reimportentry = array(
+						'lang' => 'einvoicing',
+						'enabled' => true,
+						'perm' => ($reimportofadraft ? 1 : 0),
+						'label' => 'EInvoiceReimport',
+						'url' => dol_buildpath('/einvoicing/document_card.php', 1).'?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken()
+					);
+					if (!$reimportofadraft) {
+						$reimportentry['attr'] = array('title' => $langs->trans('EInvoiceReimportOnlyOnADraft'));
+					}
+					$url_button[] = $reimportentry;
 				}
 				if ($resql) {
 					$db->free($resql);
@@ -569,6 +606,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	{
 		global $db, $langs, $user, $conf;
 
+		// Before anything else, and before the early return below: a list of the core builds its
+		// $arrayfields before it knows any action, and the versions that offer no 'completeArrayFields'
+		// hook pass the array by reference here instead. See addFieldsToList().
+		if (isset($parameters['arrayfields'])) {
+			self::addFieldsToList($parameters['arrayfields'], $parameters['context']);
+		}
+
 		if (empty($action)) {
 			return 0;
 		}
@@ -591,8 +635,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		$currentStatusDetails = null;
 
 		$isFactureContext = isset($object->element) && in_array($object->element, ['facture']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP');
-		$isSupplierInvoiceContext = isset($object->element) && in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI');
-		$isThirdpartyContext = array_intersect(['thirdpartycard', 'thirdpartycomm'], $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'));
+		$isSupplierInvoiceContext = isset($object->element) && in_array($object->element, ['invoice_supplier']) && !einvoicingReceptionDisabled();
+		$isThirdpartyContext = array_intersect(['thirdpartycard', 'thirdpartycomm'], $contexts)
+			&& (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') || getDolGlobalString('EINVOICING_ONLY_GENERATE'));
 
 		if (!$isFactureContext && !$isSupplierInvoiceContext && !$isThirdpartyContext) {
 			// Nothing relevant to this hook call for the current object/context: skip the transaction entirely.
@@ -601,6 +646,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		if ($isFactureContext) {
 			'@phan-var-force Facture $object';
+			/** @var Facture $object */
 			$permissiontoedit = $user->hasRight('facture', 'write');
 
 			$db->begin();
@@ -655,13 +701,14 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 			// Action to send invoice to Access Point
 			if (
-				$action == 'send_to_pdp' && $permissiontoedit
+				$action == 'send_to_pdp' && $permissiontoedit && !einvoicingIsSendDisabled()
 				&& is_array($currentStatusDetails)
 				&& $currentStatusDetails['file'] == 1
 				&& in_array($currentStatusDetails['code'], [
 					$einvoicing::STATUS_GENERATED,
 					$einvoicing::STATUS_ERROR,
-					$einvoicing::STATUS_UNKNOWN
+					$einvoicing::STATUS_UNKNOWN,
+					$einvoicing::STATUS_REJECTED			// resend a corrected rejected e-invoice (gated by EINVOICING_ALLOW_RESEND_TRANSMITTED)
 				])
 			) {
 				// Same gates and same transmission as the mass action of the invoice list
@@ -706,10 +753,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $object->id);
 
 					$this->warnings = array_merge($this->warnings, $genresult['warnings']);
-					if (!empty($this->warnings)) {
-						setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');
-					} else {
-						setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+					if (!defined('NOLOGIN')) {	// If in backoffice context
+						if (!empty($this->warnings)) {
+							setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');
+						} else {
+							setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+						}
 					}
 
 					if ($genresult['precheck'] === 1) {
@@ -727,7 +776,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 			// Action to precheck the E-invoice with the Access Point validation service (only if not already sent)
 			if (
-				$action == 'precheck_einvoice' && $permissiontoedit
+				$action == 'precheck_einvoice' && $permissiontoedit && !einvoicingIsSendDisabled()
 				&& is_array($currentStatusDetails)
 				&& $currentStatusDetails['file'] == 1
 			) {
@@ -754,6 +803,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 
 		if ($isSupplierInvoiceContext) {
+			'@phan-var-force FactureFournisseur $object';
 			$permissiontoedit = $user->hasRight('fournisseur', 'facture', 'creer');
 			// Who may validate a supplier invoice is decided by the core, in fourn/facture/card.php
 			// ($usercanvalidate): the "create" right is enough, unless advanced permissions are on, where
@@ -969,7 +1019,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 				// Default product for import
 				$routingProductId = GETPOST('routing_product_id', 'aZ09');
-				if ($routingProductId !== '' && $routingProductId !== '-1') {
+				if ($routingProductId !== '' && $routingProductId !== '-1' && !einvoicingReceptionDisabled()) {
 					$existing = $einvoicing->fetchDefaultRouting($socId, 'product');
 					if (empty($existing)) {
 						$result = $einvoicing->addRouting($socId, $routingProductId, '', 'product');
@@ -1051,8 +1101,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		$langs->load("einvoicing@einvoicing");
 
+		$massactions = array('einvoicing_generate' => "EInvoiceMassGenerate");
+		if (!einvoicingIsSendDisabled()) {
+			$massactions['einvoicing_send_to_pdp'] = "EInvoiceMassSendToPDP";
+		}
+
 		$out = '';
-		foreach (array('einvoicing_generate' => "EInvoiceMassGenerate", 'einvoicing_send_to_pdp' => "EInvoiceMassSendToPDP") as $code => $key) {
+		foreach ($massactions as $code => $key) {
 			$label = $langs->trans($key);
 			$out .= '<option value="'.$code.'" data-html="'.dol_escape_htmltag($label).'">'.$label.'</option>';
 		}
@@ -1084,6 +1139,10 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 		if (!$this->isMassSendAvailable($parameters)) {
 			return 0;
+		}
+		if ($massaction == 'einvoicing_send_to_pdp' && einvoicingIsSendDisabled()) {
+			$this->errors[] = $langs->trans("CheckPdpConfiguration");
+			return -1;
 		}
 
 		$langs->load("einvoicing@einvoicing");
@@ -1137,8 +1196,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 			if ($result['res'] > 0) {
 				$done++;
-				$lines[] = $invoice->ref . ' : ' . $okline
-					. (empty($result['warnings']) ? '' : ' - ' . implode(' - ', $result['warnings']));
+				$lines[] = $invoice->ref . ' : ' . $okline . (empty($result['warnings']) ? '' : ' - ' . implode(' - ', $result['warnings']));
 			} elseif ($result['res'] == 0) {
 				$skipped++;
 				$lines[] = $invoice->ref . ' : ' . $result['reason'];
@@ -1216,7 +1274,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		$out['warnings'] = array_merge($out['warnings'], (array) $protocol->warnings);
 
 		// Precheck the e-invoice with the validation service of the Access Point when the setup asks for it
-		if (getDolGlobalString('EINVOICING_PDP') && getDolGlobalString('EINVOICING_AP_PRECHECK') === 'auto') {
+		if (getDolGlobalString('EINVOICING_PDP') && getDolGlobalString('EINVOICING_AP_PRECHECK') === 'auto' && !einvoicingIsSendDisabled()) {
 			require_once __DIR__ . '/providers/PDPProviderManager.class.php';
 			$PDPManager = new PDPProviderManager($db);
 			$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
@@ -1332,7 +1390,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array			$parameters		Array of parameters
 	 * @param CommonObject	$object			Object
 	 * @param string		$action			Action code
-	 * @param Hookmanager	$hookmanager	Hook manager
+	 * @param HookManager	$hookmanager	Hook manager
 	 * @return int
 	 */
 	public function formConfirm($parameters, $object, &$action, $hookmanager)
@@ -1351,7 +1409,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 		$langs->load("einvoicing@einvoicing");
 
-		if (in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+		if (in_array($object->element, ['invoice_supplier']) && !einvoicingReceptionDisabled()) {
 			// Clone confirmation
 			if ($action == 'sendStatusMessage') {
 				$form = new Form($db);
@@ -1448,7 +1506,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function formObjectOptions($parameters, $object, &$action, $hookmanager)
@@ -1465,27 +1523,34 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		$langs->load("einvoicing@einvoicing");
 
 		if (empty($parameters['tpl_context'])) {	// Do not show the new fields when we are in the public form to register a thirdparty.
-			// Add block in invoice card
-			if (in_array($object->element, ['facture']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+			// Add block in invoice card. Kept open under EINVOICING_ONLY_GENERATE: this block also carries the
+			// generation status/history, not only the send-related parts (those are gated individually inside it).
+			if (in_array($object->element, ['facture']) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
 				'@phan-var-force Facture $object';
+				/** @var Facture $object */
 				$this->resprints .= $einvoicing->EInvoiceCardBlock($object, $action, $parameters);		// Output fields in card, including js for refreshing state
 			}
 
-			// Add block in supplier invoice card
-			if (in_array($object->element, ['invoice_supplier']) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+			// Add block in supplier invoice card (reception only)
+			if (in_array($object->element, ['invoice_supplier']) && !einvoicingReceptionDisabled()) {
 				'@phan-var-force FactureFournisseur $object';
+				/** @var FactureFournisseur $object */
 				$this->resprints .= $einvoicing->supplierInvoiceCardBlock($object, $action, $parameters);		// Output fields in card, including js for refreshing state
 			}
 
-			// Add block in product/service card
-			if (in_array($object->element, ['product']) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
+			// Add block in product/service card  (reception only)
+			if (in_array($object->element, ['product']) && !einvoicingReceptionDisabled()) {
 				'@phan-var-force Product $object';
+				/** @var Product $object */
 				$this->resprints .= $einvoicing->productServiceCardBlock($object, $action, $parameters);		// Output fields in card, including js for refreshing state
 			}
 
-			// Add block in thirdparty card
-			if (in_array($object->element, ['societe']) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
+			// Add block in thirdparty card. Kept open under EINVOICING_ONLY_GENERATE: the Routing ID part
+			// stays settable (it only feeds the generated document); the reception-only "default product for
+			// import" part is gated individually inside thirdpartyCardBlock().
+			if (in_array($object->element, ['societe']) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
 				'@phan-var-force Societe $object';
+				/** @var Societe $object */
 				$this->resprints .= $einvoicing->thirdpartyCardBlock($object, $action, $parameters);		// Output fields in card
 			}
 		}
@@ -1500,21 +1565,44 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function completeArrayFields($parameters, $object, &$action, $hookmanager)
 	{
-		if (in_array('invoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		if (isset($parameters['arrayfields'])) {
+			self::addFieldsToList($parameters['arrayfields'], $parameters['context']);
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Declare the columns of the module in the list of fields a list of the core offers to display.
+	 *
+	 * Called from two hooks on purpose: the core runs 'completeArrayFields' only from Dolibarr 22 on
+	 * the customer invoice list and 23 on the two others, while 'doActions' gets the same array by
+	 * reference from 18, 19 and 20. Without both, the checkboxes of the module do not exist at all on
+	 * the older cores. Writing the same keys twice, where both hooks run, changes nothing.
+	 *
+	 * @param 	array<string,mixed>	$arrayfields	Fields of the list, as the core passes them by reference
+	 * @param 	string				$context		Value of $parameters['context'] as the hook manager builds it
+	 * @return 	void
+	 */
+	protected static function addFieldsToList(&$arrayfields, $context)
+	{
+		$contexts = explode(':', $context);
+
+		if (in_array('invoicelist', $contexts, true) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
 			// Add fields to invoice list
-			$parameters['arrayfields']['einvoicegenerated'] = array(
+			$arrayfields['einvoicegenerated'] = array(
 				'label' => 'EInvoiceFile',
 				'checked' => -1,
 				'position' => 900,
 				'enabled' => 1,
 				'perms' => '1'
 			);
-			$parameters['arrayfields']['pdp_syncstatus'] = array(
+			$arrayfields['pdp_syncstatus'] = array(
 				'label' => 'PDPSyncStatus',
 				'checked' => 1,
 				'position' => 901,
@@ -1523,26 +1611,29 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			);
 		}
 
-		if (in_array('thirdpartylist', explode(':', $parameters['context'])) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
-			// Add fields to invoice list
-			$parameters['arrayfields']['routing_id'] = array(
-				'label' => 'RoutingIdField',
-				'help' => 'SpecificRoutingFieldHelp',
-				'checked' => -1,
-				'position' => 900,
-				'enabled' => 1,
-				'perms' => '1'
-			);
-			$parameters['arrayfields']['routing_product_id'] = array(
-				'label' => 'DefaultProductEBilling',
-				'checked' => -1,
-				'position' => 901,
-				'enabled' => '1',
-				'perms' => '1'
-			);
+		if (in_array('thirdpartylist', $contexts, true)) {
+			// Routing ID column: kept even under EINVOICING_ONLY_GENERATE, like the field on the thirdparty card.
+			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') || getDolGlobalString('EINVOICING_ONLY_GENERATE')) {
+				$arrayfields['routing_id'] = array(
+					'label' => 'RoutingIdField',
+					'help' => 'SpecificRoutingFieldHelp',
+					'checked' => -1,
+					'position' => 900,
+					'enabled' => 1,
+					'perms' => '1'
+				);
+			}
+			// Default product for import: reception only.
+			if (!einvoicingReceptionDisabled()) {
+				$arrayfields['routing_product_id'] = array(
+					'label' => 'DefaultProductEBilling',
+					'checked' => -1,
+					'position' => 901,
+					'enabled' => '1',
+					'perms' => '1'
+				);
+			}
 		}
-
-		return 0;
 	}
 
 
@@ -1564,12 +1655,28 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	}
 
 	/**
+	 * Build the sub query returning the recipients the last lifecycle status of a customer invoice was
+	 * addressed to. Same source as EInvoicing::fetchLastknownInvoiceStatus(), which the card reads, so
+	 * a rejection is named the same way in the list and on the card (issue #973).
+	 *
+	 * @return string								SQL sub query (without the surrounding parenthesis), correlated on f.rowid
+	 */
+	protected static function getCustomerLifecycleRolesSubQuery()
+	{
+		$sql = 'SELECT lc.lc_recipient_roles FROM ' . MAIN_DB_PREFIX . 'einvoicing_lifecycle_msg as lc';
+		$sql .= " WHERE lc.element_type = 'facture' AND lc.element_id = f.rowid";
+		$sql .= ' ORDER BY lc.rowid DESC LIMIT 1';
+
+		return $sql;
+	}
+
+	/**
 	 * Add SELECT fields
 	 *
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function printFieldListSelect($parameters, $object, &$action, $hookmanager)
@@ -1578,6 +1685,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		if (in_array('invoicelist', explode(':', $parameters['context']))) {
 			$this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
 			$this->resprints .= ', ext.syncstatus AS pdp_syncstatus';
+			$this->resprints .= ', (' . self::getCustomerLifecycleRolesSubQuery() . ') AS pdp_lcrecipients';
 		}
 
 		// Supplier invoice list, Product list, Soc list
@@ -1642,7 +1750,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function printFieldListFrom($parameters, $object, &$action, $hookmanager)
@@ -1684,7 +1792,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function printFieldListWhere($parameters, $object, &$action, $hookmanager)
@@ -1710,13 +1818,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			$this->resprints .= " AND subrt.routing_id = '" . $db->escape(GETPOST('search_routing_id', 'alpha')) . "')";
 		}
 
-		if (in_array('invoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		if (in_array('invoicelist', $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
 			if (GETPOST('search_pdp_syncstatus', 'alpha') !== '' && GETPOST('search_pdp_syncstatus', 'alpha') != -2) {
 				$this->resprints .= ' AND ext.syncstatus = ' . ((int) GETPOST('search_pdp_syncstatus'));
 			}
 		}
 
-		if (in_array('supplierinvoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') && GETPOST('search_pdp_lcstatus', 'alpha') !== '' && GETPOST('search_pdp_lcstatus', 'alpha') != -2) {
+		if (in_array('supplierinvoicelist', $contexts) && !einvoicingReceptionDisabled() && GETPOST('search_pdp_lcstatus', 'alpha') !== '' && GETPOST('search_pdp_lcstatus', 'alpha') != -2) {
 			$this->resprints .= ' AND (' . self::getSupplierLifecycleStatusSubQuery() . ') = ' . GETPOSTINT('search_pdp_lcstatus');
 		}
 
@@ -1745,7 +1853,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function printFieldListGroupBy($parameters, $object, &$action, $hookmanager)
@@ -1763,14 +1871,14 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function printFieldListOption($parameters, $object, &$action, $hookmanager)
 	{
 		global $form, $db;
 
-		if (in_array('invoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		if (in_array('invoicelist', explode(':', $parameters['context'])) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
 			$einvoicing = new EInvoicing($db);
 			$checkConfig = $einvoicing->checkModulePrerequisites();
 			if ($checkConfig < 0) {
@@ -1835,7 +1943,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 		// Supplier invoice list, Product list, Soc list
-		if (in_array('supplierinvoicelist', explode(':', $parameters['context'])) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+		if (in_array('supplierinvoicelist', explode(':', $parameters['context'])) && !einvoicingReceptionDisabled()) {
 			$tmpeinvoicingpartner = preg_replace('/ViaPartner/i', '', getDolGlobalString('EINVOICING_PDP'));
 			$listofoptions = array(
 				$tmpeinvoicingpartner => $tmpeinvoicingpartner,
@@ -1880,8 +1988,10 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 
-		if (in_array('thirdpartylist', explode(':', $parameters['context'])) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
-			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+		if (in_array('thirdpartylist', explode(':', $parameters['context'])) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
+			// 'routing_id' is the field addFieldsToList() declares for that list; 'einvoicegenerated' is the
+			// one of the invoice list, so the column of the thirdparty list never followed its own checkbox
+			if (!empty($parameters['arrayfields']['routing_id']['checked'])) {
 				print '<td class="liste_titre">';
 				print '<input type="text" name="search_routing_id" value="' . dolPrintHTMLForAttribute(GETPOST('search_routing_id', 'alpha')) . '" class="minwidth50 maxwidth100">';
 				print '</td>';
@@ -1903,7 +2013,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function printFieldListTitle($parameters, $object, &$action, $hookmanager)
@@ -1912,7 +2022,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		$contexts = explode(':', $parameters['context']);
 
-		if (in_array('invoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		if (in_array('invoicelist', $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
 			$einvoicing = new EInvoicing($db);
 			$checkConfig = $einvoicing->checkModulePrerequisites();
 			if ($checkConfig < 0) {
@@ -1934,13 +2044,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 		// Supplier invoice list, Product list, Soc list
-		if (in_array('supplierinvoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+		if (in_array('supplierinvoicelist', $contexts) && !einvoicingReceptionDisabled()) {
 			print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingSourceTitle'));
 			print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingInvoiceStatus'), '', '', '', $parameters['param'] ?? '', '', '', '', 'center ');
 		}
 
-		if (in_array('thirdpartylist', $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'))) {
-			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+		if (in_array('thirdpartylist', $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
+			if (!empty($parameters['arrayfields']['routing_id']['checked'])) {
 				print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingThirdPartyRoutingTitle'));
 			}
 		}
@@ -1960,7 +2070,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function printFieldListValue($parameters, $object, &$action, $hookmanager)
@@ -1979,7 +2089,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			$parameters['totalarray']['nbfield'] = 0;
 		}
 
-		if (in_array('invoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		if (in_array('invoicelist', $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
 			$einvoicing = new EInvoicing($db);
 			$checkConfig = $einvoicing->checkModulePrerequisites();
 			if ($checkConfig < 0) {
@@ -2014,7 +2124,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 			// E-invoice sync status
 			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
-				$currentStatusDetails = $obj->pdp_syncstatus ? $einvoicing->getStatusLabel($obj->pdp_syncstatus) : '';
+				$currentStatusDetails = $obj->pdp_syncstatus ? $einvoicing->getStatusLabel($obj->pdp_syncstatus, 'facture', $obj->pdp_lcrecipients ?? '') : '';
 				print '<td class="center tdoverflowmax100" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
 				print $currentStatusDetails;
 				print '</td>';
@@ -2025,7 +2135,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 		// Supplier invoice list, Product list, Soc list
-		if (in_array('supplierinvoicelist', $contexts) && !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI')) {
+		if (in_array('supplierinvoicelist', $contexts) && !einvoicingReceptionDisabled()) {
 			$obj = $parameters['obj'];
 
 			print '<td class="tdoverflowmax100">';
@@ -2039,7 +2149,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 			// E-invoice status of the supplier invoice into the Access Point system
 			$einvoicing = new EInvoicing($db);
-			$currentStatusDetails = $obj->pdp_lcstatus ? $einvoicing->getStatusLabel((int) $obj->pdp_lcstatus) : '-';
+			$currentStatusDetails = $obj->pdp_lcstatus ? $einvoicing->getStatusLabel((int) $obj->pdp_lcstatus, 'invoice_supplier') : '-';
 			print '<td class="center tdoverflowmax100" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
 			print $currentStatusDetails;
 			print '</td>';
@@ -2049,7 +2159,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		}
 
 		if (in_array('thirdpartylist', explode(':', $parameters['context']), true)) {
-			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+			if (!empty($parameters['arrayfields']['routing_id']['checked'])) {
 				$obj = $parameters['obj'];
 
 				print '<td class="tdoverflowmax125">';
@@ -2073,7 +2183,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array<string,mixed> 	$parameters		Array of parameters
 	 * @param CommonObject			$object			Object invoice
 	 * @param string		 		$action			Code action
-	 * @param Hookmanager			$hookmanager	Hookmanager
+	 * @param HookManager			$hookmanager	Hookmanager
 	 * @return int									Result
 	 */
 	public function isEditable($parameters, $object, &$action, $hookmanager)
@@ -2111,7 +2221,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * @param array{soc_origin:int,soc_dest:int} 	$parameters		Array of parameters (soc_origin = absorbed thirdparty id, soc_dest = surviving thirdparty id)
 	 * @param CommonObject							$object			Destination thirdparty object
 	 * @param string								$action			Code action
-	 * @param Hookmanager							$hookmanager	Hookmanager
+	 * @param HookManager							$hookmanager	Hookmanager
 	 * @return int									0 on success/nothing to do, -1 on error (sets $this->error/$this->errors)
 	 */
 	public function replaceThirdparty($parameters, $object, &$action, $hookmanager)
@@ -2177,7 +2287,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		// Create the target directory structure if needed
 		if (!is_dir($targetDir)) {
-			if (!dol_mkdir($targetDir)) {
+			if (!dol_mkdir($targetDir, DOL_DATA_ROOT)) {
 				dol_syslog(__METHOD__ . " Failed to create target directory: " . $targetDir, LOG_ERR);
 				return -1;
 			}
@@ -2194,7 +2304,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			// Ensure the target subdirectory exists (for files inside subdirectories)
 			$destParent = dirname($destFile);
 			if (!is_dir($destParent)) {
-				dol_mkdir($destParent);
+				dol_mkdir($destParent, DOL_DATA_ROOT);
 			}
 
 			// dol_move handles the physical move and updates ecm_files (filepath, filename, ref hash)
@@ -2231,13 +2341,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 * Add a link to the read-only XML viewer on the line of the e-invoice file, in the document list
 	 * of an invoice card (issue #687).
 	 *
-	 * The core offers no preview there: dolIsAllowedForPreview() whitelists mime subtypes that hold
+	 * The core offers no preview there: dolIsAllowedForPreview() white-lists mime subtypes that hold
 	 * neither xml nor the Factur-X pdf. This hook runs once per file line, which is where the link goes.
 	 *
 	 * @param array{colspan:int,socid:int|string,id:int|string,modulepart:string,relativepath:string}	$parameters		Array of parameters
 	 * @param array<string,mixed>																		$object			The file of the line being rendered
 	 * @param string																					$action			Code action
-	 * @param Hookmanager																				$hookmanager	Hookmanager
+	 * @param HookManager																				$hookmanager	Hookmanager
 	 * @return int																										0 in all cases (the line is completed, never replaced)
 	 */
 	public function formBuilddocLineOptions($parameters, $object, &$action, $hookmanager)
@@ -2282,15 +2392,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// page answers as a full page. The file name keeps the download link the core gives it.
 		$url = dol_buildpath('/einvoicing/xmlpreview.php', 1).'?id='.$invoiceid.$urlparam.'&mode=raw';
 
-		// Same markup as the preview picto of FormFile::showPreview(), so the line reads as a native one
 		$anchorid = 'einvoicingxmlpreview'.$invoiceid;
 		$this->resprints = '<td class="right nowraponall">';
-		$this->resprints .= '<a id="'.$anchorid.'" class="pictopreview documentpreview" href="'.$url.'" mime="text/html"';
-		$this->resprints .= ' data-title="'.dol_escape_htmltag($langs->trans("EInvoiceXmlPreviewTitle")).'"';
-		$this->resprints .= ' target="_blank" rel="noopener noreferrer"';
-		$this->resprints .= ' title="'.dol_escape_htmltag($langs->trans("EInvoicePreviewXml")).'">';
-		$this->resprints .= '<span class="fas fa-search-plus pictofixedwidth" style=" color: #808080;"></span>';
-		$this->resprints .= '</a>';
+		$this->resprints .= $this->einvoiceXmlPreviewAnchor($url, $anchorid);
 
 		// The core closes the cell holding the file name before this hook is executed, so the only place
 		// the hook can write is a cell of its own at the end of the line. The picto belongs next to the
@@ -2316,6 +2420,100 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			});
 			</script>';
 		$this->resprints .= '</td>';
+
+		return 0;
+	}
+
+	/**
+	 * The preview picto of the XML, with the markup FormFile::showPreview() gives its own.
+	 *
+	 * The 'documentpreview' class is what the core binds (lib_foot.js.php) to its preview dialog: it
+	 * reads href, mime and data-title and frames the answer, so the XML opens where a PDF opens.
+	 * Without javascript the href is simply followed, and the same page answers as a full page.
+	 *
+	 * @param  string $url      Address of the viewer for this invoice
+	 * @param  string $anchorid Identifier of the anchor, so a script can find it again
+	 * @return string           The anchor, ready to print
+	 */
+	private function einvoiceXmlPreviewAnchor($url, $anchorid)
+	{
+		global $langs;
+
+		$out = '<a id="'.$anchorid.'" class="pictopreview documentpreview" href="'.$url.'" mime="text/html"';
+		$out .= ' data-title="'.dol_escape_htmltag($langs->trans("EInvoiceXmlPreviewTitle")).'"';
+		$out .= ' target="_blank" rel="noopener noreferrer"';
+		$out .= ' title="'.dol_escape_htmltag($langs->trans("EInvoicePreviewXml")).'">';
+		$out .= '<span class="fas fa-search-plus pictofixedwidth" style=" color: #808080;"></span>';
+		$out .= '</a>';
+
+		return $out;
+	}
+
+	/**
+	 * Put the same preview picto on the XML of the "Documents" tab, which has no line hook of its own.
+	 *
+	 * That tab is drawn by FormFile::list_of_documents(), whose only hook, showFilesList, replaces the
+	 * whole list instead of completing a line - and returns an int, so it cannot even hand HTML back.
+	 * The picto is therefore placed from the footer, which runs before the core binds
+	 * 'documentpreview' on ready: the anchor is in the DOM by then and is bound like a native one.
+	 *
+	 * @param  array<string,mixed>	$parameters		Array of parameters
+	 * @param  CommonObject|null	$object			The object the page shows
+	 * @param  string				$action			Code action
+	 * @param  HookManager			$hookmanager	Hookmanager
+	 * @return int									0 in all cases, the page is only completed
+	 */
+	public function printCommonFooter($parameters, $object, &$action, $hookmanager)
+	{
+		global $langs, $user;
+
+		$this->resprints = '';
+
+		$contexts = is_array($hookmanager->contextarray) ? $hookmanager->contextarray : array();
+		if (in_array('invoicesuppliercarddocument', $contexts, true)) {
+			if (!$user->hasRight('fournisseur', 'facture', 'lire')) {
+				return 0;
+			}
+			$suffix = '_einvoice.xml';
+			$urlparam = '&element=supplier';
+		} elseif (in_array('invoicedocument', $contexts, true)) {
+			if (!$user->hasRight('facture', 'lire')) {
+				return 0;
+			}
+			$suffix = '_cii.xml';
+			$urlparam = '';
+		} else {
+			return 0;
+		}
+
+		$invoiceid = (is_object($object) && !empty($object->id)) ? (int) $object->id : GETPOSTINT('id');
+		if ($invoiceid <= 0) {
+			return 0;
+		}
+
+		$langs->load("einvoicing@einvoicing");
+
+		$url = dol_buildpath('/einvoicing/xmlpreview.php', 1).'?id='.$invoiceid.$urlparam.'&mode=raw';
+		$anchorid = 'einvoicingxmlpreview'.$invoiceid;
+		$anchor = $this->einvoiceXmlPreviewAnchor($url, $anchorid);
+
+		// Printed, not returned: printCommonFooter() of the core never prints the resPrint of this hook,
+		// it only reads its return value to decide whether to print its own block.
+		// The line is found on the name of the file the module writes, the one the viewer reads back.
+		// Nothing is inserted when that file is not listed, so a tab without an XML is left untouched.
+		print '<script nonce="'.getNonce().'" type="text/javascript">
+			(function() {
+				var links = document.querySelectorAll(\'table a[href*="'.dol_escape_js($suffix).'"]\');
+				if (!links.length || document.getElementById("'.$anchorid.'")) {
+					return;
+				}
+				var name = links[0].parentNode;
+				if (!name) {
+					return;
+				}
+				name.insertAdjacentHTML("beforeend", '.json_encode($anchor).');
+			})();
+			</script>'."\n";
 
 		return 0;
 	}
