@@ -54,6 +54,7 @@ T:	https://github.com/Dolibarr/dolibarr-community-modules.git
 EINVOICING
 M:	Mohamed Daoud <mdaoud@dolicloud.com> / Daoud-mohamed
 M:	Laurent Destailleur <ldestailleur@dolicloud.com> / eldy
+M:	Nicolas Vidal <nicolas.vidal@atm-consulting.fr> / atm-nicolasv
 S:	Maintained
 F:	einvoicing/
 T:	https://github.com/Dolibarr/dolibarr-community-modules.git
