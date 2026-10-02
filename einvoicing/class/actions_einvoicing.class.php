@@ -880,18 +880,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					$justvalidated = true;
 				}
 
-				// An answer already live on the platform is never sent again, whichever it is. Depositing a
-				// CDAR is irreversible and costs a flow, and the same answer reaches the send in more than
-				// one way: EINVOICING_SEND_APPROVED_ON_VALIDATION makes the validation just above answer on
-				// its own, the dropdown keeps offering a status the platform has not confirmed yet, and the
-				// action phase itself can run twice in a single request. Read what was really recorded
-				// rather than the setting, so a status sent by any other path is not doubled either, and
-				// leave a rejected send free to be retried.
+				// A CDAR deposit is irreversible: a status the platform did not reject is never sent twice.
 				if ($einvoicing->hasLiveStatusMessage($object->id, $object->element, $pdpstatuscode)) {
 					$sendtheanswer = false;
 
-					// Saying nothing on a validation that has just answered would be noise: the status was
-					// sent by this very request. Anywhere else the user asked for a send that did not happen.
+					// The validation above may have sent it already (EINVOICING_SEND_APPROVED_ON_VALIDATION).
 					if (!$justvalidated) {
 						setEventMessages($langs->trans('EInvoiceStatusAlreadySentToPlatform', $einvoicing->getStatusLabel($pdpstatuscode)), array(), 'warnings');
 					}

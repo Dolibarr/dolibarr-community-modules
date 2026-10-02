@@ -3700,11 +3700,7 @@ class EInvoicing
 	}
 
 	/**
-	 * Tell whether a lifecycle status is already live on the platform for an object.
-	 *
-	 * A CDAR the platform rejected ('Error') left nothing behind and may be sent again; anything else -
-	 * accepted, or still being validated - means the vendor has already been answered and a second send
-	 * would only duplicate the flow.
+	 * Tell whether a lifecycle status is already live on the platform for an object: sent and not rejected.
 	 *
 	 * @param	int		$elementId		Id of the invoice
 	 * @param	string	$elementType	Element type ('facture', 'invoice_supplier')
@@ -3734,9 +3730,9 @@ class EInvoicing
 		$sql .= " AND LOWER(direction) = 'out'";
 		// Stored as 'Ok' / 'Error', but compared lowercased like the direction above: on PostgreSQL an
 		// equality on the stored case is a comparison that silently matches nothing.
-		if ($validation == 'accepted') {
+		if ($validation === 'accepted') {
 			$sql .= " AND LOWER(lc_validation_status) = 'ok'";
-		} elseif ($validation == 'notrejected') {
+		} elseif ($validation === 'notrejected') {
 			$sql .= " AND LOWER(lc_validation_status) <> 'error'";
 		}
 		$sql .= " LIMIT 1";
