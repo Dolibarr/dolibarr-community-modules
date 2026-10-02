@@ -264,8 +264,14 @@ class InterfaceStancerTriggers extends DolibarrTriggers
 							$pendingActionCode = 'BILL_VALIDATE_PENDING';
 							$actioncommCheck = new ActionComm($this->db);
 							// The module requires Dolibarr 15 minimum, where getActions() no longer takes $db as first argument.
-							$existingPending = $actioncommCheck->getActions($object->socid, $object->id, "invoice", " AND code='AC_" . $pendingActionCode . "' AND percentage < 100");
-							if (!empty($existingPending)) {
+							// The column is percent, the ActionComm property percentage: this
+							// filter is raw SQL. Naming it percentage made getActions() answer
+							// "no such column", which is not empty, so the mail was never
+							// scheduled: the pending event looked like it already existed.
+							$existingPending = $actioncommCheck->getActions($object->socid, $object->id, "invoice", " AND code='AC_" . $pendingActionCode . "' AND percent < 100");
+							if (!is_array($existingPending)) {
+								dol_syslog("stancerTrigger BILL_VALIDATE: could not look for a pending mail on invoice " . $object->ref . ", not scheduling: " . (is_string($existingPending) ? $existingPending : $actioncommCheck->error), LOG_ERR);
+							} elseif (!empty($existingPending)) {
 								dol_syslog("stancerTrigger BILL_VALIDATE: delay=" . $delayHours . "h but a pending mail already exists for invoice " . $object->ref . ", skip schedule", LOG_DEBUG);
 							} else {
 								$pendingEvt = new ActionComm($this->db);
@@ -310,8 +316,11 @@ class InterfaceStancerTriggers extends DolibarrTriggers
 				// Cancel any pending auto-send mail scheduled at validation
 				$actioncommCancel = new ActionComm($this->db);
 				// The module requires Dolibarr 15 minimum, where getActions() no longer takes $db as first argument.
-				$pendingActions = $actioncommCancel->getActions($object->socid, $object->id, "invoice", " AND code='AC_BILL_VALIDATE_PENDING' AND percentage < 100");
-				if (is_array($pendingActions) && !empty($pendingActions)) {
+				// Raw SQL: the column is percent, not the ActionComm property percentage.
+				$pendingActions = $actioncommCancel->getActions($object->socid, $object->id, "invoice", " AND code='AC_BILL_VALIDATE_PENDING' AND percent < 100");
+				if (!is_array($pendingActions)) {
+					dol_syslog("stancerTrigger $action: could not look for a pending mail on invoice " . $object->ref . ", none cancelled: " . (is_string($pendingActions) ? $pendingActions : $actioncommCancel->error), LOG_ERR);
+				} elseif (!empty($pendingActions)) {
 					foreach ($pendingActions as $pa) {
 						$pa->percentage = 100;
 						$pa->note_private = (string) ($pa->note_private ?? '') . "\n" . dol_print_date(dol_now(), '%Y-%m-%d %H:%M:%S') . " - " . $langs->trans('StancerBillValidatePendingCancelled', $action);

@@ -94,6 +94,7 @@ StancerCBCard = Credit Card
 STANCER_PAY_BUTTON = Pay by card
 STANCER_PAY_BUTTON_MESSAGE = You will be redirected to Stancer website to proceed with payment
 STANCER_PAY_BUTTON_DEPOSIT = Deposit payment of %s %% i.e. %s
+StancerPaymentFrameTitle = Secure payment by Stancer
 STANCER_CB_ORDER_PARTIAL_PAY = Enable partial payment for orders with automatic deposit invoice creation
 STANCER_CB_ORDER_PARTIAL_PAYTooltip = This option allows setting up "30%% payment on order" for example. More information on <a href="https://doc.cap-rel.fr/projet_stancer/versement_d_un_acompte_a_la_commande">the documentation</a>
 STANCER_CB_PROPAL_PARTIAL_PAY = Enable partial payment for quotes with automatic deposit invoice creation
@@ -805,3 +806,22 @@ StancerRepairConfirmOverpay = This invoice is already settled. Add this Stancer 
 StancerRepairStaleStatusIntro = %s payment(s) with a stale local status (refused/canceled on Stancer or unconfirmed): excluded from the captured list above.
 StancerRepairRealStatus = Real Stancer status
 StancerRepairStatusUnknown = unconfirmed
+
+#
+# Send the payment link
+#
+STANCER_PAYLINK_ORDER_MAILTYPE = Payment link email template (order)
+STANCER_PAYLINK_ORDER_MAILTYPETooltip = Template used by the "Send the payment link" button on an order. The template must contain __ONLINE_PAYMENT_URL__. With no template selected, a plain message is sent instead.
+STANCER_PAYLINK_INVOICE_MAILTYPE = Payment link email template (invoice)
+STANCER_PAYLINK_INVOICE_MAILTYPETooltip = Template used by the "Send the payment link" button on an invoice. The template must contain __ONLINE_PAYMENT_URL__. With no template selected, a plain message is sent instead.
+StancerSendPayLink = Send the payment link
+StancerSendPayLinkConfirm = Send the online payment link to %s?
+StancerSendPayLinkSource = Address found on: %s
+StancerSendPayLinkSent = Payment link sent to %s
+StancerSendPayLinkNoRecipient = No email address was found, neither on this thirdparty nor on its contacts. Fill in the thirdparty or one of its contacts before sending the link.
+StancerSendPayLinkNoUrl = Online payment is not available for this document.
+StancerSendPayLinkNotSent = The payment link could not be sent to %s. See the log for the reason.
+StancerPayLinkMailSubject = Payment link for %s
+StancerPayLinkMailIntro = %s invites you to pay document %s online.
+StancerPayLinkMailButton = Pay online
+StancerPayLinkMailFallback = If the link above does not work, copy this address into your browser:
