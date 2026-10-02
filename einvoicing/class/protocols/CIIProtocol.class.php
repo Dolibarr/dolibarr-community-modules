@@ -750,9 +750,11 @@ class CIIProtocol extends AbstractProtocol
 		// updateline() below totals each line through calcul_price_total() and looks its VAT rate up with
 		// getLocalTaxesFromRate(), handing both $this->thirdparty - the vendor, seller of this invoice.
 		// Neither create() nor fetch() loads it (fetch() even clears it), so the seller arrived empty and
-		// the core read the rate in our own country instead. Left unguarded: $thirdparty is '?Societe' from
-		// Dolibarr 24 on but 'Societe' on 18, and fetch_thirdparty() already returns when there is no vendor.
-		$supplierInvoice->fetch_thirdparty();
+		// the core fell back on $mysoc: the rate and its local taxes were read in the country of our own
+		// company instead of the vendor's. Load it once for the whole loop.
+		if (empty($supplierInvoice->thirdparty) && $supplierInvoice->socid > 0) {	// @phpstan-ignore empty.property, booleanAnd.alwaysFalse (Dolibarr 18 documents $thirdparty as always set, it stays empty until fetch_thirdparty())
+			$supplierInvoice->fetch_thirdparty();
+		}
 
 		// Start after the lines already written: this runs a second time for the document level charges
 		// (BG-21). line_max() is what addline() itself calls to resolve its $rang = -1.
@@ -804,6 +806,19 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		return true;
+	}
+
+	/**
+	 * Ref of the deposit a received document deducts through BT-113.
+	 *
+	 * @param  array<string,mixed>	$parsedHeader	Parsed header of the received document
+	 * @return string|null						Ref of the deposit, null while it is not read from the document
+	 * @phan-suppress PhanPluginMoreSpecificActualReturnType
+	 */
+	protected function depositRefAnnouncedByDocument(array $parsedHeader)
+	{
+		// TODO Read it at line level (see "isDepositLine" in buildLineItem()) or at document level.
+		return null;
 	}
 
 	/**
@@ -3888,7 +3903,7 @@ class CIIProtocol extends AbstractProtocol
 		// can be defined globally.
 		// Another solution is to set the $announcedDepositRef to 'UNKNOWN_FORWARNINGONLY' and into the trigger to 'BILL_SUPPLIER_VALIDATE', if $announced['totalprepaidref' has this code,
 		// we accept the approval, instead we show a warning on the card.
-		$announcedDepositRef = null;
+		$announcedDepositRef = $this->depositRefAnnouncedByDocument($parsedHeader);
 		//$announcedDepositRef = $parsedHeader['invoiceRefDocs'];
 
 		// A document whose BT-115 does not answer BR-CO-16 says two different things about what has to
@@ -3926,13 +3941,10 @@ class CIIProtocol extends AbstractProtocol
 		}
 		// The deduction is answered before the totals, and once: no rounding convention explains a deposit
 		// that is not attached, so there is nothing for the conventions below to say about it.
-		// @phpstan-ignore notIdentical.alwaysFalse (dead until $announcedDepositRef is read, see the TODO above)
-		if ($announcedDepositRef !== null) {
-			if ($announcedPrepaid !== null
-				&& abs(SupplierInvoiceHelper::linkedDepositAmount($supplierInvoiceId) - $announcedPrepaid) >= 0.005) {
-				$this->flagPrepaidMismatch($supplierInvoiceId, $parsedHeader, $announcedTva, $announcedTtc, $announcedPrepaid, $announcedDepositRef, $return_messages);
-				return;
-			}
+		if ($announcedPrepaid !== null && $announcedDepositRef !== null
+			&& abs(SupplierInvoiceHelper::linkedDepositAmount($supplierInvoiceId) - $announcedPrepaid) >= 0.005) {
+			$this->flagPrepaidMismatch($supplierInvoiceId, $parsedHeader, $announcedTva, $announcedTtc, $announcedPrepaid, $announcedDepositRef, $return_messages);
+			return;
 		}
 
 		if (SupplierInvoiceHelper::totalsAgreeWithDocument($invoice, $announcedTva, $announcedTtc)) {
