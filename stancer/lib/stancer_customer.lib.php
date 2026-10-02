@@ -623,7 +623,7 @@ function stancerAddCustomerIfNeeded($object)
 		//societe / client
 		if (!empty($socid)) {
 			$companypaymentmode = new CompanyPaymentModeStancer($db);
-			$res = $companypaymentmode->fetch(0, '', 0, '', " AND stancer_account <> '' AND fk_soc = '" . $db->escape($socid) . "'");
+			$res = $companypaymentmode->fetch(0, '', 0, '', " AND stancer_account <> '' AND fk_soc = " . ((int) $socid));
 			if ($res) {
 				//dans stancer_account on a le customerid stancer
 				$customerID = $companypaymentmode->stancer_account;
