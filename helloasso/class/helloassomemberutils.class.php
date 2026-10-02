@@ -516,7 +516,7 @@ class HelloAssoMemberUtils
 		// Loop to have all pages
 		while ($nbpages < $maxmemberpages) {
 			$urlformemebers = "https://".urlencode($this->helloasso_url)."/v5/organizations/".urlencode($assoslug)."/forms/Membership/".urlencode($formslug).'/items'.$param;
-			dol_syslog("Send Get to url=".$urlformemebers.", to get member list, page=".$nbpages+1, LOG_DEBUG);
+			dol_syslog("Send Get to url=".$urlformemebers.", to get member list, page=".($nbpages + 1), LOG_DEBUG);
 
 			$ret = getURLContent($urlformemebers, 'GET', "", 1, $headers);
 			if ($ret["http_code"] != 200) {
