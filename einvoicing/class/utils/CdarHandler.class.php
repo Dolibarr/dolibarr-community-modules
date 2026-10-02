@@ -349,7 +349,7 @@ class CdarHandler
 
 		/**
 		 * MDT-88
-		 * TODO: the lifecycle statuses with no reference example still fall back on "in process":
+		 * Note: the lifecycle statuses with no reference example still fall back on "in process":
 		 * 39 (on hold) = Suspendue
 		 * 37 (Complete) = Complétée
 		 * 50 (Rejected / Refused) = Refusée (by C4)

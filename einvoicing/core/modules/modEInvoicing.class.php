@@ -607,7 +607,7 @@ class modEInvoicing extends DolibarrModules
 		$sql = array();
 
 		// Chorus fields
-		// TODO : Remove Chorus extrafields and move them to einvoicing_extlinks table
+		// TODO : Remove Chorus extrafields and move them to einvoicing_extrafield table
 		// The text fields are declared printable = 2 ("print only when filled") and not 1: on cores 19, 20
 		// and 21 getExtrafieldsInHtml() ignores the 'enabled' condition, so a field of a feature nobody
 		// turned on still reached the PDF of every invoice and every order (issue #614).
