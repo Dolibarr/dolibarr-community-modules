@@ -813,6 +813,7 @@ class CIIProtocol extends AbstractProtocol
 	 *
 	 * @param  array<string,mixed>	$parsedHeader	Parsed header of the received document
 	 * @return string|null						Ref of the deposit, null while it is not read from the document
+	 * @phan-suppress PhanPluginMoreSpecificActualReturnType
 	 */
 	protected function depositRefAnnouncedByDocument(array $parsedHeader)
 	{
