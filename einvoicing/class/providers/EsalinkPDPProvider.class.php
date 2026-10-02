@@ -1984,7 +1984,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				// Update einvoice status with awaiting validation
 				$einvoicing = new EInvoicing($db);
 				//$einvoicing->insertOrUpdateExtLink($object->id, $object->element, $flowId, EInvoicing::STATUS_AWAITING_VALIDATION, $object->ref);
-				$resStoreStatus = $einvoicing->storeStatusMessage($object->id, $object->element, $statusCode, '', 'out', $flowId, '', '', '', $reasonCode);
+				$resStoreStatus = $einvoicing->storeStatusMessage($object->id, $object->element, $statusCode, '', 'out', $flowId, '', '', null, $reasonCode);
 
 				// Call the API to retrieve flow details and check the validation status.
 				$resource = 'flows/' . $flowId;
