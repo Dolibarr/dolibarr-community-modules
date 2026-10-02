@@ -1863,6 +1863,29 @@ class Stancer_payments extends CommonObject
 		];
 		return in_array($this->status, $listOfPaidStatus);
 	}
+
+	/**
+	 * Tell if the stored attempt failed for good, so a new one must be started.
+	 *
+	 * Stancer keeps a unique_id reserved for ever, even when the payment that
+	 * carried it was refused: asking again with the same one is answered
+	 * "HTTP 409 duplicate unique_id", the payment is never created and the
+	 * customer can never retry. Every final failure must therefore lead to a
+	 * fresh attempt id, which is what stancerNextFreeTag() builds.
+	 *
+	 * @return bool True when the attempt reached a final failure state.
+	 */
+	public function hasFinallyFailed()
+	{
+		$listOfFailedStatus = [
+			self::STATUS_ERROR,
+			self::STATUS_EXPIRED,
+			self::STATUS_FAILED,
+			self::STATUS_REFUSED,
+			self::STATUS_CANCELED,
+		];
+		return in_array($this->status, $listOfFailedStatus);
+	}
 }
 
 
