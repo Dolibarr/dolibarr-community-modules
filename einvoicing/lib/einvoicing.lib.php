@@ -491,7 +491,9 @@ if (!function_exists('einvoicingDolGetButtonActionDropdown')) {
 	 *
 	 *  @param	string	$label			Dropdown toggle visible label
 	 *  @param	array	$urlButtons		List of sub-buttons, same format as the native $url array
-	 *                                  (each entry: 'lang', 'enabled', 'perm', 'label', 'url')
+	 *                                  (each entry: 'lang', 'enabled', 'perm', 'label', 'url', or
+	 *                                  'divider' => 1 for a separator line printed before the next
+	 *                                  entry shown)
 	 *  @param	array	$params			Extra params (only 'backtopage' is honored, like the core function)
 	 *  @return	string					Dropdown HTML
 	 *  @since	Dolibarr V18
@@ -503,10 +505,21 @@ if (!function_exists('einvoicingDolGetButtonActionDropdown')) {
 		$out = '<div id="einvoicing_button_dropdown" class="dropdown inline-block dropdown-holder">';
 		$out .= '<a style="margin-right: auto;" class="dropdown-toggle butAction" data-toggle="dropdown">' . $label . '</a>';
 		$out .= '<div class="dropdown-content">';
+		$dividerpending = false;
 		foreach ($urlButtons as $subbutton) {
+			if (!empty($subbutton['divider'])) {
+				// A separator line, printed only when an entry is shown after it: on this core a disabled
+				// entry is dropped by the test below, so the line would otherwise close the list.
+				$dividerpending = true;
+				continue;
+			}
 			if (!empty($subbutton['enabled']) && !empty($subbutton['perm'])) {
 				if (!empty($subbutton['lang'])) {
 					$langs->load($subbutton['lang']);
+				}
+				if ($dividerpending) {
+					$out .= '-----';
+					$dividerpending = false;
 				}
 				$out .= dolGetButtonAction('', $langs->trans($subbutton['label']), 'default', DOL_URL_ROOT . $subbutton['url'] . (empty($params['backtopage']) ? '' : '&amp;backtopage=' . urlencode($params['backtopage'])), '', 1);
 			}

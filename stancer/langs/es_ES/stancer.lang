@@ -25,7 +25,7 @@ ModuleStancerDesc = Módulo de pago Stancer
 # Dashboard
 #
 StancerDashboard = Panel de control Stancer
-StancerTestModeWarning = Modo de prueba activo — los datos mostrados provienen del entorno de prueba
+StancerTestModeWarning = Modo de prueba activo - los datos mostrados provienen del entorno de prueba
 StancerDashboardKPI = Indicadores mensuales
 StancerDashboardRevenue = Cobros Stancer
 StancerDashboardPayments = Pagos
@@ -89,6 +89,8 @@ StancerCBCard = Tarjeta de crédito
 STANCER_PAY_BUTTON = Pagar con tarjeta
 STANCER_PAY_BUTTON_MESSAGE = Será redirigido al sitio web de Stancer para proceder con el pago
 STANCER_PAY_BUTTON_DEPOSIT = Pago de anticipo del %s %% es decir %s
+StancerPaymentFrameTitle = Pago seguro con Stancer
+StancerSendPayLinkNotSent = No se ha podido enviar el enlace de pago a %s. El registro indica el motivo.
 STANCER_CB_ORDER_PARTIAL_PAY = Activar pago parcial para pedidos con creación automática de factura de anticipo
 STANCER_CB_ORDER_PARTIAL_PAYTooltip = Esta opción permite configurar "30%% de pago al pedido" por ejemplo. Más información en <a href="https://doc.cap-rel.fr/projet_stancer/versement_d_un_acompte_a_la_commande">la documentación</a>
 STANCER_CB_PROPAL_PARTIAL_PAY = Activar pago parcial para presupuestos con creación automática de factura de anticipo
@@ -172,8 +174,8 @@ STANCER_PUBLIC_IBAN_PAGE_FORCETooltip = Permite a su cliente reemplazar el manda
 STANCER_SEPA_CHECK_IBAN = Verificar IBAN al crear el mandato SEPA
 STANCER_SEPA_CHECK_IBANTooltip = Utiliza el servicio de verificación SEPAMail de Stancer para validar que el IBAN corresponde al titular de la cuenta. Solo funciona para bancos franceses e italianos.
 StancerSepaCheckSuccess = Verificación IBAN: puntuación %s/100 (clasificación %s)
-StancerSepaCheckWarning = Verificación IBAN: puntuación baja %s/100 (clasificación %s) — verifique los datos bancarios
-StancerSepaCheckPending = Verificación IBAN iniciada (id: %s), resultado pendiente — el mandato ha sido creado, el resultado estará disponible más tarde
+StancerSepaCheckWarning = Verificación IBAN: puntuación baja %s/100 (clasificación %s) - verifique los datos bancarios
+StancerSepaCheckPending = Verificación IBAN iniciada (id: %s), resultado pendiente - el mandato ha sido creado, el resultado estará disponible más tarde
 StancerSepaCheckSkipped = Verificación IBAN no disponible para este tercero (servicio limitado a bancos FR/IT con identificador legal)
 StancerSepaCheckError = Error durante la verificación IBAN: %s
 STANCER_MANDATE_AUTO = Generar automáticamente el Mandato SEPA en formato PDF
@@ -540,3 +542,45 @@ StancerAuditStatus_no_mapping = Unmapped Stancer customer
 StancerAuditStatus_api_unreachable = API unreachable
 StancerAuditStatus_api_not_found = Not found on Stancer
 StancerAuditStatus_api_auth_error = API authentication error
+
+#
+# Pago sin 3-D Secure, estados Stancer y envio del enlace de pago
+#
+stancer_status_refused = Pago rechazado
+stancer_status_failed = Pago fallido
+stancer_status_expired = Pago caducado
+stancer_status_canceled = Pago anulado
+stancer_status_disputed = Pago impugnado
+stancer_status_authorized = Pago autorizado
+stancer_status_captured = Pago capturado
+stancer_status_capture_sent = Captura en curso
+ErrorStancerPaymentNotStarted = No se ha podido iniciar el pago. No se ha cargado ningún importe. Puede volver a intentarlo en un momento.
+StancerPaymentErrorAuthNotCompleted = La verificación con su banco no ha podido completarse, por lo que nunca se solicitó a su banco autorizar este pago. Vuelva a intentarlo con su aplicación bancaria a mano, o utilice otro medio de pago.
+StancerPaymentErrorBankRefused = Su banco ha rechazado el pago (código %s).
+StancerPaymentNothingCharged = No se ha cargado ningún importe en su cuenta.
+StancerNo3dsFieldLabel = Pago con tarjeta sin 3-D Secure
+StancerNo3dsAllow = Permitir el pago sin 3-D Secure
+StancerNo3dsRevoke = Exigir de nuevo 3-D Secure
+StancerNo3dsConfirmTitle = Permitir el pago con tarjeta sin 3-D Secure
+StancerNo3dsConfirmText = Los pagos con tarjeta de %s se enviarán sin autenticación 3-D Secure, hasta que se pague o hasta que se exija de nuevo 3-D Secure. Hágalo solo para un cliente cuya tarjeta no consigue autenticarse: el rechazo así lo indica.<br><b>Sin 3-D Secure, una devolución fraudulenta corre a su cargo, y no a cargo del emisor de la tarjeta.</b>
+StancerNo3dsBanner = Permitido en este documento. Una devolución fraudulenta correría a su cargo. Quién lo permitió queda registrado en sus eventos.
+StancerNo3dsAllowed = Los pagos con tarjeta de este documento se enviarán sin 3-D Secure.
+StancerNo3dsWithdrawn = Los pagos con tarjeta de este documento exigen de nuevo 3-D Secure.
+StancerNo3dsChangeFailed = No se ha podido guardar el cambio, no se ha modificado nada.
+StancerNo3dsNeedsReactivation = Desactive y vuelva a activar el módulo Stancer para finalizar su actualización.
+StancerNo3dsEventOn = Pago con tarjeta sin 3-D Secure permitido en %s
+StancerNo3dsEventOff = 3-D Secure exigido de nuevo en %s
+STANCER_PAYLINK_ORDER_MAILTYPE = Plantilla de correo del enlace de pago (pedido)
+STANCER_PAYLINK_ORDER_MAILTYPETooltip = Plantilla utilizada por el botón "Enviar el enlace de pago" en un pedido. La plantilla debe contener __ONLINE_PAYMENT_URL__. Sin plantilla seleccionada, se envía un mensaje sencillo en su lugar.
+STANCER_PAYLINK_INVOICE_MAILTYPE = Plantilla de correo del enlace de pago (factura)
+STANCER_PAYLINK_INVOICE_MAILTYPETooltip = Plantilla utilizada por el botón "Enviar el enlace de pago" en una factura. La plantilla debe contener __ONLINE_PAYMENT_URL__. Sin plantilla seleccionada, se envía un mensaje sencillo en su lugar.
+StancerSendPayLink = Enviar el enlace de pago
+StancerSendPayLinkConfirm = ¿Enviar el enlace de pago en línea a %s?
+StancerSendPayLinkSource = Dirección encontrada en: %s
+StancerSendPayLinkSent = Enlace de pago enviado a %s
+StancerSendPayLinkNoRecipient = No se ha encontrado ninguna dirección de correo, ni en este tercero ni en sus contactos. Rellénela en el tercero o en uno de sus contactos antes de enviar el enlace.
+StancerSendPayLinkNoUrl = El pago en línea no está disponible para este documento.
+StancerPayLinkMailSubject = Enlace de pago para %s
+StancerPayLinkMailIntro = %s le invita a pagar el documento %s en línea.
+StancerPayLinkMailButton = Pagar en línea
+StancerPayLinkMailFallback = Si el enlace anterior no funciona, copie esta dirección en su navegador:
