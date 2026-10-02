@@ -689,20 +689,22 @@ class SupplierInvoiceHelper
 	 * document: an operator who corrects the invoice to the figures the vendor bills lifts the block
 	 * by doing so (issue #861).
 	 *
-	 * @param	int		$supplierInvoiceId	Id of the supplier invoice the import created
-	 * @param	float	$announcedTva		BT-110 of the received document, absolute value
-	 * @param	float	$announcedTtc		BT-112 of the received document, absolute value
-	 * @param	?float	$announcedPrepaid	BT-113 of the received document, when it is what the mark is about
-	 * @return	int							-1 on error, >0 otherwise
+	 * @param	int		$supplierInvoiceId		Id of the supplier invoice the import created
+	 * @param	float	$announcedTva			BT-110 of the received document, absolute value
+	 * @param	float	$announcedTtc			BT-112 of the received document, absolute value
+	 * @param	?float	$announcedPrepaid		BT-113 of the received document, when it is what the mark is about
+	 * @param	?string	$announcedRefOfDeposit	The ref of the deposit if prepaid is from a deposit
+	 * @return	int								-1 on error, >0 otherwise
 	 */
-	public static function flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc, $announcedPrepaid = null)
+	public static function flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc, $announcedPrepaid = null, $announcedRefOfDeposit = null)
 	{
 		global $db;
 
 		$einvoicing = new EInvoicing($db);
 		$value = array('tva' => (float) $announcedTva, 'ttc' => (float) $announcedTtc);
-		if ($announcedPrepaid !== null) {
+		if ($announcedPrepaid !== null && $announcedRefOfDeposit !== null) {
 			$value['prepaid'] = (float) $announcedPrepaid;
+			$value['prepaidref'] = (string) $announcedRefOfDeposit;
 		}
 		$value = json_encode($value);
 
@@ -735,6 +737,9 @@ class SupplierInvoiceHelper
 		// two totals alone, which is what every mark written before this one means.
 		if (isset($decoded['prepaid'])) {
 			$announced['prepaid'] = (float) $decoded['prepaid'];
+		}
+		if (isset($decoded['prepaidref'])) {
+			$announced['prepaidref'] = (string) $decoded['prepaidref'];
 		}
 
 		return $announced;

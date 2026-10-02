@@ -340,12 +340,15 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			// to the figures the vendor bills validates normally and drops the mark (issue #861).
 			$announced = SupplierInvoiceHelper::totalsMismatch((int) $object->id);
 			if ($announced !== null) {
-				// A prepaid amount is in the mark only for a document referencing the invoice it was paid on (BG-3).
-				if (SupplierInvoiceHelper::totalsAgreeWithDocument($object, $announced['tva'], $announced['ttc'], $announced['prepaid'] ?? null)) {
+				// A prepaid amount can be set because of a document referencing the invoice it was paid on (BG-3).
+				$isEinvoicePrepaidSameAsInvoiceDepositsOrDiscounts = SupplierInvoiceHelper::totalsAgreeWithDocument($object, $announced['tva'], $announced['ttc'], $announced['prepaid'] ?? null);
+				if ($isEinvoicePrepaidSameAsInvoiceDepositsOrDiscounts) {
+					// Total prepaid announced is same than the sum of deposits or discounts on the referenced doc.
+					// In this case, we can clear the tag EXTRAFIELD_TOTALS_MISMATCH.
 					SupplierInvoiceHelper::clearTotalsMismatch((int) $object->id);
 				} elseif (isset($announced['prepaid'])
 					&& SupplierInvoiceHelper::totalsAgreeWithDocument($object, $announced['tva'], $announced['ttc'])) {
-					// Totals right, deduction missing: saying the invoice does not total the document
+					// Totals is correct but deduction missing: saying the invoice does not total the document
 					// would send the operator looking at figures that do match. Name what is missing.
 					$this->errors[] = $langs->trans(
 						'EInvoicePrepaidMismatchBlocksValidation',
