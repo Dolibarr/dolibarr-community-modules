@@ -626,8 +626,10 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	// Actions on a received document. The block above is the skeleton one, left disabled by the
 	// module builder: it offers the CRUD of a flow record, which is written by synchronizations
 	// and not by hand.
+	// Same rule as the supplier invoice card (actions_einvoicing.class.php): a received SupplierInvoice only.
 	if ($action != 'presend' && $action != 'editline'
-		&& $object->flow_direction == 'In' && $object->fk_element_type == 'invoice_supplier' && !empty($object->flow_id)) {
+		&& $object->flow_direction == 'In' && $object->fk_element_type == 'invoice_supplier'
+		&& $object->flow_type == 'SupplierInvoice' && !empty($object->flow_id)) {
 		print '<div class="tabsAction">'."\n";
 
 		// The import replaces the invoice this document was booked on, and only a draft can be
