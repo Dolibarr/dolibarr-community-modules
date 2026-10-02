@@ -210,7 +210,7 @@ class modEInvoicing extends DolibarrModules
 		/* BEGIN MODULEBUILDER TABS */
 		// Don't forget to deactivate/reactivate your module to test your changes
 		$this->tabs = array();
-		$this->tabs[] = array('data' => 'invoice:+EinvoiceEvents:EinvoiceEventsTab:@einvoicing:$user->hasRight("facture","read"):/einvoicing/einvoice_tracking.php?id=__ID__');
+		$this->tabs[] = array('data' => 'invoice:+EinvoiceEvents:EinvoiceEventsTab:@einvoicing:$user->hasRight("facture","read") && getDolGlobalString("EINVOICING_ADD_A_DEDICATED_AGENDA_VIEW"):/einvoicing/einvoice_tracking.php?id=__ID__');
 
 		/* END MODULEBUILDER TABS */
 		// Example:
@@ -607,7 +607,7 @@ class modEInvoicing extends DolibarrModules
 		$sql = array();
 
 		// Chorus fields
-		// TODO : Remove Chorus extrafields and move them to einvoicing_extlinks table
+		// TODO : Remove Chorus extrafields and move them to einvoicing_extrafield table
 		// The text fields are declared printable = 2 ("print only when filled") and not 1: on cores 19, 20
 		// and 21 getExtrafieldsInHtml() ignores the 'enabled' condition, so a field of a feature nobody
 		// turned on still reached the PDF of every invoice and every order (issue #614).

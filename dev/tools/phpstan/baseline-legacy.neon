@@ -843,8 +843,20 @@ parameters:
 		-
 			message: '#^Property CommonObject\:\:\$thirdparty \(Societe\) in empty\(\) is not falsy\.$#'
 			identifier: empty.property
+			count: 2
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Result of && is always false\.$#'
+			identifier: booleanAnd.alwaysFalse
 			count: 1
 			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
+			message: '#^Property CommonObject\:\:\$thirdparty \(Societe\) in empty\(\) is not falsy\.$#'
+			identifier: empty.property
+			count: 1
+			path: ../../../einvoicing/class/protocols/CommonProtocol.class.php
 
 		-
 			message: '#^Call to function method_exists\(\) with Societe and ''findNearest'' will always evaluate to false\.$#'
@@ -1108,6 +1120,12 @@ parameters:
 			message: '#^Path in require_once\(\) "\.\./core/lib/files\.lib\.php" is not a file or it does not exist\.$#'
 			identifier: requireOnce.fileNotFound
 			count: 1
+			path: ../../../einvoicing/class/utils/CdarHandler.class.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/files\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
 			path: ../../../einvoicing/class/utils/FacturxTcpdfMerger.class.php
 
 		-
@@ -1353,6 +1371,12 @@ parameters:
 		-
 			message: '#^Property Document\:\:\$status \(int\) in isset\(\) is not nullable\.$#'
 			identifier: isset.property
+			count: 1
+			path: ../../../einvoicing/document_card.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./fourn/class/fournisseur\.facture\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
 			count: 1
 			path: ../../../einvoicing/document_card.php
 
@@ -1847,6 +1871,18 @@ parameters:
 			identifier: requireOnce.fileNotFound
 			count: 1
 			path: ../../../einvoicing/public/proxy_oauthcallback.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/class/utils\.class\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
+
+		-
+			message: '#^Path in require_once\(\) "\.\./core/lib/files\.lib\.php" is not a file or it does not exist\.$#'
+			identifier: requireOnce.fileNotFound
+			count: 1
+			path: ../../../einvoicing/scripts/build_function_map.php
 
 		-
 			message: '#^Path in include_once\(\) "\.\./core/lib/company\.lib\.php" is not a file or it does not exist\.$#'
