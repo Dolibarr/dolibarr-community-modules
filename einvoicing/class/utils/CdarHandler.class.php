@@ -24,6 +24,7 @@
  */
 
 require_once __DIR__ . '/../../lib/einvoicing.lib.php';	// removeAllSpaces(), used to normalize an electronic address
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
 
 
 /**
@@ -348,7 +349,7 @@ class CdarHandler
 
 		/**
 		 * MDT-88
-		 * TODO: the lifecycle statuses with no reference example still fall back on "in process":
+		 * Note: the lifecycle statuses with no reference example still fall back on "in process":
 		 * 39 (on hold) = Suspendue
 		 * 37 (Complete) = Complétée
 		 * 50 (Rejected / Refused) = Refusée (by C4)

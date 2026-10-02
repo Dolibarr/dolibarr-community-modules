@@ -151,7 +151,7 @@ class modEInvoicing extends DolibarrModules
 
 		// Dependencies
 		// A condition to hide module
-		$this->hidden = getDolGlobalInt('MODULE_EINVOICING_DISABLED'); // A condition to disable module;
+		$this->hidden = (!empty($conf->global->MODULE_EINVOICING_DISABLED) ? (int) $conf->global->MODULE_EINVOICING_DISABLED : 0); // A condition to disable module;
 		// List of module class names that must be enabled if this module is enabled. Example: array('always'=>array('modModuleToEnable1','modModuleToEnable2'), 'FR'=>array('modModuleToEnableFR')...)
 		$this->depends = array('always'=>array('modFacture', 'modFournisseur', 'modProduct'));
 		// List of module class names to disable if this one is disabled. Example: array('modModuleToDisable1', ...)
@@ -210,7 +210,7 @@ class modEInvoicing extends DolibarrModules
 		/* BEGIN MODULEBUILDER TABS */
 		// Don't forget to deactivate/reactivate your module to test your changes
 		$this->tabs = array();
-		$this->tabs[] = array('data' => 'invoice:+EinvoiceEvents:EinvoiceEventsTab:@einvoicing:$user->hasRight("facture","read"):/einvoicing/einvoice_tracking.php?id=__ID__');
+		$this->tabs[] = array('data' => 'invoice:+EinvoiceEvents:EinvoiceEventsTab:@einvoicing:$user->hasRight("facture","read") && getDolGlobalString("EINVOICING_ADD_A_DEDICATED_AGENDA_VIEW"):/einvoicing/einvoice_tracking.php?id=__ID__');
 
 		/* END MODULEBUILDER TABS */
 		// Example:
@@ -607,7 +607,7 @@ class modEInvoicing extends DolibarrModules
 		$sql = array();
 
 		// Chorus fields
-		// TODO : Remove Chorus extrafields and move them to einvoicing_extlinks table
+		// TODO : Remove Chorus extrafields and move them to einvoicing_extrafield table
 		// The text fields are declared printable = 2 ("print only when filled") and not 1: on cores 19, 20
 		// and 21 getExtrafieldsInHtml() ignores the 'enabled' condition, so a field of a feature nobody
 		// turned on still reached the PDF of every invoice and every order (issue #614).

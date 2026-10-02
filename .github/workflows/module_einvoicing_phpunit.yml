@@ -420,12 +420,10 @@ jobs:
           cat control-import-report.txt
           echo "The gate refuses the damaged document, as it has to."
 
-      - name: A deposit the document announces and the import did not attach has to be refused
+      - name: An amount already paid is not, by itself, a deposit the import has to attach
         if: ${{ !cancelled() && matrix.validate == 'yes' }}
-        # BT-113 needs its own control: not one of the five specimens announces an amount already paid at
-        # document level, so nothing in the corpus reaches that reading. A document carrying BT-113 against
-        # the invoice it names (BG-3) is built here, and the gate has to come back red naming the deduction
-        # rather than rebuild an invoice short of it.
+        # BT-113 is mostly a payment made online, not a deposit (8cd2fa9a): until the document names the
+        # deposit it deducts, the import rebuilds the invoice. This keeps that rule from changing silently.
         env:
           DOLIBARR_HTDOCS: ${{ steps.instance.outputs.htdocs }}
         run: |
@@ -440,19 +438,17 @@ jobs:
             file_put_contents("control-prepaid/cii_prepaidnotattached.xml", $xml);
             echo "540.27 declared already paid on a document referencing the invoice it was paid on\n";
           '
-          if php einvoicing/test/conformance/import-amounts.php --id-from-name control-prepaid/*.xml > control-prepaid-report.txt 2>&1; then
-            echo "::error::the document was rebuilt although its deduction is not attached - the gate is not reading BT-113"
+          if ! php einvoicing/test/conformance/import-amounts.php --id-from-name control-prepaid/*.xml > control-prepaid-report.txt 2>&1; then
+            echo "::error::a document declaring an amount already paid, without naming a deposit, is refused"
             cat control-prepaid-report.txt
             exit 1
           fi
           cat control-prepaid-report.txt
-          if ! grep -q 'already paid' control-prepaid-report.txt; then
-            # Refused, but not on the deduction: something else changed and the control no longer
-            # demonstrates what it claims to.
-            echo "::error::the document is refused without naming the amount already paid"
+          if ! grep -qE '^cii_prepaidnotattached\.xml +ok .*rebuilt' control-prepaid-report.txt; then
+            echo "::error::the document declaring an amount already paid is not reported rebuilt"
             exit 1
           fi
-          echo "The gate refuses the document whose deduction is missing, as it has to."
+          echo "The document declaring an amount already paid, without naming a deposit, is rebuilt."
 
       - uses: actions/upload-artifact@v7
         if: ${{ always() && matrix.validate == 'yes' }}
