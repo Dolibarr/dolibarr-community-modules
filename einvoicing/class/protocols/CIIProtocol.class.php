@@ -357,10 +357,6 @@ class CIIProtocol extends AbstractProtocol
 
 
 		// Call page to generate the invoice variables ($invoiceData, ...)
-		// require, not include: when the lookup does not resolve, dol_buildpath() answers a path under
-		// the main htdocs root, and include only warned - the failure then surfaced as a TypeError in
-		// buildXML() 180 lines later, naming neither the file nor the reason. Not require_once, the
-		// file runs once per invoice.
 		require dol_buildpath('einvoicing/lib/buildinvoicelines.inc.php');
 		/**
 		 * From include:
