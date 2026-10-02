@@ -640,6 +640,18 @@ class modStancer extends DolibarrModules
 		//$result4=$extrafields->addExtraField('stancer_myattr4', "New Attr 4 label", 'select',  1,  3, 'thirdparty',   0, 1, '', array('options'=>array('code1'=>'Val1','code2'=>'Val2','code3'=>'Val3')), 1,'', 0, 0, '', '', 'stancer@stancer', '$conf->stancer->enabled');
 		//$result5=$extrafields->addExtraField('stancer_myattr5', "New Attr 5 label", 'text',    1, 10, 'user',         0, 0, '', '', 1, '', 0, 0, '', '', 'stancer@stancer', '$conf->stancer->enabled');
 
+		// Card payments without 3-D Secure are allowed per order or invoice, never
+		// globally (see stancerNo3dsAllowed()). The flag is hidden on the card: it is
+		// only set through the confirmed action, which records who did it.
+		include_once DOL_DOCUMENT_ROOT . '/core/class/extrafields.class.php';
+		$extrafields = new ExtraFields($this->db);
+		foreach (array('commande', 'facture') as $elementtype) {
+			$resExtra = $extrafields->addExtraField('stancer_cb_no3ds', 'StancerNo3dsFieldLabel', 'boolean', 1000, '', $elementtype, 0, 0, '', '', 0, '', '0', '', '', '', 'stancer@stancer', 'isModEnabled("stancer")');
+			if ($resExtra < 0) {
+				dol_syslog("stancer init: could not create the stancer_cb_no3ds extrafield on " . $elementtype . ": " . $extrafields->error, LOG_ERR);
+			}
+		}
+
 		$sql = array();
 
 		//Creation d'un compte bancaire STANCER

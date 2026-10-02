@@ -689,20 +689,22 @@ class SupplierInvoiceHelper
 	 * document: an operator who corrects the invoice to the figures the vendor bills lifts the block
 	 * by doing so (issue #861).
 	 *
-	 * @param	int		$supplierInvoiceId	Id of the supplier invoice the import created
-	 * @param	float	$announcedTva		BT-110 of the received document, absolute value
-	 * @param	float	$announcedTtc		BT-112 of the received document, absolute value
-	 * @param	?float	$announcedPrepaid	BT-113 of the received document, when it is what the mark is about
-	 * @return	int							-1 on error, >0 otherwise
+	 * @param	int		$supplierInvoiceId		Id of the supplier invoice the import created
+	 * @param	float	$announcedTva			BT-110 of the received document, absolute value
+	 * @param	float	$announcedTtc			BT-112 of the received document, absolute value
+	 * @param	?float	$announcedPrepaid		BT-113 of the received document, when it is what the mark is about
+	 * @param	?string	$announcedRefOfDeposit	The ref of the deposit if prepaid is from a deposit
+	 * @return	int								-1 on error, >0 otherwise
 	 */
-	public static function flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc, $announcedPrepaid = null)
+	public static function flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc, $announcedPrepaid = null, $announcedRefOfDeposit = null)
 	{
 		global $db;
 
 		$einvoicing = new EInvoicing($db);
 		$value = array('tva' => (float) $announcedTva, 'ttc' => (float) $announcedTtc);
-		if ($announcedPrepaid !== null) {
+		if ($announcedPrepaid !== null && $announcedRefOfDeposit !== null) {
 			$value['prepaid'] = (float) $announcedPrepaid;
+			$value['prepaidref'] = (string) $announcedRefOfDeposit;
 		}
 		$value = json_encode($value);
 
@@ -735,6 +737,9 @@ class SupplierInvoiceHelper
 		// two totals alone, which is what every mark written before this one means.
 		if (isset($decoded['prepaid'])) {
 			$announced['prepaid'] = (float) $decoded['prepaid'];
+		}
+		if (isset($decoded['prepaidref'])) {
+			$announced['prepaidref'] = (string) $decoded['prepaidref'];
 		}
 
 		return $announced;
@@ -1111,6 +1116,47 @@ class SupplierInvoiceHelper
 		}
 
 		return 'Database error while looking for a supplier invoice with reference "' . $ref . '" ' . $context . ': ' . dol_escape_htmltag($db->lasterror());
+	}
+
+	/**
+	 * Build the postponed result of a reference lookup findIdByRef() could not answer.
+	 *
+	 * None of these codes is a missing document, and none of them has stored anything: the import runs
+	 * inside the one transaction createSupplierInvoiceFromSource() rolls back whole. Returned bare, the
+	 * failure makes syncFlows() count an error and break, so a database hiccup - or an ambiguity, which
+	 * no retry clears on its own - takes the rest of the batch down with it and every flow behind stays
+	 * unimported for as long as nobody looks. 'postponeflow' keeps this flow pending, reports it with
+	 * what to do about it, and lets the ones behind through.
+	 *
+	 * @param	int			$code		Negative code returned by findIdByRef()
+	 * @param	string|null	$ref		Reference that was looked for
+	 * @param	string		$context	Where that reference comes from, appended to the message
+	 * @param	int			$socId		Supplier the reference was looked up for
+	 * @param	string		$documentno	Reference of the received document being imported
+	 * @return	array{res:int,postponeflow:int,message:string,businessmessage:string,actioncode:string,actionurl:string,actiondata:array<string,mixed>,action:string}	The postponed result
+	 */
+	public static function refLookupPostponedResult(int $code, $ref, string $context, int $socId, string $documentno): array
+	{
+		global $langs;
+
+		$langs->loadLangs(array('bills', 'einvoicing@einvoicing'));
+
+		$action = $langs->trans('CheckTheSupplierInvoicesCarryingTheReference', $ref);
+		$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/list.php?search_refsupplier=' . urlencode((string) $ref) . '&socid=' . $socId . '" target="_blank">';
+		$action .= '<i class="fas fa-search"></i> ';
+		$action .= $langs->trans('ModifySupplierInvoice');
+		$action .= '</a>';
+
+		return array(
+			'res' => -1,
+			'postponeflow' => 1,
+			'message' => self::refLookupErrorMessage($code, $ref, $context),
+			'businessmessage' => $langs->trans('CantResolveReferenceOfTheImportedInvoice', $documentno, (string) $ref),
+			'actioncode' => 'LINKED_INVOICE_LOOKUP_FAILED',
+			'actionurl' => 'none',
+			'actiondata' => array('supplierref' => (string) $ref, 'linkedref' => $documentno, 'socid' => $socId),
+			'action' => $action
+		);
 	}
 
 	/**

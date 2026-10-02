@@ -166,16 +166,20 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 						$result = $protocol->generateInvoice($invoiceObject, $outputlangs, $pdfPath);		// Generate E-invoice (embed into the real generated file)
 
 						if ($result >= 0) {
-							setEventMessages($message, array(), $messagecss);
+							if (!defined('NOLOGIN')) {	// If in backoffice context
+								setEventMessages($message, array(), $messagecss);
+							}
 						}
 
 						if ($result && (!is_numeric($result) || $result > 0)) {
-							// No error
-							setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+							if (!defined('NOLOGIN')) {	// If in backoffice context
+								// No error
+								setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
 
-							// Forward non-blocking size warning from the protocol if any
-							if (!empty($protocol->warnings)) {
-								setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $protocol->warnings, 'warnings');
+								// Forward non-blocking size warning from the protocol if any
+								if (!empty($protocol->warnings)) {
+									setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $protocol->warnings, 'warnings');
+								}
 							}
 
 							// If the precheck is set to auto, we call the precheck function.
@@ -517,7 +521,6 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			// a wrong vendor is noticed, and the vendor of an existing supplier invoice cannot be changed.
 			// The action itself lives on the flow card, which is also where a flow whose draft has already
 			// been deleted is picked up again.
-			// TODO Move this in the section of the "Join files".
 			if (!empty($object->id) && $user->hasRight('einvoicing', 'write')) {
 				$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_document";
 				$sql .= " WHERE fk_element_type = 'invoice_supplier'";
@@ -529,13 +532,30 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 				$resql = $db->query($sql);
 				if ($resql && ($objdoc = $db->fetch_object($resql))) {
-					$reimporturl = dol_buildpath('/einvoicing/document_card.php', 1) . '?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken();
-					if ((int) $object->status === FactureFournisseur::STATUS_DRAFT) {
-						print '<a class="butAction" href="' . $reimporturl . '">' . $langs->trans('EInvoiceReimport') . '</a>';
-					} else {
-						print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('EInvoiceReimportOnlyOnADraft')) . '">'
-							. $langs->trans('EInvoiceReimport') . '</span>';
+					// The separator line between the lifecycle statuses and the reimport entry: the core dropdown has no divider of its own, so the line travels as the label
+					// of a disabled entry (no translation exists for '<hr>', so trans() returns it as is, and it is rendered as the HTML it is). The tooltip of a disabled
+					// entry is silenced on Dolibarr 22+ only (the 'attr' key, ignored by older cores); the polyfill of einvoicing.lib.php prints the line itself below 18.
+					if (!empty($url_button)) {
+						$dividerentry = array('divider' => 1, 'enabled' => true, 'perm' => 0, 'label' => '-----', 'labelhtml' => '<span class="opacitymedium">-----</span>', 'url' => '#');
+						$dividerentry['attr'] = array('title' => '');
+						$url_button[] = $dividerentry;
 					}
+
+					// The reimport itself, last entry of the list, grayed on the same rule as the flow card shows the button with: only a draft can be imported again
+					// (Document::reimport() refuses anything else). The reason travels as the entry tooltip, which the dropdown of the core cannot hold before
+					// Dolibarr 22 - there it says "not enough permissions" instead.
+					$reimportofadraft = ((int) $object->status === FactureFournisseur::STATUS_DRAFT);
+					$reimportentry = array(
+						'lang' => 'einvoicing',
+						'enabled' => true,
+						'perm' => ($reimportofadraft ? 1 : 0),
+						'label' => 'EInvoiceReimport',
+						'url' => dol_buildpath('/einvoicing/document_card.php', 1).'?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken()
+					);
+					if (!$reimportofadraft) {
+						$reimportentry['attr'] = array('title' => $langs->trans('EInvoiceReimportOnlyOnADraft'));
+					}
+					$url_button[] = $reimportentry;
 				}
 				if ($resql) {
 					$db->free($resql);
@@ -729,10 +749,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					dol_syslog(__METHOD__ . " Invoice generated successfully for invoice ID " . $object->id);
 
 					$this->warnings = array_merge($this->warnings, $genresult['warnings']);
-					if (!empty($this->warnings)) {
-						setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');
-					} else {
-						setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+					if (!defined('NOLOGIN')) {	// If in backoffice context
+						if (!empty($this->warnings)) {
+							setEventMessages($langs->trans("InvoiceGeneratedWithWarnings"), $this->warnings, 'warnings');
+						} else {
+							setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+						}
 					}
 
 					if ($genresult['precheck'] === 1) {
@@ -1182,8 +1204,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 			if ($result['res'] > 0) {
 				$done++;
-				$lines[] = $invoice->ref . ' : ' . $okline
-					. (empty($result['warnings']) ? '' : ' - ' . implode(' - ', $result['warnings']));
+				$lines[] = $invoice->ref . ' : ' . $okline . (empty($result['warnings']) ? '' : ' - ' . implode(' - ', $result['warnings']));
 			} elseif ($result['res'] == 0) {
 				$skipped++;
 				$lines[] = $invoice->ref . ' : ' . $result['reason'];

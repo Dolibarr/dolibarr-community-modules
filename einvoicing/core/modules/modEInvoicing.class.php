@@ -78,7 +78,11 @@ class modEInvoicing extends DolibarrModules
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@einvoicing'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = trim(file_get_contents(__DIR__.'/../../VERSION'));
+		// Read guarded like einvoicingModuleStamp() guards the same file: a deployment is free to drop
+		// VERSION, and __DIR__ resolves outside the instance when the module is a symlink, so an
+		// unguarded read prints two PHP warnings on the module list instead of leaving the value empty.
+		$versionfile = __DIR__.'/../../VERSION';
+		$this->version = (is_readable($versionfile) ? trim((string) file_get_contents($versionfile)) : '');
 		// Url to the file with your last numberversion of this module
 		$this->url_last_version = 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/refs/heads/main/einvoicing/VERSION';
 
@@ -147,7 +151,7 @@ class modEInvoicing extends DolibarrModules
 
 		// Dependencies
 		// A condition to hide module
-		$this->hidden = getDolGlobalInt('MODULE_EINVOICING_DISABLED'); // A condition to disable module;
+		$this->hidden = (!empty($conf->global->MODULE_EINVOICING_DISABLED) ? (int) $conf->global->MODULE_EINVOICING_DISABLED : 0); // A condition to disable module;
 		// List of module class names that must be enabled if this module is enabled. Example: array('always'=>array('modModuleToEnable1','modModuleToEnable2'), 'FR'=>array('modModuleToEnableFR')...)
 		$this->depends = array('always'=>array('modFacture', 'modFournisseur', 'modProduct'));
 		// List of module class names to disable if this one is disabled. Example: array('modModuleToDisable1', ...)
@@ -206,7 +210,7 @@ class modEInvoicing extends DolibarrModules
 		/* BEGIN MODULEBUILDER TABS */
 		// Don't forget to deactivate/reactivate your module to test your changes
 		$this->tabs = array();
-		$this->tabs[] = array('data' => 'invoice:+EinvoiceEvents:EinvoiceEventsTab:@einvoicing:$user->hasRight("facture","read"):/einvoicing/einvoice_tracking.php?id=__ID__');
+		$this->tabs[] = array('data' => 'invoice:+EinvoiceEvents:EinvoiceEventsTab:@einvoicing:$user->hasRight("facture","read") && getDolGlobalString("EINVOICING_ADD_A_DEDICATED_AGENDA_VIEW"):/einvoicing/einvoice_tracking.php?id=__ID__');
 
 		/* END MODULEBUILDER TABS */
 		// Example:
@@ -301,26 +305,8 @@ class modEInvoicing extends DolibarrModules
 				  'test' => 'isModEnabled("einvoicing")',
 				  'priority' => 50,
 				  ),
-			//  0 => array(
-			//      'label' => 'MyJob label',
-			//      'jobtype' => 'method',
-			//      'class' => '/einvoicing/class/call.class.php',
-			//      'objectname' => 'Call',
-			//      'method' => 'doScheduledJob',
-			//      'parameters' => '',
-			//      'comment' => 'Comment',
-			//      'frequency' => 2,
-			//      'unitfrequency' => 3600,
-			//      'status' => 0,
-			//      'test' => 'isModEnabled("einvoicing")',
-			//      'priority' => 50,
-			//  ),
 		);
 		/* END MODULEBUILDER CRON */
-		// Example: $this->cronjobs=array(
-		//    0=>array('label'=>'My label', 'jobtype'=>'method', 'class'=>'/dir/class/file.class.php', 'objectname'=>'MyClass', 'method'=>'myMethod', 'parameters'=>'param1, param2', 'comment'=>'Comment', 'frequency'=>2, 'unitfrequency'=>3600, 'status'=>0, 'test'=>'isModEnabled("einvoicing")', 'priority'=>50),
-		//    1=>array('label'=>'My label', 'jobtype'=>'command', 'command'=>'', 'parameters'=>'param1, param2', 'comment'=>'Comment', 'frequency'=>1, 'unitfrequency'=>3600*24, 'status'=>0, 'test'=>'isModEnabled("einvoicing")', 'priority'=>50)
-		// );
 
 		// Permissions provided by this module
 		$this->rights = array();
@@ -621,7 +607,7 @@ class modEInvoicing extends DolibarrModules
 		$sql = array();
 
 		// Chorus fields
-		// TODO : Remove Chorus extrafields and move them to einvoicing_extlinks table
+		// TODO : Remove Chorus extrafields and move them to einvoicing_extrafield table
 		// The text fields are declared printable = 2 ("print only when filled") and not 1: on cores 19, 20
 		// and 21 getExtrafieldsInHtml() ignores the 'enabled' condition, so a field of a feature nobody
 		// turned on still reached the PDF of every invoice and every order (issue #614).
