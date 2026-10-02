@@ -2652,10 +2652,12 @@ class EInvoicing
 				$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
 
 				if (GETPOST('highlight') == 'routing_product_id') {
-					if (getDolGlobalString('PRODUIT_USE_SEARCH_TO_SELECT')) {
-						dol_set_focus('#search_routing_product_id');	// prints its script, returns nothing
-					} else {
-						dol_set_focus('#routing_product_id');	// prints its script, returns nothing
+					if ((float) DOL_VERSION < 25) {
+						if (getDolGlobalString('PRODUIT_USE_SEARCH_TO_SELECT')) {
+							$resprints .= dol_set_focus('#search_routing_product_id', 1);
+						} else {
+							$resprints .= dol_set_focus('#routing_product_id', 1);
+						}
 					}
 				}
 			} else {
