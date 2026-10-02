@@ -357,7 +357,7 @@ class CIIProtocol extends AbstractProtocol
 
 
 		// Call page to generate the invoice variables ($invoiceData, ...)
-		include dol_buildpath('einvoicing/lib/buildinvoicelines.inc.php');
+		require dol_buildpath('einvoicing/lib/buildinvoicelines.inc.php');
 		/**
 		 * From include:
 		 * @var Facture 			$object			The `$invoice` object used in entry on inc file, but completed.
