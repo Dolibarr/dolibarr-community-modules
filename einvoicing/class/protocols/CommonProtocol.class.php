@@ -2066,7 +2066,7 @@ trait CommonProtocol
 				// registration identifier (BT-32), the buyer with its VAT identifier (BT-48) or its legal
 				// registration identifier (BT-47). Reporting it here names the record to complete; left to the
 				// Schematron it comes back from the platform as a rejected document.
-				$buyerThirdparty = empty($buyer->thirdparty) ? null : $buyer->thirdparty;
+				$buyerThirdparty = empty($buyer->thirdparty) ? null : $buyer->thirdparty;	// @phpstan-ignore empty.property (Dolibarr 18 documents $thirdparty as always set, it stays empty until fetch_thirdparty())
 				if (empty($seller->tva_intra) && empty($seller->idprof1)) {
 					throw new Exception('BADVATNUMBER[BR-AE-02]: The VAT number or the professional id of the seller '.$seller->name.' is mandatory when a line is invoiced under the reverse charge (VAT category AE).');
 				}

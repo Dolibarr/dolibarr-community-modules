@@ -321822,13 +321822,14 @@ namespace {
     function dolExplodeKeepIfQuotes($input)
     {
     }
-    /**
-     * Set focus onto field with selector (similar behaviour of 'autofocus' HTML5 tag)
-     *
-     * @param 	string	$selector	Selector ('#id' or 'input[name="ref"]') to use to find the HTML input field that must get the autofocus. You must use a CSS selector, so unique id preceding with the '#' char.
-     * @return	void
-     */
-    function dol_set_focus($selector)
+	/**
+	 * Set focus onto field with selector (similar behaviour of 'autofocus' HTML5 tag)
+	 *
+	 * @param 	string	$selector	Selector ('#id' or 'input[name="ref"]') to use to find the HTML input field that must get the autofocus. You must use a CSS selector, so unique id preceding with the '#' char.
+	 * @param	int		$nooutput	Use 1 to return with no output
+	 * @return	string				Empty string or HTML output
+	 */
+	function dol_set_focus($selector, $nooutput = 0)
     {
     }
     /**
