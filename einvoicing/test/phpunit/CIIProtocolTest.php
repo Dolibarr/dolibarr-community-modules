@@ -28,6 +28,8 @@
  *                  whatever the timezone of the server that reads it.
  *                  Product reference: an absent one must not be used as a search key, and "0" is a
  *                  reference like any other, in both directions.
+ *                  Import (issue #1031): the payment method of the document (BT-81) must reach the
+ *                  supplier invoice for every code the dictionary of Dolibarr can answer.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -507,6 +509,80 @@ class CIIProtocolTest extends CommonClassTest
 			$payment->invoke($protocol, $supplierInvoice, array('paymentDueDate' => '2026-09-02'));
 			$this->assertSame('2026-09-02', $this->storedDay($supplierInvoice->date_echeance), 'wrong due date on a server in ' . $tz);
 		}
+	}
+
+	/**
+	 * The payment method of a received document (BT-81, UNTDID 4461) reaches fk_mode_reglement of the
+	 * supplier invoice, for every code of the table that the dictionary of Dolibarr can answer. The
+	 * SEPA credit transfer (58) is the code issue #1031 was opened on: EN 16931 puts it on a par with
+	 * the plain credit transfer (30) in BR-49/BR-50, and senders use one or the other.
+	 *
+	 * @return void
+	 */
+	public function testThePaymentMeansCodeReachesTheInvoice()
+	{
+		global $db;
+
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+
+		$protocol = new CIIProtocol($db);
+		$payment = new ReflectionMethod(CIIProtocol::class, '_applyPaymentInfoToSupplierInvoice');
+		$payment->setAccessible(true);
+
+		$expected = array(
+			'10' => 'LIQ',
+			'20' => 'CHQ',
+			'21' => 'CHQ',
+			'22' => 'CHQ',
+			'25' => 'CHQ',
+			'26' => 'CHQ',
+			'30' => 'VIR',
+			'31' => 'VIR',
+			'42' => 'VIR',
+			'48' => 'CB',
+			'49' => 'PRE',
+			'54' => 'CB',
+			'55' => 'CB',
+			'58' => 'VIR',
+			'59' => 'PRE',
+		);
+
+		foreach ($expected as $untdidCode => $dolibarrCode) {
+			// Only the entries the dictionary of this instance serves: the module reads it with the
+			// filter of the core on active entries, and a deactivated one is left empty by design.
+			$paymentModeId = (int) dol_getIdFromCode($db, $dolibarrCode, 'c_paiement', 'code', 'id', 1, " AND active = 1");
+			if ($paymentModeId <= 0) {
+				continue;
+			}
+
+			$supplierInvoice = new FactureFournisseur($db);
+			$payment->invoke($protocol, $supplierInvoice, array('paymentMeansCode' => $untdidCode));
+
+			$this->assertSame($paymentModeId, (int) $supplierInvoice->mode_reglement_id, 'UNTDID 4461 code ' . $untdidCode . ' must be imported as ' . $dolibarrCode);
+		}
+	}
+
+	/**
+	 * A code of the list with no counterpart in the dictionary of Dolibarr (97, clearing between
+	 * partners) leaves the payment method empty instead of picking a wrong one, and says so.
+	 *
+	 * @return void
+	 */
+	public function testAnUnmappedPaymentMeansCodeLeavesTheMethodEmpty()
+	{
+		global $db;
+
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+
+		$protocol = new CIIProtocol($db);
+		$payment = new ReflectionMethod(CIIProtocol::class, '_applyPaymentInfoToSupplierInvoice');
+		$payment->setAccessible(true);
+
+		$supplierInvoice = new FactureFournisseur($db);
+		$res = $payment->invoke($protocol, $supplierInvoice, array('paymentMeansCode' => '97'));
+
+		$this->assertEmpty($supplierInvoice->mode_reglement_id, 'an unmapped code must not set a payment method');
+		$this->assertStringContainsString('97', $res['message'], 'the code left out must be named in the message');
 	}
 
 	/**

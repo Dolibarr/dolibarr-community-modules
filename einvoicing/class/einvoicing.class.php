@@ -1833,7 +1833,7 @@ class EInvoicing
 		$langs->load("suppliers");
 		$resprints .= '<td>';
 		if ($action != 'create') {
-			$resprints .= '<a href="' . $url . '">' . $langs->trans("History") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
+			$resprints .= '<a href="' . $url . '" title="'.$langs->trans("History").'"><i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
 		}
 		$resprints .= '</td>';
 		$resprints .= '</tr>';
@@ -1966,8 +1966,8 @@ class EInvoicing
 				$autorun = ((int) $object->status === Facture::STATUS_VALIDATED && empty($currentStatusInfo['everTransmitted'])) ? 1 : 0;
 				$resprints .= '<tr class="treinvoicing_collapseseparator">';
 				$resprints .= '<td>' . $form->textwithpicto($langs->trans("EInvoicingDirectoryCheck"), $langs->trans("EInvoicingDirectoryCheckHelp")) . '</td>';
-				$resprints .= '<td><span id="einvoice-directory" class="opacitymedium">' . ($autorun ? dol_escape_htmltag($langs->trans("EInvoicingDirectoryChecking")) : '-') . '</span>';
-				$resprints .= ' <a href="#" id="einvoice-directory-check" class="paddingleft">' . img_picto('', 'refresh', 'class="paddingright"') . $langs->trans("EInvoicingDirectoryCheckButton") . '</a>';
+				$resprints .= '<td><span id="einvoice-directory" class="opacitymedium">' . ($autorun ? dol_escape_htmltag($langs->trans("EInvoicingDirectoryChecking")) . ' - ' : '') . '</span>';
+				$resprints .= '<a href="#" id="einvoice-directory-check" class="paddingleft">' . img_picto('', 'refresh', 'class="paddingright"') . $langs->trans("EInvoicingDirectoryCheckButton") . '</a>';
 				$resprints .= '</td></tr>';
 				$resprints .= '<script type="text/javascript">
 				(function(){
@@ -2238,7 +2238,7 @@ class EInvoicing
 				$url = DOL_URL_ROOT . '/fourn/facture/agenda.php?id=' . ((int) $object->id) . '&search_agenda_label=EINVOICING';
 			}
 
-			$resprints .= '<a href="' . $url . '">' . $langs->trans("History") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
+			$resprints .= '<a href="' . $url . '" title="'.$langs->trans("History").'"><i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
 		}
 
 		$resprints .= '</td>';
@@ -2434,6 +2434,9 @@ class EInvoicing
 			$disabledcookiewrite = 1; 	// We keep status of group unchanged into the cookie
 		}
 		if (empty($conf->use_javascript_ajax)) {
+			$expand_display = true;		// We force group to be shown expanded
+		}
+		if (GETPOST('highlight')) {
 			$expand_display = true;		// We force group to be shown expanded
 		}
 
@@ -2647,6 +2650,14 @@ class EInvoicing
 			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
 			if ($mode == 'edit') {
 				$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
+
+				if (GETPOST('highlight') == 'routing_product_id') {
+					if (getDolGlobalString('PRODUIT_USE_SEARCH_TO_SELECT')) {
+						dol_set_focus('#search_routing_product_id');	// prints its script, returns nothing
+					} else {
+						dol_set_focus('#routing_product_id');	// prints its script, returns nothing
+					}
+				}
 			} else {
 				if ($product_id != '' && $product_id != '-1') {
 					if (preg_match('/^idprod/', $product_id)) {
@@ -2775,6 +2786,12 @@ class EInvoicing
 	/**
 	 * fetchLastknownInvoiceStatus
 	 *
+	 * 'code' is the status to SHOW: it is corrected from what is on disk, so a document generated
+	 * before the module wrote its status still reads as generated. 'storedcode' is the status the
+	 * table really holds, untouched by that correction - what a caller deciding whether to persist
+	 * a new status has to look at, otherwise the correction hides the very row it should update
+	 * (issue #998).
+	 *
 	 * @param int			$invoiceId		Invoice ID
 	 * @param ?string		$invoiceRef		Invoice ref
 	 * @return array<string,int|string>
@@ -2785,6 +2802,7 @@ class EInvoicing
 		$status = array(
 			'rowid' => 0,
 			'code' => self::STATUS_UNKNOWN,
+			'storedcode' => self::STATUS_UNKNOWN,
 			'status' => $this->getStatusLabel(self::STATUS_UNKNOWN),
 			'info' => '',
 			'file' => '0',
@@ -2826,6 +2844,7 @@ class EInvoicing
 					if (empty($tmpstatus)) {	// If not found yet
 						$tmpstatus['rowid'] = (int) $obj->rowid;
 						$tmpstatus['code'] = (int) $obj->syncstatus;
+						$tmpstatus['storedcode'] = (int) $obj->syncstatus;
 						$tmpstatus['status'] = $this->getStatusLabel((int) $obj->syncstatus);
 						$tmpstatus['info'] = $obj->synccomment ?? '';
 						$tmpstatus['flow_id'] = $obj->flow_id ?? '';
@@ -2849,6 +2868,7 @@ class EInvoicing
 
 				$tmpstatus['rowid'] = (int) $obj->rowid;
 				$tmpstatus['code'] = (int) $obj->syncstatus;
+				$tmpstatus['storedcode'] = (int) $obj->syncstatus;
 				$tmpstatus['status'] = $this->getStatusLabel((int) $obj->syncstatus);
 				$tmpstatus['info'] = $obj->synccomment ?? '';
 				$tmpstatus['flow_id'] = $obj->flow_id ?? '';
@@ -2907,7 +2927,8 @@ class EInvoicing
 		}
 		$this->db->free($resql);
 
-		// Check if there is an e-invoice file generated on disk
+		// Check if there is an e-invoice file generated on disk.
+		// What follows corrects 'code' for display only: 'storedcode' keeps the value of the table.
 
 		$einvoicefilepath = $this->getEInvoiceFilePath($invoiceRef);
 		if ($einvoicefilepath && is_readable($einvoicefilepath)) {
@@ -3179,7 +3200,7 @@ class EInvoicing
 	 * @param int		$elementId		ID of the element (or of the element line) the property belongs to
 	 * @param string	$elementType	Type of element (property object->element: 'facture', 'invoice_supplier', 'societe', ...)
 	 * @param string	$name			Name of the property ('buyer_order_reference', ...)
-	 * @param string	$value			Value to store ('' stores an empty value, it does not delete the row)
+	 * @param string	$value			Value to store (Value '' delete the row)
 	 * @return int						-1 on error, 1 if an existing row was updated, rowid of the new row otherwise
 	 */
 	public function insertOrUpdateExtraField($elementId, $elementType, $name, $value)
@@ -3207,19 +3228,28 @@ class EInvoicing
 		$this->db->free($resql);
 
 		if ($exists) {
-			$sql = "UPDATE " . $this->db->prefix() . "einvoicing_extrafields SET";
-			$sql .= " value = '" . $this->db->escape($value) . "'";
-			$sql .= ", fk_user_modif = " . (int) $user->id;
-			$sql .= " WHERE element_id = " . (int) $elementId;
-			$sql .= " AND element_type = '" . $this->db->escape($elementType) . "'";
-			$sql .= " AND name = '" . $this->db->escape($name) . "'";
+			if ($value !== null && $value !== '') {
+				$sql = "UPDATE " . $this->db->prefix() . "einvoicing_extrafields SET";
+				$sql .= " value = '" . $this->db->escape($value) . "'";
+				$sql .= ", fk_user_modif = " . (int) $user->id;
+				$sql .= " WHERE element_id = " . (int) $elementId;
+				$sql .= " AND element_type = '" . $this->db->escape($elementType) . "'";
+				$sql .= " AND name = '" . $this->db->escape($name) . "'";
+			} else {
+				$sql = "DELETE FROM " . $this->db->prefix() . "einvoicing_extrafields";
+				$sql .= " WHERE element_id = " . (int) $elementId;
+				$sql .= " AND element_type = '" . $this->db->escape($elementType) . "'";
+				$sql .= " AND name = '" . $this->db->escape($name) . "'";
+			}
 		} else {
-			$sql = "INSERT INTO " . $this->db->prefix() . "einvoicing_extrafields";
-			$sql .= " (element_id, element_type, name, value, date_creation, fk_user_creat)";
-			$sql .= " VALUES (" . (int) $elementId . ", '" . $this->db->escape($elementType) . "'";
-			$sql .= ", '" . $this->db->escape($name) . "'";
-			$sql .= ", '" . $this->db->escape($value) . "'";
-			$sql .= ", '" . $this->db->idate(dol_now()) . "', " . (int) $user->id . ")";
+			if ($value !== null && $value !== '') {
+				$sql = "INSERT INTO " . $this->db->prefix() . "einvoicing_extrafields";
+				$sql .= " (element_id, element_type, name, value, date_creation, fk_user_creat)";
+				$sql .= " VALUES (" . (int) $elementId . ", '" . $this->db->escape($elementType) . "'";
+				$sql .= ", '" . $this->db->escape($name) . "'";
+				$sql .= ", '" . $this->db->escape($value) . "'";
+				$sql .= ", '" . $this->db->idate(dol_now()) . "', " . (int) $user->id . ")";
+			}
 		}
 
 		$resql = $this->db->query($sql);
@@ -3594,7 +3624,7 @@ class EInvoicing
 	 * @param string 		$flowId                	PDP flow identifier (UUID), if available
 	 * @param string 		$validationStatus      	Validation status: OK, PENDING or ERROR, if status is sent by dolibarr to PDP
 	 * @param string 		$validationMessage     	Validation or error message returned by PDP, if status is sent by dolibarr to PDP
-	 * @param string|null 	$date_creation    		Date of the event, if we want to store a past event (for example when importing lifecycle history from PDP), if null current date will be used
+	 * @param int|null 		$date_creation    		Timestamp of the event, if we want to store a past event (for example when importing lifecycle history from PDP), if null current date will be used
 	 * @param string		$reasonCode				Reason code
 	 * @param string		$recipientRoles			RoleCodes the CDAR addressed the status to ('SE', 'SE,BY'), for a status we received
 	 * @return int  								Rowid inserted or -1 on error

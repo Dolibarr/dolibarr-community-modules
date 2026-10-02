@@ -32,9 +32,9 @@ CREATE TABLE llx_einvoicing_call (
 	method varchar(10),
 	endpoint varchar(255) NOT NULL,
 	request_id varchar(36),
-	request_body text,
-	response text,
-	processing_result text,
+	request_body mediumtext,
+	response mediumtext,
+	processing_result mediumtext,
 	provider varchar(50) NOT NULL,
 	entity integer DEFAULT 1
 	-- END MODULEBUILDER FIELDS

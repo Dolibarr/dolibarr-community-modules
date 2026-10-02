@@ -36,3 +36,11 @@ ALTER TABLE llx_einvoicing_sync_pending ADD UNIQUE INDEX uk_einvoicing_sync_pend
 
 -- The pending list is filtered on status (pending first) and ordered by the flow update date.
 ALTER TABLE llx_einvoicing_sync_pending ADD INDEX idx_einvoicing_sync_pending_status (entity, status, flow_updatedat);
+
+-- The API call trace stores the payloads it logs: a document is easily bigger than the 65,535 bytes
+-- of a text column, and the INSERT is then refused whole, so the call leaves no trace at all
+-- (issue #995). mediumtext is the type llx_einvoicing_document.xml_data already uses for the same
+-- content.
+ALTER TABLE llx_einvoicing_call MODIFY COLUMN request_body mediumtext;
+ALTER TABLE llx_einvoicing_call MODIFY COLUMN response mediumtext;
+ALTER TABLE llx_einvoicing_call MODIFY COLUMN processing_result mediumtext;

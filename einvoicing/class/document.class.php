@@ -1580,9 +1580,8 @@ class Document extends CommonObject
 
 
 	/**
-	 * Action executed by scheduler
-	 * CAN BE A CRON TASK. In such a case, parameters come from the schedule job setup field 'Parameters'
-	 * Use public function doScheduledJob($param1, $param2, ...) to get parameters
+	 * Action executed by scheduler. This is the only cron job of the module, declared by
+	 * modEInvoicing::$cronjobs. It takes no parameter from the 'Parameters' setup field.
 	 *
 	 * @return	int			0 if OK, <>0 if KO (this function is used also by cron so only 0 is OK)
 	 */
@@ -1687,6 +1686,11 @@ class Document extends CommonObject
 	/**
 	 * Clean XML data by removing or replacing specific contents like :
 	 * - attachments
+	 *
+	 * Not optional: this column is a MEDIUMTEXT capped at 16 Mo by checkXmlDataMaxSize(), and one
+	 * embedded PDF is enough to pass it - a document too big is then not stored at all.
+	 * EINVOICING_SPLIT_XML_WITH_EMBEDDED_PDF_IN_TWO_FILES only concerns the file kept on disk beside
+	 * the supplier invoice, which is otherwise the document the access point returned, byte for byte.
 	 *
 	 * @param ?string $xmlData The XML data to clean
 	 * @return ?string The cleaned XML data
