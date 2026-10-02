@@ -162,7 +162,6 @@ if ($objectID) {
 	}
 
 	// make a call to get validation result from PDP
-	// TODO: Move this code to a method in the provider class to avoid breaking the abstraction principle.
 	require_once "../class/providers/PDPProviderManager.class.php";
 	$PDPManager = new PDPProviderManager($db);
 	$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));

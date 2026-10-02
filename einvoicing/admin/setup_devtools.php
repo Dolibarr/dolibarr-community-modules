@@ -431,7 +431,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 			// so that list is what separates a customer of yours from anyone else on the internet. While
 			// it is empty every destination is accepted, which is the warning pdpShowWarning() prints
 			// above; a future version will refuse the redirect instead of accepting everything.
-			print '- on THIS instance, the variable EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN to the comma separated list of the domains of your customer instances, for example <input type="text" class="width300" id="idproxydomains" value="domainofmycustomers.com,anotherdomain.com" spellcheck="false">: ';
+			print '- on THIS instance, the variable EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN to the comma separated list of the domains of your customer instances <input type="text" class="width300" id="idproxydomains" placeholder="domainofmycustomers.com,anotherdomain.com" spellcheck="false">: ';
 			print (getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN') ? '<span class="ok">'.img_picto('', 'tick').' '.dolPrintHTML(getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN')).'</span>' : '<span class="error">'.img_warning().' KO, not set: every redirect destination is accepted</span>').'<br>';
 			print ajax_autoselect("idproxydomains");
 			print '</div>';

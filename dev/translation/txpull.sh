@@ -15,7 +15,7 @@ if [ "x$1" = "x" ]
 then
 	echo "This pull remote transifex files to local dir."
 	echo "Note:  If you pull a language file (not source), file will be skipped if local file is newer."
-	echo "       Using -f will overwrite local file (does not work with 'all')."
+	echo "       Using -f will overwrite local file."
 	echo "Usage: ./dev/translation/txpull.sh (all|xx_XX) [-r module.file] [-f] [-s]"
 	exit
 fi
@@ -27,23 +27,25 @@ then
 fi
 
 
-if [ "x$1" = "xall" ]
+language=$1
+shift
+
+if [ "x$language" = "xall" ]
 then
 	for dir in `find */langs/* -type d | cut -d '/' -f 3 | sort -u`
 	do
-	    fic=$dir
-	    if [ $fic != "en_US" ]
-	    then
-		    echo "tx pull -l $fic $2 $3"
-		    tx pull -l $fic $2 $3
+		if [ "$dir" != "en_US" ]
+		then
+			echo "tx pull -l $dir $*"
+			tx pull -l $dir "$@"
 		fi
 	done
 	cd -
 else
-	echo "tx pull -l $1 $2 $3 $4 $5"
-	tx pull -l $1 $2 $3 $4 $5
+	echo "tx pull -l $language $*"
+	tx pull -l $language "$@"
 fi
 
 echo
-#echo Think to launch also: 
+#echo Think to launch also:
 #echo "> dev/fixaltlanguages.sh fix all"

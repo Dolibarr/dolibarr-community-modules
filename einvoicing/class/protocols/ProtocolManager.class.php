@@ -45,7 +45,6 @@ class ProtocolManager
 	{
 		$this->db = $db;
 
-		$facturexIsOk = 1;	// TODO Check version of PHP To allow or not
 		$ciiIsOk = 1;
 		$ublIsOk = 0;
 
@@ -59,7 +58,7 @@ class ProtocolManager
 				'protocol_name' => 'FACTURX',
 				'protocol_label' => 'Factur-X',
 				'description' => 'Factur-X is a French-German hybrid e-invoicing format combining a readable PDF invoice with embedded XML data for seamless automated processing.',
-				'is_enabled' => $facturexIsOk,
+				'is_enabled' => 1,
 				'is_greyed' => (version_compare(PHP_VERSION, '7.3.0') < 0) ? 'PHP 7.3+' : ''
 				//'protocol_dol_min' => '24.0'	//experience a lot of trouble with autoload/tcpdf lib conflict and more with < 24.0. Use is possible but must be SERIOUSLY discouraged.
 			),
