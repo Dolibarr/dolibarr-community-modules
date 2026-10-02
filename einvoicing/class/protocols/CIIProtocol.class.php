@@ -752,7 +752,7 @@ class CIIProtocol extends AbstractProtocol
 		// Neither create() nor fetch() loads it (fetch() even clears it), so the seller arrived empty and
 		// the core fell back on $mysoc: the rate and its local taxes were read in the country of our own
 		// company instead of the vendor's. Load it once for the whole loop.
-		if (empty($supplierInvoice->thirdparty) && $supplierInvoice->socid > 0) {
+		if (empty($supplierInvoice->thirdparty) && $supplierInvoice->socid > 0) {	// @phpstan-ignore empty.property, booleanAnd.alwaysFalse (Dolibarr 18 documents $thirdparty as always set, it stays empty until fetch_thirdparty())
 			$supplierInvoice->fetch_thirdparty();
 		}
 
