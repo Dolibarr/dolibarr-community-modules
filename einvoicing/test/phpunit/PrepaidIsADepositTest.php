@@ -117,6 +117,46 @@ class PrepaidIsADepositTest extends CommonClassTest
 	}
 
 	/**
+	 * An invoice declaring itself already paid has no deposit to wait for behind its preceding invoice (BG-3).
+	 * @return	void
+	 */
+	public function testAnAlreadyPaidInvoiceIsNotPostponedOnAnUnknownPrecedingInvoice()
+	{
+		$messages = array();
+		$result = $this->resolveMissing(array('documentno' => 'F-2', 'businessProcessId' => 'B2', 'totalPrepaidAmount' => 540.28), $messages);
+
+		$this->assertNull($result, 'BT-23 B2 with BT-113 540.28 and an unknown BG-3 is stepped over');
+		$this->assertCount(1, $messages);
+	}
+
+	/**
+	 * An ordinary invoice announcing an amount already paid still waits for the deposit it deducts.
+	 * @return	void
+	 */
+	public function testAnOrdinaryInvoiceAnnouncingADepositIsStillPostponed()
+	{
+		$messages = array();
+		$result = $this->resolveMissing(array('documentno' => 'F-2', 'businessProcessId' => 'B1', 'totalPrepaidAmount' => 120.00), $messages);
+
+		$this->assertIsArray($result);
+		$this->assertSame(1, $result['postponeflow']);
+	}
+
+	/**
+	 * Run resolveMissingReferencedDocument() on an unknown preceding invoice "F-1".
+	 * @param	array<string,mixed>	$parsedHeader		Parsed header of the received document
+	 * @param	string[]			$messages			Import messages
+	 * @return	array<string,mixed>|null					Postpone result, or null when stepped over
+	 */
+	protected function resolveMissing(array $parsedHeader, array &$messages)
+	{
+		$method = new ReflectionMethod('CIIProtocol', 'resolveMissingReferencedDocument');
+		$method->setAccessible(true);
+
+		return $method->invokeArgs(new CIIProtocol($GLOBALS['db']), array('F-1', $parsedHeader, 1, 'preceding invoice of', &$messages));
+	}
+
+	/**
 	 * Run the rule, which is protected because it is an implementation detail of the two guards.
 	 *
 	 * @param	array<string,mixed>	$parsedHeader	Parsed header of the received document

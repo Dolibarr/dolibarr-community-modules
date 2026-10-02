@@ -864,11 +864,11 @@ class CIIProtocol extends AbstractProtocol
 			return null;
 		}
 
-		if ((float) ($parsedHeader['totalPrepaidAmount'] ?? 0) <= 0) {
+		if ($this->depositAnnouncedByDocument($parsedHeader) <= 0) {
 			if ($reportSkip) {
-				$return_messages[] = 'Document ' . dol_escape_htmltag((string) $refDoc) . ', ' . $relation . ' ' . dol_escape_htmltag($documentno) . ', was not found in Dolibarr and was ignored: the received document declares no amount already paid.';
+				$return_messages[] = 'Document ' . dol_escape_htmltag((string) $refDoc) . ', ' . $relation . ' ' . dol_escape_htmltag($documentno) . ', was not found in Dolibarr and was ignored: the received document announces no deposit to attach.';
 			}
-			dol_syslog(get_class($this) . '::resolveMissingReferencedDocument Stepping over unresolved InvoiceReferencedDocument ref="' . $refDoc . '" (no BT-113) for ' . $documentno, LOG_DEBUG);
+			dol_syslog(get_class($this) . '::resolveMissingReferencedDocument Stepping over unresolved InvoiceReferencedDocument ref="' . $refDoc . '" (no deposit announced) for ' . $documentno, LOG_DEBUG);
 			return null;
 		}
 
