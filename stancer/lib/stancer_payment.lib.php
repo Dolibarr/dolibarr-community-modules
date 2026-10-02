@@ -795,7 +795,7 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
 	if ($companypaymentmodeid == 0) {
 		//recherche si on a un moyen de paiement sepa pour cette societe chez stancer
-		$customsql = " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND fk_soc = '" . $db->escape($socid) . "' AND stancer_object_ref <> '' ORDER BY default_rib DESC";
+		$customsql = " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND fk_soc = " . ((int) $socid) . " AND stancer_object_ref <> '' ORDER BY default_rib DESC";
 		dol_syslog("stancer pay by SEPA : fetch payment mode with custom sql", LOG_DEBUG);
 		$res = $companypaymentmode->fetch(0, '', 0, '', $customsql);
 	} else {
@@ -1357,7 +1357,7 @@ function stancerCBstartPay($object, $userMessage = true, $companypaymentmodeid =
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
 	if ($companypaymentmodeid == 0) {
 		//recherche si on a un moyen de paiement sepa pour cette societe chez stancer
-		$customsql = " AND type = 'card' AND label LIKE 'stancer-card%' AND fk_soc = '" . $db->escape($socid) . "' AND stancer_object_ref <> '' ORDER BY default_rib DESC";
+		$customsql = " AND type = 'card' AND label LIKE 'stancer-card%' AND fk_soc = " . ((int) $socid) . " AND stancer_object_ref <> '' ORDER BY default_rib DESC";
 		$res = $companypaymentmode->fetch(0, '', 0, '', $customsql);
 	} else {
 		$res = $companypaymentmode->fetch($companypaymentmodeid);
@@ -1386,7 +1386,7 @@ function stancerCBstartPay($object, $userMessage = true, $companypaymentmodeid =
 
 	$sp = new Stancer_payments($db);
 	//Vérification que nous n'avons pas déjà un CB en cours ....
-	$resSP = $sp->fetchAll('ASC', '', 0, 0, array('customsql' => "live_mode = '" . getDolGlobalString('STANCER_IS_PROD') . "' AND (unique_id LIKE '%INV=" . $db->escape($object->id) . "' OR unique_id LIKE '%INV=" . $db->escape($object->id) . ".%')"));
+	$resSP = $sp->fetchAll('ASC', '', 0, 0, array('customsql' => "live_mode = '" . getDolGlobalString('STANCER_IS_PROD') . "' AND (unique_id LIKE '%INV=" . ((int) $object->id) . "' OR unique_id LIKE '%INV=" . ((int) $object->id) . ".%')"));
 	// print json_encode($object->ref) . " == " . json_encode($resSP);exit;
 	if (!empty($resSP)) {
 		$lastTry = 0;
