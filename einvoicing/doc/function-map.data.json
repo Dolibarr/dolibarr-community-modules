@@ -427,7 +427,7 @@
 			"writes": "—; when nothing is readable the flow is postponed, never dropped"
 		},
 		"provider.processincoming": {
-			"symbol": "SuperPDPProvider::processIncomingSupplierInvoiceStatus",
+			"symbol": "AbstractPDPProvider::processIncomingSupplierInvoiceStatus",
 			"label": "processIncomingSupplierInvoiceStatus()",
 			"chain": "in",
 			"role": "A status the vendor issues about one of its own invoices — a 212 answering our 211, typically. The mirror of what the CustomerInvoiceLC case does for our customers' statuses.",
@@ -491,12 +491,12 @@
 			"writes": "FactureFournisseur::create() and everything that hangs off it"
 		},
 		"facturx.docreatefromsource": {
-			"symbol": "FacturXProtocol::doCreateSupplierInvoiceFromSource",
-			"label": "FacturXProtocol::doCreateSupplierInvoiceFromSource()",
+			"symbol": "FacturXProtocol::parseReceivedDocument",
+			"label": "FacturXProtocol::parseReceivedDocument()",
 			"chain": "in",
-			"role": "Extracts the XML out of the received PDF, then runs the same CII import path.",
-			"reads": "extractXmlFromFileContent(), checkFacturxStructure()",
-			"writes": "FactureFournisseur::create(), its lines, discounts, charges, links and attachments"
+			"role": "Extracts the CII out of the received PDF/A-3, the only step a Factur-X has of its own: the import that follows is the CII one, in doCreateSupplierInvoiceFromSource().",
+			"reads": "PdfAttachmentExtractor::getInvoiceXmlFromFile(), then parseInvoiceHeader() and parseInvoiceLines()",
+			"writes": "— the parsed header and lines; FactureFournisseur::create() happens downstream, in the shared CII path"
 		},
 		"cii.parseheader": {
 			"symbol": "CIIProtocol::parseInvoiceHeader",
@@ -1988,6 +1988,11 @@
 							"the Chorus service code, and the checks that go with it"
 						],
 						[
+							"`EINVOICING_PARTY_IDENTIFIER_SCHEME`",
+							"OUT",
+							"the scheme the party identifier is declared under (BT-29, BT-46): a list in the setup for a French company, a free field elsewhere; `none` drops it. Never reaches the electronic address (BT-34, BT-49)"
+						],
+						[
 							"`EINVOICING_USE_BILLING_CONTACT_AS_BUYER`",
 							"OUT",
 							"the billing contact becomes the buyer party, not only the buyer contact group"
@@ -2048,6 +2053,16 @@
 							"try the Original document before the Converted one"
 						],
 						[
+							"`EINVOICING_PRODUCTS_MATCH_CANONICAL_REF`",
+							"IN",
+							"match a vendor product reference written with separators other than the recorded one; off by default, the comparison being an approximation"
+						],
+						[
+							"`EINVOICING_SPLIT_XML_WITH_EMBEDDED_PDF_IN_TWO_FILES`",
+							"IN",
+							"hidden: take the embedded binaries out of the attached XML file, which is otherwise the document the access point returned byte for byte; the embedded files are stored as attached files either way, and the copy in database stays scrubbed"
+						],
+						[
 							"`EINVOICING_USE_EXTERNAL_FACTURX_READER`",
 							"IN",
 							"read a received Factur-X with the external library instead of the CII parser"
@@ -2090,7 +2105,7 @@
 						[
 							"`EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION`",
 							"IN",
-							"confront the local invoice with its XML at validation (offered in the setup only when `EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_AVAILABLE` is set)"
+							"confront the local invoice with its XML at validation; offered in the setup, off by default"
 						],
 						[
 							"`EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE`",

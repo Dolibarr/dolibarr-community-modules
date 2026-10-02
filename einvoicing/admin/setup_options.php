@@ -313,19 +313,35 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->fieldAttr['min'] = '0';
 	$item->fieldAttr['step'] = '0.1';
 
+	// The three notices below are never sent empty: the generation falls back on the translations the
+	// placeholders show here, so the page states what will be written instead of keeping a silent
+	// default. Shown to a French seller only: their wording states French law, which is a promise the
+	// module has no business putting in the mouth of a seller established anywhere else.
+	$isfrenchseller = ($mysoc->country_code == 'FR');
+	$noticedefaulthelp = $isfrenchseller ? ' '.$langs->transnoentities('EINVOICING_LEGAL_NOTICE_DEFAULT_HELP') : '';
+
 	// Setup conf for PMT - Mention regarding recovery fees
 	$item = $formSetup->newItem('EINVOICING_PMT');
-	$item->helpText = $langs->transnoentities('EINVOICING_PMT_HELP');
+	$item->helpText = $langs->transnoentities('EINVOICING_PMT_HELP').$noticedefaulthelp;
+	if ($isfrenchseller) {
+		$item->fieldAttr['placeholder'] = $langs->transnoentities('RecoveryFeesMention');
+	}
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf for PMD - Mention regarding late payment penalties
 	$item = $formSetup->newItem('EINVOICING_PMD');
-	$item->helpText = $langs->transnoentities('EINVOICING_PMD_HELP');
+	$item->helpText = $langs->transnoentities('EINVOICING_PMD_HELP').$noticedefaulthelp;
+	if ($isfrenchseller) {
+		$item->fieldAttr['placeholder'] = $langs->transnoentities('LatePaymentPenaltiesMention');
+	}
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf for AAB - Mention regarding absence of discount for early payment
 	$item = $formSetup->newItem('EINVOICING_AAB');
-	$item->helpText = $langs->transnoentities('EINVOICING_AAB_HELP');
+	$item->helpText = $langs->transnoentities('EINVOICING_AAB_HELP').$noticedefaulthelp;
+	if ($isfrenchseller) {
+		$item->fieldAttr['placeholder'] = $langs->transnoentities('EarlyPaymentDiscountMention');
+	}
 	$item->cssClass = 'minwidth500';
 
 	/*
@@ -348,7 +364,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 }
 
 
-if (!einvoicingIsReceiveDisabled()) {
+if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or we are not in a generate only mode
 	// Setup conf for auto generation of objects
 	$itemtitle = $formSetup->newItem('EINVOICING_AUTO_GENERATION');
 	$itemtitle->setAsTitle();
@@ -363,7 +379,7 @@ if (!einvoicingIsReceiveDisabled()) {
 	$item->fieldParams['warningifon'] = 1;
 
 	// Setup conf to import lines as free description lines when no product is found and no default product exist on supplier
-	// TODO This option is in conflict with EINVOICING_PRODUCTS_AUTO_GENERATION, so should be disabled if EINVOICING_PRODUCTS_AUTO_GENERATION is on
+	// This option is in conflict with EINVOICING_PRODUCTS_AUTO_GENERATION, so it is disabled if EINVOICING_PRODUCTS_AUTO_GENERATION is on
 	if (!getDolGlobalString("EINVOICING_PRODUCTS_AUTO_GENERATION")) {
 		$item = $formSetup->newItem('EINVOICING_IMPORT_AS_FREE_LINES')->setAsYesNo();
 		$item->helpText = $langs->transnoentities('EINVOICING_IMPORT_AS_FREE_LINES_HELP');
@@ -437,10 +453,20 @@ if (!einvoicingIsReceiveDisabled()) {
 	$item->helpText = $langs->transnoentities('EINVOICING_SEND_PAYMENT_SENT_STATUS_HELP');
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
+
+
+	// Experimental options
+	// EINVOICING_ENABLE_MANUAL_ACTION_QUEUE: This option log import blocked flow with the action to do so we can do it manually later.
+	// Risk: unblocking action in a different order may result in undesirable side effects.
+
+	// Activate postponeflow
+	// EINVOICING_ENABLE_POSTPONE_FLOWS: This option postpone flow with the action to do so we can do it manually later.
+	// Risk: very dangerous. continuing to process flows means changing the cursor, and when a new record is save, we lost
+	// all postpone flow that were discarded.
 }
 
 
-if (!einvoicingIsReceiveDisabled() || !einvoicingIsSendDisabled()) {
+if (!einvoicingReceptionDisabled() || !einvoicingIsSendDisabled()) {
 	$itemtitle = $formSetup->newItem('EINVOICING_DEBUG')->setAsTitle();
 	$itemtitle->nameText = '<b>'.$langs->trans("Other").'</b>';
 

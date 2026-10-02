@@ -26,6 +26,10 @@
  *                  must keep one side alone and refuse a period that ends before it starts.
  *                  Import (issue #853): a date of the document must be stored as the day it states,
  *                  whatever the timezone of the server that reads it.
+ *                  Product reference: an absent one must not be used as a search key, and "0" is a
+ *                  reference like any other, in both directions.
+ *                  Import (issue #1031): the payment method of the document (BT-81) must reach the
+ *                  supplier invoice for every code the dictionary of Dolibarr can answer.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -508,6 +512,80 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
+	 * The payment method of a received document (BT-81, UNTDID 4461) reaches fk_mode_reglement of the
+	 * supplier invoice, for every code of the table that the dictionary of Dolibarr can answer. The
+	 * SEPA credit transfer (58) is the code issue #1031 was opened on: EN 16931 puts it on a par with
+	 * the plain credit transfer (30) in BR-49/BR-50, and senders use one or the other.
+	 *
+	 * @return void
+	 */
+	public function testThePaymentMeansCodeReachesTheInvoice()
+	{
+		global $db;
+
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+
+		$protocol = new CIIProtocol($db);
+		$payment = new ReflectionMethod(CIIProtocol::class, '_applyPaymentInfoToSupplierInvoice');
+		$payment->setAccessible(true);
+
+		$expected = array(
+			'10' => 'LIQ',
+			'20' => 'CHQ',
+			'21' => 'CHQ',
+			'22' => 'CHQ',
+			'25' => 'CHQ',
+			'26' => 'CHQ',
+			'30' => 'VIR',
+			'31' => 'VIR',
+			'42' => 'VIR',
+			'48' => 'CB',
+			'49' => 'PRE',
+			'54' => 'CB',
+			'55' => 'CB',
+			'58' => 'VIR',
+			'59' => 'PRE',
+		);
+
+		foreach ($expected as $untdidCode => $dolibarrCode) {
+			// Only the entries the dictionary of this instance serves: the module reads it with the
+			// filter of the core on active entries, and a deactivated one is left empty by design.
+			$paymentModeId = (int) dol_getIdFromCode($db, $dolibarrCode, 'c_paiement', 'code', 'id', 1, " AND active = 1");
+			if ($paymentModeId <= 0) {
+				continue;
+			}
+
+			$supplierInvoice = new FactureFournisseur($db);
+			$payment->invoke($protocol, $supplierInvoice, array('paymentMeansCode' => $untdidCode));
+
+			$this->assertSame($paymentModeId, (int) $supplierInvoice->mode_reglement_id, 'UNTDID 4461 code ' . $untdidCode . ' must be imported as ' . $dolibarrCode);
+		}
+	}
+
+	/**
+	 * A code of the list with no counterpart in the dictionary of Dolibarr (97, clearing between
+	 * partners) leaves the payment method empty instead of picking a wrong one, and says so.
+	 *
+	 * @return void
+	 */
+	public function testAnUnmappedPaymentMeansCodeLeavesTheMethodEmpty()
+	{
+		global $db;
+
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+
+		$protocol = new CIIProtocol($db);
+		$payment = new ReflectionMethod(CIIProtocol::class, '_applyPaymentInfoToSupplierInvoice');
+		$payment->setAccessible(true);
+
+		$supplierInvoice = new FactureFournisseur($db);
+		$res = $payment->invoke($protocol, $supplierInvoice, array('paymentMeansCode' => '97'));
+
+		$this->assertEmpty($supplierInvoice->mode_reglement_id, 'an unmapped code must not set a payment method');
+		$this->assertStringContainsString('97', $res['message'], 'the code left out must be named in the message');
+	}
+
+	/**
 	 * What the second argument buys, on the timezone the defect was reported from: left out,
 	 * dol_stringtotime() answers midnight UTC, which idate() writes as the day before.
 	 *
@@ -546,5 +624,132 @@ class CIIProtocolTest extends CommonClassTest
 			$this->assertSame('2026-09-01 00:00:00', dol_print_date($period['start'], '%Y-%m-%d %H:%M:%S', 'tzserver'), 'wrong start in ' . $tz);
 			$this->assertSame('2026-09-30 00:00:00', dol_print_date($period['end'], '%Y-%m-%d %H:%M:%S', 'tzserver'), 'wrong end in ' . $tz);
 		}
+	}
+
+	/**
+	 * Real aggregated invoice line, as a payroll provider sends it: one line standing for the whole
+	 * invoice, with no vendor reference, no buyer reference and no GTIN, and a label far longer than
+	 * the 128 characters of product_fournisseur_price.ref_fourn. Anonymized sample of a document
+	 * received in production. It lives outside test/samples, which holds the documents the module emits
+	 * and the CI validates: this one is a received document, and it breaks BR-53 as its sender sent it.
+	 *
+	 * @return void
+	 */
+	public function testAnAggregatedLineCarriesNoProductIdentifierAtAll()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+		$xml = file_get_contents(__DIR__ . '/fixtures/received/aggregated_line_without_product_ref.xml');
+		$this->assertNotFalse($xml, 'sample file not readable');
+
+		$lines = $protocol->parseInvoiceLines($xml);
+
+		$this->assertCount(1, $lines, 'the sample is a single aggregated line');
+		$this->assertSame('', trim((string) ($lines[0]['prodsellerid'] ?? '')), 'no BT-155 expected');
+		$this->assertSame('', trim((string) ($lines[0]['prodbuyerid'] ?? '')), 'no BT-156 expected');
+		$this->assertSame('', trim((string) ($lines[0]['prodglobalid'] ?? '')), 'no BT-157 expected');
+		$this->assertGreaterThan(128, strlen((string) $lines[0]['prodname']), 'the label cannot be used as a ref_fourn');
+	}
+
+	/**
+	 * A line carrying no vendor reference must not be bound to a product. Looked up as it stands, an
+	 * absent reference matches any vendor price row whose ref_fourn is empty, and the line silently
+	 * takes a product it has nothing to do with.
+	 *
+	 * @return void
+	 */
+	public function testAnAbsentVendorReferenceDoesNotMatchAnEmptyVendorPrice()
+	{
+		global $conf, $db;
+
+		$socid = $this->vendorWithoutAnyPrice();
+
+		// Written in SQL on purpose: Product::create() refuses for reasons that depend on the setup of
+		// the instance (reference module, accountancy defaults), and the fixture only needs a row to
+		// join on. The class-wide transaction of CommonClassTest rolls both inserts back.
+		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "product (entity, datec, ref, label, fk_product_type, tosell, tobuy, tva_tx)";
+		$sql .= " VALUES (" . ((int) $conf->entity) . ", '" . $db->idate(dol_now()) . "'";
+		$sql .= ", 'EITEST-" . $db->escape(uniqid()) . "', 'Bench product reachable only through an empty vendor reference', 1, 0, 1, 20)";
+		$this->assertNotFalse($db->query($sql), 'could not create the bench product: ' . $db->lasterror());
+		$productid = (int) $db->last_insert_id(MAIN_DB_PREFIX . 'product');
+		$this->assertGreaterThan(0, $productid, 'the bench product got no id');
+
+		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "product_fournisseur_price";
+		$sql .= " (entity, datec, fk_product, fk_soc, ref_fourn, price, quantity, unitprice, tva_tx)";
+		$sql .= " VALUES (" . ((int) $conf->entity) . ", '" . $db->idate(dol_now()) . "'";
+		$sql .= ", " . ((int) $productid) . ", " . ((int) $socid) . ", '', 10, 1, 10, 20)";
+		$this->assertNotFalse($db->query($sql), 'could not create the vendor price with an empty reference: ' . $db->lasterror());
+
+		$protocol = new CIIProtocol($db);
+		$found = $protocol->findProductFromEinvoiceLine(array(
+			'prodsellerid' => '',
+			'prodname' => 'A label that matches no product at all ' . uniqid(),
+			'supplierId' => $socid,
+		));
+
+		$this->assertSame(0, (int) $found['res'], 'an absent vendor reference must not resolve to a product');
+	}
+
+	/**
+	 * "0" is a valid vendor reference: emptiness has to be tested on the string, because empty()
+	 * answers true on it and drops BT-155 from the generated line.
+	 *
+	 * @return void
+	 */
+	public function testAVendorReferenceEqualToZeroIsStillWritten()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+		$doc = new DOMDocument('1.0', 'UTF-8');
+
+		$line = $this->baseLineData();
+		$line['prodsellerid'] = '0';
+		$node = $this->callBuildLineItem($protocol, $doc, $line);
+		$ids = $node->getElementsByTagName('ram:SellerAssignedID');
+		$this->assertSame(1, $ids->length, 'a vendor reference of "0" must be written');
+		$this->assertSame('0', $ids->item(0)->nodeValue);
+
+		$line['prodsellerid'] = '';
+		$node = $this->callBuildLineItem($protocol, $doc, $this->baseLineData());
+		$this->assertSame(0, $node->getElementsByTagName('ram:SellerAssignedID')->length, 'no reference, no BT-155');
+	}
+
+	/**
+	 * A vendor id carrying no vendor price at all, so the fixture is the only row the lookup can see.
+	 * A unique key allows a single price with an empty ref_fourn per vendor, so an existing vendor
+	 * cannot be reused; product_fournisseur_price.fk_soc has no foreign key, so no third party is
+	 * needed to hold the row either.
+	 *
+	 * @return int	Vendor id free of any vendor price
+	 */
+	private function vendorWithoutAnyPrice()
+	{
+		global $db;
+
+		$resql = $db->query("SELECT COALESCE(MAX(fk_soc), 0) + 1 as freesoc FROM " . MAIN_DB_PREFIX . "product_fournisseur_price");
+		$this->assertNotFalse($resql, 'could not read the vendor prices: ' . $db->lasterror());
+		$obj = $db->fetch_object($resql);
+
+		return (int) $obj->freesoc;
+	}
+
+	/**
+	 * The bill of exchange awaiting acceptance, and the generic bank card and direct debit codes, reach a
+	 * Dolibarr payment mode on import. 48 and 49 are what many senders write, rather than the credit card (54)
+	 * and SEPA direct debit (59) variants the table already knew.
+	 *
+	 * @return void
+	 */
+	public function testGenericPaymentMeansCodesAreMapped()
+	{
+		$map = new ReflectionProperty(CIIProtocol::class, 'UNTDID4461_TO_DOLIBARR_PAIEMENT_CODE');
+		$map->setAccessible(true);
+		$codes = $map->getValue();
+
+		$this->assertSame('TRA', $codes['24'] ?? null, 'bill of exchange awaiting acceptance');
+		$this->assertSame('CB', $codes['48'] ?? null, 'bank card');
+		$this->assertSame('PRE', $codes['49'] ?? null, 'direct debit');
 	}
 }

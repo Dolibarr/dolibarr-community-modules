@@ -327,6 +327,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			$item->fieldAttr['autocomplete'] = "new-password";
 			$item->nameText = $langs->trans('EINVOICING_CLIENT_SECRET');
 			$item->cssClass = 'minwidth500';
+			$this->storeThisFieldEncrypted($item);
 
 			// Authorization Code specific settings
 			// We suggest all these options if we are on the proxy.
@@ -611,7 +612,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 					}
 				}
 				// Proxy refresh failed: a via-partner client has no secret to fall back on, so we stop here.
-				dol_syslog(__METHOD__." refresh via partner proxy failed http_code=".$httpcode . " error=".$resultget['curl_error_msg'], LOG_WARNING, 0, "_einvoicing");
+				// The proxy relays the PA's raw error body (e.g. invalid_grant when the refresh_token was
+				// already rotated away), which curl_error_msg alone does not capture on a clean HTTP error.
+				dol_syslog(__METHOD__." refresh via partner proxy failed http_code=".$httpcode . " error=".$resultget['curl_error_msg'] . " response=".dol_trunc((string) ($resultget['content'] ?? ''), 500), LOG_WARNING, 0, "_einvoicing");
 				// Return a generic error message to avoid leaking the proxy URL in the logs.
 				setEventMessages('FailedToRetrieveAccessToken', null, 'errors');
 				$this->errors[] = 'FailedToRetrieveAccessToken';
@@ -1818,8 +1821,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 		dol_syslog(__METHOD__ . " syncFlows start from " . dol_print_date($dateafter, 'standard') . " limit " . $limit, LOG_DEBUG);
 		dol_syslog(__METHOD__ . " syncFlows start from " . dol_print_date($dateafter, 'standard') . " limit " . $limit, LOG_DEBUG, 0, "_einvoicing");
 
-		// If limit is 0, we first need to get the total number of flows to sync because AP set a default limit of 25 if not specified
-		/* response param "total" not supported by SuperPDP
+		// If limit is 0, we first need to get the total number of flows to sync because AP set a default limit of 25 if not specified.
+		// NOTE: Response param "total" not supported by SuperPDP, so we disable this. Instead we will use a batch mode in the loop later.
+		// NOTE: EsaLink support the param "total" so no batch mode is implemented for this provider.
+		/*
 		if ($limit == 0) {
 			$jsonparams = json_encode($params);
 			$response = $this->callApi($resource, "POST", $jsonparams, array('Request-Id' => $uuid));
@@ -1866,6 +1871,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$alreadyExist = 0;
 		$syncedFlows = 0;
 		$postponedFlows = 0;	// Flows left unread on purpose, retried on the next run (see 'postponeflow')
+		$pendingQueued = 0;		// Flows recorded in the manual-action queue instead of aborting the whole run
+		$providershort = preg_replace('/ViaPartner$/', '', (string) $this->providerName);
+		dol_include_once('/einvoicing/class/einvoicingsyncpending.class.php');
+		$syncPending = new EInvoicingSyncPending($db);
 		$call_id = null;
 		$i = 0;
 		$flow = null;
@@ -1964,9 +1973,9 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 					// If res < 0, rollback
 					if ($res['res'] < 0) {
-						if (!empty($res['postponeflow'])) {
-							// TODO Critical pb. When a flow is postponed, if some flow are recorded after, the postponed one may become out of range of the next sync
-							//and be definitely lost.
+						if (getDolGlobalInt('EINVOICING_ENABLE_POSTPONE_FLOWS') && !empty($res['postponeflow'])) {
+							// Critical pb. When a flow is postponed, if some flow are recorded after, the postponed one may become out of range of the next sync
+							// and be definitely lost.
 
 							// This flow could not be read, but nothing was stored for it: it stays pending and
 							// the next synchronization will try it again, so no invoice is lost. Report it with
@@ -1989,7 +1998,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 							continue;
 						}
 
-						if (isset($res['action']) && $res['action'] != '') {	// Save business errors if it is
+						if (isset($res['action']) && $res['action'] != '') {	// Save the business errors if it is
 							$rescode = $res['actioncode'] ?? '0';
 							// Set the result code and label into array $actions.
 							$actions[$rescode] = array(
@@ -1998,11 +2007,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 								'action' => $res['action'],
 								'actiondata' => $res['actiondata'] ?? array()
 							);
-
-							// Complete the $actions array with the Business error message
-							if ($rescode == 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT') {
-								$actions[$rescode]['businessmessage'] = $langs->trans("SupplierInvoiceFoundButWithdifferentAmount", $res['actiondata']['supplierref'] ?? '', $res['actiondata']['expectedamount'] ?? '');
+							// Some error return directly the business action to do.
+							if (!empty($res['businessmessage'])) {
+								$actions[$rescode]['businessmessage'] = $res['businessmessage'] . $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
 							}
+
+							// Complete the $actions array with the Business error message for common known cases.
 							if ($rescode == 'THIRDPARTY_NOT_FOUND') {
 								$infostring = '';
 								foreach ($res['actiondata'] ?? [] as $datakey => $dataval) {
@@ -2061,6 +2071,37 @@ class SuperPDPProvider extends AbstractPDPProvider
 								$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
 							}
 						}
+
+						// A manual-action business error (a missing product, a missing thirdparty, a supplier
+						// invoice found with a different amount) aborts the whole batch here by default, and every
+						// flow behind it with it - and since the cause does not go away on its own, the next run
+						// stops at the same place. The skip-and-continue queue below is an opt-in alternative, off
+						// by default and enabled only by the hidden option EINVOICING_ENABLE_MANUAL_ACTION_QUEUE:
+						// the strict ordering of the flow updates makes carrying on risky, so it stays a debug /
+						// power-user behaviour. When enabled, the flow is recorded in a persistent manual-action
+						// queue and the batch carries on, the same way the postponed flows above do; the queued
+						// flow is retried on demand once the product/thirdparty exists, and it is not lost when it
+						// drifts out of the rolling synchronization window.
+						if (getDolGlobalInt('EINVOICING_ENABLE_MANUAL_ACTION_QUEUE')
+							&& in_array($rescode, array('THIRDPARTY_NOT_FOUND', 'PRODUCT_NOT_FOUND', 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT'))) {
+							// Normalize the manual actions the protocol computed (create / associate an existing product / set a default one...) into a compact list the queue renders as icons.
+							$manualactions = array();
+							if (!empty($res['allactiondata']) && is_array($res['allactiondata'])) {
+								foreach ($res['allactiondata'] as $akey => $adata) {
+									if (!empty($adata['url'])) {
+										$manualactions[] = array('key' => $akey, 'url' => $adata['url'], 'label' => ($adata['label'] ?? ''));
+									}
+								}
+							} elseif (!empty($res['actionurl'])) {
+								$manualactions[] = array('key' => ($rescode == 'THIRDPARTY_NOT_FOUND' ? 'createthirdparty' : 'create'), 'url' => $res['actionurl'], 'label' => '');
+							}
+							$syncPending->queueFromFlow($flow, $providershort, $rescode, ($res['message'] ?? ''), $manualactions, $user, ($res['action'] ?? ''), ($res['actiondata'] ?? array()));
+							dol_syslog(__METHOD__ . " Flow " . $flow['flowId'] . " queued for manual action (" . $rescode . "), synchronization continues.", LOG_WARNING, 0, "_einvoicing");
+							$results_messages[] = "<span class=\"opacitylow\">Flow " . dol_escape_htmltag((string) $flow['flowId']) . " queued for manual action (" . $rescode . "): " . $res['message'] . "</span>";
+							$pendingQueued++;
+							continue;
+						}
+
 						dol_syslog(__METHOD__ . " Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], LOG_DEBUG, 0, "_einvoicing");
 						$errormessage = "ERROR_SYNCFLOW - Failed to synchronize flow " . dol_escape_htmltag((string) $flow['flowId']) . ": " . $res['message'];
 						$results_messages[] = $errormessage;
@@ -2080,6 +2121,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 					if ($res['res'] > 0) {
 						$syncedFlows++;
 						//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
+					}
+
+					// A flow that finally synchronized (or now already exists) leaves the manual-action queue.
+					// When an incoming flow created a supplier invoice, keep the link to it for traceability.
+					if (getDolGlobalInt('EINVOICING_ENABLE_MANUAL_ACTION_QUEUE') && $res['res'] >= 0) {
+						$resolvedElementType = ((($flow['flowDirection'] ?? '') === 'In') ? 'invoice_supplier' : '');
+						$syncPending->resolveByFlowId($flow['flowId'], $providershort, $user, $resolvedElementType, ($res['res'] > 0 ? (int) $res['res'] : 0));
 					}
 				} catch (Exception $e) {
 					$errormessage = "Exception occurred while synchronizing flow " . dol_escape_htmltag((string) $flow['flowId']) . ": " . dol_escape_htmltag($e->getMessage());
@@ -2166,6 +2214,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 			// Counted apart from the skipped ones: those flows were not stored, they come back next run
 			$messages[] = $langs->trans("TotalPostponedSync") . ": <b>" . $postponedFlows . "</b>";
 		}
+		if ($pendingQueued > 0) {
+			// Flows put in the manual-action queue during this run (a missing product or thirdparty, a supplier
+			// invoice with a different amount): the run carried on instead of stalling on them. Point to the
+			// queue where the manual action is done and the flow retried.
+			$messages[] = $langs->trans("TotalQueuedForManualAction") . ": <b>" . $pendingQueued . "</b> "
+				. '<a href="' . dol_buildpath('/einvoicing/sync_pending_list.php', 1) . '" class="paddingleft">' . $langs->trans("GoToPendingQueue") . ' &rarr;</a>';
+		}
 
 		// Processing result that will be saved in DB
 		$processingResult = '';
@@ -2174,6 +2229,8 @@ class SuperPDPProvider extends AbstractPDPProvider
 		}
 		$processingResult .= "<br>----------------------<br>" . implode("<br>", $messages);
 		$processingResult = "Processing result:<br>" . $processingResult;
+		// The recap grows with the number of flows: keep it inside its column, a refused UPDATE loses it whole
+		$processingResult = $this->makeStorableDebugPayload($processingResult);
 
 		// Save sync recap (only when this sync is attached to a Call row; otherwise $sql would be undefined/stale)
 		if ($call_id) {
@@ -2198,6 +2255,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			'totalFlows' => $totalFlows,
 			'alreadyExist' => $alreadyExist,
 			'syncedFlows' => $syncedFlows,
+			'pendingQueued' => $pendingQueued,
 			'batchlimit' => $batchlimit,
 			'actions' => $actions,
 			'details' => $results_messages,
@@ -2232,7 +2290,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 *
 	 * @param string 		$flowId        	FlowId
 	 * @param string|null 	$call_id  		Call ID for logging purposes
-	 * @return array{res:int<-1,1>, message:string, postponeflow?:int, actioncode?:string|null, actionurl?:string|null, action?:string|null, actiondata?:array<string,mixed>|null, businessmessage?:string} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'. 'postponeflow' marks a failure that stored nothing, so the batch may go on and the flow be retried later.
+	 * @return array{res:int<-1,1>, message:string, postponeflow?:int, actioncode?:string|null, actionurl?:string|null, action?:string|null, actiondata?:array<string,mixed>, businessmessage?:string} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'. 'postponeflow' marks a failure that stored nothing, so the batch may go on and the flow be retried later.
 	 */
 	public function syncFlow($flowId, $call_id = null)
 	{
@@ -2400,12 +2458,13 @@ class SuperPDPProvider extends AbstractPDPProvider
 				$exchangeProtocol = $importable['protocol'];
 
 				// Retrieve also einvoice file that is readable generated by Access Point (usually a PDF generated by AP)
+				// Getting it is optional, so a failure does not stop the import - but it is traced: the call
+				// is logged like any other, and the reason is said out loud instead of being dropped (#980).
 				$readableViewFile = null;
 				if ($detectedProtocol != 'FACTURX') {
-					$flowResponse = $this->fetchFlowData($flowId, 'ReadableView');
+					$flowResponse = $this->fetchFlowData($flowId, 'ReadableView', 'get_readable_view_for_invoice');
 					if ($flowResponse['status_code'] != 200) {
-						// We disable this error, getting the readable file is optional.
-						//return array('res' => -1, 'message' => "ERROR_FLOW_GETREADABLE Failed to retrieve ReadableView document for SupplierInvoice flow (flowId: $flowId)");
+						dol_syslog(__METHOD__ . " No readable view for flowId " . $flowId . ": HTTP " . $flowResponse['status_code'] . (empty($flowResponse['errorMessage']) ? '' : ' - ' . $flowResponse['errorMessage']) . ". The supplier invoice is imported without it.", LOG_WARNING, 0, '_einvoicing');
 					} else {
 						$readableViewFile = $flowResponse['response'];	// This is a string with PDF file content.
 					}
@@ -2429,7 +2488,12 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$retarray['actioncode'] = $res['actioncode'] ?? null;
 						$retarray['actionurl'] = $res['actionurl'] ?? null;
 						$retarray['action'] = $res['action'] ?? null;
-						$retarray['actiondata'] = $res['actiondata'] ?? null;
+						// Set only when the import sent one, the way postponeflow and businessmessage are just
+						// below: the key is declared optional, and carrying it at null instead hands every caller
+						// a null to index into.
+						if (isset($res['actiondata'])) {
+							$retarray['actiondata'] = $res['actiondata'];
+						}
 						// A failure that stored nothing may be retried later: the flag and the message that
 						// goes with it have to reach syncFlows(), which is what decides to carry on. Both are
 						// set only when the import sent them, so the shape stays the one declared above.
@@ -2592,6 +2656,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 					$document->cdar_reason_code = isset($refDoc['StatusReasonCode']) ? $refDoc['StatusReasonCode'] : '';
 					$document->cdar_reason_desc = isset($refDoc['StatusReason']) ? $refDoc['StatusReason'] : '';
 					$document->cdar_reason_detail = isset($refDoc['StatusIncludedNoteContent']) ? $refDoc['StatusIncludedNoteContent'] : '';
+					$recipientRoles = CdarHandler::recipientRoles($cdarDocument);
 
 					$exceptionmessage = '';
 					$db->begin();
@@ -2607,9 +2672,14 @@ class SuperPDPProvider extends AbstractPDPProvider
 								$syncStatus = $einvoicing::STATUS_ERROR;
 								$syncComment = $document->ack_info;
 							}
+							// 0 keeps the status the invoice already carries: a duplicate rejection refuses the
+							// new delivery, not the invoice the platform holds and quotes (issue #985).
+							if ($einvoicing->isTransmissionOnlyRejection($factureObj->id, $factureObj->element, $syncStatus, $document->cdar_reason_code)) {
+								$syncStatus = 0;
+							}
 							$einvoicing->insertOrUpdateExtLink($factureObj->id, $factureObj->element, $flowId, $syncStatus, $factureObj->ref, $syncComment);
 
-							$einvoicing->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code, $syncComment, $document->flow_direction, $flowId, $syncValidationStatus, $syncValidationComment, $document->submittedat, $document->cdar_reason_code);
+							$einvoicing->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code, $syncComment, $document->flow_direction, $flowId, $syncValidationStatus, $syncValidationComment, $document->submittedat, $document->cdar_reason_code, $recipientRoles);
 						} else {
 							dol_syslog(__METHOD__ . " Customer invoice not found for flowId: {$flowId}, so we save the flow into document table but we don't create an entry into einvoicing_extlinks table", LOG_WARNING); // This can happen if the invoice was sent from another system using the same PDP account
 						}
@@ -2740,6 +2810,17 @@ class SuperPDPProvider extends AbstractPDPProvider
 					} else {
 						$document->fk_element_id = !empty($supplierInvoiceObj->id) ? $supplierInvoiceObj->id : 0;
 						$document->tracking_idref = !empty($supplierInvoiceObj->ref) ? $supplierInvoiceObj->ref : '(NOTFOUND)'; // Should always be found here
+					}
+
+					// The status we sent is the one recorded when the message left, so the flow row can carry
+					// it like an incoming one does. Without it the list and the card show a lifecycle line
+					// with an empty code, and the two directions cannot be read the same way.
+					if (!empty($resFetchStatusMessages['lc_status'])) {
+						$document->cdar_lifecycle_code = (string) $resFetchStatusMessages['lc_status'];
+						$document->cdar_lifecycle_label = $einvoicing->getStatusLabel($resFetchStatusMessages['lc_status']);
+					}
+					if (empty($document->cdar_reason_code) && !empty($resFetchStatusMessages['lc_reason_code'])) {
+						$document->cdar_reason_code = $resFetchStatusMessages['lc_reason_code'];
 					}
 
 					// Update LC message status in einvoicing_lifecycle_msg table based on validation response
@@ -2882,7 +2963,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 	 * @param mixed $object Invoice object (CustomerInvoice or SupplierInvoice)
 	 * @param int $statusCode   Status code to send (see class constants for available codes)
 	 * @param string $reasonCode Reason code to send (optional)
-	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>} $paymentData Cashed amount (TTC) for status 212 (Encaissee), mandatory content of the CDAR (rule BR-FR-CDV-14)
+	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>,reason?:string} $paymentData Amount (TTC) moved for status 212 (Encaissee), negative on a refund, with the reason of the cancellation (rules BR-FR-CDV-14, P1.17)
 	 *
 	 * @return array{res:int, message:string}       Returns array with 'res' (1 on success, -1 on failure) with a 'message'.
 	 */
@@ -2959,7 +3040,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// Update einvoice status with awaiting validation
 				$einvoicing = new EInvoicing($db);
 				//$einvoicing->insertOrUpdateExtLink($object->id, $object->element, $flowId, EInvoicing::STATUS_AWAITING_VALIDATION, $object->ref);
-				$resStoreStatus = $einvoicing->storeStatusMessage($object->id, $object->element, $statusCode, '', 'out', $flowId, '', '', '', $reasonCode);
+				$resStoreStatus = $einvoicing->storeStatusMessage($object->id, $object->element, $statusCode, '', 'out', $flowId, '', '', null, $reasonCode);
 
 				// Call the API to retrieve flow details and check the validation status.
 				$resource = 'flows/' . $flowId;

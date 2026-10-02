@@ -12,6 +12,26 @@ The rules come from the FNFE `France_RFE` package (EUPL,
 <https://github.com/fnfempe/France_RFE>), and Saxon-HE runs the compiled XSLT of that package.
 Neither is vendored here: the CI fetches a pinned release, and so do you.
 
+A Schematron refuses in two ways, and both are read. Besides the assertion that fails
+(`svrl:failed-assert`), a `<report>` that fires produces an `svrl:successful-report`, and that is how
+a profile XSLT states *"Element 'ram:X' is marked as not used in the given context"* for everything
+the profile leaves out. A platform returns those as `REJ_COH`, so a document that fires one is
+reported `INVALID` here, counted apart in the `N report(s)` of the stage line.
+
+## The negative controls
+
+A green run says something only once the chain is shown to refuse something. Two scripts build that
+proof, from the very documents that were just accepted:
+
+| script | the defect it rebuilds | what must refuse it |
+|---|---|---|
+| `damage-vat-rate.php` | #709, BT-119 at 0.00 against a non-zero BT-117 | `BR-CO-17`, a failed assertion |
+| `damage-line-exemption.php` | #974, a VAT exemption reason on the invoice lines | the profile stage, as a **report** |
+
+The second one exists for the shape of the first column, not only for its rule: it is refused by a
+`<report>` alone, so a validator that reads only the failed assertions calls it valid. That is what
+happened before this defect was found, and what the control keeps from happening again.
+
 ## Running it locally
 
 ```sh

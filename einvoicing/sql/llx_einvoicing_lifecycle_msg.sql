@@ -26,6 +26,7 @@ CREATE TABLE llx_einvoicing_lifecycle_msg(
 	lc_validation_status varchar(20) NOT NULL,		-- Lifecycle validation status: OK | PENDING | ERROR - only filled if direction is OUT
 	lc_validation_message text NOT NULL,	-- Lifecycle validation message if error - only filled if direction is OUT
 	lc_reason_code varchar(50) NOT NULL,			-- Reason code for current status if applicable (e.g. for rejected status)
+	lc_recipient_roles varchar(50),					-- RoleCodes the CDAR addressed the status to ('SE', 'SE,BY'), empty when we sent it
 	date_creation datetime NOT NULL,
 	tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 	fk_user_creat integer NOT NULL,

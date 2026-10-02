@@ -642,6 +642,42 @@ abstract class AbstractPDPProvider
 	abstract public function syncFlow($flowId, $call_id = null);
 
 	/**
+	 * Have the value of a setup field stored encrypted, whatever its constant is named.
+	 *
+	 * dolibarr_set_const() decides on the END of the name, and the environment marker of the production
+	 * credentials hides the keyword it matches (#599, #1013). dolEncrypt() returns an already encrypted
+	 * string unchanged, so a core that does encrypt that name still stores a single layer.
+	 *
+	 * @param	FormSetupItem	$item	Setup field holding a credential
+	 * @return	void
+	 */
+	protected function storeThisFieldEncrypted($item)
+	{
+		$item->setSaveCallBack(function (FormSetupItem $credentialitem) {
+			$res = dolibarr_set_const($credentialitem->db, $credentialitem->confKey, AbstractPDPProvider::encryptIfReadable((string) $credentialitem->fieldValue), 'chaine', 0, '', $credentialitem->entity);
+
+			return ($res < 0 ? -1 : 1);
+		});
+	}
+
+	/**
+	 * Encrypt a credential, unless this core would not give it back.
+	 *
+	 * Dolibarr 23 refuses a decrypted value that is not plain ASCII and hands the encrypted string over
+	 * instead (its dolDecrypt() tests ascii_check(), which 24 relaxed to ascii or utf8), so a password
+	 * carrying an accent would come back unusable. Such a value is stored the way it was before.
+	 *
+	 * @param	string	$value	Value of the credential
+	 * @return	string			What to store: encrypted, or the value itself when it would not read back
+	 */
+	public static function encryptIfReadable($value)
+	{
+		$encrypted = dolEncrypt((string) $value);
+
+		return (dolDecrypt($encrypted) === (string) $value) ? $encrypted : (string) $value;
+	}
+
+	/**
 	 * Insert or update OAuth token for the given PDP.
 	 *
 	 * @param  string      $accessToken    Access token string
@@ -668,10 +704,12 @@ abstract class AbstractPDPProvider
 				$forceentity = getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP");
 			}
 
-			dolibarr_set_const($db, $serviceName.'_TOKEN', $accessToken, 'chaine', 0, '', $forceentity);
+			// Neither '_TOKEN' nor '_REFRESH' is in the list dolibarr_set_const() matches, so both would
+			// be stored as received. Reading needs no change, dolDecrypt() is applied to every constant.
+			dolibarr_set_const($db, $serviceName.'_TOKEN', self::encryptIfReadable($accessToken), 'chaine', 0, '', $forceentity);
 
 			if ($refreshToken !== null) {
-				dolibarr_set_const($db, $serviceName.'_REFRESH', $refreshToken, 'chaine', 0, '', $forceentity);
+				dolibarr_set_const($db, $serviceName.'_REFRESH', self::encryptIfReadable($refreshToken), 'chaine', 0, '', $forceentity);
 			}
 
 			if ($expire_at !== null) {
@@ -698,9 +736,9 @@ abstract class AbstractPDPProvider
 			if ($db->num_rows($resql) > 0) {
 				// --- Update existing token ---
 				$sql  = "UPDATE ".MAIN_DB_PREFIX."oauth_token SET ";
-				$sql .= "tokenstring = '".$db->escape($accessToken)."'";
+				$sql .= "tokenstring = '".$db->escape(self::encryptIfReadable($accessToken))."'";
 				if ($refreshToken !== null) {
-					$sql .= ", tokenstring_refresh = '".$db->escape($refreshToken)."'";
+					$sql .= ", tokenstring_refresh = '".$db->escape(self::encryptIfReadable($refreshToken))."'";
 				}
 				if ($expire_at !== null) {
 					$sql .= ", expire_at = '".$db->idate($expire_at, 'gmt')."'";
@@ -715,8 +753,8 @@ abstract class AbstractPDPProvider
 				$sql .= $expire_at !== null ? ", expire_at" : "";
 				$sql .= ", entity) VALUES (";
 				$sql .= "'".$db->escape($serviceName)."', ";
-				$sql .= "'".$db->escape($accessToken)."'";
-				$sql .= $refreshToken !== null ? ", '".$db->escape($refreshToken)."'" : "";
+				$sql .= "'".$db->escape(self::encryptIfReadable($accessToken))."'";
+				$sql .= $refreshToken !== null ? ", '".$db->escape(self::encryptIfReadable($refreshToken))."'" : "";
 				$sql .= ", '".$db->idate($now)."'";
 				$sql .= $expire_at !== null ? ", '".$db->idate($expire_at, 'gmt')."'" : "";
 				$sql .= ", ".(int) $forceentity.")";
@@ -795,9 +833,11 @@ abstract class AbstractPDPProvider
 
 		$obj = $db->fetch_object($resql);
 
+		// dolDecrypt() returns unchanged what has no 'dolcrypt:' prefix: a row written in clear by an
+		// earlier version is read as before.
 		return [
-			'token' => (string) $obj->tokenstring,
-			'refresh_token' => (string) $obj->tokenstring_refresh,
+			'token' => (string) dolDecrypt((string) $obj->tokenstring),
+			'refresh_token' => (string) dolDecrypt((string) $obj->tokenstring_refresh),
 			'token_expires_at' => (string) $db->jdate($obj->expire_at, 'gmt')
 		];
 	}
@@ -916,6 +956,18 @@ abstract class AbstractPDPProvider
 	const LOGCALL_SENSITIVE_KEYS = array('client_secret', 'access_token', 'refresh_token', 'id_token', 'password');
 
 	/**
+	 * Maximum number of bytes of a payload stored in the debug columns of the trace. Beyond it the
+	 * payload is stored truncated: an INSERT refused for one oversized column loses the whole trace
+	 * of the call (issue #995), and 1 MiB is already far more than a diagnosis reads.
+	 */
+	const LOGCALL_MAX_PAYLOAD_SIZE = 1048576;
+
+	/**
+	 * Bytes kept free inside LOGCALL_MAX_PAYLOAD_SIZE for the marker appended to a truncated payload.
+	 */
+	const LOGCALL_TRUNCATION_MARKER_SIZE = 64;
+
+	/**
 	 * Redact known sensitive fields (@see LOGCALL_SENSITIVE_KEYS) from a value before it is
 	 * persisted in the API call log, whatever its shape: PHP array, application/x-www-form-urlencoded
 	 * string (OAuth token requests), JSON string, or plain text (left untouched in that last case).
@@ -977,8 +1029,8 @@ abstract class AbstractPDPProvider
 	 * (llx_einvoicing_call.response, llx_einvoicing_document.response_for_debug).
 	 *
 	 * Some PDP responses carry non-UTF-8 bytes (signed or compressed payloads): stored as-is they raise a
-	 * SQL error 1366 (Incorrect string value) and abort the flow. Valid UTF-8 is kept unchanged; anything
-	 * else is base64-encoded behind a marker.
+	 * SQL error 1366 (Incorrect string value) and abort the flow. Valid UTF-8 is kept as is, anything else
+	 * is base64-encoded behind a marker, and what exceeds LOGCALL_MAX_PAYLOAD_SIZE is truncated (issue #995).
 	 *
 	 * @param   string|null $payload    Raw payload, possibly binary
 	 * @return  string                  UTF-8-safe representation
@@ -989,9 +1041,46 @@ abstract class AbstractPDPProvider
 			return (string) $payload;
 		}
 		if (preg_match('//u', $payload)) {	// already valid UTF-8
+			return self::truncateDebugPayload($payload);
+		}
+		// Encode only what fits: base64 grows by a third, and cutting the result afterwards would
+		// leave an undecodable tail (4 characters carry 3 bytes).
+		$room = self::LOGCALL_MAX_PAYLOAD_SIZE - self::LOGCALL_TRUNCATION_MARKER_SIZE - strlen('[base64] ');
+		$fits = intdiv($room, 4) * 3;
+		if (strlen($payload) <= $fits) {
+			return '[base64] ' . base64_encode($payload);
+		}
+		return '[base64] ' . base64_encode(substr($payload, 0, $fits)) . self::debugPayloadTruncationMarker(strlen($payload) - $fits);
+	}
+
+	/**
+	 * Keep a UTF-8 payload within LOGCALL_MAX_PAYLOAD_SIZE bytes, cutting on a character boundary:
+	 * a multi-byte character left in half makes the whole column invalid UTF-8 (SQL error 1366).
+	 *
+	 * @param   string  $payload    Valid UTF-8 payload
+	 * @return  string              Payload, truncated and marked as such when it was too long
+	 */
+	protected static function truncateDebugPayload($payload)
+	{
+		if (strlen($payload) <= self::LOGCALL_MAX_PAYLOAD_SIZE) {
 			return $payload;
 		}
-		return '[base64] ' . base64_encode($payload);
+		$kept = substr($payload, 0, self::LOGCALL_MAX_PAYLOAD_SIZE - self::LOGCALL_TRUNCATION_MARKER_SIZE);
+		while ($kept !== '' && !preg_match('//u', $kept)) {	// step back over a character cut in half
+			$kept = substr($kept, 0, -1);
+		}
+		return $kept . self::debugPayloadTruncationMarker(strlen($payload) - strlen($kept));
+	}
+
+	/**
+	 * Marker appended to a payload stored truncated, so the trace says what it does not hold.
+	 *
+	 * @param   int     $dropped    Number of bytes left out
+	 * @return  string              Marker, shorter than LOGCALL_TRUNCATION_MARKER_SIZE
+	 */
+	protected static function debugPayloadTruncationMarker($dropped)
+	{
+		return "\n[truncated: " . ((int) $dropped) . " more bytes]";
 	}
 
 	/**
@@ -1208,6 +1297,7 @@ abstract class AbstractPDPProvider
 		$document->cdar_reason_code = isset($refDoc['StatusReasonCode']) ? $refDoc['StatusReasonCode'] : '';
 		$document->cdar_reason_desc = isset($refDoc['StatusReason']) ? $refDoc['StatusReason'] : '';
 		$document->cdar_reason_detail = isset($refDoc['StatusIncludedNoteContent']) ? $refDoc['StatusIncludedNoteContent'] : '';
+		$recipientRoles = CdarHandler::recipientRoles($cdarDocument);
 
 		// The referenced document is the vendor invoice, identified the way its issuer numbered it:
 		// that is our ref_supplier, and the issuing party is the vendor it belongs to.
@@ -1256,13 +1346,27 @@ abstract class AbstractPDPProvider
 
 		$statusComment = $document->cdar_reason_detail ? $document->cdar_reason_detail : $document->cdar_reason_desc;
 
+		// What the vendor reports in figures (MDG-43): the amount cashed in of a 212 above all, which is
+		// the only thing telling a cash-in from the refund of a credit note (both are a 212).
+		$amountsReported = empty($refDoc['StatusCharacteristics'])
+			? ''
+			: CdarHandler::describeStatusCharacteristics($refDoc['StatusCharacteristics'], $langs);
+		if ($amountsReported !== '') {
+			$statusComment = $statusComment ? $amountsReported . ' - ' . $statusComment : $amountsReported;
+		}
+
 		$db->begin();
 
 		// Neither write throws: a SQL failure comes back as -1, so the rollback below is only reachable
 		// if the two results are read.
 		// The flow_id of the link is left alone on purpose: on a supplier invoice it points at the
 		// received invoice document, which stays the source of its XML. Only the status moves.
-		$resExtLink = $einvoicing->insertOrUpdateExtLink($supplierInvoice->id, $supplierInvoice->element, '', $document->cdar_lifecycle_code, '', $statusComment);
+		// 0 leaves the status the invoice already carries untouched: a duplicate rejection refuses the
+		// new delivery, not the invoice the platform already holds and this status quotes (issue #985).
+		$statusToRecord = $einvoicing->isTransmissionOnlyRejection($supplierInvoice->id, $supplierInvoice->element, $document->cdar_lifecycle_code, $document->cdar_reason_code)
+			? 0 : $document->cdar_lifecycle_code;
+
+		$resExtLink = $einvoicing->insertOrUpdateExtLink($supplierInvoice->id, $supplierInvoice->element, '', $statusToRecord, '', $statusComment);
 
 		$resStatusMessage = ($resExtLink > 0 ? $einvoicing->storeStatusMessage(
 			$supplierInvoice->id,
@@ -1274,7 +1378,8 @@ abstract class AbstractPDPProvider
 			$document->ack_status,
 			$document->ack_info,
 			$document->submittedat,
-			$document->cdar_reason_code
+			$document->cdar_reason_code,
+			$recipientRoles
 		) : -1);
 
 		if ($resExtLink <= 0 || $resStatusMessage <= 0) {
@@ -1286,10 +1391,10 @@ abstract class AbstractPDPProvider
 		$db->commit();
 
 		$statusLabel = $document->cdar_lifecycle_label ? $document->cdar_lifecycle_label : $document->cdar_lifecycle_code;
-		$reasonDetail = $document->cdar_reason_detail ? " - " . $document->cdar_reason_detail : '';
+		$reasonDetail = $statusComment ? " - " . $statusComment : '';
 		$this->addEvent('STATUS', "EINVOICING - Status: " . $statusLabel, "EINVOICING - Status: " . $statusLabel . $reasonDetail, $supplierInvoice);
 
-		return array('res' => 1, 'message' => "FlowId " . $flowId . " - Vendor status " . $document->cdar_lifecycle_code . " recorded on supplier invoice " . $supplierInvoice->ref);
+		return array('res' => 1, 'message' => "FlowId " . $flowId . " - Vendor status " . $document->cdar_lifecycle_code . ($amountsReported !== '' ? " (" . $amountsReported . ")" : '') . " recorded on supplier invoice " . $supplierInvoice->ref);
 	}
 
 	/**
@@ -1442,7 +1547,7 @@ abstract class AbstractPDPProvider
 	 * @param mixed $object Invoice object (CustomerInvoice or SupplierInvoice)
 	 * @param int $statusCode   Status code to send (see class constants for available codes)
 	 * @param string $reasonCode Reason code to send (optional)
-	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>} $paymentData Cashed amount (TTC) for status 212 (Encaissee), mandatory content of the CDAR (rule BR-FR-CDV-14)
+	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>,reason?:string} $paymentData Amount (TTC) moved for status 212 (Encaissee), negative on a refund, with the reason of the cancellation (rules BR-FR-CDV-14, P1.17)
 	 *
 	 * @return array{res:int, message:string}       Returns array with 'res' (1 on success, -1 on failure) with a 'message'.
 	 */

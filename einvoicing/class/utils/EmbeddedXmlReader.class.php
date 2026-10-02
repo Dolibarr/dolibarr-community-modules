@@ -2,6 +2,7 @@
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2026      MB Informatique      <info@mb-informatique.fr>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -50,15 +51,22 @@ class EmbeddedXmlReader
 
 	/**
 	 * Parse an XML string and return all AdditionalReferencedDocument entries
-	 * for a given line ID, with their IssuerAssignedID, TypeCode and IssueDate (if available).
+	 * for a given line ID, with their IssuerAssignedID, TypeCode, ReferenceTypeCode and IssueDate
+	 * (if available).
 	 *
 	 * @param string|int $lineid        Line ID to look up
 	 *
-	 * @return array<array{IssuerAssignedID:?string,typeCode:?string,issueDate:?string}>
+	 * @return array<array{IssuerAssignedID:?string,typeCode:?string,referenceTypeCode:?string,issueDate:?string}>
 	 */
 	public function getLineAdditionalReferencedDocuments($lineid): array
 	{
 		$additionalRefDocs = [];
+
+		// No XML was embedded in the PDF: loadXML() takes no null since PHP 8.1, and there is
+		// nothing to query anyway.
+		if (empty($this->embeddedXml)) {
+			return $additionalRefDocs;
+		}
 
 		$dom = new \DOMDocument();
 
@@ -77,16 +85,20 @@ class EmbeddedXmlReader
 
 		if ($refDocs !== false) {
 			foreach ($refDocs as $refDoc) {
-				$id       = $xpath->evaluate('string(ram:IssuerAssignedID)', $refDoc);
-				$typeCode = $xpath->evaluate('string(ram:TypeCode)', $refDoc);
-				$dateStr  = $xpath->evaluate('string(ram:FormattedIssueDateTime/qdt:DateTimeString)', $refDoc);
+				$id                = $xpath->evaluate('string(ram:IssuerAssignedID)', $refDoc);
+				$typeCode          = $xpath->evaluate('string(ram:TypeCode)', $refDoc);
+				$referenceTypeCode = $xpath->evaluate('string(ram:ReferenceTypeCode)', $refDoc);
+				$dateStr           = $xpath->evaluate('string(ram:FormattedIssueDateTime/qdt:DateTimeString)', $refDoc);
+
+				// A date the sender did not write in the 102 format makes createFromFormat() return
+				// false, and calling format() on it was fatal on a document the module only receives.
+				$issueDate = $dateStr ? \DateTime::createFromFormat('Ymd', $dateStr) : false;
 
 				$additionalRefDocs[] = [
-					'IssuerAssignedID' => $id ?: null,
-					'typeCode'         => $typeCode ?: null,
-					'issueDate'        => $dateStr
-						? \DateTime::createFromFormat('Ymd', $dateStr)->format('Y-m-d')
-						: null,
+					'IssuerAssignedID'  => $id ?: null,
+					'typeCode'          => $typeCode ?: null,
+					'referenceTypeCode' => $referenceTypeCode ?: null,
+					'issueDate'         => $issueDate ? $issueDate->format('Y-m-d') : null,
 				];
 			}
 		}
