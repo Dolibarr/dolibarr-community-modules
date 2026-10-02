@@ -162,7 +162,6 @@ if (!$sortorder) {
 }
 
 // Add a recap field into $object->fields array for list (we add it into object directly to be able to position it)
-// TODO : Update Module Builder to manage virtual fields
 $object->fields['recap'] = array(
 	'label' => $langs->trans("flowRecap"),
 	'type' => 'text',
