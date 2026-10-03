@@ -840,7 +840,7 @@ trait CommonProtocol
 			dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Updating existing thirdparty (client status'.(getDolGlobalString('EINVOICING_THIRDPARTIES_COMPLETE_INFO') ? ' + other info' : '').'): ' . $thirdpartyId);
 
 			$thirdparty = new Societe($db);
-			$thirdparty->fetch($thirdpartyId);
+			$this->_fetchThirdpartyForImportUpdate($thirdparty, $thirdpartyId);
 
 			// Update thirdparty information based on priority
 			if (getDolGlobalInt('EINVOICING_THIRDPARTIES_COMPLETE_INFO')) {
@@ -959,7 +959,7 @@ trait CommonProtocol
 				$completionError = implode(', ', array_filter(array_merge(array($thirdparty->error), $thirdparty->errors)));
 
 				$plainthirdparty = new Societe($db);
-				if ($plainthirdparty->fetch($thirdpartyId) > 0) {
+				if ($this->_fetchThirdpartyForImportUpdate($plainthirdparty, $thirdpartyId) > 0) {
 					$allowmodcodeclient = 0;
 					$allowmodcodefournisseur = 0;
 					$this->_prepareThirdpartyForImportUpdate($plainthirdparty, $allowmodcodeclient, $allowmodcodefournisseur);
@@ -1254,6 +1254,23 @@ trait CommonProtocol
 		} else {
 			dol_syslog(get_class($this) . '::_setThirdpartyCountryFromCode Unknown country code in document: ' . $countrycode, LOG_WARNING);
 		}
+	}
+
+	/**
+	 * Load a thirdparty found in Dolibarr for the update done when a document is imported.
+	 *
+	 * @param	Societe	$thirdparty		Thirdparty to load
+	 * @param	int		$thirdpartyId	Id of the thirdparty
+	 * @return	int						Result of Societe::fetch()
+	 */
+	private function _fetchThirdpartyForImportUpdate($thirdparty, $thirdpartyId)
+	{
+		$result = $thirdparty->fetch($thirdpartyId);
+		// Societe::update() accepts a code out of the current numbering mask only when oldcopy holds it
+		// unchanged. A plain clone: dol_clone() of Dolibarr 24 drops the null properties update() reads.
+		$thirdparty->oldcopy = clone $thirdparty;
+
+		return $result;
 	}
 
 	/**
