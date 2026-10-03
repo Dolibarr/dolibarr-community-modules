@@ -330,7 +330,7 @@ print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sort
 
 // Add code for pre mass action (confirmation or email presend form)
 $objecttmp = new ProductFournisseur($db);
-include DOL_DOCUMENT_ROOT.'/core/tpl/massactions_pre.tpl.php';
+include DOL_DOCUMENT_ROOT.'/core/tpl/massactions_pre.tpl.php';	// @phpstan-ignore include.fileNotFound (PHPStan takes DOL_DOCUMENT_ROOT from install/inc.php of the core, where it is '..')
 
 print '<div class="info"><span class="">'.$langs->trans("MappedVendorRefsDesc");
 print ' '.$langs->trans("MapEInvoiceProductsDesc2");

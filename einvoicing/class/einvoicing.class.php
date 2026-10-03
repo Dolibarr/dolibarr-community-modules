@@ -2023,7 +2023,17 @@ class EInvoicing
 					if (!empty($currentOverrideRouting)) {
 						$resprints .= dol_escape_htmltag($selectOptions[$currentOverrideRouting]);
 					} else {
-						$resprints .= '<span class="opacitymedium">' . $langs->trans("InvoiceRoutingOverrideDefault") . '</span>';
+						// Show the address the invoice will really be sent to, as getBuyerCommunicationURI() resolves it.
+						if (!is_object($object->thirdparty ?? null) && !empty($object->socid)) {
+							$object->fetch_thirdparty();
+						}
+						$buyer = $object->thirdparty ?? null;
+						$defaultTarget = ($buyer instanceof Societe) ? $this->getBuyerCommunicationURI($buyer) : '';
+						$resprints .= '<span class="opacitymedium">' . $langs->trans("InvoiceRoutingOverrideDefault");
+						if ($defaultTarget !== '') {
+							$resprints .= ' (' . dol_escape_htmltag($defaultTarget) . ')';
+						}
+						$resprints .= '</span>';
 					}
 				}
 				$resprints .= '</td>';
@@ -2387,9 +2397,9 @@ class EInvoicing
                                 if (data.statusvalidationlabel === "Pending") {
 									countCheckInvoiceStatus++;
 									if (countCheckInvoiceStatus <= 3) {
-		                            	setTimeout(checkInvoiceStatus, 5000);
+		                            	setTimeout(checkSupplierInvoiceStatus, 5000);
 									} else if (countCheckInvoiceStatus <= 5) {
-		                            	setTimeout(checkInvoiceStatus, 10000);
+		                            	setTimeout(checkSupplierInvoiceStatus, 10000);
 									}
                                 }
                             }, "json");
@@ -2652,11 +2662,11 @@ class EInvoicing
 				$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
 
 				if (GETPOST('highlight') == 'routing_product_id') {
-					if ((float) DOL_VERSION < 25) {
+					if ((float) DOL_VERSION >= 25) {
 						if (getDolGlobalString('PRODUIT_USE_SEARCH_TO_SELECT')) {
-							$resprints .= dol_set_focus('#search_routing_product_id', 1);
+							$resprints .= dol_set_focus('#search_routing_product_id', 1);	// @phpstan-ignore arguments.count, function.void (the second parameter and the return value exist from Dolibarr 25)
 						} else {
-							$resprints .= dol_set_focus('#routing_product_id', 1);
+							$resprints .= dol_set_focus('#routing_product_id', 1);	// @phpstan-ignore arguments.count, function.void (the second parameter and the return value exist from Dolibarr 25)
 						}
 					}
 				}
