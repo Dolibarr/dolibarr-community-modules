@@ -369,7 +369,8 @@ if (!$isSlaveEntity && getDolGlobalString('EINVOICING_PDP')) {
 	$provider = $providerManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 }
 
-if ($action == 'confirm_sync' && !$isSlaveEntity && getDolGlobalString('EINVOICING_PDP') && $confirm == 'yes') {
+// The sync creates supplier invoices and vendors: reading the list is not enough to run it.
+if ($action == 'confirm_sync' && !$isSlaveEntity && $permissiontoadd && getDolGlobalString('EINVOICING_PDP') && $confirm == 'yes') {
 	if (isset($provider)) {
 		// Sync all flows
 		$sync_result = $provider->syncFlows($syncFromDate, $maxflows);
@@ -960,9 +961,15 @@ if ($provider) {
 	print '</table>'."\n";
 
 	// Button to submit (sync manage both in and update of out invoices)
-	print '<a class="inline-block valignmiddle butAction small margintoponly marginbottomonly" href="#" id="runSyncBtn" style="margin: 0;">';
-	print img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC");
-	print '</a>'."\n";
+	if ($permissiontoadd) {
+		print '<a class="inline-block valignmiddle butAction small margintoponly marginbottomonly" href="#" id="runSyncBtn" style="margin: 0;">';
+		print img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC");
+		print '</a>'."\n";
+	} else {
+		print '<span class="inline-block valignmiddle butActionRefused classfortooltip small margintoponly marginbottomonly" style="margin: 0;" title="'.dol_escape_htmltag($langs->trans("NotEnoughPermissions")).'">';
+		print img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC");
+		print '</span>'."\n";
+	}
 
 	print '</div>';
 	print '</div>'."\n";
@@ -983,19 +990,21 @@ if ($provider) {
 
 	print "</div>\n";
 
-	print '<script>'."\n";
-	print "document.getElementById('runSyncBtn').addEventListener('click', function(e){\n";
-	print "  e.preventDefault();\n";
-	print "  var maxFlows = document.getElementById('maxflows') ? encodeURIComponent(document.getElementById('maxflows').value) : '0';\n";
-	print "  var token = encodeURIComponent('".newToken()."');\n";
-	print "  var lastSyncDatetimehour = document.getElementById('last_sync_datetimehour') ? encodeURIComponent(document.getElementById('last_sync_datetimehour').value) : '0';\n";
-	print "  var lastSyncDatetimemin = document.getElementById('last_sync_datetimemin') ? encodeURIComponent(document.getElementById('last_sync_datetimemin').value) : '0';\n";
-	print "  var lastSyncDatetimemonth = document.getElementById('last_sync_datetimemonth') ? encodeURIComponent(document.getElementById('last_sync_datetimemonth').value) : '0';\n";
-	print "  var lastSyncDatetimeday = document.getElementById('last_sync_datetimeday') ? encodeURIComponent(document.getElementById('last_sync_datetimeday').value) : '0';\n";
-	print "  var lastSyncDatetimeyear = document.getElementById('last_sync_datetimeyear') ? encodeURIComponent(document.getElementById('last_sync_datetimeyear').value) : '0';\n";
-	print "  window.location.href = '".$_SERVER["PHP_SELF"]."?action=sync&maxflows=' + maxFlows + '&last_sync_datetimehour=' + lastSyncDatetimehour + '&last_sync_datetimemin=' + lastSyncDatetimemin + '&last_sync_datetimemonth=' + lastSyncDatetimemonth + '&last_sync_datetimeday=' + lastSyncDatetimeday + '&last_sync_datetimeyear=' + lastSyncDatetimeyear + '&token=' + token;\n";
-	print "});\n";
-	print "</script>\n";
+	if ($permissiontoadd) {
+		print '<script>'."\n";
+		print "document.getElementById('runSyncBtn').addEventListener('click', function(e){\n";
+		print "  e.preventDefault();\n";
+		print "  var maxFlows = document.getElementById('maxflows') ? encodeURIComponent(document.getElementById('maxflows').value) : '0';\n";
+		print "  var token = encodeURIComponent('".newToken()."');\n";
+		print "  var lastSyncDatetimehour = document.getElementById('last_sync_datetimehour') ? encodeURIComponent(document.getElementById('last_sync_datetimehour').value) : '0';\n";
+		print "  var lastSyncDatetimemin = document.getElementById('last_sync_datetimemin') ? encodeURIComponent(document.getElementById('last_sync_datetimemin').value) : '0';\n";
+		print "  var lastSyncDatetimemonth = document.getElementById('last_sync_datetimemonth') ? encodeURIComponent(document.getElementById('last_sync_datetimemonth').value) : '0';\n";
+		print "  var lastSyncDatetimeday = document.getElementById('last_sync_datetimeday') ? encodeURIComponent(document.getElementById('last_sync_datetimeday').value) : '0';\n";
+		print "  var lastSyncDatetimeyear = document.getElementById('last_sync_datetimeyear') ? encodeURIComponent(document.getElementById('last_sync_datetimeyear').value) : '0';\n";
+		print "  window.location.href = '".$_SERVER["PHP_SELF"]."?action=sync&maxflows=' + maxFlows + '&last_sync_datetimehour=' + lastSyncDatetimehour + '&last_sync_datetimemin=' + lastSyncDatetimemin + '&last_sync_datetimemonth=' + lastSyncDatetimemonth + '&last_sync_datetimeday=' + lastSyncDatetimeday + '&last_sync_datetimeyear=' + lastSyncDatetimeyear + '&token=' + token;\n";
+		print "});\n";
+		print "</script>\n";
+	}
 } elseif (!$isSlaveEntity) {
 	// Message to check module configuration
 	print info_admin($langs->transnoentities("checkEInvoicingModuleConfiguration"), 0, 0, '1', '', '', 'warning');
@@ -1003,7 +1012,7 @@ if ($provider) {
 
 
 // Confirmation dialog
-if ($action == 'sync' && $provider) {
+if ($action == 'sync' && $provider && $permissiontoadd) {
 	$validationFormError = 0;
 
 	if ($maxflows < 0) {
