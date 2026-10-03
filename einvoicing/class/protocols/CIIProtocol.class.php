@@ -851,12 +851,12 @@ class CIIProtocol extends AbstractProtocol
 
 	/**
 	 * Decide what to do with a BG-3 reference (BT-25) the buyer does not hold.
-	 * BT-113 is what tells the two cases apart: an amount already paid points at a deposit the import
+	 * depositAnnouncedByDocument() tells the two cases apart: an amount already paid points at a deposit the import
 	 * has to deduct, so the flow waits for it rather than importing an invoice short of its deduction;
 	 * nothing paid means the reference is documentary - a contract number, or the placeholder some
 	 * vendors always emit - and stepping over it costs nothing, as long as it is reported (#880).
 	 * ram:TypeCode cannot arbitrate this: CII-DT-018 forbids it below EXTENDED, so it is always absent.
-	 * A reference repeating the document's own number (BT-1) is settled before BT-113 is even read:
+	 * A reference repeating the document's own number (BT-1) is settled before that amount is read:
 	 * it can never resolve, so waiting for it is waiting for ever (#927).
 	 *
 	 * @param  string					$refDoc           BT-25, the identifier of the referenced document
