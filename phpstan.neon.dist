@@ -161,11 +161,11 @@ parameters:
 			identifier: method.nameCase
 			path: einvoicing/class/utils/FacturxTcpdfMerger.class.php
 
-        # A useless test for a useless control.
-        -
-            identifier: nullCoalesce.property
-            message: '#on left side of \?\? is not nullable#'           
+		# A useless test for a useless control.
+		-
+			identifier: nullCoalesce.property
+			message: '#on left side of \?\? is not nullable#'           
 
 		-
-            identifier: ignore.count
-            message: '#on left side of ?? is not nullable#'		    
+			identifier: ignore.count
+			message: '#on left side of ?? is not nullable#'		    
