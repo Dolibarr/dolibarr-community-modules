@@ -3212,7 +3212,7 @@ class EInvoicing
 	 * @param string	$elementType	Type of element (property object->element: 'facture', 'invoice_supplier', 'societe', ...)
 	 * @param string	$name			Name of the property ('buyer_order_reference', ...)
 	 * @param string	$value			Value to store (Value '' delete the row)
-	 * @return int						-1 on error, 1 if an existing row was updated, rowid of the new row otherwise
+	 * @return int						-1 on error, 0 if the value is empty and no row exists, 1 if an existing row was updated or deleted, rowid of the new row otherwise
 	 */
 	public function insertOrUpdateExtraField($elementId, $elementType, $name, $value)
 	{
@@ -3260,6 +3260,8 @@ class EInvoicing
 				$sql .= ", '" . $this->db->escape($name) . "'";
 				$sql .= ", '" . $this->db->escape($value) . "'";
 				$sql .= ", '" . $this->db->idate(dol_now()) . "', " . (int) $user->id . ")";
+			} else {
+				return 0;
 			}
 		}
 
