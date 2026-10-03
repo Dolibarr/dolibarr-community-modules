@@ -552,7 +552,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 						'enabled' => true,
 						'perm' => ($reimportofadraft ? 1 : 0),
 						'label' => 'EInvoiceReimport',
-						'url' => dol_buildpath('/einvoicing/document_card.php', 1).'?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken()
+						'url' => einvoicingDropdownEntryUrl(dol_buildpath('/einvoicing/document_card.php', 1)) . '?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken()
 					);
 					if (!$reimportofadraft) {
 						$reimportentry['attr'] = array('title' => $langs->trans('EInvoiceReimportOnlyOnADraft'));
