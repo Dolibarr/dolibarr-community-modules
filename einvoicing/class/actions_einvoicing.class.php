@@ -165,7 +165,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 						$result = $protocol->generateInvoice($invoiceObject, $outputlangs, $pdfPath);		// Generate E-invoice (embed into the real generated file)
 
-						if ($result >= 0) {
+						// $result is the path of the file, or -1: under PHP 8 a path compared to 0 is compared as
+						// a string, and "/..." >= "0" is false, so the configuration warning was never shown.
+						if (!is_numeric($result) || $result >= 0) {
 							if (!defined('NOLOGIN')) {	// If in backoffice context
 								setEventMessages($message, array(), $messagecss);
 							}
