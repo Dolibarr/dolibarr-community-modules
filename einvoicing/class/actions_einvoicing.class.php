@@ -1794,8 +1794,14 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		$contexts = explode(':', $parameters['context']);
 
 		if (array_intersect($contexts, ['invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
-			if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == getDolGlobalString('EINVOICING_PDP')) {
-				$this->resprints .= " AND ext.provider = '" . $db->escape(getDolGlobalString('EINVOICING_PDP')) . "'";
+			// The 'search_pdplinked' select option is built from the provider name with any trailing
+			// 'ViaPartner' stripped (see printFieldListOption()), and that is also what document.provider
+			// gets stored as (see e.g. SuperPDPProvider::providershort). Comparing against the raw
+			// EINVOICING_PDP config value here would never match for a *ViaPartner provider, silently
+			// turning this filter into a no-op.
+			$tmpeinvoicingpartner = preg_replace('/ViaPartner/i', '', getDolGlobalString('EINVOICING_PDP'));
+			if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == $tmpeinvoicingpartner) {
+				$this->resprints .= " AND ext.provider = '" . $db->escape($tmpeinvoicingpartner) . "'";
 			}
 		}
 
