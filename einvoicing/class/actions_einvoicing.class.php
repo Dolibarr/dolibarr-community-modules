@@ -2371,6 +2371,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// itself and have nothing to gain here. The line is recognised by the name the module gives the
 		// file it writes, which costs nothing: the viewer resolves the path of the file on its own, and
 		// prints nothing if it does not find it.
+		$matches = array();
 		if ($modulepart == 'facture') {
 			// Sent to a customer: <ref>/<ref>_cii.xml, the name EInvoicing::getEInvoiceXmlFilePath() builds
 			if (!$user->hasRight('facture', 'lire') || substr($relativepath, -8) !== '_cii.xml') {
@@ -2378,12 +2379,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 			$urlparam = '';
 		} elseif ($modulepart == 'facture_fournisseur') {
-			// Received from a supplier: <ref supplier>_einvoice.xml, the name
-			// CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment() gives the file it saves
-			if (!$user->hasRight('fournisseur', 'facture', 'lire') || substr($relativepath, -13) !== '_einvoice.xml') {
+			// Received from a supplier: <ref supplier>_<converted|original|einvoice>.xml, the names
+			// CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment() gives the files it saves
+			if (!$user->hasRight('fournisseur', 'facture', 'lire') || !preg_match('/_(converted|original|einvoice)\.xml$/', $relativepath, $matches)) {
 				return 0;
 			}
-			$urlparam = '&element=supplier';
+			$urlparam = '&element=supplier&format='.$matches[1];
 		} else {
 			return 0;
 		}
@@ -2396,7 +2397,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// page answers as a full page. The file name keeps the download link the core gives it.
 		$url = dol_buildpath('/einvoicing/xmlpreview.php', 1).'?id='.$invoiceid.$urlparam.'&mode=raw';
 
-		$anchorid = 'einvoicingxmlpreview'.$invoiceid;
+		$anchorid = 'einvoicingxmlpreview'.$invoiceid.(empty($matches[1]) ? '' : $matches[1]);
 		$this->resprints = '<td class="right nowraponall">';
 		$this->resprints .= $this->einvoiceXmlPreviewAnchor($url, $anchorid);
 
@@ -2473,19 +2474,21 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		$this->resprints = '';
 
+		// The name of each file the module writes, and what the viewer needs to read that one back
 		$contexts = is_array($hookmanager->contextarray) ? $hookmanager->contextarray : array();
 		if (in_array('invoicesuppliercarddocument', $contexts, true)) {
 			if (!$user->hasRight('fournisseur', 'facture', 'lire')) {
 				return 0;
 			}
-			$suffix = '_einvoice.xml';
-			$urlparam = '&element=supplier';
+			$targets = array();
+			foreach (array('converted', 'original', 'einvoice') as $format) {
+				$targets['_'.$format.'.xml'] = array('&element=supplier&format='.$format, $format);
+			}
 		} elseif (in_array('invoicedocument', $contexts, true)) {
 			if (!$user->hasRight('facture', 'lire')) {
 				return 0;
 			}
-			$suffix = '_cii.xml';
-			$urlparam = '';
+			$targets = array('_cii.xml' => array('', ''));
 		} else {
 			return 0;
 		}
@@ -2497,15 +2500,16 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		$langs->load("einvoicing@einvoicing");
 
-		$url = dol_buildpath('/einvoicing/xmlpreview.php', 1).'?id='.$invoiceid.$urlparam.'&mode=raw';
-		$anchorid = 'einvoicingxmlpreview'.$invoiceid;
-		$anchor = $this->einvoiceXmlPreviewAnchor($url, $anchorid);
-
 		// Printed, not returned: printCommonFooter() of the core never prints the resPrint of this hook,
 		// it only reads its return value to decide whether to print its own block.
 		// The line is found on the name of the file the module writes, the one the viewer reads back.
 		// Nothing is inserted when that file is not listed, so a tab without an XML is left untouched.
-		print '<script nonce="'.getNonce().'" type="text/javascript">
+		foreach ($targets as $suffix => $target) {
+			$url = dol_buildpath('/einvoicing/xmlpreview.php', 1).'?id='.$invoiceid.$target[0].'&mode=raw';
+			$anchorid = 'einvoicingxmlpreview'.$invoiceid.$target[1];
+			$anchor = $this->einvoiceXmlPreviewAnchor($url, $anchorid);
+
+			print '<script nonce="'.getNonce().'" type="text/javascript">
 			(function() {
 				var links = document.querySelectorAll(\'table a[href*="'.dol_escape_js($suffix).'"]\');
 				if (!links.length || document.getElementById("'.$anchorid.'")) {
@@ -2518,6 +2522,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				name.insertAdjacentHTML("beforeend", '.json_encode($anchor).');
 			})();
 			</script>'."\n";
+		}
 
 		return 0;
 	}

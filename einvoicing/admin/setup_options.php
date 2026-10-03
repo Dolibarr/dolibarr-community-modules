@@ -408,6 +408,12 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 
+	// Setup conf to keep, beside the imported document, the other formats the access point holds
+	$item = $formSetup->newItem('EINVOICING_SAVE_ALL_RECEIVED_FORMATS')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_SAVE_ALL_RECEIVED_FORMATS_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+
 	// Setup conf to to enable a limit of flows to synchronize per one synchronization call
 	/* This option is useless, should be always on. Disabling it is possible by editing hidden cosntant
 	$item = $formSetup->newItem('EINVOICING_FLOWS_SYNC_CALL_LIMIT')->setAsYesNo();
