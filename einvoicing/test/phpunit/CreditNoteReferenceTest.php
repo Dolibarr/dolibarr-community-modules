@@ -217,7 +217,7 @@ class CreditNoteReferenceTest extends CommonClassTest
 	}
 
 	/**
-	 * A credit note names the invoice it cancels, never a deposit: an amount already paid does not make it wait.
+	 * A credit note names the invoice it cancels or corrects, never a deposit: an amount already paid does not make it wait.
 	 *
 	 * @return void
 	 */
