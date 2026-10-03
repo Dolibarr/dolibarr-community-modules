@@ -3675,7 +3675,7 @@ class EInvoicing
 		$sql .= ($flowId ? "'" . $db->escape($flowId) . "'" : "NULL") . ", ";
 		$sql .= "'" . $db->escape($direction) . "', ";
 		$sql .= (int) $statusCode . ", ";
-		$sql .= "'" . $db->escape($statusMessage) . "', ";
+		$sql .= "'" . $db->escape(mb_substr((string) $statusMessage, 0, 255, 'UTF-8')) . "', ";	// lc_status_message is a varchar(255)
 		$sql .= "'" . $db->escape($validationStatus) . "', ";
 		$sql .= "'" . $db->escape($validationMessage) . "', ";
 		$sql .= "'" . $db->escape($date_creation) . "', ";
@@ -3869,7 +3869,7 @@ class EInvoicing
 		$db->free($resql);
 
 		$sql = "UPDATE " . $db->prefix() . "einvoicing_lifecycle_msg SET ";
-		$sql .= "lc_status_message = '" . $db->escape($statusMessage) . "', ";
+		$sql .= "lc_status_message = '" . $db->escape(mb_substr((string) $statusMessage, 0, 255, 'UTF-8')) . "', ";
 		$sql .= "lc_validation_status = '" . $db->escape($validationStatus) . "', ";
 		$sql .= "lc_validation_message = '" . $db->escape($validationMessage) . "', ";
 		$sql .= "fk_user_modif = " . (int) $user->id . " ";
