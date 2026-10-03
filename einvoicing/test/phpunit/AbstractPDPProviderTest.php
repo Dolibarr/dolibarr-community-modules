@@ -21,6 +21,8 @@
  *      \brief      PHPUnit test for AbstractPDPProvider::makeStorableDebugPayload(): the payloads written
  *                  in the trace of an API call stay inside their column. A response bigger than the column
  *                  had its INSERT refused whole, so the call left no trace at all (issue #995).
+ *                  Also on replayPostponedFlows(): the flows waiting on something missing here are taken
+ *                  again by identifier, so leaving the synchronization window no longer loses them.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -39,6 +41,7 @@ require_once $dolibarrHtdocs . '/master.inc.php';
 dol_include_once('einvoicing/class/providers/AbstractPDPProvider.class.php');
 // AbstractPDPProvider is abstract: its reference implementation is the one instantiated here.
 dol_include_once('einvoicing/class/providers/TestPDPProvider.class.php');
+dol_include_once('einvoicing/class/einvoicingsyncpending.class.php');
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 
 if (empty($user->id)) {
@@ -52,6 +55,45 @@ if (empty($user->id)) {
 	}
 }
 $conf->global->MAIN_DISABLE_ALL_MAILS = 1;
+
+
+/**
+ * Provider whose syncFlow() answers what a test scripted for each flow, and which exposes the replay.
+ * Nothing else of the provider is needed: the replay decides on the answer, not on the platform.
+ */
+class ReplayScriptedProvider extends TestPDPProvider
+{
+	/** @var array<string,array<string,mixed>> Answer to give for each flow id */
+	public $scripted = array();
+	/** @var string[] Flow ids syncFlow() was called on, in order */
+	public $asked = array();
+
+	/**
+	 * Answer the scripted result instead of calling the access point.
+	 *
+	 * @param	string	$flowId		Flow id to synchronize
+	 * @param	?int	$call_id	Id of the call row of the run
+	 * @return	array<string,mixed>	The scripted result
+	 */
+	public function syncFlow($flowId, $call_id = null)
+	{
+		$this->asked[] = $flowId;
+
+		return isset($this->scripted[$flowId]) ? $this->scripted[$flowId] : array('res' => -1, 'message' => 'nothing scripted for ' . $flowId);
+	}
+
+	/**
+	 * Reach the protected replay the synchronization runs at its head.
+	 *
+	 * @param	string[]							$messages	Run messages, appended to
+	 * @param	array<string,array<string,mixed>>	$actions	Manual actions to do, appended to
+	 * @return	array{imported:int,waiting:int,handled:string[]}	What the replay did
+	 */
+	public function replay(&$messages, &$actions)
+	{
+		return $this->replayPostponedFlows($messages, $actions);
+	}
+}
 
 
 /**
@@ -161,5 +203,263 @@ class AbstractPDPProviderTest extends CommonClassTest
 		$decoded = base64_decode($encoded, true);
 		$this->assertNotSame(false, $decoded, 'What is stored of a binary payload can still be decoded');
 		$this->assertSame(substr($big, 0, strlen($decoded)), $decoded, 'It decodes to the beginning of the payload');
+	}
+
+	/** @var string Provider key of the rows written by the replay tests, so they cannot mix with a real queue */
+	const REPLAY_PROVIDER = 'TESTPDP';
+
+	/**
+	 * A provider whose queue holds exactly the flows given, and whose syncFlow() answers what is scripted.
+	 *
+	 * @param	array<string,array<string,mixed>>	$rows		Flow id => what to queue (reason, action, actiondata)
+	 * @param	array<string,array<string,mixed>>	$scripted	Flow id => what syncFlow() answers
+	 * @return	ReplayScriptedProvider							The provider, its queue filled
+	 */
+	private function providerWithQueue($rows, $scripted)
+	{
+		global $db, $user;
+
+		$db->query("DELETE FROM " . $db->prefix() . "einvoicing_sync_pending WHERE provider = '" . $db->escape(self::REPLAY_PROVIDER) . "'");
+
+		$queue = new EInvoicingSyncPending($db);
+		foreach ($rows as $flowId => $row) {
+			$flow = array('flowId' => $flowId, 'flowDirection' => 'In', 'flowType' => 'SupplierInvoice', 'trackingId' => 'TEST-' . $flowId);
+			$queue->queueFromFlow(
+				$flow,
+				self::REPLAY_PROVIDER,
+				(string) $row['reason'],
+				'queued for the test',
+				isset($row['actiondata']) ? $row['actiondata'] : array(),
+				$user,
+				isset($row['action']) ? (string) $row['action'] : '',
+				isset($row['matchdata']) ? $row['matchdata'] : array()
+			);
+		}
+
+		$provider = new ReplayScriptedProvider($db);
+		// The short key of the access point is what the queue is read on: a partner suffix is not part of it.
+		$provider->providerName = self::REPLAY_PROVIDER . 'ViaPartner';
+		$provider->scripted = $scripted;
+
+		return $provider;
+	}
+
+	/**
+	 * Read the row of one flow as the database holds it.
+	 *
+	 * @param	string	$flowId	Flow id
+	 * @return	?stdClass		Its row, or null when the flow has none
+	 */
+	private function queueRow($flowId)
+	{
+		global $db;
+
+		$resql = $db->query("SELECT * FROM " . $db->prefix() . "einvoicing_sync_pending WHERE provider = '" . $db->escape(self::REPLAY_PROVIDER) . "' AND flow_id = '" . $db->escape($flowId) . "'");
+		if (!$resql) {
+			return null;
+		}
+		$row = $db->fetch_object($resql);
+
+		return empty($row) ? null : $row;
+	}
+
+	/**
+	 * With the option unset - the delivery default - the replay does nothing at all: no flow is asked for,
+	 * and the queue is left exactly as it was.
+	 *
+	 * @return void
+	 */
+	public function testTheReplayDoesNothingWithoutTheOption()
+	{
+		global $conf;
+
+		unset($conf->global->EINVOICING_ENABLE_POSTPONE_FLOWS);
+
+		$provider = $this->providerWithQueue(
+			array('i_off_1' => array('reason' => 'LINKED_INVOICE_NOT_FOUND')),
+			array('i_off_1' => array('res' => 1, 'message' => 'imported'))
+		);
+
+		$messages = array();
+		$actions = array();
+		$replay = $provider->replay($messages, $actions);
+
+		$this->assertSame(array('imported' => 0, 'waiting' => 0, 'handled' => array()), $replay, 'An unset option means no replay at all');
+		$this->assertSame(array(), $provider->asked, 'No flow is asked for when the option is unset');
+		$this->assertSame(array(), $messages);
+		$this->assertSame(array(), $actions);
+
+		$row = $this->queueRow('i_off_1');
+		$this->assertSame(1, (int) $row->nb_attempts, 'The waiting row is not even touched');
+		$this->assertSame((int) EInvoicingSyncPending::STATUS_PENDING, (int) $row->status);
+	}
+
+	/**
+	 * A waiting flow is asked for by identifier and, when it goes through, its row leaves the queue. This
+	 * is what makes "retried on the next synchronization" true once the window has moved past the flow.
+	 *
+	 * @return void
+	 */
+	public function testAWaitingFlowIsTakenAgainByIdentifierAndResolved()
+	{
+		global $conf;
+
+		$conf->global->EINVOICING_ENABLE_POSTPONE_FLOWS = 1;
+
+		$provider = $this->providerWithQueue(
+			array('i_ok_1' => array('reason' => 'LINKED_INVOICE_NOT_FOUND')),
+			array('i_ok_1' => array('res' => 1, 'message' => 'supplier invoice created'))
+		);
+
+		$messages = array();
+		$actions = array();
+		$replay = $provider->replay($messages, $actions);
+
+		$this->assertSame(array('i_ok_1'), $provider->asked, 'The waiting flow is asked for by its identifier');
+		$this->assertSame(1, $replay['imported']);
+		$this->assertSame(0, $replay['waiting']);
+		$this->assertSame(array('i_ok_1'), $replay['handled'], 'The window loop is told which flows it can skip');
+		$this->assertCount(1, $messages);
+		$this->assertStringContainsString('supplier invoice created', $messages[0], 'The run says what became of the flow');
+		$this->assertSame(array(), $actions, 'A flow that went through asks for no manual action');
+
+		$row = $this->queueRow('i_ok_1');
+		$this->assertSame((int) EInvoicingSyncPending::STATUS_RESOLVED, (int) $row->status, 'Its row never outlives its cause');
+		$this->assertSame('invoice_supplier', $row->fk_element_type);
+
+		// A flow that now already exists (res 0) is resolved just the same: nothing is left waiting for it.
+		$provider = $this->providerWithQueue(
+			array('i_ok_2' => array('reason' => 'CONVERSION_FORMAT_NOT_SUPPORTED')),
+			array('i_ok_2' => array('res' => 0, 'message' => 'already imported'))
+		);
+		$messages = array();
+		$actions = array();
+		$replay = $provider->replay($messages, $actions);
+		$this->assertSame(1, $replay['imported']);
+		$this->assertSame((int) EInvoicingSyncPending::STATUS_RESOLVED, (int) $this->queueRow('i_ok_2')->status);
+	}
+
+	/**
+	 * A flow that still cannot be synchronized stays in the queue with its actions, is reported, and is
+	 * never counted as an error: one flow nobody can unblock must not abort every run from here on.
+	 *
+	 * @return void
+	 */
+	public function testAFlowThatStillWaitsKeepsItsRowAndItsActions()
+	{
+		global $conf;
+
+		$conf->global->EINVOICING_ENABLE_POSTPONE_FLOWS = 1;
+
+		$provider = $this->providerWithQueue(
+			array('i_wait_1' => array(
+				'reason' => 'LINKED_INVOICE_NOT_FOUND',
+				'action' => '<a class="butAction">Create the missing invoice</a>',
+				'actiondata' => array(array('key' => 'create', 'url' => '/fourn/facture/card.php?action=create', 'label' => '')),
+				'matchdata' => array('socid' => 42, 'supplierref' => 'TEST-AC-0001'),
+			)),
+			// The second attempt knows nothing but that it failed: the row must not lose what it holds.
+			array('i_wait_1' => array('res' => -1, 'postponeflow' => 1, 'message' => 'still not found in Dolibarr'))
+		);
+		$before = $this->queueRow('i_wait_1');
+
+		$messages = array();
+		$actions = array();
+		$replay = $provider->replay($messages, $actions);
+
+		$this->assertSame(0, $replay['imported']);
+		$this->assertSame(1, $replay['waiting'], 'It is counted as waiting, not as an error');
+		$this->assertSame(array('i_wait_1'), $replay['handled']);
+		$this->assertCount(1, $messages);
+		$this->assertStringContainsString('still cannot be synchronized', $messages[0]);
+
+		// The operator is told what to do, with what the row holds when the new attempt brings nothing.
+		$this->assertArrayHasKey('LINKED_INVOICE_NOT_FOUND', $actions);
+		$this->assertStringContainsString('Create the missing invoice', $actions['LINKED_INVOICE_NOT_FOUND']['action']);
+		$this->assertSame('queued for the test', $actions['LINKED_INVOICE_NOT_FOUND']['businessmessage']);
+
+		$after = $this->queueRow('i_wait_1');
+		$this->assertSame((int) EInvoicingSyncPending::STATUS_PENDING, (int) $after->status, 'It stays waiting');
+		$this->assertSame(2, (int) $after->nb_attempts, 'And says how many runs met it');
+		$this->assertSame($before->date_creation, $after->date_creation, 'The date it was first seen never moves');
+		$this->assertSame($before->action_data, $after->action_data, 'Its manual actions survive the attempt');
+		$this->assertSame($before->action_html, $after->action_html);
+		$this->assertSame($before->match_data, $after->match_data);
+	}
+
+	/**
+	 * The rows the manual-action queue wrote are taken again the same way: once the product or the third
+	 * party exists, the flow lands on the next run instead of waiting for somebody to press retry. Their
+	 * actions are refreshed when the new attempt computes some.
+	 *
+	 * @return void
+	 */
+	public function testTheRowsOfTheManualActionQueueAreTakenAgainToo()
+	{
+		global $conf;
+
+		$conf->global->EINVOICING_ENABLE_POSTPONE_FLOWS = 1;
+		unset($conf->global->EINVOICING_ENABLE_MANUAL_ACTION_QUEUE);
+
+		$provider = $this->providerWithQueue(
+			array(
+				'i_mq_1' => array('reason' => 'PRODUCT_NOT_FOUND', 'action' => '<a>Create the product</a>'),
+				'i_mq_2' => array('reason' => 'THIRDPARTY_NOT_FOUND', 'action' => '<a>Create the thirdparty</a>'),
+			),
+			array(
+				'i_mq_1' => array('res' => 1, 'message' => 'imported, the product exists now'),
+				'i_mq_2' => array('res' => -1, 'message' => 'no thirdparty yet', 'actioncode' => 'THIRDPARTY_NOT_FOUND',
+					'allactiondata' => array('createthirdparty' => array('url' => '/societe/card.php?action=create', 'label' => 'Create'))),
+			)
+		);
+
+		$messages = array();
+		$actions = array();
+		$replay = $provider->replay($messages, $actions);
+
+		$this->assertSame(array('i_mq_1', 'i_mq_2'), $provider->asked, 'No reason code is left out of the replay');
+		$this->assertSame(1, $replay['imported']);
+		$this->assertSame(1, $replay['waiting']);
+		$this->assertSame((int) EInvoicingSyncPending::STATUS_RESOLVED, (int) $this->queueRow('i_mq_1')->status, 'The manual action was done: its row is resolved');
+
+		$stillwaiting = $this->queueRow('i_mq_2');
+		$this->assertSame((int) EInvoicingSyncPending::STATUS_PENDING, (int) $stillwaiting->status);
+		$data = json_decode((string) $stillwaiting->action_data, true);
+		$this->assertSame('createthirdparty', $data[0]['key'], 'What the new attempt offers is what the queue page shows');
+		$this->assertSame('/societe/card.php?action=create', $data[0]['url']);
+	}
+
+	/**
+	 * The replay costs one call per waiting row, so how many it takes per run is bounded.
+	 *
+	 * @return void
+	 */
+	public function testTheReplayIsBoundedBySize()
+	{
+		global $conf, $db;
+
+		$conf->global->EINVOICING_ENABLE_POSTPONE_FLOWS = 1;
+		$conf->global->EINVOICING_FLOWS_SYNC_REPLAY_SIZE = 1;
+
+		$provider = $this->providerWithQueue(
+			array(
+				'i_cap_old' => array('reason' => 'LINKED_INVOICE_NOT_FOUND'),
+				'i_cap_new' => array('reason' => 'LINKED_INVOICE_NOT_FOUND'),
+			),
+			array('i_cap_old' => array('res' => 1, 'message' => 'imported'), 'i_cap_new' => array('res' => 1, 'message' => 'imported'))
+		);
+		// Both rows are written in the same second: the order under test needs distinct dates.
+		$db->query("UPDATE " . $db->prefix() . "einvoicing_sync_pending SET date_creation = '2026-09-01 08:00:00' WHERE provider = '" . $db->escape(self::REPLAY_PROVIDER) . "' AND flow_id = 'i_cap_old'");
+		$db->query("UPDATE " . $db->prefix() . "einvoicing_sync_pending SET date_creation = '2026-09-02 08:00:00' WHERE provider = '" . $db->escape(self::REPLAY_PROVIDER) . "' AND flow_id = 'i_cap_new'");
+
+		$messages = array();
+		$actions = array();
+		$replay = $provider->replay($messages, $actions);
+
+		$this->assertSame(array('i_cap_old'), $provider->asked, 'The cap is honoured, and what waited longest goes first');
+		$this->assertSame(1, $replay['imported']);
+		$this->assertSame((int) EInvoicingSyncPending::STATUS_PENDING, (int) $this->queueRow('i_cap_new')->status, 'What did not fit stays waiting for the next run');
+
+		unset($conf->global->EINVOICING_FLOWS_SYNC_REPLAY_SIZE);
 	}
 }
