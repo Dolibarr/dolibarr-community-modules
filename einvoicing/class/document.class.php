@@ -517,6 +517,103 @@ class Document extends CommonObject
 	}
 
 	/**
+	 * List the incoming invoice flows a manual product mapping can be started from, most useful first.
+	 *
+	 * Two sources, because a flow is worth mapping on both sides of the import: the queue of the flows a
+	 * synchronization could not import (llx_einvoicing_sync_pending, where a PRODUCT_NOT_FOUND lands) and
+	 * the incoming documents already received (llx_einvoicing_document). A flow held by both is listed
+	 * once, as a pending one: that is the state the user has something to do about.
+	 *
+	 * The vendor is only the one Dolibarr already knows: the supplier invoice of a received document
+	 * names it, a queued flow does not (it is often queued because no third party was found), so the
+	 * issuer name carried by the document is shown instead. Nothing is guessed here - the mapping page
+	 * reads the identifiers of the seller in the document itself.
+	 *
+	 * @param	DoliDB	$db			Database handler
+	 * @param	int		$limit		Maximum number of flows read per source
+	 * @return	array<int,array{flowid:string,ref:string,date:int,socid:int,socname:string,reason:string,pending:int}>	Flows, the queued ones first, most recent first
+	 */
+	public static function listIncomingFlowsForMapping($db, $limit = 50)
+	{
+		$flows = array();
+		$seen = array();
+
+		// Flows a synchronization left in the queue: a missing product is what this list is for, but a
+		// flow queued for another reason may carry unmapped lines too, so the reason is shown, not filtered.
+		$sql = "SELECT sp.flow_id, sp.tracking_idref, sp.reason_code, sp.match_data, sp.flow_updatedat, sp.date_creation";
+		$sql .= " FROM ".$db->prefix()."einvoicing_sync_pending as sp";
+		$sql .= " WHERE sp.entity IN (".getEntity('einvoicing').")";
+		$sql .= " AND sp.status = 0";
+		$sql .= " AND (sp.flow_direction IS NULL OR sp.flow_direction <> 'Out')";
+		$sql .= " ORDER BY sp.date_creation DESC, sp.rowid DESC";
+		$sql .= $db->plimit($limit);
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__.' '.$db->lasterror(), LOG_ERR);
+		} else {
+			while ($obj = $db->fetch_object($resql)) {
+				$flowid = (string) $obj->flow_id;
+				if ($flowid === '' || isset($seen[$flowid])) {
+					continue;
+				}
+				$seen[$flowid] = 1;
+				$matchdata = json_decode((string) $obj->match_data, true);
+				$flows[] = array(
+					'flowid' => $flowid,
+					'ref' => (string) $obj->tracking_idref,
+					'date' => (int) $db->jdate($obj->flow_updatedat ? $obj->flow_updatedat : $obj->date_creation),
+					'socid' => 0,
+					'socname' => is_array($matchdata) ? (string) ($matchdata['name'] ?? '') : '',
+					'reason' => (string) $obj->reason_code,
+					'pending' => 1,
+				);
+			}
+			$db->free($resql);
+		}
+
+		// Documents already received. The vendor comes from the supplier invoice the flow was booked on,
+		// which is the only link between a flow and a third party this table holds.
+		$sql = "SELECT d.flow_id, d.tracking_idref, d.submittedat, s.rowid as socid, s.nom as socname";
+		$sql .= " FROM ".$db->prefix()."einvoicing_document as d";
+		$sql .= " LEFT JOIN ".$db->prefix()."facture_fourn as ff ON (d.fk_element_type = 'invoice_supplier' AND ff.rowid = d.fk_element_id)";
+		$sql .= " LEFT JOIN ".$db->prefix()."societe as s ON s.rowid = ff.fk_soc";
+		$sql .= " WHERE d.entity IN (".getEntity('document').")";
+		$sql .= " AND d.flow_direction = 'In'";
+		$sql .= " AND d.flow_type = 'SupplierInvoice'";
+		$sql .= " AND d.flow_id IS NOT NULL AND d.flow_id <> ''";
+		$sql .= " ORDER BY d.submittedat DESC, d.rowid DESC";
+		$sql .= $db->plimit($limit);
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__.' '.$db->lasterror(), LOG_ERR);
+
+			return $flows;
+		}
+
+		while ($obj = $db->fetch_object($resql)) {
+			$flowid = (string) $obj->flow_id;
+			if ($flowid === '' || isset($seen[$flowid])) {
+				continue;
+			}
+			$seen[$flowid] = 1;
+			$flows[] = array(
+				'flowid' => $flowid,
+				'ref' => (string) $obj->tracking_idref,
+				'date' => (int) $db->jdate($obj->submittedat),
+				'socid' => (int) $obj->socid,
+				'socname' => (string) $obj->socname,
+				'reason' => '',
+				'pending' => 0,
+			);
+		}
+		$db->free($resql);
+
+		return $flows;
+	}
+
+	/**
 	 * Update object into database
 	 *
 	 * @param	User		$user		User that modifies
