@@ -94,6 +94,31 @@ class PdfAttachmentExtractor extends tcpdi_parser
 	}
 
 	/**
+	 * @param	string		$data			Raw content of the PDF
+	 * @param	string		$uniqueid		Identifier of this parser
+	 */
+	public function __construct($data, $uniqueid)
+	{
+		parent::__construct(self::blankCommentsBeforeStartxref((string) $data), $uniqueid);
+	}
+
+	/**
+	 * Blank the comment lines written between a trailer and its startxref, which tcpdi 1.0 (core below 22) cannot skip.
+	 *
+	 * @param	string		$data			Raw content of the PDF
+	 * @return	string						The same content, of the same length
+	 */
+	private static function blankCommentsBeforeStartxref($data)
+	{
+		// Length must be kept: every offset of the xref table points into this content.
+		$blanked = preg_replace_callback('/>>((?:[ \t\r\n]*%[^\r\n]*[\r\n]+)+)(?=[ \t\r\n]*startxref)/', function ($matches) {
+			return '>>'.preg_replace('/[^\r\n]/', ' ', $matches[1]);
+		}, $data);
+
+		return ($blanked === null ? $data : $blanked);
+	}
+
+	/**
 	 * Refuse a PDF that cannot be read, instead of ending the request on the spot.
 	 *
 	 * tcpdi_parser::Error() calls die() - unconditionally below Dolibarr 24, and above it unless the

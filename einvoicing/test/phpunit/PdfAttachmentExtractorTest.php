@@ -103,6 +103,20 @@ class PdfAttachmentExtractorTest extends CommonClassTest
 	}
 
 	/**
+	 * A comment line between the trailer and startxref, as iText writes, does not hide the invoice.
+	 *
+	 * @return	void
+	 */
+	public function testACommentBeforeStartxrefDoesNotHideTheInvoice()
+	{
+		$content = (string) file_get_contents($this->facturxSample());
+		$commented = preg_replace('/>>(\s*startxref\s+\d+\s+%%EOF\s*)$/', ">>\n%iText-7.1.15 for .NET$1", $content, 1, $count);
+		$this->assertSame(1, $count, 'The sample has no trailer followed by startxref to put a comment in');
+
+		$this->assertSame(PdfAttachmentExtractor::getInvoiceXmlFromContent($content), PdfAttachmentExtractor::getInvoiceXmlFromContent($commented));
+	}
+
+	/**
 	 * The name under which the invoice is attached is decoded, whatever form the container used.
 	 *
 	 * @return	void
