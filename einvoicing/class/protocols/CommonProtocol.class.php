@@ -1254,7 +1254,7 @@ trait CommonProtocol
 	{
 		$result = $thirdparty->fetch($thirdpartyId);
 		// Societe::update() accepts a code out of the current numbering mask only when oldcopy holds it
-		// unchanged, and reads every field of oldcopy: dol_clone() would drop the empty ones.
+		// unchanged. A plain clone: dol_clone() of Dolibarr 24 drops the null properties update() reads.
 		$thirdparty->oldcopy = clone $thirdparty;
 
 		return $result;
