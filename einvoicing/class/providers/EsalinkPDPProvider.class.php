@@ -1606,9 +1606,24 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 							if ($einvoicing->isTransmissionOnlyRejection($factureObj->id, $factureObj->element, $syncStatus, $document->cdar_reason_code)) {
 								$syncStatus = 0;
 							}
-							$einvoicing->insertOrUpdateExtLink($factureObj->id, $factureObj->element, $flowId, $syncStatus, $factureObj->ref, $syncComment);
+							// Neither write throws: a SQL failure comes back as -1. Left unread, the commit below ran anyway
+							// and the flow was stored as processed, so the status was never recorded, even on a later run.
+							$resExtLink = $einvoicing->insertOrUpdateExtLink($factureObj->id, $factureObj->element, $flowId, $syncStatus, $factureObj->ref, $syncComment);
 
-							$einvoicing->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code, $syncComment, $document->flow_direction, $flowId, $syncValidationStatus, $syncValidationComment, $document->submittedat, $document->cdar_reason_code, $recipientRoles);
+							$resStatusMessage = ($resExtLink < 0 ? -1 : $einvoicing->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code, $syncComment, $document->flow_direction, $flowId, $syncValidationStatus, $syncValidationComment, $document->submittedat, $document->cdar_reason_code, $recipientRoles));
+							if ($resExtLink < 0 || $resStatusMessage < 0) {
+								dol_syslog(__METHOD__ . " FlowId " . $flowId . " - failed to record the status of customer invoice " . $factureObj->ref . ": " . $db->lasterror(), LOG_ERR);
+								$db->rollback();
+								return array(
+									'res' => -1,
+									'postponeflow' => 1,
+									'message' => "FlowId " . $flowId . " - Failed to record the status on customer invoice " . $factureObj->ref,
+									'actioncode' => 'CANT_RECORD_SENT_INVOICE_LIFECYCLE_STATUS',
+									'actionurl' => '',
+									'action' => $langs->trans('CheckSyncLogCantRecordSentInvoiceStatus'),
+									'businessmessage' => $langs->trans('CantRecordTheStatusOfTheInvoiceYouSent', $flowId)
+								);
+							}
 						} else {
 							dol_syslog(__METHOD__ . " Customer invoice not found for flowId: {$flowId}, so we save the flow into document table but we don't create an entry into einvoicing_extlinks table", LOG_WARNING); // This can happen if the invoice was sent from another system using the same PDP account
 						}
@@ -1969,7 +1984,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				// Update einvoice status with awaiting validation
 				$einvoicing = new EInvoicing($db);
 				//$einvoicing->insertOrUpdateExtLink($object->id, $object->element, $flowId, EInvoicing::STATUS_AWAITING_VALIDATION, $object->ref);
-				$resStoreStatus = $einvoicing->storeStatusMessage($object->id, $object->element, $statusCode, '', 'out', $flowId, '', '', '', $reasonCode);
+				$resStoreStatus = $einvoicing->storeStatusMessage($object->id, $object->element, $statusCode, '', 'out', $flowId, '', '', null, $reasonCode);
 
 				// Call the API to retrieve flow details and check the validation status.
 				$resource = 'flows/' . $flowId;

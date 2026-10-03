@@ -412,11 +412,13 @@ class ImportVatCalculationModeTest extends CommonClassTest
 		global $db;
 
 		$creditNote = new FactureFournisseur($db);
+		$creditNote->type = FactureFournisseur::TYPE_CREDIT_NOTE;
 		$creditNote->total_tva = -2.09;
 		$creditNote->total_ttc = -12.56;
 		$this->assertTrue(SupplierInvoiceHelper::totalsAgreeWithDocument($creditNote, 2.09, 12.56));
 
 		$off = new FactureFournisseur($db);
+		$off->type = FactureFournisseur::TYPE_CREDIT_NOTE;
 		$off->total_tva = -2.10;
 		$off->total_ttc = -12.57;
 		$this->assertFalse(SupplierInvoiceHelper::totalsAgreeWithDocument($off, 2.09, 12.56));

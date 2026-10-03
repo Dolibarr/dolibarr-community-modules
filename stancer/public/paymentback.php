@@ -284,6 +284,9 @@ if (!empty($conf->stancer->enabled)) {
 			$status = '';
 		} else {
 			$status = isset($paymentData['status']) ? $paymentData['status'] : '';
+			if (isset($paymentData['customer'])) {
+				$customerID = (string) (is_array($paymentData['customer']) ? $paymentData['customer']['id'] : $paymentData['customer']);
+			}
 			dol_syslog("stancer paymentback API OK, pid=$pid, status=$status", LOG_DEBUG);
 		}
 		$statusTXT = $sp->getLabelStatus($status);
@@ -312,7 +315,7 @@ if (!empty($conf->stancer->enabled)) {
 					'fk_soc' => $socid,
 					'label' => $label,
 					'bank' => $db->escape(isset($cb['brand']) ? $cb['brand'] : ''),
-					'stancer_account' => $db->escape($customerID),
+					'stancer_account' => $db->escape((string) $customerID),
 					'stancer_object_ref' => $db->escape(isset($cb['id']) ? $cb['id'] : ''),
 					'last_four' => $db->escape(isset($cb['last4']) ? $cb['last4'] : ''),
 					'number' => 0000,

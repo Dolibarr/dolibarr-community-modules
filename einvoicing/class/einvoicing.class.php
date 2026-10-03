@@ -1840,10 +1840,8 @@ class EInvoicing
 
 		$info = $currentStatusInfo['info'] ?? '';
 
+		// Not tied to isEditable(): these fields are still set once the invoice is locked (a 212 after payment).
 		$editenable = $user->hasRight('facture', 'creer');
-		if (method_exists($object, 'isEditable') && !$object->isEditable()) {
-			$editenable = false;
-		}
 		if ($action == 'create') {
 			$editenable = false;
 		}
@@ -2023,7 +2021,18 @@ class EInvoicing
 					if (!empty($currentOverrideRouting)) {
 						$resprints .= dol_escape_htmltag($selectOptions[$currentOverrideRouting]);
 					} else {
-						$resprints .= '<span class="opacitymedium">' . $langs->trans("InvoiceRoutingOverrideDefault") . '</span>';
+						// Show the address the invoice will really be sent to, as getBuyerCommunicationURI() resolves it.
+						$buyer = $object->thirdparty ?? null;
+						if (!($buyer instanceof Societe) && !empty($object->socid)) {
+							$object->fetch_thirdparty();
+							$buyer = $object->thirdparty;
+						}
+						$defaultTarget = ($buyer instanceof Societe) ? $this->getBuyerCommunicationURI($buyer) : '';
+						$resprints .= '<span class="opacitymedium">' . $langs->trans("InvoiceRoutingOverrideDefault");
+						if ($defaultTarget !== '') {
+							$resprints .= ' (' . dol_escape_htmltag($defaultTarget) . ')';
+						}
+						$resprints .= '</span>';
 					}
 				}
 				$resprints .= '</td>';
@@ -2387,9 +2396,9 @@ class EInvoicing
                                 if (data.statusvalidationlabel === "Pending") {
 									countCheckInvoiceStatus++;
 									if (countCheckInvoiceStatus <= 3) {
-		                            	setTimeout(checkInvoiceStatus, 5000);
+		                            	setTimeout(checkSupplierInvoiceStatus, 5000);
 									} else if (countCheckInvoiceStatus <= 5) {
-		                            	setTimeout(checkInvoiceStatus, 10000);
+		                            	setTimeout(checkSupplierInvoiceStatus, 10000);
 									}
                                 }
                             }, "json");
@@ -2652,10 +2661,12 @@ class EInvoicing
 				$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
 
 				if (GETPOST('highlight') == 'routing_product_id') {
-					if (getDolGlobalString('PRODUIT_USE_SEARCH_TO_SELECT')) {
-						$resprints .= dol_set_focus('#search_routing_product_id');
-					} else {
-						$resprints .= dol_set_focus('#routing_product_id');
+					if ((float) DOL_VERSION >= 25) {
+						if (getDolGlobalString('PRODUIT_USE_SEARCH_TO_SELECT')) {
+							$resprints .= dol_set_focus('#search_routing_product_id', 1);	// @phpstan-ignore arguments.count, function.void (the second parameter and the return value exist from Dolibarr 25)
+						} else {
+							$resprints .= dol_set_focus('#routing_product_id', 1);	// @phpstan-ignore arguments.count, function.void (the second parameter and the return value exist from Dolibarr 25)
+						}
 					}
 				}
 			} else {
@@ -3624,7 +3635,7 @@ class EInvoicing
 	 * @param string 		$flowId                	PDP flow identifier (UUID), if available
 	 * @param string 		$validationStatus      	Validation status: OK, PENDING or ERROR, if status is sent by dolibarr to PDP
 	 * @param string 		$validationMessage     	Validation or error message returned by PDP, if status is sent by dolibarr to PDP
-	 * @param string|null 	$date_creation    		Date of the event, if we want to store a past event (for example when importing lifecycle history from PDP), if null current date will be used
+	 * @param int|null 		$date_creation    		Timestamp of the event, if we want to store a past event (for example when importing lifecycle history from PDP), if null current date will be used
 	 * @param string		$reasonCode				Reason code
 	 * @param string		$recipientRoles			RoleCodes the CDAR addressed the status to ('SE', 'SE,BY'), for a status we received
 	 * @return int  								Rowid inserted or -1 on error
