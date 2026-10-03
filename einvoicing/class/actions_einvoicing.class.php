@@ -190,8 +190,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 								$PDPManager = new PDPProviderManager($db);
 								$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 								$precheckAvailable = $provider->hasValidator();
-								if (!empty($currentStatusDetails['file']) && $currentStatusDetails['file'] == 1 && $precheckAvailable) {
-									$einvoiceFilePath = $einvoicing->getEInvoiceFilePath($invoiceObject->ref);
+								// generateInvoice() returns -1 or the path of the file it wrote: past the test above, $result is
+								// that path. The status read before generating said 'file' = 0 at validation (the definitive
+								// ref had no file yet), so the precheck was skipped on the only generation that auto-sends.
+								if ($precheckAvailable) {
+									$einvoiceFilePath = $result;
 									$result = $provider->validateEInvoiceFile($invoiceObject->id, $einvoiceFilePath);
 									if ($result['res'] > 0) {
 										$precheckresult = 1;
