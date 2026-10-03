@@ -1207,7 +1207,7 @@ abstract class AbstractPDPProvider
 		$actioncomm->authorid = $user->id;
 		$actioncomm->userownerid = $user->id;
 		// Dolibarr 18 writes fk_element only, 22 and later read elementid: both, or the event is not linked.
-		$actioncomm->fk_element = $object->id;
+		$actioncomm->fk_element = $object->id;	// @phan-suppress-current-line PhanDeprecatedProperty
 		$actioncomm->elementid = $object->id;
 		$actioncomm->elementtype = $object->element;
 
