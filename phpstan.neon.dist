@@ -167,5 +167,5 @@ parameters:
 			message: '#on left side of \?\? is not nullable#'           
 
 		-
-			identifier: ignore.count
+			identifier: nullCoalesce.property
 			message: '#on left side of ?? is not nullable#'		    
