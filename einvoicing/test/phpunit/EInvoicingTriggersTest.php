@@ -20,7 +20,8 @@
  *      \file       test/phpunit/EInvoicingTriggersTest.php
  *      \ingroup    test
  *      \brief      PHPUnit test for the triggers of the module: DOCUMENT_DELETE and
- *                  BILL_SUPPLIER_DELETE, which refuse a deletion the module must protect, and
+ *                  BILL_SUPPLIER_DELETE, which refuse a deletion the module must protect, the gates
+ *                  of the payment status (212) PAYMENT_CUSTOMER_CREATE shares with the invoice card, and
  *                  COMPANY_MODIFY, which stores the default product of a vendor.
  *                  Covers issues #766, #791 and the delete guard of a received e-invoice.
  *      \remarks    To run this script as CLI: phpunit filename.php
@@ -38,6 +39,7 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 
 require_once $dolibarrHtdocs . '/master.inc.php';
 require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
 require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 require_once DOL_DOCUMENT_ROOT . '/user/class/user.class.php';
@@ -69,6 +71,12 @@ $conf->global->MAIN_DISABLE_ALL_MAILS = 1;
  */
 class EInvoicingTriggersTest extends CommonClassTest
 {
+	/** @var int Element id of the in-memory invoices of the payment status tests: no real invoice uses it */
+	const CASH_IN_ELEMENT_ID = 999999212;
+
+	/** @var array<string,?string> Setup of the instance a test changed, given back by tearDown() */
+	private $savedConsts = array();
+
 	/**
 	 * Forget the field of the form between two tests, so a test never reads what another one posted.
 	 *
@@ -76,10 +84,22 @@ class EInvoicingTriggersTest extends CommonClassTest
 	 */
 	protected function tearDown(): void
 	{
+		global $conf;
+
 		unset($_POST['routing_product_id']);
 		unset($_POST['routing_product_id_shown']);
 		unset($_GET['routing_product_id']);
 		unset($_GET['routing_product_id_shown']);
+
+		// Give the setup of the instance back, whatever a test of the payment status set
+		foreach ($this->savedConsts as $name => $value) {
+			if ($value === null) {
+				unset($conf->global->$name);
+			} else {
+				$conf->global->$name = $value;
+			}
+		}
+		$this->savedConsts = array();
 
 		parent::tearDown();
 	}
@@ -663,5 +683,208 @@ class EInvoicingTriggersTest extends CommonClassTest
 
 		$this->assertSame(0, $this->runSupplierInvoiceDeleteTrigger($ghost));
 		$this->assertSame(array(), $this->lasttrigger->errors);
+	}
+
+	/**
+	 * Set the VAT mode of the company for goods and services, the one thing that decides a payment status.
+	 *
+	 * @param	string	$product	'invoice' (on debits) or 'payment' (on collection) for goods
+	 * @param	string	$service	Same for services
+	 * @return	void
+	 */
+	private function setVatMode($product, $service)
+	{
+		$this->setConst('TAX_MODE_SELL_PRODUCT', $product);
+		$this->setConst('TAX_MODE_SELL_SERVICE', $service);
+	}
+
+	/**
+	 * Change a constant of the setup for the test, tearDown() gives the value of the instance back.
+	 *
+	 * @param	string	$name	Name of the constant
+	 * @param	string	$value	Value for the test
+	 * @return	void
+	 */
+	private function setConst($name, $value)
+	{
+		global $conf;
+
+		if (!array_key_exists($name, $this->savedConsts)) {
+			$this->savedConsts[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
+		}
+		$conf->global->$name = $value;
+	}
+
+	/**
+	 * An invoice of a French company billing one service, in memory, with the e-invoicing record given.
+	 *
+	 * @param	?string	$flowId		Flow id of the record, null for no record at all
+	 * @param	int		$syncStatus	Status of the record
+	 * @return	Facture				The invoice
+	 */
+	private function serviceInvoice($flowId, $syncStatus = EInvoicing::STATUS_AWAITING_VALIDATION)
+	{
+		global $db;
+
+		// The record is read for the platform of the setup, and the scope must not depend on the instance
+		$this->setConst('EINVOICING_PDP', 'SUPERPDP');
+		$this->setConst('EINVOICING_SKIP_B2C', '0');
+		$this->setConst('EINVOICING_USE_BILLING_CONTACT_AS_BUYER', '0');
+
+		$db->query("DELETE FROM " . $db->prefix() . "einvoicing_extlinks WHERE element_id = " . self::CASH_IN_ELEMENT_ID);
+		if ($flowId !== null) {
+			$einvoicing = new EInvoicing($db);
+			$einvoicing->insertOrUpdateExtLink(self::CASH_IN_ELEMENT_ID, 'facture', $flowId, $syncStatus, 'TEST-212-0001');
+		}
+
+		$invoice = new Facture($db);
+		$invoice->id = self::CASH_IN_ELEMENT_ID;
+		$invoice->ref = 'TEST-212-0001';
+		$invoice->type = Facture::TYPE_STANDARD;
+		$invoice->module_source = '';
+		$invoice->thirdparty = new Societe($db);
+		$invoice->thirdparty->country_code = 'FR';
+		$invoice->thirdparty->tva_assuj = 1;
+		$line = new FactureLigne($db);
+		$line->product_type = 1;
+		$invoice->lines = array($line);
+
+		return $invoice;
+	}
+
+	/**
+	 * A transmitted invoice whose VAT falls due on collection has its payments reported.
+	 *
+	 * @return void
+	 */
+	public function testTransmittedInvoiceWithVatOnCollectionHasItsPaymentsReported()
+	{
+		global $db;
+
+		$this->setVatMode('invoice', 'payment');
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertSame(1, $einvoicing->getCashInReportState($this->serviceInvoice('ie_2443476')));
+	}
+
+	/**
+	 * Under the debits option no payment is reported: nothing is sent, by the trigger nor by hand.
+	 *
+	 * @return void
+	 */
+	public function testVatOnDebitsHasNoPaymentToReport()
+	{
+		global $db;
+
+		$this->setVatMode('invoice', 'invoice');
+
+		$einvoicing = new EInvoicing($db);
+		$invoice = $this->serviceInvoice('ie_2443476');
+		$this->assertSame(0, $einvoicing->getCashInReportState($invoice));
+		$this->assertSame(0, $einvoicing->reportCashIn($invoice, 100.0)['res']);
+	}
+
+	/**
+	 * An invoice the platform never received has no payment to report.
+	 *
+	 * @return void
+	 */
+	public function testNeverTransmittedInvoiceHasNoPaymentToReport()
+	{
+		global $db;
+
+		$this->setVatMode('payment', 'payment');
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertSame(0, $einvoicing->getCashInReportState($this->serviceInvoice(null)));
+		$this->assertSame(0, $einvoicing->reportCashIn($this->serviceInvoice('', EInvoicing::STATUS_GENERATED), 100.0)['res']);
+	}
+
+	/**
+	 * A deposit the platform refused holds no invoice to report on: said apart, so the card can say why.
+	 *
+	 * @return void
+	 */
+	public function testRefusedDepositBlocksThePaymentReport()
+	{
+		global $db;
+
+		$this->setVatMode('payment', 'payment');
+
+		$einvoicing = new EInvoicing($db);
+		$invoice = $this->serviceInvoice('ie_2443476', EInvoicing::STATUS_ERROR);
+		$this->assertSame(-1, $einvoicing->getCashInReportState($invoice));
+		$this->assertSame(-2, $einvoicing->reportCashIn($invoice, 100.0)['res']);
+	}
+
+	/**
+	 * The payments offered for a report by hand are those that moved money: a cash-in, a refund with the
+	 * comment that says why, and not the line of a payment that moved nothing on this invoice.
+	 *
+	 * @return void
+	 */
+	public function testCashInPaymentsListTheMoneyMovedOnTheInvoice()
+	{
+		global $db;
+
+		$thirdparty = new Societe($db);
+		$thirdparty->name = 'Customer of the payment status test';
+		$thirdparty->country_code = 'FR';
+		$thirdparty->client = 1;
+		$thirdparty->code_client = 'auto';
+		$socid = $thirdparty->create($this->author());
+		$this->assertGreaterThan(0, $socid, 'Could not create the customer of the test: ' . $thirdparty->error);
+
+		$invoice = new Facture($db);
+		$invoice->socid = $socid;
+		$invoice->date = dol_mktime(12, 0, 0, 9, 1, 2026);
+		$invoice->type = Facture::TYPE_STANDARD;
+		$invoiceId = $invoice->create($this->author());
+		$this->assertGreaterThan(0, $invoiceId, 'Could not create the invoice of the test: ' . $invoice->error);
+
+		$resql = $db->query("SELECT id FROM " . $db->prefix() . "c_paiement ORDER BY id ASC LIMIT 1");
+		$mode = $db->fetch_object($resql);
+		$this->assertNotEmpty($mode, 'No payment mode in the base');
+
+		$lines = array(array('PAYTEST-212-1', 20260902, 120.0, ''), array('PAYTEST-212-2', 20260903, 0.0, ''), array('PAYTEST-212-3', 20260905, -20.0, 'Goods sent back'));
+		$ids = array();
+		foreach ($lines as $line) {
+			list($ref, $day, $amount, $note) = $line;
+			$datep = $db->idate(dol_mktime(10, 0, 0, (int) substr((string) $day, 4, 2), (int) substr((string) $day, 6, 2), 2026));
+			$sql = "INSERT INTO " . $db->prefix() . "paiement (entity, ref, datec, datep, amount, fk_paiement, note, fk_user_creat)";
+			$sql .= " VALUES (1, '" . $db->escape($ref) . "', '" . $datep . "', '" . $datep . "', " . $amount . ", " . (int) $mode->id . ", '" . $db->escape($note) . "', " . (int) $this->author()->id . ")";
+			$this->assertNotFalse($db->query($sql), (string) $db->lasterror());
+			$ids[$ref] = (int) $db->last_insert_id($db->prefix() . "paiement");
+			$sql = "INSERT INTO " . $db->prefix() . "paiement_facture (fk_paiement, fk_facture, amount) VALUES (" . $ids[$ref] . ", " . (int) $invoiceId . ", " . $amount . ")";
+			$this->assertNotFalse($db->query($sql), (string) $db->lasterror());
+		}
+
+		$einvoicing = new EInvoicing($db);
+		$payments = $einvoicing->getCashInPayments($invoiceId);
+
+		$this->assertSame(array($ids['PAYTEST-212-1'], $ids['PAYTEST-212-3']), array_keys($payments), 'oldest first, the line of no amount left out');
+		$this->assertSame(120.0, $payments[$ids['PAYTEST-212-1']]['amount']);
+		$this->assertSame(-20.0, $payments[$ids['PAYTEST-212-3']]['amount']);
+		$this->assertSame('Goods sent back', $payments[$ids['PAYTEST-212-3']]['note']);
+	}
+
+	/**
+	 * The count shown in the confirmation is the statuses 212 this Dolibarr sent, and nothing else.
+	 *
+	 * @return void
+	 */
+	public function testSentPaymentStatusesAreCounted()
+	{
+		global $db;
+
+		$db->query("DELETE FROM " . $db->prefix() . "einvoicing_lifecycle_msg WHERE element_id = " . self::CASH_IN_ELEMENT_ID);
+		foreach (array(array('out', 212), array('Out', 212), array('In', 212), array('out', 211)) as $row) {
+			$sql = "INSERT INTO " . $db->prefix() . "einvoicing_lifecycle_msg (element_id, element_type, provider, flow_id, direction, lc_status, lc_status_message, lc_validation_status, lc_validation_message, lc_reason_code, date_creation, fk_user_creat)";
+			$sql .= " VALUES (" . self::CASH_IN_ELEMENT_ID . ", 'facture', 'SUPERPDP', 'ie_test', '" . $row[0] . "', " . $row[1] . ", '', 'Ok', '', '', '" . $db->idate(dol_now()) . "', " . (int) $this->author()->id . ")";
+			$this->assertNotFalse($db->query($sql), (string) $db->lasterror());
+		}
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertSame(2, $einvoicing->countSentStatusMessages(self::CASH_IN_ELEMENT_ID, 'facture', 212));
 	}
 }
