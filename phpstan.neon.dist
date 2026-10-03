@@ -163,7 +163,7 @@ parameters:
 
 		# A useless test for a useless control.
 		-
-			identifier: nullCoalesce.property
+			identifier: ignore.count
 			message: '#on left side of \?\? is not nullable#'           
 
 		-
