@@ -445,6 +445,10 @@ while ($i < min($num, $limit)) {
 	} elseif ($permissiontoadd) {
 		$actioncolumn = '<a class="editfielda marginrightonly marginleftonly" href="'.$_SERVER["PHP_SELF"].'?action=editmapping&token='.newToken().'&rowid='.((int) $obj->rowid).$param.'" title="'.dol_escape_htmltag($langs->trans("RemapVendorRef")).'">'.img_edit().'</a>';
 		$actioncolumn .= '<a class="marginrightonly marginleftonly" href="'.$_SERVER["PHP_SELF"].'?action=delete&token='.newToken().'&rowid='.((int) $obj->rowid).$param.'" title="'.dol_escape_htmltag($langs->trans("DeleteVendorRefMapping")).'">'.img_delete().'</a>';
+	} else {
+		// Greyed rather than hidden, so the user reads why the mapping cannot be changed
+		$actioncolumn = '<span class="opacitymedium cursornotallowed marginrightonly marginleftonly">'.img_edit($langs->trans("NotEnoughPermissions")).'</span>';
+		$actioncolumn .= '<span class="opacitymedium cursornotallowed marginrightonly marginleftonly">'.img_delete($langs->trans("NotEnoughPermissions")).'</span>';
 	}
 
 	print '<tr class="oddeven">';
