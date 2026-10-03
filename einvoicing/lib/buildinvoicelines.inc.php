@@ -342,6 +342,22 @@ if ($chorus && $buyerParty->country_code == 'FR') {
 	// option was on, and the invoice may then be generated with the option off.
 }
 
+// SIRET of the seller (BT-29 under scheme 0009), which BR-FR-CPRO-03 and BR-FR-CPRO-09 require on a B2G
+// invoice whose seller is identified by a SIREN. Same shape as the buyer SIRET above: declared on top of
+// the setup identifier, only on an invoice that looks B2G, and emitted under the EXTENDED profile only.
+$sellerChorusSiret = '';
+if ($looksLikeB2GInvoice && $mysoc->country_code == 'FR') {
+	$sellerChorusSiret = removeAllSpaces((string) $mysoc->idprof2);
+	if ($sellerChorusSiret === '') {
+		$this->warnings[] = $outputlangs->trans('EInvoiceChorusSellerSiretMissing');
+	} elseif (!preg_match('/^\d{14}$/', $sellerChorusSiret)) {
+		$this->warnings[] = $outputlangs->trans('EInvoiceChorusSellerSiretMalformed', $mysoc->idprof2);
+		$sellerChorusSiret = '';
+	} elseif ($mySchemeGlobalIdProf === EInvoicing::SCHEME_FR_SIRET && $myGlobalIdProf === $sellerChorusSiret) {
+		$sellerChorusSiret = '';	// Already the setup identifier: a second copy would say nothing more
+	}
+}
+
 // Contract type (EXT-FR-FE-01) of a B2G invoice: the Chorus extrafield the contract reference comes from
 // is the market number, which BR-FR-CPRO-01 qualifies with "GC". An ordinary contract would be "CT", and
 // those are the only two values that rule accepts; the module has no field of its own for that case yet.
@@ -1083,6 +1099,47 @@ if ($notSubjectToVatGroups > 0) {
 	}
 }
 
+// The PMT, PMD, AAB, and TXD notes are handled separately.
+// The other EINVOICING_EXTRA_<CODE> constants are added
+// as structured notes BT-21 / BT-22.
+$documentNotes = array();
+
+$sqlExtraNotes = 'SELECT name, value';
+$sqlExtraNotes .= ' FROM '.MAIN_DB_PREFIX.'const';
+$sqlExtraNotes .= " WHERE name LIKE 'EINVOICING_EXTRA_%'";
+$sqlExtraNotes .= ' AND entity = '.((int) $conf->entity);
+$sqlExtraNotes .= ' ORDER BY name ASC';
+
+$resqlExtraNotes = $db->query($sqlExtraNotes);
+
+if (!$resqlExtraNotes) {
+	dol_syslog(__METHOD__.' SQL error while loading extra notes: '.$db->lasterror(), LOG_ERR);
+} else {
+	while ($extraNote = $db->fetch_object($resqlExtraNotes)) {
+		$subjectCode = substr($extraNote->name, strlen('EINVOICING_EXTRA_'));
+
+		$content = trim((string) $extraNote->value);
+
+		// Only 3-character UNTDID codes are accepted.
+		if (!preg_match('/^[A-Z0-9]{3}$/', $subjectCode)) {
+			continue;
+		}
+
+		if ($content === '') {
+			continue;
+		}
+
+		// These codes already have dedicated variables.
+		if (in_array($subjectCode, array('PMT', 'PMD', 'AAB', 'TXD'), true)) {
+			continue;
+		}
+
+		$documentNotes[] = array('subjectCode' => $subjectCode, 'content' => $content);
+	}
+
+	$db->free($resqlExtraNotes);
+}
+
 $invoiceData = [
 	// Document part
 	'documentno'           => $object->ref,												// BT-25
@@ -1096,7 +1153,7 @@ $invoiceData = [
 
 	'documentDeliveryDate' => $deliveryDate,
 
-	'invoicingPeriodStart' => $invoicingPeriodStart,										// BT-73
+	'invoicingPeriodStart' => $invoicingPeriodStart,									// BT-73
 	'invoicingPeriodEnd'   => $invoicingPeriodEnd,										// BT-74
 
 	// $prepaidAmount is what the document reports in BT-113, and BR-FR-CO-09 ties the "already paid"
@@ -1117,7 +1174,9 @@ $invoiceData = [
 	// Legal mention that goes with the "TVA d'après les débits" option, mandatory on the invoices of a
 	// seller who took it. The structured form of the same information is the VAT point date code below.
 	'documentNoteTXD'      => $vatOnDebits ? $outputlangs->transnoentities('VATOnDebitsMention') : '',
-	'documentNotes'        => [],
+	// BR-FR-CPRO-00: a note with subject code ADN and content B2G flags the invoice as B2G for the platforms.
+	'documentNoteADN'      => $looksLikeB2GInvoice ? 'B2G' : '',
+	'documentNotes'        => $documentNotes,									        // BT-21 / BT-22
 
 	// BT-8 (VAT point date code), which tells the buyer when the VAT falls due, hence from when it can be
 	// deducted. See einvoicingVatPointDateCode() for the rule and what the French socle names.
@@ -1145,6 +1204,7 @@ $invoiceData = [
 	'sellerCommunicationUri'    => $myUri,
 
 	'sellerGlobalIds'           => $sellerGlobalIds,
+	'sellerChorusSiret'         => $sellerChorusSiret,
 	// BT-31 or BT-32, whichever the VAT regime of the seller calls for - see
 	// einvoicingSellerTaxRegistrations(). A seller that does not charge VAT has no BT-31 to declare and
 	// must still identify itself, or every exempt line trips BR-E-02 (issue #560).
