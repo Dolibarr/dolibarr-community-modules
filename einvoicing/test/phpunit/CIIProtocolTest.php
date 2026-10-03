@@ -435,6 +435,44 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
+	 * A consolidated credit note (BT-3 = 262, issue #1058) is imported as a credit note. It was refused,
+	 * and from the scheduler that refusal stopped every flow behind it.
+	 *
+	 * @return void
+	 */
+	public function testAConsolidatedCreditNoteIsACreditNote()
+	{
+		global $db;
+
+		$method = new ReflectionMethod(CIIProtocol::class, 'getDolibarrInvoiceType');
+		$method->setAccessible(true);
+		$protocol = new CIIProtocol($db);
+
+		$this->assertSame(CommonInvoice::TYPE_CREDIT_NOTE, $method->invoke($protocol, '262'));
+		$this->assertSame(CommonInvoice::TYPE_CREDIT_NOTE, $method->invoke($protocol, '381'));
+		$this->assertSame('-1', $method->invoke($protocol, '385'), 'a code the French list does not allow stays refused');
+	}
+
+	/**
+	 * A factored invoice, credit note or corrective invoice (393, 396, 472) is imported as its unfactored
+	 * counterpart (380, 381, 384): factoring changes who is paid, not what the document is.
+	 *
+	 * @return void
+	 */
+	public function testAFactoredDocumentIsImportedAsItsUnfactoredType()
+	{
+		global $db;
+
+		$method = new ReflectionMethod(CIIProtocol::class, 'getDolibarrInvoiceType');
+		$method->setAccessible(true);
+		$protocol = new CIIProtocol($db);
+
+		foreach (array('393' => '380', '396' => '381', '472' => '384') as $factored => $plain) {
+			$this->assertSame($method->invoke($protocol, $plain), $method->invoke($protocol, $factored), $factored);
+		}
+	}
+
+	/**
 	 * Save the timezone the tests below move.
 	 *
 	 * @return void
