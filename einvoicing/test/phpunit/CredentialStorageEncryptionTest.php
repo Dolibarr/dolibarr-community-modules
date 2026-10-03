@@ -73,14 +73,27 @@ class CredentialStorageEncryptionProvider extends TestPDPProvider
 	{
 		$this->storeThisFieldEncrypted($item);
 	}
+
+	/**
+	 * Give the connection the token is read and written on, from outside the class.
+	 *
+	 * @return	DoliDB		Connection used by saveOAuthTokenDB() and fetchOAuthTokenDB()
+	 */
+	public function exposeTokenStorageDb()
+	{
+		return $this->getTokenStorageDb();
+	}
 }
 
 
 /**
  * Tests on the storage of the credentials.
  *
- * Everything written here happens inside the transaction CommonClassTest opens for the class and
- * rolls back afterwards, so a run leaves neither constant nor token row behind.
+ * The constants written here happen inside the transaction CommonClassTest opens for the class and
+ * rolls back afterwards. The token is different: the module stores it on a connection of its own, so
+ * that a rollback of the caller cannot bring a rotated token back. It is therefore committed at once,
+ * and the tests plant it and read it on that same connection, then put back what was there before.
+ * Either way a run leaves neither constant nor token row behind.
  *
  * @backupGlobals disabled
  */
@@ -88,6 +101,106 @@ class CredentialStorageEncryptionTest extends CommonClassTest
 {
 	/** @var string Name of a constant no installation has, so the rows below are ours alone */
 	const SECRET_CONST = 'EINVOICING_TESTPDP_CLIENT_SECRET_PROD';
+
+	/** @var array<int,array<string,mixed>> Rows holding the token of the test service before the test */
+	private $savedTokenRows = array();
+
+	/**
+	 * Keep the rows holding the token of the test service, as they are not protected by the transaction.
+	 *
+	 * @return void
+	 */
+	protected function setUp(): void
+	{
+		parent::setUp();
+
+		$tokendb = $this->tokenDb();
+		$this->savedTokenRows = array();
+
+		$resql = $tokendb->query("SELECT * FROM " . $this->tokenTable() . " WHERE " . $this->tokenRowsFilter());
+		$this->assertNotFalse($resql, 'Could not save the token of the test service: ' . $tokendb->lasterror());
+		while ($obj = $tokendb->fetch_object($resql)) {
+			$this->savedTokenRows[] = (array) $obj;
+		}
+	}
+
+	/**
+	 * Put the rows holding the token of the test service back as they were.
+	 *
+	 * @return void
+	 */
+	protected function tearDown(): void
+	{
+		$tokendb = $this->tokenDb();
+
+		$tokendb->query("DELETE FROM " . $this->tokenTable() . " WHERE " . $this->tokenRowsFilter());
+		foreach ($this->savedTokenRows as $row) {
+			$values = array();
+			foreach ($row as $value) {
+				$values[] = ($value === null ? 'NULL' : "'" . $tokendb->escape((string) $value) . "'");
+			}
+			$tokendb->query("INSERT INTO " . $this->tokenTable() . " (" . implode(', ', array_keys($row)) . ") VALUES (" . implode(', ', $values) . ")");
+		}
+
+		parent::tearDown();
+	}
+
+	/**
+	 * Name of the service the provider of the tests stores its token under.
+	 *
+	 * @return string	The 'dol_prefix' of the provider plus the environment
+	 */
+	private function tokenService()
+	{
+		return 'EINVOICING_TESTPDP_' . (getDolGlobalInt('EINVOICING_LIVE') ? 'PROD' : 'TEST');
+	}
+
+	/**
+	 * Connection the module reads and writes the token on.
+	 *
+	 * @return DoliDB	Connection of the token, apart from the transaction of the tests
+	 */
+	private function tokenDb()
+	{
+		global $db;
+
+		$provider = new CredentialStorageEncryptionProvider($db);
+
+		return $provider->exposeTokenStorageDb();
+	}
+
+	/**
+	 * Table this core version keeps the token in.
+	 *
+	 * @return string	Table name with its prefix
+	 */
+	private function tokenTable()
+	{
+		return MAIN_DB_PREFIX . (version_compare(DOL_VERSION, '23.0.0-alpha', '<') ? 'const' : 'oauth_token');
+	}
+
+	/**
+	 * SQL filter selecting the rows that hold the token of the test service.
+	 *
+	 * @return string	Content of a WHERE clause
+	 */
+	private function tokenRowsFilter()
+	{
+		global $conf;
+
+		$tokendb = $this->tokenDb();
+		$service = $this->tokenService();
+
+		if (version_compare(DOL_VERSION, '23.0.0-alpha', '<')) {
+			$names = array();
+			foreach (array('_TOKEN', '_REFRESH', '_EXPIRE') as $suffix) {
+				$names[] = $tokendb->encrypt($service . $suffix);
+			}
+			return "name IN (" . implode(', ', $names) . ") AND entity = " . ((int) $conf->entity);
+		}
+
+		return "service = '" . $tokendb->escape($service) . "' AND entity = " . ((int) $conf->entity);
+	}
 
 	/**
 	 * Tell whether this instance can encrypt at all.
@@ -107,12 +220,15 @@ class CredentialStorageEncryptionTest extends CommonClassTest
 	/**
 	 * Read a constant as it sits in the table, without the decryption dolibarr_get_const() applies.
 	 *
-	 * @param	string	$name	Name of the constant
-	 * @return	string			Raw value, '' when the row does not exist
+	 * @param	string		$name		Name of the constant
+	 * @param	?DoliDB		$dbtouse	Connection to read on, the one of the tests when null
+	 * @return	string					Raw value, '' when the row does not exist
 	 */
-	private function rawConstValue($name)
+	private function rawConstValue($name, $dbtouse = null)
 	{
-		global $conf, $db;
+		global $conf;
+
+		$db = (is_object($dbtouse) ? $dbtouse : $GLOBALS['db']);
 
 		$sql = "SELECT " . $db->decrypt('value') . " as value FROM " . MAIN_DB_PREFIX . "const";
 		$sql .= " WHERE name = " . $db->encrypt($name);
@@ -134,7 +250,9 @@ class CredentialStorageEncryptionTest extends CommonClassTest
 	 */
 	private function rawTokenRow($service)
 	{
-		global $conf, $db;
+		global $conf;
+
+		$db = $this->tokenDb();
 
 		$sql = "SELECT tokenstring, tokenstring_refresh FROM " . MAIN_DB_PREFIX . "oauth_token";
 		$sql .= " WHERE service = '" . $db->escape($service) . "'";
@@ -161,8 +279,8 @@ class CredentialStorageEncryptionTest extends CommonClassTest
 	{
 		if (version_compare(DOL_VERSION, '23.0.0-alpha', '<')) {
 			return array(
-				'token' => $this->rawConstValue($service . '_TOKEN'),
-				'refresh' => $this->rawConstValue($service . '_REFRESH'),
+				'token' => $this->rawConstValue($service . '_TOKEN', $this->tokenDb()),
+				'refresh' => $this->rawConstValue($service . '_REFRESH', $this->tokenDb()),
 			);
 		}
 
@@ -224,18 +342,19 @@ class CredentialStorageEncryptionTest extends CommonClassTest
 		$provider = new CredentialStorageEncryptionProvider($db);
 		$service = 'EINVOICING_TESTPDP_' . (getDolGlobalInt('EINVOICING_LIVE') ? 'PROD' : 'TEST');
 
-		// Plant what the module used to write, bypassing the code under test.
+		// Plant what the module used to write, bypassing the code under test, on the connection it reads on.
+		$tokendb = $provider->exposeTokenStorageDb();
 		if (version_compare(DOL_VERSION, '23.0.0-alpha', '<')) {
-			dolibarr_set_const($db, $service . '_TOKEN', 'legacy-access-in-clear', 'chaine', 0, '', $conf->entity);
-			dolibarr_set_const($db, $service . '_REFRESH', 'legacy-refresh-in-clear', 'chaine', 0, '', $conf->entity);
+			dolibarr_set_const($tokendb, $service . '_TOKEN', 'legacy-access-in-clear', 'chaine', 0, '', $conf->entity);
+			dolibarr_set_const($tokendb, $service . '_REFRESH', 'legacy-refresh-in-clear', 'chaine', 0, '', $conf->entity);
 		} else {
-			$sql = "DELETE FROM " . MAIN_DB_PREFIX . "oauth_token WHERE service = '" . $db->escape($service) . "'";
+			$sql = "DELETE FROM " . MAIN_DB_PREFIX . "oauth_token WHERE service = '" . $tokendb->escape($service) . "'";
 			$sql .= " AND entity = " . ((int) $conf->entity);
-			$this->assertNotFalse($db->query($sql));
+			$this->assertNotFalse($tokendb->query($sql));
 
 			$sql = "INSERT INTO " . MAIN_DB_PREFIX . "oauth_token (service, tokenstring, tokenstring_refresh, datec, entity)";
-			$sql .= " VALUES ('" . $db->escape($service) . "', 'legacy-access-in-clear', 'legacy-refresh-in-clear', '" . $db->idate(dol_now()) . "', " . ((int) $conf->entity) . ")";
-			$this->assertNotFalse($db->query($sql));
+			$sql .= " VALUES ('" . $tokendb->escape($service) . "', 'legacy-access-in-clear', 'legacy-refresh-in-clear', '" . $tokendb->idate(dol_now()) . "', " . ((int) $conf->entity) . ")";
+			$this->assertNotFalse($tokendb->query($sql));
 		}
 
 		$read = $provider->fetchOAuthTokenDB((int) $conf->entity);
