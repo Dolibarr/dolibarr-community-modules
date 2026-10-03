@@ -859,6 +859,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				// validates it too. Validation comes first: a status accepted by the platform cannot be taken
 				// back, while a validation that fails (numbering, closed period, ...) must leave it untouched.
 				$sendtheanswer = true;
+				$justvalidated = false;
 				if (in_array($pdpstatuscode, EInvoicing::STATUSES_ACCEPTING_A_DOCUMENT, true) && (int) $object->status === FactureFournisseur::STATUS_DRAFT) {
 					if (!$permissiontovalidate) {
 						$message = $langs->trans('EInvoiceApprovalNeedsValidateRight');
@@ -882,12 +883,16 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 					setEventMessages($langs->trans('EInvoiceApprovalValidatedTheInvoice', (string) $object->ref), array(), 'mesgs');
 
-					// EINVOICING_SEND_APPROVED_ON_VALIDATION makes that validation answer the platform on
-					// its own: sending the status again here would duplicate the flow. Read what the
-					// validation actually recorded rather than the setting, so a status sent by any other
-					// path is not doubled either.
-					if ($einvoicing->hasSentStatusMessage($object->id, $object->element, $pdpstatuscode)) {
-						$sendtheanswer = false;
+					$justvalidated = true;
+				}
+
+				// A CDAR deposit is irreversible: a status the platform did not reject is never sent twice.
+				if ($einvoicing->hasLiveStatusMessage($object->id, $object->element, $pdpstatuscode)) {
+					$sendtheanswer = false;
+
+					// The validation above may have sent it already (EINVOICING_SEND_APPROVED_ON_VALIDATION).
+					if (!$justvalidated) {
+						setEventMessages($langs->trans('EInvoiceStatusAlreadySentToPlatform', $einvoicing->getStatusLabel($pdpstatuscode)), array(), 'warnings');
 					}
 				}
 
