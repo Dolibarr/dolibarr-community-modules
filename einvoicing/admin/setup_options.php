@@ -396,6 +396,14 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 	$item->cssClass = 'minwidth500';
 	$item->fieldParams['warningifon'] = 1;
 
+	// Setup conf to attach an imported supplier invoice to the recurring template of its vendor.
+	// Off by default: it writes on the invoice settings the operator chose for the subscription, and
+	// moves the template past a generation it still owed.
+	$item = $formSetup->newItem('EINVOICING_LINK_RECURRING_TEMPLATE')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_LINK_RECURRING_TEMPLATE_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+
 	// Setup conf to choose use of auto generation or not of third parties
 	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_AUTO_GENERATION')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_THIRDPARTIES_AUTO_GENERATION_HELP');
