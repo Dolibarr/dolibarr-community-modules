@@ -531,6 +531,18 @@ if (!function_exists('einvoicingDolGetButtonActionDropdown')) {
 	}
 }
 
+/**
+ * Url for the 'url' key of a dropdown entry of dolGetButtonAction(), which every core prefixes with DOL_URL_ROOT.
+ *
+ * @param	string	$url		Url as dol_buildpath() returns it with type 1
+ * @param	string	$urlroot	Prefix the core puts in front of the url
+ * @return	string				Url without that prefix
+ */
+function einvoicingDropdownEntryUrl($url, $urlroot = DOL_URL_ROOT)
+{
+	return (string) preg_replace('/^' . preg_quote($urlroot, '/') . '/', '', $url);
+}
+
 
 if (!method_exists('Societe', 'findNearest')) {
 	/**
