@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2025-2026       Laurent Destailleur         <eldy@users.sourceforge.net>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  * Copyright (C) 2025-2026       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
@@ -1083,6 +1084,15 @@ trait CommonProtocol
 			// Create URL to prefill thirdparty creation form
 			$createUrl = DOL_URL_ROOT . '/societe/card.php?action=create&type=f';
 			if (!empty($createParams)) {
+				// The Dolibarr GET firewall (analyseVarsForSqlAndScriptsInjection) rejects " < > in any URL
+				// parameter, so a seller name/address carrying them would 403 before the prefilled creation
+				// form even opens. Use the core helper (replaces " with ' and removes < >, identical from
+				// v18 to v25) to drop them from the prefill - a convenience the operator reviews and edits.
+				foreach ($createParams as $cpKey => $cpVal) {
+					if (is_string($cpVal)) {
+						$createParams[$cpKey] = dol_string_nospecial($cpVal, "'", array('"'), array('<', '>'));
+					}
+				}
 				$createUrl .= '&' . http_build_query($createParams);
 			}
 			$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
@@ -1584,6 +1594,15 @@ trait CommonProtocol
 			// Create URL to prefill product creation form
 			$createUrl = DOL_URL_ROOT . '/product/card.php?action=create';
 			if (!empty($createParams)) {
+				// The Dolibarr GET firewall (analyseVarsForSqlAndScriptsInjection) rejects " < > in any URL
+				// parameter, so a line label/description carrying them would 403 before the prefilled creation
+				// form even opens. Use the core helper (replaces " with ' and removes < >, identical from
+				// v18 to v25) to drop them from the prefill - a convenience the operator reviews and edits.
+				foreach ($createParams as $cpKey => $cpVal) {
+					if (is_string($cpVal)) {
+						$createParams[$cpKey] = dol_string_nospecial($cpVal, "'", array('"'), array('<', '>'));
+					}
+				}
 				$createUrl .= '&' . http_build_query($createParams);
 			}
 			$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
@@ -2066,7 +2085,7 @@ trait CommonProtocol
 				// registration identifier (BT-32), the buyer with its VAT identifier (BT-48) or its legal
 				// registration identifier (BT-47). Reporting it here names the record to complete; left to the
 				// Schematron it comes back from the platform as a rejected document.
-				$buyerThirdparty = empty($buyer->thirdparty) ? null : $buyer->thirdparty;
+				$buyerThirdparty = empty($buyer->thirdparty) ? null : $buyer->thirdparty;	// @phpstan-ignore empty.property (Dolibarr 18 documents $thirdparty as always set, it stays empty until fetch_thirdparty())
 				if (empty($seller->tva_intra) && empty($seller->idprof1)) {
 					throw new Exception('BADVATNUMBER[BR-AE-02]: The VAT number or the professional id of the seller '.$seller->name.' is mandatory when a line is invoiced under the reverse charge (VAT category AE).');
 				}
