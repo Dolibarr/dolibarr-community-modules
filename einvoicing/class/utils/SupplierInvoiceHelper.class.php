@@ -764,7 +764,7 @@ class SupplierInvoiceHelper
 	 * Remove the mark, once the invoice totals what the document announces.
 	 *
 	 * @param	int		$supplierInvoiceId	Id of the supplier invoice
-	 * @return	int							-1 on error, >0 otherwise
+	 * @return	int							-1 on error, 0 if the invoice carried no mark, 1 otherwise
 	 */
 	public static function clearTotalsMismatch($supplierInvoiceId)
 	{
