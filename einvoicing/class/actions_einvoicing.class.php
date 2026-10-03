@@ -165,7 +165,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 						$result = $protocol->generateInvoice($invoiceObject, $outputlangs, $pdfPath);		// Generate E-invoice (embed into the real generated file)
 
-						if ($result >= 0) {
+						// $result is the path of the file, or -1: under PHP 8 a path compared to 0 is compared as
+						// a string, and "/..." >= "0" is false, so the configuration warning was never shown.
+						if (!is_numeric($result) || $result >= 0) {
 							if (!defined('NOLOGIN')) {	// If in backoffice context
 								setEventMessages($message, array(), $messagecss);
 							}
@@ -577,7 +579,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// Add button to change the entity (multi-company) of a supplier invoice (we test context invoicesuppliercard but also main for old versions of module)
 		if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE') && isModEnabled('multicompany') && in_array($object->element, ['invoice_supplier'])
 			&& !empty($object->id) && $user->hasRight('fournisseur', 'facture', 'creer') && preg_match('/invoicesuppliercard|main/', $parameters['currentcontext'] ?? '')) {
-			if ($object->isEditable()) {
+			// isEditable() only exists since Dolibarr 23 and answers a negative code when refused. Before, same
+			// rule as the core card offers "Modify" with: no payment and not dispatched in bookkeeping.
+			$editable = method_exists($object, 'isEditable') ? ($object->isEditable() > 0)
+				: ($object->getSommePaiement() == 0 && $object->getVentilExportCompta() == 0);
+			if ($editable) {
 				print '<a class="butAction" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?id=' . $object->id . '&action=change_entity&token=' . newToken() . '">'
 					. $langs->trans('ChangeEntity') . '</a>';
 			} else {
@@ -1799,8 +1805,14 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		$contexts = explode(':', $parameters['context']);
 
 		if (array_intersect($contexts, ['invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
-			if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == getDolGlobalString('EINVOICING_PDP')) {
-				$this->resprints .= " AND ext.provider = '" . $db->escape(getDolGlobalString('EINVOICING_PDP')) . "'";
+			// The 'search_pdplinked' select option is built from the provider name with any trailing
+			// 'ViaPartner' stripped (see printFieldListOption()), and that is also what document.provider
+			// gets stored as (see e.g. SuperPDPProvider::providershort). Comparing against the raw
+			// EINVOICING_PDP config value here would never match for a *ViaPartner provider, silently
+			// turning this filter into a no-op.
+			$tmpeinvoicingpartner = preg_replace('/ViaPartner/i', '', getDolGlobalString('EINVOICING_PDP'));
+			if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == $tmpeinvoicingpartner) {
+				$this->resprints .= " AND ext.provider = '" . $db->escape($tmpeinvoicingpartner) . "'";
 			}
 		}
 
