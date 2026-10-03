@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
  * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
+ * Copyright (C) 2026		Alexandre Spangaro          <alexandre@inovea-conseil.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -1082,6 +1083,52 @@ if ($notSubjectToVatGroups > 0) {
 	}
 }
 
+// Document extra mention
+// The PMT, PMD, AAB, and TXD notes are handled separately.
+// The other EINVOICING_EXTRA_<CODE> constants are added
+// as structured notes BT-21 / BT-22.
+$sqlExtraNotes = 'SELECT name, value';
+$sqlExtraNotes .= ' FROM '.MAIN_DB_PREFIX.'const';
+$sqlExtraNotes .= " WHERE name LIKE 'EINVOICING_EXTRA_%'";
+$sqlExtraNotes .= ' AND entity = '.((int) $conf->entity);
+$sqlExtraNotes .= ' ORDER BY name ASC';
+
+$resqlExtraNotes = $db->query($sqlExtraNotes);
+
+if (!$resqlExtraNotes) {
+	dol_syslog(__METHOD__.' SQL error while loading extra notes: '.$db->lasterror(), LOG_ERR);
+} else {
+	while ($extraNote = $db->fetch_object($resqlExtraNotes)) {
+		$subjectCode = substr(
+			$extraNote->name,
+			strlen('EINVOICING_EXTRA_')
+		);
+		$content = trim((string) $extraNote->value);
+
+		// Security: Only 3-character UNTDID codes are accepted.
+		if (!preg_match('/^[A-Z0-9]{3}$/', $subjectCode)) {
+			continue;
+		}
+
+		if ($content === '') {
+			continue;
+		}
+
+		// These codes already have dedicated variables.
+		if (in_array($subjectCode, array('PMT', 'PMD', 'AAB', 'TXD'), true)) {
+			continue;
+		}
+
+		$documentNotes[] = array(
+			'subjectCode' => $subjectCode,
+			'content' => $content,
+		);
+	}
+
+	$db->free($resqlExtraNotes);
+}
+
+
 $invoiceData = [
 	// Document part
 	'documentno'           => $object->ref,												// BT-25
@@ -1095,7 +1142,7 @@ $invoiceData = [
 
 	'documentDeliveryDate' => $deliveryDate,
 
-	'invoicingPeriodStart' => $invoicingPeriodStart,										// BT-73
+	'invoicingPeriodStart' => $invoicingPeriodStart,								    // BT-73
 	'invoicingPeriodEnd'   => $invoicingPeriodEnd,										// BT-74
 
 	// $prepaidAmount is what the document reports in BT-113, and BR-FR-CO-09 ties the "already paid"
@@ -1116,7 +1163,7 @@ $invoiceData = [
 	// Legal mention that goes with the "TVA d'après les débits" option, mandatory on the invoices of a
 	// seller who took it. The structured form of the same information is the VAT point date code below.
 	'documentNoteTXD'      => $vatOnDebits ? $outputlangs->transnoentities('VATOnDebitsMention') : '',
-	'documentNotes'        => [],
+	'documentNotes'        => $documentNotes,								            // BT-21 / BT-22
 
 	// BT-8 (VAT point date code), which tells the buyer when the VAT falls due, hence from when it can be
 	// deducted. See einvoicingVatPointDateCode() for the rule and what the French socle names.

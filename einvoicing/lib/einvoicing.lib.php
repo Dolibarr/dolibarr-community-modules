@@ -52,9 +52,19 @@ function einvoicingAdminPrepareHead()
 	$head[$h][2] = 'settings';
 	$h++;
 
-	$head[$h][0] = dol_buildpath("/einvoicing/admin/setup_options.php", 1);
-	$head[$h][1] = $langs->trans("Options");
-	$head[$h][2] = 'options';
+	$head[$h][0] = dol_buildpath('/einvoicing/admin/setup_send.php', 1);
+	$head[$h][1] = $langs->trans('OptionsEInvoicingSend');
+	$head[$h][2] = 'send';
+	$h++;
+
+	$head[$h][0] = dol_buildpath('/einvoicing/admin/setup_receive.php', 1);
+	$head[$h][1] = $langs->trans('OptionsEInvoicingReceive');
+	$head[$h][2] = 'receive';
+	$h++;
+
+	$head[$h][0] = dol_buildpath('/einvoicing/admin/setup_advanced.php', 1);
+	$head[$h][1] = $langs->trans('OptionsEInvoicingAdvanced');
+	$head[$h][2] = 'advanced';
 	$h++;
 
 	/*
@@ -1344,4 +1354,92 @@ function einvoicingDiagnosticPreviewLink($fileName)
 	$out .= '<span class="fas fa-search-plus pictofixedwidth" style="color: #808080;"></span></a>';
 
 	return $out;
+}
+
+/**
+ * Returns the active and usable UNTDID codes for extra entrie
+ *
+ * @param DoliDB $db
+ * @param Translate $langs
+ * @param int $entity
+ * @param array<int,string> $excludedCodes
+ * @return array<string,array{rowid:int,code:string,label:string}>
+ */
+function einvoicingGetActiveUntdid4451Codes($db, $langs, $entity, array $excludedCodes = array()) {
+	$result = array();
+	$sql = 'SELECT rowid, code, label, position';
+	$sql .= ' FROM '.MAIN_DB_PREFIX.'c_einvoicing_untdid4451';
+	$sql .= ' WHERE entity IN (0, '.((int) $entity).')';
+	$sql .= ' AND active = 1';
+	$sql .= ' ORDER BY position ASC, code ASC';
+
+	$resql = $db->query($sql);
+	if (!$resql) {
+		dol_syslog(__METHOD__.' SQL error: '.$db->lasterror(), LOG_ERR);
+		return $result;
+	}
+
+	while ($obj = $db->fetch_object($resql)) {
+		$code = strtoupper(trim((string) $obj->code));
+		if (!preg_match('/^[A-Z0-9]{3}$/', $code) || in_array($code, $excludedCodes, true)) {
+			continue;
+		}
+
+		$label = $obj->label;
+		$translatedLabel = $langs->trans($label);
+		if ($translatedLabel !== $label) {
+			$label = $translatedLabel;
+		}
+
+		$result[$code] = array(
+			'rowid' => (int) $obj->rowid,
+			'code' => $code,
+			'label' => $label,
+		);
+	}
+	$db->free($resql);
+
+	return $result;
+}
+
+/**
+ * Check to see if a code is active in the UNTDID 4451 dictionary.
+ *
+ * @param DoliDB $db
+ * @param string $code
+ * @param int $entity
+ * @param array<int,string> $excludedCodes
+ * @return bool
+ */
+function einvoicingIsActiveUntdid4451Code($db, $code, $entity, array $excludedCodes = array()) {
+	$code = strtoupper(trim((string) $code));
+
+	if (!preg_match('/^[A-Z0-9]{3}$/', $code)) {
+		return false;
+	}
+
+	if (in_array($code, $excludedCodes, true)) {
+		return false;
+	}
+
+	$sql = 'SELECT rowid';
+	$sql .= ' FROM '.MAIN_DB_PREFIX.'c_einvoicing_untdid4451';
+	$sql .= " WHERE code = '".$db->escape($code)."'";
+	$sql .= ' AND active = 1';
+	$sql .= $db->plimit(1);
+
+	$resql = $db->query($sql);
+
+	if (!$resql) {
+		dol_syslog(
+			__METHOD__.' SQL error: '.$db->lasterror(),
+			LOG_ERR
+		);
+
+		return false;
+	}
+
+	$valid = ($db->num_rows($resql) > 0);
+	$db->free($resql);
+	return $valid;
 }

@@ -271,7 +271,18 @@ class modEInvoicing extends DolibarrModules
 		 );
 		 */
 		/* BEGIN MODULEBUILDER DICTIONARIES */
-		$this->dictionaries = array();
+		$this->dictionaries = array(
+			'langs' => 'einvoicing@einvoicing',
+			'tabname' => array(MAIN_DB_PREFIX.'c_einvoicing_untdid4451',),
+			'tablib' => array('EInvoicingUntdidDictionary',),
+			'tabsql' => array('SELECT f.rowid as rowid, f.code, f.label, f.label_en, f.active FROM '.MAIN_DB_PREFIX.'c_einvoicing_untdid4451 as f'),
+			'tabsqlsort' => array('code ASC',),
+			'tabfield' => array('code,label,label_en'),
+			'tabfieldvalue' => array('code,label,label_en'),
+			'tabfieldinsert' => array('code,label,label_en'),
+			'tabrowid' => array('rowid',),
+			'tabcond' => array('isModEnabled("einvoicing")',),
+		);
 		/* END MODULEBUILDER DICTIONARIES */
 
 		// Boxes/Widgets

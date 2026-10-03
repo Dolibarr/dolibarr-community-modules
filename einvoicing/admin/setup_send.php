@@ -18,7 +18,7 @@
  */
 
 /**
- * \file    einvoicing/admin/setup_options.php
+ * \file    einvoicing/admin/setup_send.php
  * \ingroup einvoicing
  * \brief   EInvoicing setup page.
  */
@@ -106,6 +106,9 @@ if (!class_exists('FormSetup')) {
 
 $formSetup = new FormSetup($db);
 
+$excludedUntdidCodes = array('PMT', 'PMD', 'AAB',
+);
+
 // Access control
 if (!$user->admin) {
 	accessforbidden();
@@ -153,7 +156,6 @@ if (getDolGlobalString('EINVOICING_PDP') && !getDolGlobalString('EINVOICING_PROT
 }
 
 if ($action == 'savesyncoptions') {
-	dolibarr_set_const($db, "EINVOICING_DISABLE_SYNC_AP_TO_DOLI", (int) !GETPOSTINT("EINVOICING_DISABLE_SYNC_AP_TO_DOLI"), 'chaine', 0, '', $conf->entity);
 	dolibarr_set_const($db, "EINVOICING_DISABLE_SYNC_DOLI_TO_AP", (int) !GETPOSTINT("EINVOICING_DISABLE_SYNC_DOLI_TO_AP"), 'chaine', 0, '', $conf->entity);
 
 	header("Location: ".$_SERVER["PHP_SELF"]);
@@ -320,6 +322,24 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$isfrenchseller = ($mysoc->country_code == 'FR');
 	$noticedefaulthelp = $isfrenchseller ? ' '.$langs->transnoentities('EINVOICING_LEGAL_NOTICE_DEFAULT_HELP') : '';
 
+	/*
+	$vatexigibility = $langs->trans(getDolGlobalString('TAX_MODE_SELL_PRODUCT') == 'payment' ? 'OnPayment' : 'OnInvoice');
+	$vatexigibility .= ' / ';
+	$vatexigibility .= $langs->trans(getDolGlobalString('TAX_MODE_SELL_SERVICE') == 'payment' ? 'OnPayment' : 'OnInvoice');
+	*/
+	$conf->global->EINVOICING_TELL_CUSTOMER_PAYMENT_RECEIVED = $langs->trans("Mandatory");
+	$item = $formSetup->newItem('EINVOICING_TELL_CUSTOMER_PAYMENT_RECEIVED');
+	$item->helpText = $langs->trans('EINVOICING_TELL_CUSTOMER_PAYMENT_RECEIVED_HELP');
+	$item->fieldInputOverride = $langs->trans("Mandatory");
+	//$item->enabled = 0;
+	$item->cssClass = 'opacitymedium';
+
+	/*
+	$itemtitle->helpText = $langs->trans('EINVOICING_VAT_EXIGIBILITY_HELP').' <b>'
+			.dol_escape_htmltag($vatexigibility)
+			.'</b> <a href="'.DOL_URL_ROOT.'/admin/taxes.php">'.$langs->trans('Setup').'</a>';
+	*/
+
 	// Setup conf for PMT - Mention regarding recovery fees
 	$item = $formSetup->newItem('EINVOICING_PMT');
 	$item->helpText = $langs->transnoentities('EINVOICING_PMT_HELP').$noticedefaulthelp;
@@ -343,144 +363,39 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 		$item->fieldAttr['placeholder'] = $langs->transnoentities('EarlyPaymentDiscountMention');
 	}
 	$item->cssClass = 'minwidth500';
-
-	/*
-	$vatexigibility = $langs->trans(getDolGlobalString('TAX_MODE_SELL_PRODUCT') == 'payment' ? 'OnPayment' : 'OnInvoice');
-	$vatexigibility .= ' / ';
-	$vatexigibility .= $langs->trans(getDolGlobalString('TAX_MODE_SELL_SERVICE') == 'payment' ? 'OnPayment' : 'OnInvoice');
-	*/
-	$conf->global->EINVOICING_TELL_CUSTOMER_PAYMENT_RECEIVED = $langs->trans("Mandatory");
-	$item = $formSetup->newItem('EINVOICING_TELL_CUSTOMER_PAYMENT_RECEIVED');
-	$item->helpText = $langs->trans('EINVOICING_TELL_CUSTOMER_PAYMENT_RECEIVED_HELP');
-	$item->fieldInputOverride = $langs->trans("Mandatory");
-	//$item->enabled = 0;
-	$item->cssClass = 'opacitymedium';
-
-	/*
-	$itemtitle->helpText = $langs->trans('EINVOICING_VAT_EXIGIBILITY_HELP').' <b>'
-			.dol_escape_htmltag($vatexigibility)
-			.'</b> <a href="'.DOL_URL_ROOT.'/admin/taxes.php">'.$langs->trans('Setup').'</a>';
-	*/
 }
 
+if ($action == 'save_extra_untdid' && GETPOST('token', 'alpha') === newToken()) {
+	$code = strtoupper(trim(GETPOST('untdid_code', 'aZ09')));
+	$text = trim(GETPOST('untdid_text', 'restricthtml'));
 
-if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or we are not in a generate only mode
-	// Setup conf for auto generation of objects
-	$itemtitle = $formSetup->newItem('EINVOICING_AUTO_GENERATION');
-	$itemtitle->setAsTitle();
-	$itemtitle->nameText = '<b>'.$langs->trans("EINVOICING_AUTO_GENERATION").'</b>';
-
-	// Setup conf to choose use of auto generation or not of products
-	$item = $formSetup->newItem('EINVOICING_PRODUCTS_AUTO_GENERATION')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_PRODUCTS_AUTO_GENERATION_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-	$item->fieldParams['forcereload'] = 1;
-	$item->fieldParams['warningifon'] = 1;
-
-	// Setup conf to import lines as free description lines when no product is found and no default product exist on supplier
-	// This option is in conflict with EINVOICING_PRODUCTS_AUTO_GENERATION, so it is disabled if EINVOICING_PRODUCTS_AUTO_GENERATION is on
-	if (!getDolGlobalString("EINVOICING_PRODUCTS_AUTO_GENERATION")) {
-		$item = $formSetup->newItem('EINVOICING_IMPORT_AS_FREE_LINES')->setAsYesNo();
-		$item->helpText = $langs->transnoentities('EINVOICING_IMPORT_AS_FREE_LINES_HELP');
-		$item->defaultFieldValue = '0';
-		$item->cssClass = 'minwidth500';
-		$item->fieldParams['warningifon'] = 1;
+	if (!   einvoicingIsActiveUntdid4451Code($db, $code, $conf->entity, $excludedUntdidCodes)) {
+		setEventMessages($langs->trans('EINVOICING_INVALID_UNTDID_CODE'), null, 'errors');
+	} elseif ($text === '') {
+		setEventMessages($langs->trans('EINVOICING_EMPTY_UNTDID_TEXT'), null, 'errors');
+	} else {
+		$constantName = 'EINVOICING_EXTRA_'.$code;
+		dolibarr_set_const($db, $constantName, $text, 'chaine', 0, '', $conf->entity);
+		setEventMessages($langs->trans('EINVOICING_EXTRA_MENTION_SAVED', $code), null, 'mesgs');
 	}
 
-	// Setup conf to match a vendor product reference written with separators other than the recorded one.
-	// Off by default: the comparison ignores separators, so it is an approximation.
-	$item = $formSetup->newItem('EINVOICING_PRODUCTS_MATCH_CANONICAL_REF')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_PRODUCTS_MATCH_CANONICAL_REF_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-	$item->fieldParams['warningifon'] = 1;
-
-	// Setup conf to choose use of auto generation or not of third parties
-	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_AUTO_GENERATION')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_THIRDPARTIES_AUTO_GENERATION_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-
-	// Setup conf to enable complete third party information when receiving an invoice from from PDP
-	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_COMPLETE_INFO')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_THIRDPARTIES_COMPLETE_INFO_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-
-	// Setup conf to to enable a limit of flows to synchronize per one synchronization call
-	/* This option is useless, should be always on. Disabling it is possible by editing hidden cosntant
-	$item = $formSetup->newItem('EINVOICING_FLOWS_SYNC_CALL_LIMIT')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_FLOWS_SYNC_CALL_LIMIT_HELP');
-	$item->defaultFieldValue = '1';
-	$item->cssClass = 'minwidth500';
-	$item->fieldParams['forcereload'] = 1;
-	*/
-
-	// Setup conf to enable or not the consistency check on supplier invoice validation. Off by default:
-	// it re-checks every e-invoice at validation, including the ones edited by hand afterwards, which is
-	// a wider question than the one the import itself settles.
-	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION');
-	$item->helpText = $langs->transnoentities('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP');
-	$item->setAsYesNo();
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-
-	// Tell the vendor that its invoice is approved (status 205) when the supplier invoice is validated so approved.
-	// Off by default.
-	$item = $formSetup->newItem('EINVOICING_SEND_APPROVED_ON_VALIDATION')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_SEND_APPROVED_ON_VALIDATION_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-
-	// Tell the vendor of a supplier invoice that its payment has been sent (status 211), as soon as the
-	// invoice is classified paid in Dolibarr. Optional status of the reform, hence off by default: it is
-	// a courtesy to the vendor and it costs one platform flow per invoice.
-	$item = $formSetup->newItem('EINVOICING_SEND_PAYMENT_SENT_STATUS')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_SEND_PAYMENT_SENT_STATUS_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-
-
-	// Experimental options
-	// EINVOICING_ENABLE_MANUAL_ACTION_QUEUE: This option log import blocked flow with the action to do so we can do it manually later.
-	// Risk: unblocking action in a different order may result in undesirable side effects.
-
-	// Activate postponeflow
-	// EINVOICING_ENABLE_POSTPONE_FLOWS: This option postpone flow with the action to do so we can do it manually later.
-	// Risk: very dangerous. continuing to process flows means changing the cursor, and when a new record is save, we lost
-	// all postpone flow that were discarded.
+	header('Location: '.$_SERVER['PHP_SELF']);
+	exit;
 }
 
+if ($action == 'delete_extra_untdid' && GETPOST('token', 'alpha') === newToken()) {
+	$code = strtoupper(trim(GETPOST('untdid_code', 'aZ09')));
 
-if (!einvoicingReceptionDisabled() || !einvoicingIsSendDisabled()) {
-	$itemtitle = $formSetup->newItem('EINVOICING_DEBUG')->setAsTitle();
-	$itemtitle->nameText = '<b>'.$langs->trans("Other").'</b>';
+	if (!einvoicingIsActiveUntdid4451Code($db, $code, $conf->entity, $excludedUntdidCodes)) {
+		setEventMessages($langs->trans('EINVOICING_INVALID_UNTDID_CODE'), null, 'errors');
+	} else {
+		$constantName = 'EINVOICING_EXTRA_'.$code;
+		dolibarr_del_const($db, $constantName, $conf->entity);
+		setEventMessages($langs->trans('EINVOICING_EXTRA_MENTION_DELETED', $code), null, 'mesgs');
+	}
 
-	// Setup conf to to define the number of flows to synchronize per one synchronization call
-	$item = $formSetup->newItem('EINVOICING_FLOWS_SYNC_CALL_SIZE');
-	$item->helpText = $langs->transnoentities('EINVOICING_FLOWS_SYNC_CALL_SIZE_HELP');
-	$item->defaultFieldValue = '100';
-	$item->cssClass = 'maxwidth100';
-
-	// Setup conf to define a time margin in hours to go back from the current date of the last synchronization
-	$item = $formSetup->newItem('EINVOICING_SYNC_MARGIN_TIME_HOURS');
-	$item->helpText = $langs->transnoentities('EINVOICING_SYNC_MARGIN_TIME_HOURS_HELP');
-	$item->fieldAttr['placeholder'] = $langs->transnoentities('Hours');
-	$item->cssClass = 'maxwidth100';
-
-	// Setup conf to choose to use Chorus or not
-	$item = $formSetup->newItem('EINVOICING_USE_CHORUS')->setAsYesNo();
-	$item->nameText = $langs->trans("EINVOICING_USE_CHORUS").' <span class="opacitymedium">('.$langs->trans("FeatureNotFullyYetSupported").')</span>';
-	$item->helpText = $langs->transnoentities('EINVOICING_USE_CHORUS_HELP');
-	$item->cssClass = 'minwidth500';
-
-	// Setup conf to enable or not debug mode
-	$item = $formSetup->newItem('EINVOICING_DEBUG_MODE')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_DEBUG_MODE_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-	$item->fieldParams['warningifon'] = 1;
+	header('Location: '.$_SERVER['PHP_SELF']);
+	exit;
 }
 
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
@@ -498,9 +413,9 @@ $action = 'edit';
 $form = new Form($db);
 
 $help_url = 'EN:Module_EInvoicing';
-$title = "EInvoicingSetup";
+$title = "OptionsEInvoicingSend";
 
-llxHeader('', $langs->trans($title), $help_url, '', 0, 0, '', '', '', 'mod-einvoicing page-admin-options');
+llxHeader('', $langs->trans($title), $help_url, '', 0, 0, '', '', '', 'mod-einvoicing page-admin-optionssend');
 
 // Subheader
 $linkback = '<a href="'.($backtopage ? $backtopage : DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1').'">'.img_picto($langs->trans("BackToModuleList"), 'back', 'class="pictofixedwidth"').'<span class="hideonsmartphone">'.$langs->trans("BackToModuleList").'</span></a>';
@@ -510,7 +425,7 @@ print load_fiche_titre($langs->trans($title), $linkback, 'title_setup');
 
 // Configuration header
 $head = einvoicingAdminPrepareHead();
-print dol_get_fiche_head($head, 'options', $langs->trans($title), -1, "einvoicing.png@einvoicing");
+print dol_get_fiche_head($head, 'send', $langs->trans($title), -1, "einvoicing.png@einvoicing");
 
 // Setup page goes here
 //print info_admin($langs->trans("EInvoicingInfo"));
@@ -530,13 +445,6 @@ print '<div class="neutral">';
 
 print img_picto('', 'bill', 'class="pictofixedwidth"').$langs->trans("EnableInvoiceExport").' ';
 print $form->selectyesno("EINVOICING_DISABLE_SYNC_DOLI_TO_AP", GETPOSTISSET("EINVOICING_DISABLE_SYNC_DOLI_TO_AP") ? GETPOSTINT('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') : !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP'), 1, false, 0, 1);
-print '<br>';
-
-print '<br>';
-
-print img_picto('', 'supplier_invoice', 'class="pictofixedwidth"').$langs->trans("EnableInvoiceImport").' ';
-print $form->selectyesno("EINVOICING_DISABLE_SYNC_AP_TO_DOLI", GETPOSTISSET("EINVOICING_DISABLE_SYNC_AP_TO_DOLI") ? GETPOSTINT("EINVOIC
-NG_DISABLE_SYNC_AP_TO_DOLI") : !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'), 1, false, 0, 1);
 print '<br>';
 
 print '</div>';
@@ -584,16 +492,123 @@ if (!empty($formSetup->items)) {
 	print '<br>';
 }
 
-// on change EINVOICING_PDP reload page to show specific configuration of selected PDP
+$excludedUntdidCodes = array('PMT', 'PMD', 'AAB');
+
+$extraUntdidCodes = einvoicingGetActiveUntdid4451Codes($db, $langs, $conf->entity, $excludedUntdidCodes);
+
+print '<br>';
+print load_fiche_titre($langs->trans('EINVOICING_EXTRA_MENTIONS'), '', 'title_setup');
+print '<div class="opacitymedium">'.$langs->trans('EINVOICING_EXTRA_MENTIONS_HELP').'</div>';
+print '<br>';
+
+// Formulaire d'ajout ou de modification.
+print '<form method="POST" action="'.dol_escape_htmltag($_SERVER['PHP_SELF']).'">';
+print '<input type="hidden" name="token" value="'.newToken().'">';
+print '<input type="hidden" name="action" value="save_extra_untdid">';
+
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre">';
+print '<td>'.$langs->trans('EINVOICING_UNTDID_CODE').'</td>';
+print '<td>'.$langs->trans('EINVOICING_UNTDID_DESCRIPTION').'</td>';
+print '<td>'.$langs->trans('EINVOICING_MENTION_TEXT').'</td>';
+print '<td></td>';
+print '</tr>';
+print '<tr class="oddeven">';
+
+print '<td>';
+print '<select name="untdid_code" id="untdid_code" class="minwidth200">';
+print '<option value="">-- '.$langs->trans('Select'). ' --</option>';
+foreach ($extraUntdidCodes as $code => $codeData) {
+	$constantName = 'EINVOICING_EXTRA_'.$code;
+	$existingText = getDolGlobalString($constantName);
+	print '<option value="'.dol_escape_htmltag($code).'"';
+	print ' data-description="'.dol_escape_htmltag($codeData['label']).'"';
+	print ' data-existing-text="'.dol_escape_htmltag($existingText).'"';
+	print '>'.dol_escape_htmltag($code.' - '.$codeData['label']).'</option>';
+}
+print '</select>';
+print '</td>';
+
+print '<td><span id="untdid_description" class="opacitymedium"></span></td>';
+print '<td><textarea name="untdid_text" id="untdid_text" class="minwidth500" rows="4"></textarea></td>';
+print '<td><input type="submit" class="button" value="'.$langs->trans('Add').'"></td>';
+print '</tr>';
+print '</table>';
+print '</form>';
+
+print '<br>';
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre">';
+print '<td>'.$langs->trans('EINVOICING_UNTDID_CODE').'</td>';
+print '<td>'.$langs->trans('EINVOICING_UNTDID_DESCRIPTION').'</td>';
+print '<td>'.$langs->trans('EINVOICING_MENTION_TEXT').'</td>';
+print '<td class="right">'.$langs->trans('Action').'</td>';
+print '</tr>';
+
+$hasExtraMention = false;
+foreach ($extraUntdidCodes as $code => $codeData) {
+	$constantName = 'EINVOICING_EXTRA_'.$code;
+	$existingText = getDolGlobalString($constantName);
+	if ($existingText === '') {
+		continue;
+	}
+
+	$hasExtraMention = true;
+	print '<tr class="oddeven">';
+	print '<td><strong>'.dol_escape_htmltag($code).'</strong></td>';
+	print '<td>'.dol_escape_htmltag($codeData['label']).'</td>';
+	print '<td>'.dol_escape_htmltag($existingText).'</td>';
+	print '<td class="right">';
+	print '<a class="reposition" href="#" data-code="'.dol_escape_htmltag($code).'">'.$langs->trans('Modify').'</a> ';
+	print '<a class="reposition" href="'.dol_escape_htmltag($_SERVER['PHP_SELF'].'?action=delete_extra_untdid&token='.newToken().'&untdid_code='.urlencode($code)).'" onclick="return confirm(\''.dol_escape_js($langs->trans('ConfirmDelete')).'\');">';
+	print img_picto($langs->trans('Delete'), 'delete').'</a>';
+	print '</td>';
+	print '</tr>';
+}
+
+if (!$hasExtraMention) {
+	print '<tr><td colspan="4" class="opacitymedium">'.$langs->trans('EINVOICING_NO_EXTRA_MENTION').'</td></tr>';
+}
+print '</table>';
+
 print '<script>
 $(document).ready(function() {
-	var pdpSelect = $("select[name=\'EINVOICING_PDP\']");
-	if (pdpSelect.length) {
-		pdpSelect.on("change", function() {
-			console.log("PDP changed, submit form to reload page");
-			$(this).closest("form").submit();
-		});
-	}
+    // Mentions complémentaires UNTDID 4451
+    var codeSelect = $("#untdid_code");
+    var description = $("#untdid_description");
+    var textArea = $("#untdid_text");
+
+    if (codeSelect.length && description.length && textArea.length) {
+        codeSelect.on("change", function() {
+            var selectedOption = this.options[this.selectedIndex];
+
+            description.text(
+                selectedOption.getAttribute("data-description") || ""
+            );
+
+            textArea.val(
+                selectedOption.getAttribute("data-existing-text") || ""
+            );
+        });
+
+        $("[data-code]").on("click", function(event) {
+            event.preventDefault();
+
+            codeSelect.val($(this).data("code"));
+            codeSelect.trigger("change");
+            textArea.trigger("focus");
+        });
+    }
+
+    // Recharger la page lorsque la PDP est modifiée
+    var pdpSelect = $("select[name=\'EINVOICING_PDP\']");
+
+    if (pdpSelect.length) {
+        pdpSelect.on("change", function() {
+            console.log("PDP changed, submit form to reload page");
+            $(this).closest("form").submit();
+        });
+    }
 });
 </script>';
 
