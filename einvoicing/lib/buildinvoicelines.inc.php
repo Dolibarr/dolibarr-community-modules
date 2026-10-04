@@ -1113,7 +1113,7 @@ $sqlExtraNotes .= ' ORDER BY name ASC';
 $resqlExtraNotes = $db->query($sqlExtraNotes);
 
 if (!$resqlExtraNotes) {
-	dol_syslog(__METHOD__.' SQL error while loading extra notes: '.$db->lasterror(), LOG_ERR);
+	dol_syslog('ExtraNotes - SQL error while loading extra notes: '.$db->lasterror(), LOG_ERR);
 } else {
 	while ($extraNote = $db->fetch_object($resqlExtraNotes)) {
 		$subjectCode = substr($extraNote->name, strlen('EINVOICING_EXTRA_'));
