@@ -63,9 +63,10 @@ is a target.** An invoice belonging to one of these cases has to be produced out
 `schemeID` `0231` — then the tax representative block **BG-11** shall be present and carry the VAT
 number of the group (BT-63).
 
-The module writes the seller identifier under `0225` only (`0231` is deliberately left out of
-`_mapGlobalIdSchemeToIdprof()`, it is not the registration identifier of the party the document
-names), and it never constructs `ram:SellerTaxRepresentativeTradeParty`. **A seller belonging to a
+The module writes the seller identifier under the scheme set in `EINVOICING_PARTY_IDENTIFIER_SCHEME`
+— `0225` by default, `0009` or none for a French company; `0231` is not offered, it is not the
+registration identifier of the party the document names — plus a second one under `0009` (the SIRET)
+on a B2G invoice. It never constructs `ram:SellerTaxRepresentativeTradeParty`. **A seller belonging to a
 VAT group cannot emit a conformant invoice through this module.**
 
 ## 2. Syntaxes
@@ -78,7 +79,8 @@ VAT group cannot emit a conformant invoice through this module.**
 | **UBL** | **no** | **no** |
 
 UBL is declared in `ProtocolManager` and disabled there (`$ublIsOk = 0`); the protocol class does not
-exist. A UBL invoice received is not read, whatever its profile. The reference package ships UBL
+exist. A UBL document is never parsed, whatever its profile: a UBL invoice received is imported only
+through the CII or Factur-X conversion the access point provides (`Converted`). The reference package ships UBL
 documents; they are not part of what is measured.
 
 ## 3. Elements the reference documents carry and the builder never writes
@@ -138,9 +140,9 @@ Settled on [issue #958](https://github.com/Dolibarr/dolibarr-community-modules/i
 - **BG-13 / BT-70 / BT-75 / BT-76 is the one worth reading**, and where it goes is not open to
   interpretation. The maintainer's answer: *"The delivery address was, is and will be the contact
   with type SHIPPING. No other method to store it exists. The fk_address_delivery was never released
-  and will never be as it is a duplicate method of SHIPPING address."* So the import stores it in the
-  `invoice_supplier / external / SHIPPING` contact, the one the emission already builds BG-15 from.
-  It is the asymmetry named in section 5.
+  and will never be as it is a duplicate method of SHIPPING address."* So when the import reads it, it
+  will store it in the `invoice_supplier / external / SHIPPING` contact, the one the emission already
+  builds BG-15 from. Until then it is the asymmetry named in section 5.
 - The terms with **no home in the core** (BT-33, BT-8, BT-56, BT-19, document-level BT-18) and the
   two that are a **design question** (BG-10, the line-level item seller) follow the rule at the top
   of this page: not mandatory, not read — and Dolibarr has no multi-vendor. They stay listed here
@@ -171,7 +173,7 @@ unpacked (see [`../test/conformance/README.md`](../test/conformance/README.md) f
 
 ```sh
 # what the import never reads, over the whole corpus - needs a Dolibarr instance
-DOLI_ROOT=/var/www/dolibarr/htdocs \
+DEEP=1 DOLI_ROOT=/var/www/dolibarr/htdocs \
   php einvoicing/test/conformance/import-corpus.php "$FNFE_ROOT/Z.example/TEST"
 
 # what the builder never writes - needs nothing but the sources
@@ -181,5 +183,7 @@ php einvoicing/test/conformance/emitted-terms.php "$FNFE_ROOT/Z.example/TEST"
 DOLI_ROOT=/var/www/dolibarr/htdocs php einvoicing/test/conformance/emitted-paths.php
 ```
 
-The first two report and never fail: they are an inventory, not a debt. The third is the fatal one,
-and it is fatal on one thing only — an element the builder used to write and writes no more.
+Only `emitted-terms.php` never fails: it is an inventory, not a debt. `import-corpus.php` fails on a
+reference document it cannot read in full, or whose PDF and XML do not parse to the same thing; its
+`DEEP` listing is the inventory. `emitted-paths.php` fails on one thing only — an element the builder
+used to write and writes no more.

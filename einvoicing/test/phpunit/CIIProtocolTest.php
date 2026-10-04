@@ -48,6 +48,7 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 }
 
 require_once $dolibarrHtdocs . '/master.inc.php';
+dol_include_once('einvoicing/class/providers/AbstractPDPProvider.class.php');
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 
@@ -689,6 +690,74 @@ class CIIProtocolTest extends CommonClassTest
 		));
 
 		$this->assertSame(0, (int) $found['res'], 'an absent vendor reference must not resolve to a product');
+	}
+
+	/**
+	 * EN 16931 bounds none of the texts of a document, the columns they are written to are bounded: a
+	 * longer seller name, town, phone, item name (BT-153, 272 characters on a real aggregated line) or
+	 * vendor reference (BT-155) was refused by the database and stopped the whole synchronization. The
+	 * document imports, and imported again it finds the same third party and product.
+	 *
+	 * @return void
+	 */
+	public function testADocumentWithTextsLongerThanTheColumnsIsImported()
+	{
+		global $conf, $db, $user;
+
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+		// The invoice is written with the user as its author: this file loads none at the top.
+		if (empty($user->id)) {
+			$user->fetch(1);
+		}
+
+		$R = 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100';
+		$doc = new DOMDocument();
+		$doc->load(__DIR__ . '/fixtures/received_documents/cii_rounding_amount.xml');
+		$xp = new DOMXPath($doc);
+		$xp->registerNamespace('ram', $R);
+		$siren = (string) random_int(100000000, 999999999);
+		$seller = $xp->query('//ram:SellerTradeParty')->item(0);
+		$xp->query('ram:GlobalID', $seller)->item(0)->nodeValue = $siren . '00017';
+		$xp->query('ram:SpecifiedLegalOrganization/ram:ID', $seller)->item(0)->nodeValue = $siren;
+		$xp->query('ram:SpecifiedTaxRegistration/ram:ID', $seller)->item(0)->nodeValue = 'FR00' . $siren;
+		$xp->query('ram:Name', $seller)->item(0)->nodeValue = 'LONG ' . $siren . ' ' . str_repeat('Société à responsabilité limitée ', 5);
+		$xp->query('ram:PostalTradeAddress/ram:CityName', $seller)->item(0)->nodeValue = str_repeat('Saint-Rémy-', 6);
+		$contact = $doc->createElementNS($R, 'DefinedTradeContact');
+		$phone = $doc->createElementNS($R, 'TelephoneUniversalCommunication');
+		$phone->appendChild($doc->createElementNS($R, 'CompleteNumber', '+33 1 23 45 67 89 / +33 6 12 34 56 78'));
+		$contact->appendChild($phone);
+		$seller->insertBefore($contact, $xp->query('ram:PostalTradeAddress', $seller)->item(0));
+		$product = $xp->query('//ram:SpecifiedTradeProduct')->item(0);
+		$product->insertBefore($doc->createElementNS($R, 'SellerAssignedID', 'REF-' . $siren . '-' . str_repeat('0123456789', 15)), $product->firstChild);
+		$xp->query('ram:Name', $product)->item(0)->nodeValue = 'ITEM ' . $siren . ' ' . str_repeat('désignation longue ', 16);
+		$docid = $xp->query('//*[local-name()="ExchangedDocument"]/*[local-name()="ID"]')->item(0);
+
+		$saved = array();
+		foreach (array('EINVOICING_THIRDPARTIES_AUTO_GENERATION' => 1, 'EINVOICING_PRODUCTS_AUTO_GENERATION' => 1, 'EINVOICING_IMPORT_AS_FREE_LINES' => 0) as $name => $value) {
+			$saved[$name] = getDolGlobalString($name);
+			$conf->global->$name = $value;
+		}
+		$found = array();
+		foreach (array(1, 2) as $run) {
+			$docid->nodeValue = 'LONG-' . $siren . '-' . $run;
+			$res = (new CIIProtocol($db))->createSupplierInvoiceFromSource($doc->saveXML(), null, 'test-long-' . $siren . '-' . $run);
+			$invoice = new FactureFournisseur($db);
+			if (($res['res'] ?? 0) > 0 && $invoice->fetch((int) $res['res']) > 0) {
+				$found[$run] = $invoice->socid . '/' . $invoice->lines[0]->fk_product;
+			}
+			$this->assertArrayHasKey($run, $found, 'import ' . $run . ': ' . strip_tags((string) ($res['message'] ?? '')));
+		}
+		foreach ($saved as $name => $value) {
+			$conf->global->$name = $value;
+		}
+
+		$this->assertSame($found[1], $found[2], 'imported again, the document finds the same third party and product');
+		$line = $invoice->lines[0];
+		$this->assertSame(128, dol_strlen((string) $line->ref_supplier), 'BT-155 is cut to the 128 characters of its columns');
+		$item = new Product($db);
+		$item->fetch((int) $line->fk_product);
+		$this->assertSame(trim(dol_substr($xp->query('ram:Name', $product)->item(0)->nodeValue, 0, 255)), $item->label, 'BT-153 is cut to the 255 characters of the product label');
+		$this->assertStringContainsString(trim($xp->query('ram:Name', $product)->item(0)->nodeValue), (string) $line->description, 'the line keeps the whole item name');
 	}
 
 	/**
