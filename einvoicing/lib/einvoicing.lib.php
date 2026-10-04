@@ -1414,6 +1414,8 @@ function einvoicingGetActiveUntdid4451Codes($db, $langs, $entity, array $exclude
  */
 function einvoicingIsActiveUntdid4451Code($db, $code, $entity, array $excludedCodes = array())
 {
+	global $conf;
+
 	$code = strtoupper(trim((string) $code));
 
 	if (!preg_match('/^[A-Z0-9]{3}$/', $code)) {
@@ -1427,7 +1429,11 @@ function einvoicingIsActiveUntdid4451Code($db, $code, $entity, array $excludedCo
 	$sql = 'SELECT rowid';
 	$sql .= ' FROM '.MAIN_DB_PREFIX.'c_einvoicing_untdid4451';
 	$sql .= " WHERE code = '".$db->escape($code)."'";
-	$sql .= " entity IN (0, '.((int) $entity).')";
+	if (! empty($entity)) {
+		$sql .= " AND entity = " . (int) $entity;
+	} else {
+		$sql .= " AND entity = " . $conf->entity; // unique key include the entity so each company has its own index
+	}
 	$sql .= ' AND active = 1';
 	$sql .= $db->plimit(1);
 
