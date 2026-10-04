@@ -634,4 +634,66 @@ class EinvoicingLibTest extends CommonClassTest
 		$this->assertFalse(einvoicingIsAllowedRedirectUrl('ftp://partner.tld/callback'), 'A scheme other than http(s) must be refused');
 		$this->assertFalse(einvoicingIsAllowedRedirectUrl('https:///callback'), 'An URL without a host must be refused');
 	}
+
+	/**
+	 * A credit note is a 381, except the credit note of a deposit invoice, which the French list of
+	 * BR-FR-04 names an "avoir d'acompte" (503). Every other type keeps its code.
+	 *
+	 * @return void
+	 */
+	public function testACreditNoteOfADepositIsA503()
+	{
+		global $db;
+
+		require_once DOL_DOCUMENT_ROOT . '/user/class/user.class.php';
+		require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+
+		$user = new User($db);
+		$this->assertGreaterThan(0, $user->fetch(1), 'the instance has a user to act as');
+
+		$thirdparty = new Societe($db);
+		$thirdparty->name = 'EINVOICING TEST DOCUMENT TYPE';
+		$thirdparty->client = 1;
+		$thirdparty->fournisseur = 1;
+		$thirdparty->code_client = 'EINVDT' . strtoupper(substr(md5(uniqid('', true)), 0, 6));
+		$thirdparty->code_fournisseur = 'EINVDS' . strtoupper(substr(md5(uniqid('', true)), 0, 6));
+		$this->assertGreaterThan(0, $thirdparty->create($user), 'the third party is created: ' . $thirdparty->error);
+
+		$sources = array();
+		foreach (array(Facture::TYPE_STANDARD, Facture::TYPE_DEPOSIT) as $type) {
+			$invoice = new Facture($db);
+			$invoice->socid = $thirdparty->id;
+			$invoice->type = $type;
+			$invoice->date = dol_now();
+			$this->assertGreaterThan(0, $invoice->create($user), 'the invoice of type ' . $type . ' is created: ' . $invoice->error);
+			$sources[$type] = $invoice;
+		}
+		$this->assertSame('380', einvoicingDocumentTypeCode($sources[Facture::TYPE_STANDARD], $db));
+		$this->assertSame('386', einvoicingDocumentTypeCode($sources[Facture::TYPE_DEPOSIT], $db));
+
+		$creditNote = new Facture($db);
+		$creditNote->type = Facture::TYPE_CREDIT_NOTE;
+		$this->assertSame('381', einvoicingDocumentTypeCode($creditNote, $db), 'no source');
+		$creditNote->fk_facture_source = $sources[Facture::TYPE_STANDARD]->id;
+		$this->assertSame('381', einvoicingDocumentTypeCode($creditNote, $db), 'source is a commercial invoice');
+		$creditNote->fk_facture_source = $sources[Facture::TYPE_DEPOSIT]->id;
+		$this->assertSame('503', einvoicingDocumentTypeCode($creditNote, $db), 'source is a deposit invoice');
+
+		// The source of a supplier credit note is read among the supplier invoices, where its id belongs
+		$supplierDeposit = new FactureFournisseur($db);
+		$supplierDeposit->socid = $thirdparty->id;
+		$supplierDeposit->type = FactureFournisseur::TYPE_DEPOSIT;
+		$supplierDeposit->ref_supplier = 'EINVDT-' . $thirdparty->id;
+		$supplierDeposit->date = dol_now();
+		$this->assertGreaterThan(0, $supplierDeposit->create($user), 'the supplier deposit is created: ' . $supplierDeposit->error);
+		$supplierCreditNote = new FactureFournisseur($db);
+		$supplierCreditNote->type = FactureFournisseur::TYPE_CREDIT_NOTE;
+		$supplierCreditNote->fk_facture_source = $supplierDeposit->id;
+		$this->assertSame('503', einvoicingDocumentTypeCode($supplierCreditNote, $db), 'supplier credit note of a supplier deposit');
+
+		$replacement = new Facture($db);
+		$replacement->type = Facture::TYPE_REPLACEMENT;
+		$this->assertSame('384', einvoicingDocumentTypeCode($replacement, $db));
+	}
 }
