@@ -1260,7 +1260,8 @@ foreach ($object->fields as $key => $val) {
 	}
 	$cssforfield = preg_replace('/small\s*/', '', $cssforfield);	// the 'small' css must not be used for the title label
 	if (!empty($arrayfields['t.'.$key]['checked'])) {
-		$sortablefield = ($key == 'thirdparty' ? 'thirdparty_name' : 't.'.$key);
+		// recap is built for display and is not a column of the table: its title must not be a sort link.
+		$sortablefield = ($key == 'recap' ? '' : ($key == 'thirdparty' ? 'thirdparty_name' : 't.'.$key));
 		print getTitleFieldOfList($arrayfields['t.'.$key]['label'], 0, $_SERVER['PHP_SELF'], $sortablefield, '', $param, ($cssforfield ? 'class="'.$cssforfield.'"' : ''), $sortfield, $sortorder, ($cssforfield ? $cssforfield.' ' : ''), 0, (empty($val['helplist']) ? '' : $val['helplist']))."\n";
 		$totalarray['nbfield']++;
 	}

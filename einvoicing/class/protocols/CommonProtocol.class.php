@@ -559,6 +559,12 @@ trait CommonProtocol
 	 */
 	private function _syncOrCreateThirdpartyFromEInvoiceSeller($sellerInfo, $priority = 'dolibarr', $flowId = '')
 	{
+		// EN 16931 bounds none of these texts, llx_societe does: a longer one was refused and stopped the import.
+		foreach (array('sellername' => 128, 'sellercity' => 50) as $key => $max) {
+			if (isset($sellerInfo[$key])) {
+				$sellerInfo[$key] = dol_substr((string) $sellerInfo[$key], 0, $max);
+			}
+		}
 		/**
 		 * Scenario to find or create a thirdparty based on E-invoice seller information:
 		 *
@@ -647,31 +653,73 @@ trait CommonProtocol
 		// Step 2: Try to find using VAT number if not found by global IDs
 		if ($thirdpartyId < 0) {
 			if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
-				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape(removeAllSpaces($sellerInfo['sellerTaxRegistations']['VA'])) . "' AND entity IN (". getEntity('societe').")";
+				$sql = "SELECT rowid, siret FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape(removeAllSpaces($sellerInfo['sellerTaxRegistations']['VA'])) . "' AND entity IN (". getEntity('societe').")";
 				$resql = $db->query($sql);
 				if ($resql) {
 					if ($db->num_rows($resql) > 1) {
-						dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error: Multiple thirdparties found for VAT number: ' . $sellerInfo['sellerTaxRegistations']['VA'], LOG_ERR);
-						$obj1 = $db->fetch_object($resql);
-						$obj2 = $db->fetch_object($resql);
+						// Several thirdparties can legitimately share one VAT number: in France it is
+						// derived from the SIREN alone (FR + 2 check digits + SIREN), so different
+						// établissements (same SIREN, different SIRET) of one legal entity collide here.
+						// Try the SIRET carried by the document to pick the right établissement before
+						// treating this as an unresolved data-quality duplicate.
+						$candidates = array();
+						while ($obj = $db->fetch_object($resql)) {
+							$candidates[] = $obj;
+						}
 
-						// Create URL to prefill thirdparty creation form
-						$createUrl = DOL_URL_ROOT . '/societe/list.php?type=f&search_vat='.urlencode($sellerInfo['sellerTaxRegistations']['VA']);
-						$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
+						$sellerSiret = $this->_extractSellerSiret($sellerInfo, $sellerCountryCode);
+						$matchedCandidate = null;
+						$severalCandidatesMatchSiret = false;
+						if ($sellerSiret !== '') {
+							foreach ($candidates as $candidate) {
+								if (!empty($candidate->siret) && removeAllSpaces($candidate->siret) === $sellerSiret) {
+									if ($matchedCandidate !== null) {
+										$severalCandidatesMatchSiret = true;
+										break;
+									}
+									$matchedCandidate = $candidate;
+								}
+							}
+						}
 
-						$action = $langs->trans('CheckSuppliersWithDuplicateCode', $sellerInfo['sellerTaxRegistations']['VA']);
-						$action .= '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
-						$action .= '<i class="fas fa-plus-circle"></i> ';
-						$action .= $langs->trans('CheckSuppliers');
-						$action .= '</a>';
+						if ($matchedCandidate !== null && !$severalCandidatesMatchSiret) {
+							$result = $thirdparty->fetch($matchedCandidate->rowid);
+							if ($result > 0) {
+								$thirdpartyId = $thirdparty->id;
+								$matchedByStructuredIdentifier = true;
+								dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller VAT number ' . $sellerInfo['sellerTaxRegistations']['VA'] . ' shared by ' . count($candidates) . ' thirdparties, disambiguated by SIRET ' . $sellerSiret . ': ' . $thirdpartyId);
+							}
+						} elseif ($sellerSiret !== '' && !$severalCandidatesMatchSiret) {
+							// The document's SIRET matches none of the établissements sharing this VAT
+							// number: most likely a new établissement of the same entity. Do not block
+							// the import on it, let step 3/4 below handle it (name match or creation).
+							dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller VAT number ' . $sellerInfo['sellerTaxRegistations']['VA'] . ' shared by ' . count($candidates) . ' thirdparties, none matches document SIRET ' . $sellerSiret . '; not treated as a blocking duplicate', LOG_WARNING);
+						} else {
+							// No SIRET on the document to disambiguate with, or several candidates share
+							// the same SIRET: genuine ambiguity, cannot safely resolve it.
+							dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error: Multiple thirdparties found for VAT number: ' . $sellerInfo['sellerTaxRegistations']['VA'], LOG_ERR);
 
-						return array(
-							'res' => -1,
-							'message' => $langs->trans("SuppliersWithDuplicateVATCode", $sellerInfo['sellerTaxRegistations']['VA']),	// Can be a technical message. The business one is defined into the syncFlows() of the provider.
-							'actioncode' => 'THIRDPARTY_DUPLICATE_VAT',
-							'action' => $action,
-							'actiondata' => array('thirdpartyid1' => $obj1->rowid, 'thirdpartyid2' => $obj2->rowid, 'vatnumber' => $sellerInfo['sellerTaxRegistations']['VA'])
-						);
+							$obj1 = $candidates[0];
+							$obj2 = $candidates[1];
+
+							// Create URL to prefill thirdparty creation form
+							$createUrl = DOL_URL_ROOT . '/societe/list.php?type=f&search_vat='.urlencode($sellerInfo['sellerTaxRegistations']['VA']);
+							$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
+
+							$action = $langs->trans('CheckSuppliersWithDuplicateCode', $sellerInfo['sellerTaxRegistations']['VA']);
+							$action .= '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+							$action .= '<i class="fas fa-plus-circle"></i> ';
+							$action .= $langs->trans('CheckSuppliers');
+							$action .= '</a>';
+
+							return array(
+								'res' => -1,
+								'message' => $langs->trans("SuppliersWithDuplicateVATCode", $sellerInfo['sellerTaxRegistations']['VA']),	// Can be a technical message. The business one is defined into the syncFlows() of the provider.
+								'actioncode' => 'THIRDPARTY_DUPLICATE_VAT',
+								'action' => $action,
+								'actiondata' => array('thirdpartyid1' => $obj1->rowid, 'thirdpartyid2' => $obj2->rowid, 'vatnumber' => $sellerInfo['sellerTaxRegistations']['VA'])
+							);
+						}
 					} elseif ($db->num_rows($resql) === 1) {
 						$obj = $db->fetch_object($resql);
 						$result = $thirdparty->fetch($obj->rowid);
@@ -779,6 +827,11 @@ trait CommonProtocol
 		// appel)" in it. Keep the number and leave the sentence out, so the column can hold it. See #943.
 		$sellerPhone = $this->_extractPhoneNumberFromDocument($sellerInfo['sellercontactphoneno'] ?? '');
 		$sellerFax = $this->_extractPhoneNumberFromDocument($sellerInfo['sellercontactfaxno'] ?? '');
+		// A number cut short is a wrong number: one longer than the column (20 up to Dolibarr 21) once the
+		// core has removed its spaces and dots is not saved.
+		$phoneMax = (int) DOL_VERSION >= 22 ? 30 : 20;
+		$sellerPhone = dol_strlen(preg_replace('/[\s.]/', '', $sellerPhone)) > $phoneMax ? '' : $sellerPhone;
+		$sellerFax = dol_strlen(preg_replace('/[\s.]/', '', $sellerFax)) > $phoneMax ? '' : $sellerFax;
 
 		// Step 4: Create or update thirdparty
 
@@ -787,7 +840,7 @@ trait CommonProtocol
 			dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Updating existing thirdparty (client status'.(getDolGlobalString('EINVOICING_THIRDPARTIES_COMPLETE_INFO') ? ' + other info' : '').'): ' . $thirdpartyId);
 
 			$thirdparty = new Societe($db);
-			$thirdparty->fetch($thirdpartyId);
+			$this->_fetchThirdpartyForImportUpdate($thirdparty, $thirdpartyId);
 
 			// Update thirdparty information based on priority
 			if (getDolGlobalInt('EINVOICING_THIRDPARTIES_COMPLETE_INFO')) {
@@ -839,6 +892,7 @@ trait CommonProtocol
 						if (!empty($sellerInfo['sellerlinethree'])) {
 							$thirdparty->address .= "\n" . $sellerInfo['sellerlinethree'];
 						}
+						$thirdparty->address = dol_substr($thirdparty->address, 0, 255);
 					}
 					if (empty($thirdparty->zip) && !empty($sellerInfo['sellerpostcode'])) {
 						$thirdparty->zip = $sellerInfo['sellerpostcode'];
@@ -905,7 +959,7 @@ trait CommonProtocol
 				$completionError = implode(', ', array_filter(array_merge(array($thirdparty->error), $thirdparty->errors)));
 
 				$plainthirdparty = new Societe($db);
-				if ($plainthirdparty->fetch($thirdpartyId) > 0) {
+				if ($this->_fetchThirdpartyForImportUpdate($plainthirdparty, $thirdpartyId) > 0) {
 					$allowmodcodeclient = 0;
 					$allowmodcodefournisseur = 0;
 					$this->_prepareThirdpartyForImportUpdate($plainthirdparty, $allowmodcodeclient, $allowmodcodefournisseur);
@@ -984,6 +1038,7 @@ trait CommonProtocol
 			if (!empty($sellerInfo['sellerlinethree'])) {
 				$thirdparty->address .= "\n" . $sellerInfo['sellerlinethree'];
 			}
+			$thirdparty->address = dol_substr($thirdparty->address, 0, 255);
 			$thirdparty->zip = $sellerInfo['sellerpostcode'] ?? '';
 			$thirdparty->town = $sellerInfo['sellercity'] ?? '';
 			$this->_setThirdpartyCountryFromCode($thirdparty, $sellerInfo['sellercountry'] ?? '');
@@ -1202,6 +1257,23 @@ trait CommonProtocol
 	}
 
 	/**
+	 * Load a thirdparty found in Dolibarr for the update done when a document is imported.
+	 *
+	 * @param	Societe	$thirdparty		Thirdparty to load
+	 * @param	int		$thirdpartyId	Id of the thirdparty
+	 * @return	int						Result of Societe::fetch()
+	 */
+	private function _fetchThirdpartyForImportUpdate($thirdparty, $thirdpartyId)
+	{
+		$result = $thirdparty->fetch($thirdpartyId);
+		// Societe::update() accepts a code out of the current numbering mask only when oldcopy holds it
+		// unchanged. A plain clone: dol_clone() of Dolibarr 24 drops the null properties update() reads.
+		$thirdparty->oldcopy = clone $thirdparty;
+
+		return $result;
+	}
+
+	/**
 	 * Prepare a thirdparty found in Dolibarr for the update done when a document is imported.
 	 *
 	 * A thirdparty code may be mandatory (MAIN_COMPANY_CODE_ALWAYS_REQUIRED, or a numbering module
@@ -1376,7 +1448,7 @@ trait CommonProtocol
 			// 'EI-A1234_10_42' but was looked up as 'EI-A1234|10|42', so the module could never
 			// find back a product it had created itself.
 			$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
-			$sql .= " WHERE ref = 'EI-" . $db->escape(dol_sanitizeFileName($lineData['prodsellerid'])) . "'";
+			$sql .= " WHERE ref = '" . $db->escape(dol_substr('EI-' . dol_sanitizeFileName($lineData['prodsellerid']), 0, 128)) . "'";
 			$sql .= " AND entity IN (" . getEntity('product') . ")";
 			$sql .= " LIMIT 1";
 			$resql = $db->query($sql);
@@ -1389,7 +1461,7 @@ trait CommonProtocol
 
 		// Text Search using prodname
 		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
-		$sql .= " WHERE label = '" . $db->escape($lineData['prodname'] ?? '') . "'";
+		$sql .= " WHERE label = '" . $db->escape(trim(dol_substr((string) ($lineData['prodname'] ?? ''), 0, 255))) . "'";
 		$sql .= " AND entity IN (" . getEntity('product') . ")";
 		$resql = $db->query($sql);
 		if ($resql) {
@@ -1479,10 +1551,12 @@ trait CommonProtocol
 			$product->type 		= $this->_detectProductTypeFromEinvoiceLine($lineData);
 			// The && was inside the empty(), which warns on an absent key instead of being protected by it.
 			$sellerref = trim((string) ($lineData['prodsellerid'] ?? ''));
-			$product->ref 		= 'EI-' . dol_sanitizeFileName($sellerref !== '' ? $sellerref : uniqid());
+			$product->ref 		= dol_substr('EI-' . dol_sanitizeFileName($sellerref !== '' ? $sellerref : uniqid()), 0, 128);
 			$product->ref_ext 	= $sellerref;
+			// BT-153 has no maximum length (EN 16931, BR-FR) and product.label holds 255 characters: a longer
+			// name was refused by the database and stopped the whole synchronization. The line keeps it whole.
 			$product->label 	= !empty($lineData['prodname'])
-				? $lineData['prodname']
+				? trim(dol_substr($lineData['prodname'], 0, 255))
 				: 'Imported product from supplier invoice (Ref: ' . $lineData['parentDocumentNo'] . ')';
 			$product->description = trim($lineData['proddesc'] ?? '');
 			$product->tva_tx 	= (float) ($lineData['rateApplicablePercent'] ?? 0);
@@ -1669,6 +1743,31 @@ trait CommonProtocol
 				'allactiondata' => $allactiondata	// Array with all actions
 			);
 		}
+	}
+
+
+	/**
+	 * Extract a SIRET from the seller's global identifiers (sellerGlobalIds / sellerLegalOrgId), the
+	 * only identifier precise enough to tell apart two établissements of one French entity that share
+	 * a single VAT number (the number is derived from the SIREN alone, not the SIRET).
+	 *
+	 * @param	array<string,mixed>	$sellerInfo	Seller information extracted from the e-invoice
+	 * @param	string	$sellerCountryCode	Country code of the seller
+	 * @return	string						Cleaned SIRET (no spaces), '' when the document carries none
+	 */
+	private function _extractSellerSiret($sellerInfo, $sellerCountryCode)
+	{
+		if (empty($sellerInfo['sellerGlobalIds']) || !is_array($sellerInfo['sellerGlobalIds'])) {
+			return '';
+		}
+
+		foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
+			if (!empty($globalId) && $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId) === 'idprof2') {
+				return removeAllSpaces($globalId);
+			}
+		}
+
+		return '';
 	}
 
 

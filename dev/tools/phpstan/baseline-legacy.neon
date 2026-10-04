@@ -607,6 +607,12 @@ parameters:
 			path: ../../../einvoicing/class/document.class.php
 
 		-
+			message: '#^Parameter \#2 \$start of function dol_substr expects string, int given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/document.class.php
+
+		-
 			message: '#^Function getURLContent invoked with 12 parameters, 1\-8 required\.$#'
 			identifier: arguments.count
 			count: 1
@@ -663,6 +669,12 @@ parameters:
 		-
 			message: '#^Property Societe\:\:\$zip \(string\) on left side of \?\? is not nullable\.$#'
 			identifier: nullCoalesce.property
+			count: 1
+			path: ../../../einvoicing/class/einvoicing.class.php
+
+		-
+			message: '#^Parameter \#2 \$start of function dol_substr expects string, int given\.$#'
+			identifier: argument.type
 			count: 1
 			path: ../../../einvoicing/class/einvoicing.class.php
 
@@ -847,6 +859,12 @@ parameters:
 			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
 
 		-
+			message: '#^Parameter \#2 \$start of function dol_substr expects string, int given\.$#'
+			identifier: argument.type
+			count: 8
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
 			message: '#^Call to function method_exists\(\) with Societe and ''findNearest'' will always evaluate to false\.$#'
 			identifier: function.impossibleType
 			count: 1
@@ -970,6 +988,12 @@ parameters:
 			message: '#^Property CommonObject\:\:\$thirdparty \(Societe\) in empty\(\) is not falsy\.$#'
 			identifier: empty.property
 			count: 1
+			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
+
+		-
+			message: '#^Parameter \#2 \$start of function dol_substr expects string, int given\.$#'
+			identifier: argument.type
+			count: 7
 			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
 
 		-

@@ -287,6 +287,8 @@ if ($action == 'confirm_linkthirdparty' && $rowid > 0 && $permissiontowrite) {
 			setEventMessages($langs->trans("RecordNotFound"), null, 'errors');
 			$action = 'linkthirdparty';
 		} else {
+			// Societe::update() accepts a code out of the current numbering mask only when oldcopy holds it unchanged.
+			$soc->oldcopy = clone $soc;
 			// Write only the fields the user ticked on the comparison screen (apply_<key>).
 			$idmap = array('name' => 'name', 'vatnumber' => 'tva_intra', 'idprof1' => 'idprof1', 'idprof2' => 'idprof2', 'idprof3' => 'idprof3', 'email' => 'email');
 			$nbwritten = 0;

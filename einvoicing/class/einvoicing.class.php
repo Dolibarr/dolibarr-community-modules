@@ -1840,10 +1840,8 @@ class EInvoicing
 
 		$info = $currentStatusInfo['info'] ?? '';
 
+		// Not tied to isEditable(): these fields are still set once the invoice is locked (a 212 after payment).
 		$editenable = $user->hasRight('facture', 'creer');
-		if (method_exists($object, 'isEditable') && !$object->isEditable()) {
-			$editenable = false;
-		}
 		if ($action == 'create') {
 			$editenable = false;
 		}
@@ -2024,10 +2022,11 @@ class EInvoicing
 						$resprints .= dol_escape_htmltag($selectOptions[$currentOverrideRouting]);
 					} else {
 						// Show the address the invoice will really be sent to, as getBuyerCommunicationURI() resolves it.
-						if (!is_object($object->thirdparty ?? null) && !empty($object->socid)) {
-							$object->fetch_thirdparty();
-						}
 						$buyer = $object->thirdparty ?? null;
+						if (!($buyer instanceof Societe) && !empty($object->socid)) {
+							$object->fetch_thirdparty();
+							$buyer = $object->thirdparty;
+						}
 						$defaultTarget = ($buyer instanceof Societe) ? $this->getBuyerCommunicationURI($buyer) : '';
 						$resprints .= '<span class="opacitymedium">' . $langs->trans("InvoiceRoutingOverrideDefault");
 						if ($defaultTarget !== '') {
@@ -3213,7 +3212,7 @@ class EInvoicing
 	 * @param string	$elementType	Type of element (property object->element: 'facture', 'invoice_supplier', 'societe', ...)
 	 * @param string	$name			Name of the property ('buyer_order_reference', ...)
 	 * @param string	$value			Value to store (Value '' delete the row)
-	 * @return int						-1 on error, 1 if an existing row was updated, rowid of the new row otherwise
+	 * @return int						-1 on error, 0 if the value is empty and no row exists, 1 if an existing row was updated or deleted, rowid of the new row otherwise
 	 */
 	public function insertOrUpdateExtraField($elementId, $elementType, $name, $value)
 	{
@@ -3261,6 +3260,8 @@ class EInvoicing
 				$sql .= ", '" . $this->db->escape($name) . "'";
 				$sql .= ", '" . $this->db->escape($value) . "'";
 				$sql .= ", '" . $this->db->idate(dol_now()) . "', " . (int) $user->id . ")";
+			} else {
+				return 0;
 			}
 		}
 
@@ -3676,7 +3677,7 @@ class EInvoicing
 		$sql .= ($flowId ? "'" . $db->escape($flowId) . "'" : "NULL") . ", ";
 		$sql .= "'" . $db->escape($direction) . "', ";
 		$sql .= (int) $statusCode . ", ";
-		$sql .= "'" . $db->escape($statusMessage) . "', ";
+		$sql .= "'" . $db->escape(dol_substr((string) $statusMessage, 0, 255)) . "', ";
 		$sql .= "'" . $db->escape($validationStatus) . "', ";
 		$sql .= "'" . $db->escape($validationMessage) . "', ";
 		$sql .= "'" . $db->escape($date_creation) . "', ";
@@ -3708,15 +3709,44 @@ class EInvoicing
 	 */
 	public function hasSentStatusMessage($elementId, $elementType, $statusCode, $onlyAccepted = 0)
 	{
+		return $this->statusMessageExists($elementId, $elementType, $statusCode, $onlyAccepted ? 'accepted' : 'any');
+	}
+
+	/**
+	 * Tell whether a lifecycle status is already live on the platform for an object: sent and not rejected.
+	 *
+	 * @param	int		$elementId		Id of the invoice
+	 * @param	string	$elementType	Element type ('facture', 'invoice_supplier')
+	 * @param	int		$statusCode		Lifecycle status looked for (200 to 213)
+	 * @return	bool					True if that status is already live on the platform
+	 */
+	public function hasLiveStatusMessage($elementId, $elementType, $statusCode)
+	{
+		return $this->statusMessageExists($elementId, $elementType, $statusCode, 'notrejected');
+	}
+
+	/**
+	 * Tell whether an outbound lifecycle status message exists for an object.
+	 *
+	 * @param	int		$elementId		Id of the invoice
+	 * @param	string	$elementType	Element type ('facture', 'invoice_supplier')
+	 * @param	int		$statusCode		Lifecycle status looked for (200 to 213)
+	 * @param	string	$validation		Sends to count: 'any', 'accepted' (the platform confirmed it) or 'notrejected' (anything it did not refuse)
+	 * @return	bool					True if such a message exists
+	 */
+	private function statusMessageExists($elementId, $elementType, $statusCode, $validation)
+	{
 		$sql = "SELECT rowid FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 		$sql .= " WHERE element_type = '" . $this->db->escape($elementType) . "'";
 		$sql .= " AND element_id = " . (int) $elementId;
 		$sql .= " AND lc_status = " . (int) $statusCode;
 		$sql .= " AND LOWER(direction) = 'out'";
-		if ($onlyAccepted) {
-			// Stored as 'Ok', but compared lowercased like the direction above: on PostgreSQL an equality
-			// on the stored case is a comparison that silently matches nothing.
+		// Stored as 'Ok' / 'Error', but compared lowercased like the direction above: on PostgreSQL an
+		// equality on the stored case is a comparison that silently matches nothing.
+		if ($validation === 'accepted') {
 			$sql .= " AND LOWER(lc_validation_status) = 'ok'";
+		} elseif ($validation === 'notrejected') {
+			$sql .= " AND LOWER(lc_validation_status) <> 'error'";
 		}
 		$sql .= " LIMIT 1";
 

@@ -34,7 +34,7 @@
 			"chain": "out",
 			"role": "Opens the outbound chain. Leaves the request marker the PDF hook reads to know a validation is what caused the coming rebuild, then records the status the invoice qualifies for.",
 			"reads": "Facture, llx_einvoicing_extlinks, EINVOICING_DISABLE_SYNC_DOLI_TO_AP",
-			"writes": "setInvoiceValidatedInThisRequest() (request-scoped marker), setEInvoiceStatus() → extlinks"
+			"writes": "setInvoiceValidatedInThisRequest() (request-scoped marker), setEInvoiceStatus() → extlinks when no status was stored yet; with EINVOICING_EINVOICE_IN_REAL_TIME + EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS a failed checkRequiredinformations() returns -1 and rolls the validation back"
 		},
 		"trigger.bill_create": {
 			"symbol": "InterfaceEInvoicingTriggers::runTrigger",
@@ -76,8 +76,8 @@
 			"locate": "$action == 'BILL_SUPPLIER_VALIDATE'",
 			"label": "TRIGGER BILL_SUPPLIER_VALIDATE",
 			"chain": "out-status",
-			"role": "Three jobs on a received invoice being validated: the optional consistency check against its XML, closing the invoice a replacement supersedes, and answering 205 — validating a received invoice is the act of accepting it.",
-			"reads": "SupplierInvoiceHelper::isEInvoice(), checkDolInvoiceAndEInvoiceConsistency(), shouldSendApprovedOnValidation()",
+			"role": "Four jobs on a received invoice being validated: refusing it while the totals-mismatch mark of the import still holds (cleared once the invoice totals the document), the optional consistency check against its XML (and a duplicate flow), closing the invoice a replacement supersedes, and answering 205 — validating a received invoice is the act of accepting it.",
+			"reads": "SupplierInvoiceHelper::totalsMismatch() (llx_einvoicing_extrafields), SupplierInvoiceHelper::isEInvoice(), checkDolInvoiceAndEInvoiceConsistency(), shouldSendApprovedOnValidation()",
 			"writes": "closeReplacedSupplierInvoice() (core), sendStatusMessage($object, 205). A send failure never rolls back the validation."
 		},
 		"trigger.bill_supplier_payed": {
@@ -198,7 +198,7 @@
 			"symbol": "EInvoicing::isTransmittedLockActive",
 			"label": "isTransmittedLockActive()",
 			"chain": "cross",
-			"role": "The real lock. Keys on the persistent flow_id, which the first successful submission assigns and nothing ever clears — unlike syncstatus, which a regeneration resets to GENERATED.",
+			"role": "The real lock. Keys on the persistent flow_id, which the first successful submission assigns and nothing ever clears — unlike syncstatus, which a manual status change can overwrite.",
 			"reads": "fetchLastknownInvoiceStatus()['everTransmitted']",
 			"writes": "—; opt-out EINVOICING_ALLOW_RESEND_TRANSMITTED"
 		},
@@ -230,7 +230,7 @@
 			"symbol": "EInvoicing::hasSentStatusMessage",
 			"label": "hasSentStatusMessage()",
 			"chain": "out-status",
-			"role": "Whether a given status was already sent for an object — the idempotency of the 205 and of the 211, whatever the path that sent it.",
+			"role": "Whether a given status was ever sent for an object (any answer, or accepted only) — the idempotency of the 205 at validation and of the 211. The card button asks `hasLiveStatusMessage()` instead, which leaves a send the PA rejected free to be retried.",
 			"reads": "llx_einvoicing_lifecycle_msg",
 			"writes": "—"
 		},
@@ -296,7 +296,7 @@
 			"chain": "out",
 			"role": "Produces the transmitted file: builds the XML, copies it to its final name, fires the afterEinvoiceCreation hook, records the status and checks the size.",
 			"reads": "Facture, the temp XML",
-			"writes": "<output>/<REF>/<REF>_cii.xml, setEInvoiceStatus(GENERATED), checkFileSizeLimit() → warnings"
+			"writes": "<output>/<REF>/<REF>_cii.xml (creating the invoice dir when missing), setEInvoiceStatus(GENERATED) when 'storedcode' is UNKNOWN / NOT_GENERATED, checkFileSizeLimit() → warnings"
 		},
 		"cii.generatexml": {
 			"symbol": "CIIProtocol::generateXML",
@@ -399,7 +399,7 @@
 			"label": "Document::cronSyncFlows()",
 			"chain": "in",
 			"role": "The scheduled job. Loads the provider itself — the cron runner includes this class file and nothing else — then reports the run in $this->output.",
-			"reads": "EINVOICING_PDP, getLastSyncDate(), EINVOICING_FLOWS_SYNC_CALL_SIZE",
+			"reads": "EINVOICING_PDP, EINVOICING_ONLY_GENERATE, getLastSyncDate(EINVOICING_SYNC_MARGIN_TIME_HOURS), getCronSyncBatchSize()",
 			"writes": "delegates to syncFlows(); the job output carries the manual actions to do"
 		},
 		"provider.syncflows": {
@@ -408,13 +408,13 @@
 			"chain": "in",
 			"role": "Walks the flow window in batches. This search endpoint ignores offset and page, caps a batch and reports no total, so the only cursor is updatedAfter and the batches walk it.",
 			"reads": "POST flows/search, then SELECT flow_id FROM einvoicing_document to discard what is already stored",
-			"writes": "one Call row for the whole run; collects the business actions and the postponed flows"
+			"writes": "one Call row for the whole run; the first flow failing (postponed included, unless EINVOICING_ENABLE_POSTPONE_FLOWS) aborts the run; with EINVOICING_ENABLE_MANUAL_ACTION_QUEUE a missing third party / product or a bad amount is queued in llx_einvoicing_sync_pending instead"
 		},
 		"provider.syncflow": {
 			"symbol": "SuperPDPProvider::syncFlow",
 			"label": "SuperPDP syncFlow()",
 			"chain": "in",
-			"role": "One flow. Reads its metadata into a Document object, then dispatches on flow_type. Whatever happens, the Document row is written at the end.",
+			"role": "One flow. Reads its metadata into a Document object, then dispatches on flow_type. The Document row is written at the end, unless the case returned a failure or a postponement first.",
 			"reads": "GET flows/{id}?docType=Metadata",
 			"writes": "Document::create() → llx_einvoicing_document"
 		},
@@ -424,15 +424,15 @@
 			"chain": "in",
 			"role": "Retrieves the invoice in whichever shape this module can read: Converted, then Original, then the readable view. Asking only for the Converted one makes the import depend on a setting that lives on the PA account.",
 			"reads": "fetchFlowData() x3, detectProtocolFromContent()",
-			"writes": "—; when nothing is readable the flow is postponed, never dropped"
+			"writes": "—; when nothing is readable it returns postponeflow (nothing stored); the run then aborts unless EINVOICING_ENABLE_POSTPONE_FLOWS"
 		},
 		"provider.processincoming": {
 			"symbol": "AbstractPDPProvider::processIncomingSupplierInvoiceStatus",
 			"label": "processIncomingSupplierInvoiceStatus()",
 			"chain": "in",
 			"role": "A status the vendor issues about one of its own invoices — a 212 answering our 211, typically. The mirror of what the CustomerInvoiceLC case does for our customers' statuses.",
-			"reads": "GET flows/{id}?docType=Original, CdarHandler, findSupplierInvoiceByVendorReference()",
-			"writes": "storeStatusMessage(direction IN); never a negative result, so one unattachable status cannot stall the run"
+			"reads": "GET flows/{id}?docType=Original, else Converted, CdarHandler, findSupplierInvoiceByVendorReference()",
+			"writes": "insertOrUpdateExtLink() + storeStatusMessage(direction IN) + addEvent(); res 0 (stored, unattached) for an unknown or unparsable status, negative + postponeflow only on a failed platform call"
 		},
 		"cdar.generate": {
 			"symbol": "CdarHandler::generateCdarFile",
@@ -519,8 +519,8 @@
 			"label": "_syncOrCreateThirdpartyFromEInvoiceSeller()",
 			"chain": "in",
 			"role": "Resolves the vendor. Its own transaction, committed before the import starts: a business error further down must not roll back the third party the operator is precisely being asked to complete.",
-			"reads": "sellerGlobalIds merged with SpecifiedLegalOrganization, VAT number, EINVOICING_THIRDPARTIES_MATCH_ON_NAME",
-			"writes": "Societe::fetch() by idprof1..6, then Societe::create() or Societe::update()"
+			"reads": "sellerGlobalIds merged with SpecifiedLegalOrganization, VAT number, EINVOICING_THIRDPARTIES_MATCH_ON_NAME, the SIRET of the document",
+			"writes": "Societe::fetch() by idprof1..6, then Societe::create() or Societe::update(); the country from the document on a created vendor"
 		},
 		"common.findproduct": {
 			"symbol": "CommonProtocol::findProductFromEinvoiceLine",
@@ -560,7 +560,7 @@
 			"chain": "in",
 			"role": "Once every line exists, confronts the totals of the invoice with the ones the document announces, and picks the rounding mode that reconciles them when one does.",
 			"reads": "the parsed header totals",
-			"writes": "FactureFournisseur::update_price(), and a message when they still disagree"
+			"writes": "carryAnnouncedVatOntoLines(), FactureFournisseur::update_price(); flagTotalsMismatch() / clearTotalsMismatch() in llx_einvoicing_extrafields (the mark BILL_SUPPLIER_VALIDATE enforces) and a message when they still disagree"
 		},
 		"cii.saveattachment": {
 			"symbol": "CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment",
@@ -606,7 +606,7 @@
 			"symbol": "SupplierInvoiceHelper::shouldSendApprovedOnValidation",
 			"label": "shouldSendApprovedOnValidation()",
 			"chain": "out-status",
-			"role": "Whether the validation of a received invoice must answer 205: the option, the invoice really coming from the platform, and no 205 already sent.",
+			"role": "Whether the validation of a received invoice must answer 205: the option, sending not disabled, the invoice really coming from the platform, no 205 nor 210 already sent, not a credit note of a refused invoice, and not a B2B-international flow.",
 			"reads": "EINVOICING_SEND_APPROVED_ON_VALIDATION, isEInvoice(), hasSentStatusMessage()",
 			"writes": "—"
 		},
@@ -662,15 +662,15 @@
 			"symbol": "EsalinkPDPProvider::syncFlows",
 			"label": "Esalink syncFlows()",
 			"chain": "in",
-			"role": "Its flow search answers a total, so the run asks for that many rows in one call: no updatedAfter cursor to walk and no batch ceiling. Flows already stored are discarded, and an unreadable one is postponed.",
+			"role": "One single call, limited to the limit it is given (the total the flow search answers when called with none): no updatedAfter cursor to walk and no batch loop. Flows already stored are discarded; an unreadable one is postponed, which aborts the run unless EINVOICING_ENABLE_POSTPONE_FLOWS.",
 			"reads": "POST flows/search, the total it returns",
-			"writes": "one Call row for the run; same postponeflow handling as SuperPDP"
+			"writes": "one Call row for the run; same abort / EINVOICING_ENABLE_POSTPONE_FLOWS handling as SuperPDP, no manual-action queue"
 		},
 		"esalink.syncflow": {
 			"symbol": "EsalinkPDPProvider::syncFlow",
 			"label": "Esalink syncFlow()",
 			"chain": "in",
-			"role": "Reads the flow metadata into a Document, dispatches on flow_type over the five flow types, and writes the Document row at the end whatever happened.",
+			"role": "Reads the flow metadata into a Document, dispatches on flow_type over the five flow types, and writes the Document row at the end, unless the case returned a failure or a postponement first.",
 			"reads": "GET flows/{id}?docType=Metadata",
 			"writes": "Document::create() → llx_einvoicing_document"
 		},
@@ -734,6 +734,12 @@
 							"`getExtraFieldValue()`, the supplier invoice card"
 						],
 						[
+							"`llx_einvoicing_sync_pending`",
+							"one **received flow waiting for a manual action** (missing third party or product, supplier invoice with a different amount), only when `EINVOICING_ENABLE_MANUAL_ACTION_QUEUE` is on, and only through `SuperPDPProvider`",
+							"`EInvoicingSyncPending::queueFromFlow()` in `syncFlows()`, `resolveByFlowId()` once the flow goes through",
+							"`sync_pending_list.php` (retry, ignore), the pending counter of the flow list"
+						],
+						[
 							"`llx_einvoicing_call`",
 							"one **API call**, or one whole synchronization run, with its request and response, secrets redacted",
 							"`AbstractPDPProvider::logCall()`",
@@ -779,7 +785,7 @@
 							"lines": [
 								"setInvoiceValidatedInThisRequest() — the marker the PDF hook reads",
 								"fetchLastknownInvoiceStatus(), then setEInvoiceStatus()",
-								"-> extlinks: NOT_GENERATED (in scope) or IGNORE (out of scope)"
+								"-> extlinks, if no status yet: NOT_GENERATED (in scope) or IGNORE (out of scope); a failed pre-flight may abort the validation"
 							]
 						},
 						{
@@ -879,7 +885,7 @@
 							"label": "then, still inside generateInvoice()",
 							"items": [
 								"hook afterEinvoiceCreation (other modules)",
-								"setEInvoiceStatus(STATUS_GENERATED) -> extlinks",
+								"setEInvoiceStatus(STATUS_GENERATED) -> extlinks, only when the stored status is UNKNOWN / NOT_GENERATED",
 								"checkFileSizeLimit() -> warnings"
 							]
 						},
@@ -1073,7 +1079,7 @@
 						[
 							"BT-27…BT-34 seller",
 							"`$mysoc`, `einvoicingSellerTaxRegistrations()`, `getSellerCommunicationURI()`",
-							"BT-31 or BT-32 per VAT regime"
+							"BT-31 or BT-32 per VAT regime; on a B2G invoice the SIRET is added under scheme 0009 (EXTENDED), plus an ADN note 'B2G'"
 						],
 						[
 							"BT-44…BT-49 buyer",
@@ -1155,7 +1161,7 @@
 									"label": "212 Encaissee — on OUR OWN invoice (we are the seller)",
 									"fn": "trigger.payment_customer_create",
 									"lines": [
-										"for each invoice paid by this payment, amount > 0",
+										"for each invoice paid by this payment, amount ≠ 0 (negative = refund, sent with its reason)",
 										"-> sendCashedInStatus()",
 										"AUTOMATIC, no option: the reform wants every",
 										"cash-in, partial ones included"
@@ -1168,7 +1174,7 @@
 										"shouldSendApprovedOnValidation()",
 										"(EINVOICING_SEND_APPROVED_ON_VALIDATION, off by default)",
 										"or the card button, which validates the draft first",
-										"then sends only if the validation did not already"
+										"then sends only if that status is not already live at the PA (hasLiveStatusMessage)"
 									]
 								},
 								{
@@ -1185,7 +1191,7 @@
 									"fn": "actions.doactions",
 									"lines": [
 										"doActions('confirm_sendStatusMessage')",
-										"-> sendStatusMessage($object, code, reasonCode)"
+										"-> unless hasLiveStatusMessage(code): sendStatusMessage($object, code, reasonCode)"
 									]
 								}
 							]
@@ -1327,7 +1333,7 @@
 					"steps": [
 						{
 							"kind": "event",
-							"label": "CRON \"EInvoicing flows synchronization\", hourly (declared in modEInvoicing::$cronjobs)"
+							"label": "CRON \"EInvoicing Document Sync\", hourly, disabled until enabled (declared in modEInvoicing::$cronjobs)"
 						},
 						{
 							"kind": "node",
@@ -1335,7 +1341,7 @@
 							"lines": [
 								"provider = PDPProviderManager::getProvider(EINVOICING_PDP)",
 								"syncFromDate = getLastSyncDate()",
-								"maxflows = EINVOICING_FLOWS_SYNC_CALL_SIZE (100)"
+								"maxflows = getCronSyncBatchSize(): EINVOICING_FLOWS_SYNC_CRON_SIZE, else EINVOICING_FLOWS_SYNC_CALL_SIZE, else 100"
 							]
 						},
 						{
@@ -1359,7 +1365,7 @@
 									"lines": [
 										"hubtimize.fr/api/orchestrator/v1/",
 										"POST flows/search, the answer has a total",
-										"one single call sized on that total",
+										"one single call: limit = maxflows (the total, only when called with no limit)",
 										"no cursor, no batch loop",
 										"discards the flows already stored"
 									]
@@ -1447,8 +1453,8 @@
 							"kind": "node",
 							"label": "$document->create($user)",
 							"lines": [
-								"one row in einvoicing_document, always,",
-								"whatever happened above"
+								"one row in einvoicing_document,",
+								"unless the case returned early (failure or postponed: not stored, retried)"
 							]
 						}
 					]
@@ -1457,8 +1463,8 @@
 					"type": "prose",
 					"md": [
 						"Two return shapes matter and are easy to confuse:",
-						"* **error** (`res < 0`, no `postponeflow`): something *was* stored, or the flow is unusable. It is reported as a business action for the operator.",
-						"* **postponed** (`res < 0` **and** `postponeflow = 1`): nothing was stored, the flow stays pending and the next run retries it. Used when no readable document could be fetched, or when the invoice references a document Dolibarr does not hold yet. That flag is the reason one bad flow no longer stalls every invoice queued behind it."
+						"* **error** (`res < 0`, no `postponeflow`): the flow is not stored either; the run stops on it (`Aborting synchronization`), and its business action is reported to the operator.",
+						"* **postponed** (`res < 0` **and** `postponeflow = 1`): nothing was stored and the next run retries it. Used when no readable document could be fetched, when a referenced deposit or a reference lookup is missing, when an invoice with that ref exists with another amount, or when a lifecycle status could not be read or recorded. Only with the hidden `EINVOICING_ENABLE_POSTPONE_FLOWS` does the run skip it and carry on; by default it aborts the run like an error, with its business message."
 					]
 				},
 				{
@@ -1502,7 +1508,7 @@
 							"lines": [
 								"OWN TRANSACTION, committed before the import starts",
 								"1. Societe::fetch() by idprof1..6 from the seller GlobalIDs",
-								"2. else by VAT number (several matches = error)",
+								"2. else by VAT number (several matches: the document SIRET picks one; none matching -> steps 3/4; no SIRET or ambiguous -> THIRDPARTY_DUPLICATE_VAT)",
 								"3. else, only with EINVOICING_THIRDPARTIES_MATCH_ON_NAME, findNearest()",
 								"4. else Societe::create(), or refuse if auto-creation is off"
 							]
@@ -1515,8 +1521,8 @@
 							"kind": "list",
 							"label": "the two refusals that come before anything is written",
 							"items": [
-								"already imported for this supplier ? findIdByRef(ref_supplier, socid) -> only (re)attach the files",
-								"every referenced document present ? no -> postponeflow, with a link to the screen that creates the missing invoice"
+								"already imported for this supplier ? findIdByRef(ref_supplier, socid, BT-112 + BT-114, |BT-114|) -> same amount: only (re)attach the files; other amount (-3): postponeflow SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT; lookup error (-1/-2): postponeflow LINKED_INVOICE_LOOKUP_FAILED",
+								"every referenced document (BG-3) present ? no -> postponeflow LINKED_INVOICE_NOT_FOUND, with a link to create it — only when a deposit is announced (BT-113 > 0, BT-23 not B2/S2/M2); a credit note, a self-reference or nothing to deduct steps over it with a message; a failed lookup -> postponeflow LINKED_INVOICE_LOOKUP_FAILED"
 							]
 						},
 						{
@@ -1553,10 +1559,9 @@
 							"items": [
 								"deposits: getOrCreateDepositDiscount() -> DiscountAbsolute::create()",
 								"Societe::update() to flag the third party as a supplier if needed",
+								"insert_discount() for the document-level allowances",
 								"createHeaderChargeLines() — document-level charges (BG-21) as lines",
-								"ProductFournisseur::update_buyprice() — supplier prices of the imported products",
-								"insertOrUpdateExtLink($supplierInvoiceId, 'invoice_supplier', $flowId)",
-								"saveEInvoiceFileToSupplierInvoiceAttachment() x2 — document and readable view"
+								"createRoundingLine() — BT-114 as a line"
 							]
 						},
 						{
@@ -1566,13 +1571,23 @@
 								"every line exists now: confront the totals with BT-112 / BT-115",
 								"core update_price()"
 							]
+						},
+						{
+							"kind": "list",
+							"label": "then what records the import",
+							"items": [
+								"ProductFournisseur::update_buyprice() — supplier prices of the imported products",
+								"insertOrUpdateExtLink($supplierInvoiceId, 'invoice_supplier', $flowId)",
+								"storeEmbeddedAttachments() — the files embedded in the document (BG-24)",
+								"saveEInvoiceFileToSupplierInvoiceAttachment() x2 — document and readable view"
+							]
 						}
 					]
 				},
 				{
 					"type": "note",
 					"md": [
-						"`FacturXProtocol` overrides only the entry point: it extracts the XML out of the PDF (`extractXmlFromFileContent()`, `checkFacturxStructure()`) and then runs the same CII path."
+						"`FacturXProtocol` overrides only `parseReceivedDocument()`: it extracts the CII out of the PDF/A-3 (`PdfAttachmentExtractor::getInvoiceXmlFromFile()`, or the external reader with `EINVOICING_USE_EXTERNAL_FACTURX_READER`) and then runs the same CII path."
 					]
 				},
 				{
@@ -1726,7 +1741,7 @@
 							"kind": "node",
 							"fn": "cdar.read",
 							"lines": [
-								"GET flows/{id}?docType=Original -> the CDAR XML",
+								"GET flows/{id}?docType=Original, else Converted -> the CDAR XML",
 								"AcknowledgementDocument.ReferenceReferencedDocument.IssuerAssignedID",
 								"-> Facture::fetch(0, $ref), entity checked"
 							]
@@ -1737,7 +1752,8 @@
 							"items": [
 								"insertOrUpdateExtLink(facture, flowId, ProcessConditionCode, ...) — the card and the list now show the PA status",
 								"storeStatusMessage(..., direction IN, reasonCode) — the status history of the invoice",
-								"addEvent('STATUS', ...) — the agenda of the invoice"
+								"addEvent('STATUS', ...) — the agenda of the invoice",
+								"either of the first two failing -> rollback, postponeflow CANT_RECORD_SENT_INVOICE_LIFECYCLE_STATUS, flow not stored"
 							]
 						},
 						{
@@ -1749,7 +1765,7 @@
 				{
 					"type": "note",
 					"md": [
-						"`processIncomingSupplierInvoiceStatus()` is the mirror image for a status a **vendor** issues about one of its own invoices — a 212 answering our 211, typically. It resolves the supplier invoice with `findSupplierInvoiceByVendorReference()` (vendor reference and legal id) and never returns a negative result: a vendor may perfectly well report on an invoice this Dolibarr does not hold, and failing there would stall the whole synchronization, run after run."
+						"`processIncomingSupplierInvoiceStatus()` is the mirror image for a status a **vendor** issues about one of its own invoices — a 212 answering our 211, typically. It resolves the supplier invoice with `findSupplierInvoiceByVendorReference()` (vendor reference and legal id) and returns a negative result (postponed) only when the platform call fails: a vendor may perfectly well report on an invoice this Dolibarr does not hold, and failing there would stall the whole synchronization, run after run."
 					]
 				}
 			]
@@ -1783,7 +1799,7 @@
 							"transmitted (weak)",
 							"`fetchLastknownInvoiceStatus()['transmitted']`",
 							"`extlinks.syncstatus`",
-							"reset to GENERATED by a regeneration — which is exactly why the auto-send carries *both* guards"
+							"not reset by a regeneration (`generateInvoice()` writes GENERATED only over UNKNOWN / NOT_GENERATED, read on 'storedcode'); but a manual status change can overwrite it, hence the auto-send still carries both guards"
 						],
 						[
 							"generation re-entry",
@@ -1799,9 +1815,9 @@
 						],
 						[
 							"status already sent",
-							"`hasSentStatusMessage()`",
+							"`hasSentStatusMessage()` (triggers), `hasLiveStatusMessage()` (card button)",
 							"`lifecycle_msg`",
-							"one 205 and one 211 per invoice, whatever the path"
+							"the triggers send one 205 and one 211 per invoice, whatever was sent before; the card button never re-sends a status the PA has not rejected, and a rejected one may be retried"
 						],
 						[
 							"flow already imported",
@@ -2038,6 +2054,11 @@
 							"batch size of the flow search"
 						],
 						[
+							"`EINVOICING_FLOWS_SYNC_CRON_SIZE`",
+							"IN",
+							"hidden: how many flows one scheduled synchronization may synchronize (SuperPDP) or ask for (Esalink); unset, it follows `EINVOICING_FLOWS_SYNC_CALL_SIZE`"
+						],
+						[
 							"`EINVOICING_FLOWS_SYNC_CALL_LIMIT`",
 							"IN",
 							"the limit the manual synchronization form suggests"
@@ -2045,7 +2066,17 @@
 						[
 							"`EINVOICING_SYNC_MARGIN_TIME_HOURS`",
 							"IN",
-							"how far back the manual synchronization form starts, before the last known flow"
+							"how far back a synchronization starts before the last known flow: the scheduled job through `getLastSyncDate()`, the manual form through the date it suggests"
+						],
+						[
+							"`EINVOICING_ENABLE_POSTPONE_FLOWS`",
+							"IN",
+							"hidden, off: a flow returned with `postponeflow` is skipped and the run carries on, instead of aborting it, at the risk of losing a flow that drifts out of the synchronization window"
+						],
+						[
+							"`EINVOICING_ENABLE_MANUAL_ACTION_QUEUE`",
+							"IN",
+							"hidden, off: a missing third party or product, or an amount mismatch, queues the flow in `llx_einvoicing_sync_pending` and the run carries on (SuperPDP only)"
 						],
 						[
 							"`EINVOICING_PREFER_ORIGINAL`",
@@ -2111,6 +2142,11 @@
 							"`EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE`",
 							"IN",
 							"the extra entities `findIdByRef()` may look into"
+						],
+						[
+							"`EINVOICING_ADD_A_DEDICATED_AGENDA_VIEW`",
+							"both",
+							"adds an e-invoice events tab on the customer invoice card"
 						]
 					]
 				},
@@ -2146,7 +2182,7 @@
 						[
 							"`syncFlows()`",
 							"the search answers no total: the run walks the `updatedAfter` cursor, `MAX_SYNC_BATCHES` batches at most",
-							"the search answers a total: one single call sized on it, no cursor and no batch loop"
+							"one single call, limited to maxflows (sized on the total the search answers only when called with no limit), no cursor and no batch loop"
 						],
 						[
 							"`syncFlow()`",
@@ -2214,7 +2250,7 @@
 						],
 						[
 							"one flow blocks the whole run",
-							"it should be **postponed**, not failed — check the `postponeflow` returns"
+							"by default it does: a failed or postponed flow aborts the run; `EINVOICING_ENABLE_POSTPONE_FLOWS` skips the postponed ones, `EINVOICING_ENABLE_MANUAL_ACTION_QUEUE` queues the manual-action ones (SuperPDP)"
 						],
 						[
 							"a received invoice landed on the wrong vendor",
