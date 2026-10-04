@@ -1,7 +1,8 @@
 <?php
 /* Copyright (C) 2004-2017  Laurent Destailleur     <eldy@users.sourceforge.net>
  * Copyright (C) 2024       Frédéric France         <frederic.france@free.fr>
- * Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
+ * Copyright (C) 2025		SuperAdmin				<daoud.mouhamed@gmail.com>
+ * Copyright (C) 2026		Alexandre Spangaro      <alexandre@inovea-conseil.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -156,7 +157,8 @@ if (getDolGlobalString('EINVOICING_PDP') && !getDolGlobalString('EINVOICING_PROT
 }
 
 if ($action == 'savesyncoptions') {
-	dolibarr_set_const($db, "EINVOICING_DISABLE_SYNC_DOLI_TO_AP", (int) !GETPOSTINT("EINVOICING_DISABLE_SYNC_DOLI_TO_AP"), 'chaine', 0, '', $conf->entity);
+	$value = GETPOSTINT('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') ? '0' : '1';
+	dolibarr_set_const($db, "EINVOICING_DISABLE_SYNC_DOLI_TO_AP", $value, 'chaine', 0, '', $conf->entity);
 
 	header("Location: ".$_SERVER["PHP_SELF"]);
 	exit;
@@ -416,7 +418,7 @@ $form = new Form($db);
 $help_url = 'EN:Module_EInvoicing';
 $title = "OptionsEInvoicingSend";
 
-llxHeader('', $langs->trans($title), $help_url, '', 0, 0, '', '', '', 'mod-einvoicing page-admin-optionssend');
+llxHeader('', $langs->trans($title), $help_url, '', 0, 0, '', '', '');
 
 // Subheader
 $linkback = '<a href="'.($backtopage ? $backtopage : DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1').'">'.img_picto($langs->trans("BackToModuleList"), 'back', 'class="pictofixedwidth"').'<span class="hideonsmartphone">'.$langs->trans("BackToModuleList").'</span></a>';

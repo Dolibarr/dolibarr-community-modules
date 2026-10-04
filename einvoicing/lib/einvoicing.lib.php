@@ -1430,9 +1430,9 @@ function einvoicingIsActiveUntdid4451Code($db, $code, $entity, array $excludedCo
 	$sql .= ' FROM '.MAIN_DB_PREFIX.'c_einvoicing_untdid4451';
 	$sql .= " WHERE code = '".$db->escape($code)."'";
 	if (! empty($entity)) {
-		$sql .= " AND entity = " . (int) $entity;
+		$sql .= " AND entity = " . ((int) $entity);
 	} else {
-		$sql .= " AND entity = " . $conf->entity; // unique key include the entity so each company has its own index
+		$sql .= " AND entity = " . ((int) $conf->entity); // unique key include the entity so each company has its own index
 	}
 	$sql .= ' AND active = 1';
 	$sql .= $db->plimit(1);
