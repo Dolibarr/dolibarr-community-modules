@@ -851,12 +851,12 @@ class CIIProtocol extends AbstractProtocol
 
 	/**
 	 * Decide what to do with a BG-3 reference (BT-25) the buyer does not hold.
-	 * BT-113 is what tells the two cases apart: an amount already paid points at a deposit the import
+	 * depositAnnouncedByDocument() tells the two cases apart: an amount already paid points at a deposit the import
 	 * has to deduct, so the flow waits for it rather than importing an invoice short of its deduction;
 	 * nothing paid means the reference is documentary - a contract number, or the placeholder some
 	 * vendors always emit - and stepping over it costs nothing, as long as it is reported (#880).
 	 * ram:TypeCode cannot arbitrate this: CII-DT-018 forbids it below EXTENDED, so it is always absent.
-	 * A reference repeating the document's own number (BT-1) is settled before BT-113 is even read:
+	 * A reference repeating the document's own number (BT-1) is settled before that amount is read:
 	 * it can never resolve, so waiting for it is waiting for ever (#927).
 	 * A credit note is settled before BT-113 is read too: its BG-3 is the invoice it cancels or corrects, never a deposit.
 	 *
@@ -894,11 +894,11 @@ class CIIProtocol extends AbstractProtocol
 			return null;
 		}
 
-		if ((float) ($parsedHeader['totalPrepaidAmount'] ?? 0) <= 0) {
+		if ($this->depositAnnouncedByDocument($parsedHeader) <= 0) {
 			if ($reportSkip) {
-				$return_messages[] = 'Document ' . dol_escape_htmltag((string) $refDoc) . ', ' . $relation . ' ' . dol_escape_htmltag($documentno) . ', was not found in Dolibarr and was ignored: the received document declares no amount already paid.';
+				$return_messages[] = 'Document ' . dol_escape_htmltag((string) $refDoc) . ', ' . $relation . ' ' . dol_escape_htmltag($documentno) . ', was not found in Dolibarr and was ignored: the received document announces no deposit to attach.';
 			}
-			dol_syslog(get_class($this) . '::resolveMissingReferencedDocument Stepping over unresolved InvoiceReferencedDocument ref="' . $refDoc . '" (no BT-113) for ' . $documentno, LOG_DEBUG);
+			dol_syslog(get_class($this) . '::resolveMissingReferencedDocument Stepping over unresolved InvoiceReferencedDocument ref="' . $refDoc . '" (no deposit announced) for ' . $documentno, LOG_DEBUG);
 			return null;
 		}
 
