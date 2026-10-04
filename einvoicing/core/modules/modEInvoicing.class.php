@@ -272,7 +272,7 @@ class modEInvoicing extends DolibarrModules
 		 */
 		/* BEGIN MODULEBUILDER DICTIONARIES */
 		$this->dictionaries = array(
-			'langs' => array('einvoicing@einvoicing'),
+			'langs' => 'einvoicing@einvoicing',
 			'tabname' => array(MAIN_DB_PREFIX.'c_einvoicing_untdid4451',),
 			'tablib' => array('EInvoicingUntdidDictionary',),
 			'tabsql' => array('SELECT f.rowid as rowid, f.code, f.label, f.active FROM '.MAIN_DB_PREFIX.'c_einvoicing_untdid4451 as f'),
@@ -281,7 +281,7 @@ class modEInvoicing extends DolibarrModules
 			'tabfieldvalue' => array('code,label'),
 			'tabfieldinsert' => array('code,label'),
 			'tabrowid' => array('rowid'),
-			'tabcond' => array('isModEnabled("einvoicing")'),
+			'tabcond' => array(isModEnabled('einvoicing'))
 		);
 		/* END MODULEBUILDER DICTIONARIES */
 

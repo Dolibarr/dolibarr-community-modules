@@ -274,7 +274,7 @@ $form = new Form($db);
 $help_url = 'EN:Module_EInvoicing';
 $title = "OptionsEInvoicingReceive";
 
-llxHeader('', $langs->trans($title), $help_url, '', 0, 0, '', '', '');
+llxHeader('', $langs->trans($title), $help_url);
 
 // Subheader
 $linkback = '<a href="'.($backtopage ? $backtopage : DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1').'">'.img_picto($langs->trans("BackToModuleList"), 'back', 'class="pictofixedwidth"').'<span class="hideonsmartphone">'.$langs->trans("BackToModuleList").'</span></a>';
