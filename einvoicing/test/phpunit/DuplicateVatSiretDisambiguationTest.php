@@ -40,6 +40,7 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 
 require_once $dolibarrHtdocs . '/master.inc.php';
 require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+require_once DOL_DOCUMENT_ROOT . '/core/lib/company.lib.php';	// Societe::create() of Dolibarr 21 calls getCountry() without loading it
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 
