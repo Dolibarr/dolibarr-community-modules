@@ -26,7 +26,7 @@
 // Load Dolibarr environment
 $res = 0;
 // Try main.inc.php into web root known defined into CONTEXT_DOCUMENT_ROOT (not always defined)
-if (!$res && !empty($_SERVER["CONTEXT_DOCUMENT_ROOT"])) {
+if (!empty($_SERVER["CONTEXT_DOCUMENT_ROOT"])) {
 	$res = @include $_SERVER["CONTEXT_DOCUMENT_ROOT"]."/main.inc.php";
 }
 // Try main.inc.php into web root detected using web root calculated from SCRIPT_FILENAME
@@ -69,12 +69,12 @@ if (!$res) {
  * @var Societe $mysoc
  */
 // Libraries
+// @phpstan-ignore-next-line
 require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once __DIR__.'/../lib/einvoicing.lib.php';
 require_once __DIR__.'/../class/providers/PDPProviderManager.class.php';
 require_once __DIR__.'/../class/protocols/ProtocolManager.class.php';
 require_once __DIR__.'/../class/einvoicing.class.php';
-
 
 // Translations
 $langs->loadLangs(array("admin", "einvoicing@einvoicing"));
@@ -101,13 +101,13 @@ $setupnotempty = 0;
 $useFormSetup = 1;
 
 if (!class_exists('FormSetup')) {
+	// @phpstan-ignore-next-line
 	require_once DOL_DOCUMENT_ROOT.'/core/class/html.formsetup.class.php';
 }
 
 $formSetup = new FormSetup($db);
 
-$excludedUntdidCodes = array('PMT', 'PMD', 'AAB',
-);
+$excludedUntdidCodes = array('PMT', 'PMD', 'AAB');
 
 // Access control
 if (!$user->admin) {
@@ -398,6 +398,7 @@ if ($action == 'delete_extra_untdid' && GETPOST('token', 'alpha') === newToken()
 	exit;
 }
 
+// @phpstan-ignore-next-line
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
 //print getDolGlobalString('EINVOICING_PDP');
