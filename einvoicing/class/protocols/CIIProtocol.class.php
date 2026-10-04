@@ -4945,7 +4945,7 @@ class CIIProtocol extends AbstractProtocol
 			return;
 		}
 
-		foreach (dol_dir_list($dir, 'files', 0, '', '(\.meta|_preview.*\.png)$') as $entry) {
+		foreach (dol_dir_list($dir, 'files', 0, '', array('(\.meta|_preview.*\.png)$')) as $entry) {
 			$ecmfile = new EcmFiles($db);
 			$relativepath = preg_replace('/^' . preg_quote(DOL_DATA_ROOT . '/', '/') . '/', '', $dir . '/' . $entry['name']);
 			if ($ecmfile->fetch(0, '', $relativepath) <= 0) {
