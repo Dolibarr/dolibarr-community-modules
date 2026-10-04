@@ -133,7 +133,8 @@ class FacturXProtocol extends CIIProtocol
 		// Resolve the source PDF into which the Factur-X XML will be embedded, by priority:
 		//   1. $sourceFilePath from the generation hook (ODT/ODS: the MAIN_ODT_AS_PDF rendition shares the basename);
 		//   2. the most recent <ref>*.pdf already present in the output dir (manual generation, ODT output
-		//      like <ref>_Template.pdf for which last_main_doc is not maintained), excluding our own output;
+		//      like <ref>_Template.pdf for which last_main_doc is not maintained), excluding our own output
+		//      and the files attached to the invoice (<ref>-<name>.pdf);
 		//   3. legacy <ref>.pdf, regenerated with the default PDF model if missing.
 		$orig_pdf = '';
 		$fromodt = false;
@@ -153,7 +154,9 @@ class FacturXProtocol extends CIIProtocol
 				if (preg_match('/_facturx\.pdf$/i', $cand['name'])) {		// skip our own Factur-X output
 					continue;
 				}
-				if (strpos($cand['name'], $filename) !== 0) {				// must belong to this invoice ref
+				// Dolibarr names the invoice <ref>.pdf (PDF model) or <ref>_<template>.pdf (ODT as PDF). A file
+				// attached from the page is <ref>-<name>.pdf: it belongs to the invoice but is not the invoice.
+				if (!preg_match('/^' . preg_quote($filename, '/') . '(_.+)?\.pdf$/i', $cand['name'])) {
 					continue;
 				}
 				$orig_pdf = $cand['fullname'];								// list is sorted by date desc: newest first
