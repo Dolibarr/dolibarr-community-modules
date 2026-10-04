@@ -1111,6 +1111,18 @@ parameters:
 			path: ../../../einvoicing/class/utils/FacturxTcpdfMerger.class.php
 
 		-
+			message: '#^Property Account\:\:\$status \(array\) does not accept int\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../../einvoicing/class/utils/PayeeBankAccountHelper.class.php
+
+		-
+			message: '#^Property CompanyBankAccount\:\:\$default_rib \(bool\) does not accept int\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../../einvoicing/class/utils/PayeeBankAccountHelper.class.php
+
+		-
 			message: '#^Parameter \#1 \$qty of function calcul_price_total expects int, float given\.$#'
 			identifier: argument.type
 			count: 1
