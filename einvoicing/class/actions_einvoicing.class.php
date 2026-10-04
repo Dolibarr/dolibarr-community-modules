@@ -165,7 +165,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 						$result = $protocol->generateInvoice($invoiceObject, $outputlangs, $pdfPath);		// Generate E-invoice (embed into the real generated file)
 
-						if ($result >= 0) {
+						// $result is the path of the file, or -1: under PHP 8 a path compared to 0 is compared as
+						// a string, and "/..." >= "0" is false, so the configuration warning was never shown.
+						if (!is_numeric($result) || $result >= 0) {
 							if (!defined('NOLOGIN')) {	// If in backoffice context
 								setEventMessages($message, array(), $messagecss);
 							}
@@ -577,7 +579,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// Add button to change the entity (multi-company) of a supplier invoice (we test context invoicesuppliercard but also main for old versions of module)
 		if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE') && isModEnabled('multicompany') && in_array($object->element, ['invoice_supplier'])
 			&& !empty($object->id) && $user->hasRight('fournisseur', 'facture', 'creer') && preg_match('/invoicesuppliercard|main/', $parameters['currentcontext'] ?? '')) {
-			if ($object->isEditable()) {
+			// isEditable() only exists since Dolibarr 23 and answers a negative code when refused. Before, same
+			// rule as the core card offers "Modify" with: no payment and not dispatched in bookkeeping.
+			$editable = method_exists($object, 'isEditable') ? ($object->isEditable() > 0)
+				: ($object->getSommePaiement() == 0 && $object->getVentilExportCompta() == 0);
+			if ($editable) {
 				print '<a class="butAction" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?id=' . $object->id . '&action=change_entity&token=' . newToken() . '">'
 					. $langs->trans('ChangeEntity') . '</a>';
 			} else {
@@ -853,6 +859,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				// validates it too. Validation comes first: a status accepted by the platform cannot be taken
 				// back, while a validation that fails (numbering, closed period, ...) must leave it untouched.
 				$sendtheanswer = true;
+				$justvalidated = false;
 				if (in_array($pdpstatuscode, EInvoicing::STATUSES_ACCEPTING_A_DOCUMENT, true) && (int) $object->status === FactureFournisseur::STATUS_DRAFT) {
 					if (!$permissiontovalidate) {
 						$message = $langs->trans('EInvoiceApprovalNeedsValidateRight');
@@ -876,12 +883,16 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 					setEventMessages($langs->trans('EInvoiceApprovalValidatedTheInvoice', (string) $object->ref), array(), 'mesgs');
 
-					// EINVOICING_SEND_APPROVED_ON_VALIDATION makes that validation answer the platform on
-					// its own: sending the status again here would duplicate the flow. Read what the
-					// validation actually recorded rather than the setting, so a status sent by any other
-					// path is not doubled either.
-					if ($einvoicing->hasSentStatusMessage($object->id, $object->element, $pdpstatuscode)) {
-						$sendtheanswer = false;
+					$justvalidated = true;
+				}
+
+				// A CDAR deposit is irreversible: a status the platform did not reject is never sent twice.
+				if ($einvoicing->hasLiveStatusMessage($object->id, $object->element, $pdpstatuscode)) {
+					$sendtheanswer = false;
+
+					// The validation above may have sent it already (EINVOICING_SEND_APPROVED_ON_VALIDATION).
+					if (!$justvalidated) {
+						setEventMessages($langs->trans('EInvoiceStatusAlreadySentToPlatform', $einvoicing->getStatusLabel($pdpstatuscode)), array(), 'warnings');
 					}
 				}
 
@@ -1794,8 +1805,14 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		$contexts = explode(':', $parameters['context']);
 
 		if (array_intersect($contexts, ['invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'productservicelist', 'societelist'])) {
-			if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == getDolGlobalString('EINVOICING_PDP')) {
-				$this->resprints .= " AND ext.provider = '" . $db->escape(getDolGlobalString('EINVOICING_PDP')) . "'";
+			// The 'search_pdplinked' select option is built from the provider name with any trailing
+			// 'ViaPartner' stripped (see printFieldListOption()), and that is also what document.provider
+			// gets stored as (see e.g. SuperPDPProvider::providershort). Comparing against the raw
+			// EINVOICING_PDP config value here would never match for a *ViaPartner provider, silently
+			// turning this filter into a no-op.
+			$tmpeinvoicingpartner = preg_replace('/ViaPartner/i', '', getDolGlobalString('EINVOICING_PDP'));
+			if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == $tmpeinvoicingpartner) {
+				$this->resprints .= " AND ext.provider = '" . $db->escape($tmpeinvoicingpartner) . "'";
 			}
 		}
 

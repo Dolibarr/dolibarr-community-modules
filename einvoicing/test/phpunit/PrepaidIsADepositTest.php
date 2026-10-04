@@ -105,15 +105,55 @@ class PrepaidIsADepositTest extends CommonClassTest
 	}
 
 	/**
-	 * A credit note stores its amounts negative while a document announces them positive.
+	 * BT-113 is read with its sign: a negative amount already paid is no deposit the import can attach.
 	 *
 	 * @return	void
 	 */
-	public function testTheAnnouncedAmountIsReadAsAbsolute()
+	public function testANegativeAmountAlreadyPaidIsNoDepositToAttach()
 	{
 		$rule = $this->rule(array('businessProcessId' => 'B1', 'totalPrepaidAmount' => -120.00));
 
-		$this->assertEqualsWithDelta(120.00, $rule, 0.001, 'a negative BT-113 still announces 120 to attach');
+		$this->assertEqualsWithDelta(0.0, $rule, 0.001, 'a negative BT-113 announces nothing to attach');
+	}
+
+	/**
+	 * An invoice declaring itself already paid has no deposit to wait for behind its preceding invoice (BG-3).
+	 * @return	void
+	 */
+	public function testAnAlreadyPaidInvoiceIsNotPostponedOnAnUnknownPrecedingInvoice()
+	{
+		$messages = array();
+		$result = $this->resolveMissing(array('documentno' => 'F-2', 'businessProcessId' => 'B2', 'totalPrepaidAmount' => 540.28), $messages);
+
+		$this->assertNull($result, 'BT-23 B2 with BT-113 540.28 and an unknown BG-3 is stepped over');
+		$this->assertCount(1, $messages);
+	}
+
+	/**
+	 * An ordinary invoice announcing an amount already paid still waits for the deposit it deducts.
+	 * @return	void
+	 */
+	public function testAnOrdinaryInvoiceAnnouncingADepositIsStillPostponed()
+	{
+		$messages = array();
+		$result = $this->resolveMissing(array('documentno' => 'F-2', 'businessProcessId' => 'B1', 'totalPrepaidAmount' => 120.00), $messages);
+
+		$this->assertIsArray($result);
+		$this->assertSame(1, $result['postponeflow']);
+	}
+
+	/**
+	 * Run resolveMissingReferencedDocument() on an unknown preceding invoice "F-1".
+	 * @param	array<string,mixed>	$parsedHeader		Parsed header of the received document
+	 * @param	string[]			$messages			Import messages
+	 * @return	array<string,mixed>|null					Postpone result, or null when stepped over
+	 */
+	protected function resolveMissing(array $parsedHeader, array &$messages)
+	{
+		$method = new ReflectionMethod('CIIProtocol', 'resolveMissingReferencedDocument');
+		$method->setAccessible(true);
+
+		return $method->invokeArgs(new CIIProtocol($GLOBALS['db']), array('F-1', $parsedHeader, 1, 'preceding invoice of', &$messages));
 	}
 
 	/**

@@ -132,6 +132,14 @@ function einvsp_actionMetaFromUrl($url)
 		}
 		return array('label' => 'CreateProduct', 'help' => 'ActionCreateProductHelp', 'icon' => 'fa-plus-circle');
 	}
+	// SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT: an invoice with this supplier ref already exists but with a
+	// different amount. The action opens the supplier invoice list filtered on that ref. Give it its own
+	// "modify" icon and an explanatory tooltip, otherwise it falls back to a bare plus that looks like a
+	// "create" and carries no help - the operator cannot tell what to do with the blocked flow.
+	if (strpos($url, '/fourn/facture/card.php') !== false
+		|| (strpos($url, '/fourn/facture/list.php') !== false && strpos($url, 'search_refsupplier=') !== false)) {
+		return array('label' => 'ModifySupplierInvoiceShort', 'help' => 'ActionModifySupplierInvoiceHelp', 'icon' => 'fa-pen');
+	}
 	return array('label' => '', 'help' => '', 'icon' => '');
 }
 
@@ -209,7 +217,7 @@ if ($action == 'confirm_retry' && $rowid > 0 && $permissiontowrite && $confirm =
 							$manualactions[] = array('key' => $akey, 'url' => $adata['url'], 'label' => ($adata['label'] ?? ''));
 						}
 					}
-				} elseif (is_array($syncres) && !empty($syncres['actionurl'])) {
+				} elseif (is_array($syncres) && !empty($syncres['actionurl']) && $syncres['actionurl'] !== 'none') {	// 'none' = action carried only by the HTML block (bad-amount "modify invoice" link), not a real URL
 					$manualactions[] = array('key' => ($reason == 'THIRDPARTY_NOT_FOUND' ? 'createthirdparty' : 'create'), 'url' => $syncres['actionurl'], 'label' => '');
 				}
 				$actionhtml = (is_array($syncres) && !empty($syncres['action'])) ? $syncres['action'] : '';
@@ -279,6 +287,8 @@ if ($action == 'confirm_linkthirdparty' && $rowid > 0 && $permissiontowrite) {
 			setEventMessages($langs->trans("RecordNotFound"), null, 'errors');
 			$action = 'linkthirdparty';
 		} else {
+			// Societe::update() accepts a code out of the current numbering mask only when oldcopy holds it unchanged.
+			$soc->oldcopy = clone $soc;
 			// Write only the fields the user ticked on the comparison screen (apply_<key>).
 			$idmap = array('name' => 'name', 'vatnumber' => 'tva_intra', 'idprof1' => 'idprof1', 'idprof2' => 'idprof2', 'idprof3' => 'idprof3', 'email' => 'email');
 			$nbwritten = 0;
@@ -752,7 +762,9 @@ while ($i < $imaxinloop) {
 			$tip .= '<br>'.dol_escape_htmltag($rhelp);
 		}
 		if (!empty($obj->reason_message)) {
-			$tip .= '<br><br>'.dol_escape_htmltag($obj->reason_message);
+			// The protocol builds this message with <br> separators (CIIProtocol). Keep them so the tooltip
+			// shows real line breaks instead of literal "<br>"; every other tag stays escaped (only <br> passes).
+			$tip .= '<br><br>'.dol_escape_htmltag($obj->reason_message, 1, 1, 'br');
 		}
 		print $form->textwithpicto('<span class="badge badge-status1 badge-status">'.dol_escape_htmltag($short).'</span>', $tip, 1, 'warning');
 	}

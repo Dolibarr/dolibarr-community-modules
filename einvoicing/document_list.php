@@ -369,7 +369,8 @@ if (!$isSlaveEntity && getDolGlobalString('EINVOICING_PDP')) {
 	$provider = $providerManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 }
 
-if ($action == 'confirm_sync' && !$isSlaveEntity && getDolGlobalString('EINVOICING_PDP') && $confirm == 'yes') {
+// The sync creates supplier invoices and vendors: reading the list is not enough to run it.
+if ($action == 'confirm_sync' && !$isSlaveEntity && $permissiontoadd && getDolGlobalString('EINVOICING_PDP') && $confirm == 'yes') {
 	if (isset($provider)) {
 		// Sync all flows
 		$sync_result = $provider->syncFlows($syncFromDate, $maxflows);
@@ -390,6 +391,20 @@ if ($action == 'confirm_sync' && !$isSlaveEntity && getDolGlobalString('EINVOICI
 			if (!empty($sync_result['syncedFlows']) && $sync_result['syncedFlows'] > 0) {
 				// If sync was successful and we processed 1 new record, we clear the submitted date so a new one will be suggested from the last record in db.
 				$syncfromdate = 0;
+			}
+		}
+
+		// After a synchronization, remind the operator of the flows still queued for a manual action:
+		// they are errors to resolve, and are easy to miss once the run reports only its success count.
+		if (getDolGlobalInt('EINVOICING_ENABLE_MANUAL_ACTION_QUEUE')) {
+			$nbpendingqueue = 0;
+			$resqlpendingqueue = $db->query("SELECT COUNT(*) as nb FROM ".MAIN_DB_PREFIX."einvoicing_sync_pending WHERE entity IN (".getEntity('einvoicing').") AND status = 0");	// 0 = STATUS_PENDING
+			if ($resqlpendingqueue) {
+				$objpendingqueue = $db->fetch_object($resqlpendingqueue);
+				$nbpendingqueue = (int) $objpendingqueue->nb;
+			}
+			if ($nbpendingqueue > 0) {
+				setEventMessages($langs->trans("EInvoiceSyncPendingRemindAfterSync", $nbpendingqueue).' <a href="'.dol_buildpath('/einvoicing/sync_pending_list.php', 1).'">'.$langs->trans("EInvoiceSyncPending").'</a>', null, 'warnings');
 			}
 		}
 	} else {
@@ -743,6 +758,21 @@ if (!$isSlaveEntity && getDolGlobalString('EINVOICING_SHOW_MAPPING_TOOL_ON_VENDO
 	$newcardbutton .= dolGetButtonTitle($langs->trans('MapEInvoiceProducts'), '', 'fa fa-link', dol_buildpath('/einvoicing/product_mapping.php', 1), '', $permissiontoadd);
 }
 
+// Link to the manual-action queue (error management): the flows a synchronization could not import
+// because they need a manual action (missing product/thirdparty, supplier invoice with a different
+// amount) are listed there. Shown only when the queue is enabled, with the number still pending so a
+// blocked flow is not missed from this screen.
+if (getDolGlobalInt('EINVOICING_ENABLE_MANUAL_ACTION_QUEUE')) {
+	$nbpendingqueue = 0;
+	$resqlpendingqueue = $db->query("SELECT COUNT(*) as nb FROM ".MAIN_DB_PREFIX."einvoicing_sync_pending WHERE entity IN (".getEntity('einvoicing').") AND status = 0");	// 0 = STATUS_PENDING
+	if ($resqlpendingqueue) {
+		$objpendingqueue = $db->fetch_object($resqlpendingqueue);
+		$nbpendingqueue = (int) $objpendingqueue->nb;
+	}
+	$labelpendingqueue = $langs->trans('EInvoiceSyncPending').($nbpendingqueue > 0 ? ' ('.$nbpendingqueue.')' : '');
+	$newcardbutton .= dolGetButtonTitle($labelpendingqueue, '', 'fa fa-hourglass-half', dol_buildpath('/einvoicing/sync_pending_list.php', 1), '', 1);
+}
+
 $providershort = '';
 if ($provider) {
 	$providershort = preg_replace('/ViaPartner$/', '', (string) $provider->providerName);
@@ -931,9 +961,15 @@ if ($provider) {
 	print '</table>'."\n";
 
 	// Button to submit (sync manage both in and update of out invoices)
-	print '<a class="inline-block valignmiddle butAction small margintoponly marginbottomonly" href="#" id="runSyncBtn" style="margin: 0;">';
-	print img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC");
-	print '</a>'."\n";
+	if ($permissiontoadd) {
+		print '<a class="inline-block valignmiddle butAction small margintoponly marginbottomonly" href="#" id="runSyncBtn" style="margin: 0;">';
+		print img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC");
+		print '</a>'."\n";
+	} else {
+		print '<span class="inline-block valignmiddle butActionRefused classfortooltip small margintoponly marginbottomonly" style="margin: 0;" title="'.dol_escape_htmltag($langs->trans("NotEnoughPermissions")).'">';
+		print img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC");
+		print '</span>'."\n";
+	}
 
 	print '</div>';
 	print '</div>'."\n";
@@ -954,19 +990,21 @@ if ($provider) {
 
 	print "</div>\n";
 
-	print '<script>'."\n";
-	print "document.getElementById('runSyncBtn').addEventListener('click', function(e){\n";
-	print "  e.preventDefault();\n";
-	print "  var maxFlows = document.getElementById('maxflows') ? encodeURIComponent(document.getElementById('maxflows').value) : '0';\n";
-	print "  var token = encodeURIComponent('".newToken()."');\n";
-	print "  var lastSyncDatetimehour = document.getElementById('last_sync_datetimehour') ? encodeURIComponent(document.getElementById('last_sync_datetimehour').value) : '0';\n";
-	print "  var lastSyncDatetimemin = document.getElementById('last_sync_datetimemin') ? encodeURIComponent(document.getElementById('last_sync_datetimemin').value) : '0';\n";
-	print "  var lastSyncDatetimemonth = document.getElementById('last_sync_datetimemonth') ? encodeURIComponent(document.getElementById('last_sync_datetimemonth').value) : '0';\n";
-	print "  var lastSyncDatetimeday = document.getElementById('last_sync_datetimeday') ? encodeURIComponent(document.getElementById('last_sync_datetimeday').value) : '0';\n";
-	print "  var lastSyncDatetimeyear = document.getElementById('last_sync_datetimeyear') ? encodeURIComponent(document.getElementById('last_sync_datetimeyear').value) : '0';\n";
-	print "  window.location.href = '".$_SERVER["PHP_SELF"]."?action=sync&maxflows=' + maxFlows + '&last_sync_datetimehour=' + lastSyncDatetimehour + '&last_sync_datetimemin=' + lastSyncDatetimemin + '&last_sync_datetimemonth=' + lastSyncDatetimemonth + '&last_sync_datetimeday=' + lastSyncDatetimeday + '&last_sync_datetimeyear=' + lastSyncDatetimeyear + '&token=' + token;\n";
-	print "});\n";
-	print "</script>\n";
+	if ($permissiontoadd) {
+		print '<script>'."\n";
+		print "document.getElementById('runSyncBtn').addEventListener('click', function(e){\n";
+		print "  e.preventDefault();\n";
+		print "  var maxFlows = document.getElementById('maxflows') ? encodeURIComponent(document.getElementById('maxflows').value) : '0';\n";
+		print "  var token = encodeURIComponent('".newToken()."');\n";
+		print "  var lastSyncDatetimehour = document.getElementById('last_sync_datetimehour') ? encodeURIComponent(document.getElementById('last_sync_datetimehour').value) : '0';\n";
+		print "  var lastSyncDatetimemin = document.getElementById('last_sync_datetimemin') ? encodeURIComponent(document.getElementById('last_sync_datetimemin').value) : '0';\n";
+		print "  var lastSyncDatetimemonth = document.getElementById('last_sync_datetimemonth') ? encodeURIComponent(document.getElementById('last_sync_datetimemonth').value) : '0';\n";
+		print "  var lastSyncDatetimeday = document.getElementById('last_sync_datetimeday') ? encodeURIComponent(document.getElementById('last_sync_datetimeday').value) : '0';\n";
+		print "  var lastSyncDatetimeyear = document.getElementById('last_sync_datetimeyear') ? encodeURIComponent(document.getElementById('last_sync_datetimeyear').value) : '0';\n";
+		print "  window.location.href = '".$_SERVER["PHP_SELF"]."?action=sync&maxflows=' + maxFlows + '&last_sync_datetimehour=' + lastSyncDatetimehour + '&last_sync_datetimemin=' + lastSyncDatetimemin + '&last_sync_datetimemonth=' + lastSyncDatetimemonth + '&last_sync_datetimeday=' + lastSyncDatetimeday + '&last_sync_datetimeyear=' + lastSyncDatetimeyear + '&token=' + token;\n";
+		print "});\n";
+		print "</script>\n";
+	}
 } elseif (!$isSlaveEntity) {
 	// Message to check module configuration
 	print info_admin($langs->transnoentities("checkEInvoicingModuleConfiguration"), 0, 0, '1', '', '', 'warning');
@@ -974,7 +1012,7 @@ if ($provider) {
 
 
 // Confirmation dialog
-if ($action == 'sync' && $provider) {
+if ($action == 'sync' && $provider && $permissiontoadd) {
 	$validationFormError = 0;
 
 	if ($maxflows < 0) {
@@ -1222,7 +1260,8 @@ foreach ($object->fields as $key => $val) {
 	}
 	$cssforfield = preg_replace('/small\s*/', '', $cssforfield);	// the 'small' css must not be used for the title label
 	if (!empty($arrayfields['t.'.$key]['checked'])) {
-		$sortablefield = ($key == 'thirdparty' ? 'thirdparty_name' : 't.'.$key);
+		// recap is built for display and is not a column of the table: its title must not be a sort link.
+		$sortablefield = ($key == 'recap' ? '' : ($key == 'thirdparty' ? 'thirdparty_name' : 't.'.$key));
 		print getTitleFieldOfList($arrayfields['t.'.$key]['label'], 0, $_SERVER['PHP_SELF'], $sortablefield, '', $param, ($cssforfield ? 'class="'.$cssforfield.'"' : ''), $sortfield, $sortorder, ($cssforfield ? $cssforfield.' ' : ''), 0, (empty($val['helplist']) ? '' : $val['helplist']))."\n";
 		$totalarray['nbfield']++;
 	}

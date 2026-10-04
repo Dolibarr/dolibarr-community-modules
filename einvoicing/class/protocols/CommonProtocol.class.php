@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2025-2026       Laurent Destailleur         <eldy@users.sourceforge.net>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  * Copyright (C) 2025-2026       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
@@ -646,31 +647,73 @@ trait CommonProtocol
 		// Step 2: Try to find using VAT number if not found by global IDs
 		if ($thirdpartyId < 0) {
 			if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
-				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape(removeAllSpaces($sellerInfo['sellerTaxRegistations']['VA'])) . "' AND entity IN (". getEntity('societe').")";
+				$sql = "SELECT rowid, siret FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape(removeAllSpaces($sellerInfo['sellerTaxRegistations']['VA'])) . "' AND entity IN (". getEntity('societe').")";
 				$resql = $db->query($sql);
 				if ($resql) {
 					if ($db->num_rows($resql) > 1) {
-						dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error: Multiple thirdparties found for VAT number: ' . $sellerInfo['sellerTaxRegistations']['VA'], LOG_ERR);
-						$obj1 = $db->fetch_object($resql);
-						$obj2 = $db->fetch_object($resql);
+						// Several thirdparties can legitimately share one VAT number: in France it is
+						// derived from the SIREN alone (FR + 2 check digits + SIREN), so different
+						// établissements (same SIREN, different SIRET) of one legal entity collide here.
+						// Try the SIRET carried by the document to pick the right établissement before
+						// treating this as an unresolved data-quality duplicate.
+						$candidates = array();
+						while ($obj = $db->fetch_object($resql)) {
+							$candidates[] = $obj;
+						}
 
-						// Create URL to prefill thirdparty creation form
-						$createUrl = DOL_URL_ROOT . '/societe/list.php?type=f&search_vat='.urlencode($sellerInfo['sellerTaxRegistations']['VA']);
-						$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
+						$sellerSiret = $this->_extractSellerSiret($sellerInfo, $sellerCountryCode);
+						$matchedCandidate = null;
+						$severalCandidatesMatchSiret = false;
+						if ($sellerSiret !== '') {
+							foreach ($candidates as $candidate) {
+								if (!empty($candidate->siret) && removeAllSpaces($candidate->siret) === $sellerSiret) {
+									if ($matchedCandidate !== null) {
+										$severalCandidatesMatchSiret = true;
+										break;
+									}
+									$matchedCandidate = $candidate;
+								}
+							}
+						}
 
-						$action = $langs->trans('CheckSuppliersWithDuplicateCode', $sellerInfo['sellerTaxRegistations']['VA']);
-						$action .= '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
-						$action .= '<i class="fas fa-plus-circle"></i> ';
-						$action .= $langs->trans('CheckSuppliers');
-						$action .= '</a>';
+						if ($matchedCandidate !== null && !$severalCandidatesMatchSiret) {
+							$result = $thirdparty->fetch($matchedCandidate->rowid);
+							if ($result > 0) {
+								$thirdpartyId = $thirdparty->id;
+								$matchedByStructuredIdentifier = true;
+								dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller VAT number ' . $sellerInfo['sellerTaxRegistations']['VA'] . ' shared by ' . count($candidates) . ' thirdparties, disambiguated by SIRET ' . $sellerSiret . ': ' . $thirdpartyId);
+							}
+						} elseif ($sellerSiret !== '' && !$severalCandidatesMatchSiret) {
+							// The document's SIRET matches none of the établissements sharing this VAT
+							// number: most likely a new établissement of the same entity. Do not block
+							// the import on it, let step 3/4 below handle it (name match or creation).
+							dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller VAT number ' . $sellerInfo['sellerTaxRegistations']['VA'] . ' shared by ' . count($candidates) . ' thirdparties, none matches document SIRET ' . $sellerSiret . '; not treated as a blocking duplicate', LOG_WARNING);
+						} else {
+							// No SIRET on the document to disambiguate with, or several candidates share
+							// the same SIRET: genuine ambiguity, cannot safely resolve it.
+							dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error: Multiple thirdparties found for VAT number: ' . $sellerInfo['sellerTaxRegistations']['VA'], LOG_ERR);
 
-						return array(
-							'res' => -1,
-							'message' => $langs->trans("SuppliersWithDuplicateVATCode", $sellerInfo['sellerTaxRegistations']['VA']),	// Can be a technical message. The business one is defined into the syncFlows() of the provider.
-							'actioncode' => 'THIRDPARTY_DUPLICATE_VAT',
-							'action' => $action,
-							'actiondata' => array('thirdpartyid1' => $obj1->rowid, 'thirdpartyid2' => $obj2->rowid, 'vatnumber' => $sellerInfo['sellerTaxRegistations']['VA'])
-						);
+							$obj1 = $candidates[0];
+							$obj2 = $candidates[1];
+
+							// Create URL to prefill thirdparty creation form
+							$createUrl = DOL_URL_ROOT . '/societe/list.php?type=f&search_vat='.urlencode($sellerInfo['sellerTaxRegistations']['VA']);
+							$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
+
+							$action = $langs->trans('CheckSuppliersWithDuplicateCode', $sellerInfo['sellerTaxRegistations']['VA']);
+							$action .= '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+							$action .= '<i class="fas fa-plus-circle"></i> ';
+							$action .= $langs->trans('CheckSuppliers');
+							$action .= '</a>';
+
+							return array(
+								'res' => -1,
+								'message' => $langs->trans("SuppliersWithDuplicateVATCode", $sellerInfo['sellerTaxRegistations']['VA']),	// Can be a technical message. The business one is defined into the syncFlows() of the provider.
+								'actioncode' => 'THIRDPARTY_DUPLICATE_VAT',
+								'action' => $action,
+								'actiondata' => array('thirdpartyid1' => $obj1->rowid, 'thirdpartyid2' => $obj2->rowid, 'vatnumber' => $sellerInfo['sellerTaxRegistations']['VA'])
+							);
+						}
 					} elseif ($db->num_rows($resql) === 1) {
 						$obj = $db->fetch_object($resql);
 						$result = $thirdparty->fetch($obj->rowid);
@@ -786,7 +829,7 @@ trait CommonProtocol
 			dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Updating existing thirdparty (client status'.(getDolGlobalString('EINVOICING_THIRDPARTIES_COMPLETE_INFO') ? ' + other info' : '').'): ' . $thirdpartyId);
 
 			$thirdparty = new Societe($db);
-			$thirdparty->fetch($thirdpartyId);
+			$this->_fetchThirdpartyForImportUpdate($thirdparty, $thirdpartyId);
 
 			// Update thirdparty information based on priority
 			if (getDolGlobalInt('EINVOICING_THIRDPARTIES_COMPLETE_INFO')) {
@@ -904,7 +947,7 @@ trait CommonProtocol
 				$completionError = implode(', ', array_filter(array_merge(array($thirdparty->error), $thirdparty->errors)));
 
 				$plainthirdparty = new Societe($db);
-				if ($plainthirdparty->fetch($thirdpartyId) > 0) {
+				if ($this->_fetchThirdpartyForImportUpdate($plainthirdparty, $thirdpartyId) > 0) {
 					$allowmodcodeclient = 0;
 					$allowmodcodefournisseur = 0;
 					$this->_prepareThirdpartyForImportUpdate($plainthirdparty, $allowmodcodeclient, $allowmodcodefournisseur);
@@ -1083,6 +1126,15 @@ trait CommonProtocol
 			// Create URL to prefill thirdparty creation form
 			$createUrl = DOL_URL_ROOT . '/societe/card.php?action=create&type=f';
 			if (!empty($createParams)) {
+				// The Dolibarr GET firewall (analyseVarsForSqlAndScriptsInjection) rejects " < > in any URL
+				// parameter, so a seller name/address carrying them would 403 before the prefilled creation
+				// form even opens. Use the core helper (replaces " with ' and removes < >, identical from
+				// v18 to v25) to drop them from the prefill - a convenience the operator reviews and edits.
+				foreach ($createParams as $cpKey => $cpVal) {
+					if (is_string($cpVal)) {
+						$createParams[$cpKey] = dol_string_nospecial($cpVal, "'", array('"'), array('<', '>'));
+					}
+				}
 				$createUrl .= '&' . http_build_query($createParams);
 			}
 			$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
@@ -1189,6 +1241,23 @@ trait CommonProtocol
 		} else {
 			dol_syslog(get_class($this) . '::_setThirdpartyCountryFromCode Unknown country code in document: ' . $countrycode, LOG_WARNING);
 		}
+	}
+
+	/**
+	 * Load a thirdparty found in Dolibarr for the update done when a document is imported.
+	 *
+	 * @param	Societe	$thirdparty		Thirdparty to load
+	 * @param	int		$thirdpartyId	Id of the thirdparty
+	 * @return	int						Result of Societe::fetch()
+	 */
+	private function _fetchThirdpartyForImportUpdate($thirdparty, $thirdpartyId)
+	{
+		$result = $thirdparty->fetch($thirdpartyId);
+		// Societe::update() accepts a code out of the current numbering mask only when oldcopy holds it
+		// unchanged. A plain clone: dol_clone() of Dolibarr 24 drops the null properties update() reads.
+		$thirdparty->oldcopy = clone $thirdparty;
+
+		return $result;
 	}
 
 	/**
@@ -1584,6 +1653,15 @@ trait CommonProtocol
 			// Create URL to prefill product creation form
 			$createUrl = DOL_URL_ROOT . '/product/card.php?action=create';
 			if (!empty($createParams)) {
+				// The Dolibarr GET firewall (analyseVarsForSqlAndScriptsInjection) rejects " < > in any URL
+				// parameter, so a line label/description carrying them would 403 before the prefilled creation
+				// form even opens. Use the core helper (replaces " with ' and removes < >, identical from
+				// v18 to v25) to drop them from the prefill - a convenience the operator reviews and edits.
+				foreach ($createParams as $cpKey => $cpVal) {
+					if (is_string($cpVal)) {
+						$createParams[$cpKey] = dol_string_nospecial($cpVal, "'", array('"'), array('<', '>'));
+					}
+				}
 				$createUrl .= '&' . http_build_query($createParams);
 			}
 			$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
@@ -1650,6 +1728,31 @@ trait CommonProtocol
 				'allactiondata' => $allactiondata	// Array with all actions
 			);
 		}
+	}
+
+
+	/**
+	 * Extract a SIRET from the seller's global identifiers (sellerGlobalIds / sellerLegalOrgId), the
+	 * only identifier precise enough to tell apart two établissements of one French entity that share
+	 * a single VAT number (the number is derived from the SIREN alone, not the SIRET).
+	 *
+	 * @param	array<string,mixed>	$sellerInfo	Seller information extracted from the e-invoice
+	 * @param	string	$sellerCountryCode	Country code of the seller
+	 * @return	string						Cleaned SIRET (no spaces), '' when the document carries none
+	 */
+	private function _extractSellerSiret($sellerInfo, $sellerCountryCode)
+	{
+		if (empty($sellerInfo['sellerGlobalIds']) || !is_array($sellerInfo['sellerGlobalIds'])) {
+			return '';
+		}
+
+		foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
+			if (!empty($globalId) && $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId) === 'idprof2') {
+				return removeAllSpaces($globalId);
+			}
+		}
+
+		return '';
 	}
 
 
@@ -2066,7 +2169,7 @@ trait CommonProtocol
 				// registration identifier (BT-32), the buyer with its VAT identifier (BT-48) or its legal
 				// registration identifier (BT-47). Reporting it here names the record to complete; left to the
 				// Schematron it comes back from the platform as a rejected document.
-				$buyerThirdparty = empty($buyer->thirdparty) ? null : $buyer->thirdparty;
+				$buyerThirdparty = empty($buyer->thirdparty) ? null : $buyer->thirdparty;	// @phpstan-ignore empty.property (Dolibarr 18 documents $thirdparty as always set, it stays empty until fetch_thirdparty())
 				if (empty($seller->tva_intra) && empty($seller->idprof1)) {
 					throw new Exception('BADVATNUMBER[BR-AE-02]: The VAT number or the professional id of the seller '.$seller->name.' is mandatory when a line is invoiced under the reverse charge (VAT category AE).');
 				}

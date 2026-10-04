@@ -1613,7 +1613,7 @@ class Document extends CommonObject
 			// it re-lists that are already stored are cheaply discarded by the alreadyProcessedFlowIds
 			// pre-check in syncFlows(), which queries only the flowIds of the current listing.
 			$syncFromDate = $provider->getLastSyncDate(getDolGlobalInt('EINVOICING_SYNC_MARGIN_TIME_HOURS'));
-			$maxflows = getDolGlobalInt('EINVOICING_FLOWS_SYNC_CRON_SIZE', 100);
+			$maxflows = self::getCronSyncBatchSize();
 
 			// Sync all flows
 			$sync_result = $provider->syncFlows($syncFromDate, $maxflows);
@@ -1667,6 +1667,16 @@ class Document extends CommonObject
 		dol_syslog(__METHOD__." end", LOG_INFO);
 
 		return $error ?: 0;
+	}
+
+	/**
+	 * The hidden EINVOICING_FLOWS_SYNC_CRON_SIZE must keep falling back on EINVOICING_FLOWS_SYNC_CALL_SIZE, the admin setting.
+	 *
+	 * @return int	Number of flows the scheduled sync asks for
+	 */
+	public static function getCronSyncBatchSize()
+	{
+		return getDolGlobalInt('EINVOICING_FLOWS_SYNC_CRON_SIZE', getDolGlobalInt('EINVOICING_FLOWS_SYNC_CALL_SIZE', 100));
 	}
 
 	/**
