@@ -80,6 +80,23 @@ class TransmittedLockTest extends CommonClassTest
 		unset($conf->global->EINVOICING_ALLOW_RESEND_TRANSMITTED);
 
 		$db->query("DELETE FROM " . $db->prefix() . "einvoicing_extlinks WHERE element_id = " . (int) self::TEST_ELEMENT_ID);
+		$db->query("DELETE FROM " . $db->prefix() . "einvoicing_lifecycle_msg WHERE element_id = " . (int) self::TEST_ELEMENT_ID);
+	}
+
+	/**
+	 * Record a lifecycle status received for the test invoice, the way the CDAR import stores it.
+	 *
+	 * @param 	int 	$code 		Status code
+	 * @param 	string 	$reason 	Reason code
+	 * @param 	string 	$roles 		RoleCodes the status was addressed to
+	 * @return 	void
+	 */
+	private function received($code, $reason = '', $roles = 'SE')
+	{
+		global $db;
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertGreaterThan(0, $einvoicing->storeStatusMessage(self::TEST_ELEMENT_ID, 'facture', $code, '', 'in', 'ie_' . (int) $code, '', '', null, $reason, $roles), (string) $db->lasterror());
 	}
 
 	/**
@@ -165,8 +182,8 @@ class TransmittedLockTest extends CommonClassTest
 	}
 
 	/**
-	 * A rejected invoice stays locked too: the platform keeps the flow it already registered under that
-	 * reference, so re-sending the same reference is refused whatever the outcome of the first send.
+	 * A submission that failed stays locked as long as no rejection at emission is received: until the
+	 * platform says it refused the invoice, it may hold it, and re-sending the same reference is refused.
 	 *
 	 * @return void
 	 */
@@ -180,6 +197,83 @@ class TransmittedLockTest extends CommonClassTest
 
 		$einvoicing = new EInvoicing($db);
 		$this->assertTrue($einvoicing->isTransmittedLockActive(self::TEST_ELEMENT_ID, 'TEST-LOCK-0001'));
+	}
+
+	/**
+	 * The seller's AP rejected the invoice at emission (XP Z12-014 annex A 2.2): it was never deposited,
+	 * so the platform accepts the corrected document under the same number. Regenerating it resets the
+	 * status to GENERATED, and it must stay sendable then too. The invoice itself stays locked.
+	 *
+	 * @return void
+	 */
+	public function testRejectedAtEmissionIsNotLocked()
+	{
+		global $db;
+
+		$this->statusFor('i_708390', EInvoicing::STATUS_REJECTED);
+		$this->received(EInvoicing::STATUS_REJECTED, 'REJ_SEMAN', 'SE');
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertTrue($einvoicing->isOnlyRejectedAtEmission(self::TEST_ELEMENT_ID));
+		$this->assertFalse($einvoicing->isSendLocked(self::TEST_ELEMENT_ID, 'TEST-LOCK-0001'));
+		$this->assertTrue($einvoicing->isTransmittedLockActive(self::TEST_ELEMENT_ID, 'TEST-LOCK-0001'), 'the invoice itself stays locked: its number was reported with the rejection');
+
+		$einvoicing->insertOrUpdateExtLink(self::TEST_ELEMENT_ID, 'facture', '', EInvoicing::STATUS_GENERATED, 'TEST-LOCK-0001');
+		$this->assertFalse($einvoicing->isSendLocked(self::TEST_ELEMENT_ID, 'TEST-LOCK-0001'), 'regenerating the rejected invoice must not lock its sending again');
+	}
+
+	/**
+	 * A rejection recorded before the recipients were stored names no one: without any status proving a
+	 * deposit, it is read as the seller's AP refusing the invoice at emission.
+	 *
+	 * @return void
+	 */
+	public function testRejectionWithoutRecipientsIsNotLocked()
+	{
+		global $db;
+
+		$this->statusFor('i_708390', EInvoicing::STATUS_REJECTED);
+		$this->received(EInvoicing::STATUS_REJECTED, 'REJ_SEMAN', '');
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertFalse($einvoicing->isSendLocked(self::TEST_ELEMENT_ID, 'TEST-LOCK-0001'));
+	}
+
+	/**
+	 * Every rejection the platform still holds a copy of keeps the lock, since sending the same number
+	 * again only comes back as a duplicate: DOUBLON, a rejection addressed to the buyer (annex A 2.4),
+	 * a rejection after the platform deposited the invoice, and a corrected invoice accepted since.
+	 *
+	 * @return array<string,array{0:array<int,array{0:int,1:string,2:string}>}>
+	 */
+	public static function rejectionsStillHeldByThePlatform()
+	{
+		return array(
+			'duplicate' => array(array(array(EInvoicing::STATUS_REJECTED, 'DOUBLON', 'SE'))),
+			'rejected by the buyer AP' => array(array(array(EInvoicing::STATUS_REJECTED, 'REJ_SEMAN', 'SE,BY'))),
+			'rejected after deposit' => array(array(array(200, '', 'SE'), array(201, '', 'SE'), array(EInvoicing::STATUS_REJECTED, 'REJ_SEMAN', 'SE'))),
+			'accepted once corrected' => array(array(array(EInvoicing::STATUS_REJECTED, 'REJ_SEMAN', 'SE'), array(200, '', 'SE'), array(201, '', 'SE'))),
+		);
+	}
+
+	/**
+	 * @dataProvider rejectionsStillHeldByThePlatform
+	 *
+	 * @param 	array<int,array{0:int,1:string,2:string}> 	$statuses 	Statuses received, oldest first
+	 * @return 	void
+	 */
+	public function testRejectionStillHeldByThePlatformStaysLocked($statuses)
+	{
+		global $db;
+
+		$this->statusFor('i_708390', EInvoicing::STATUS_REJECTED);
+		foreach ($statuses as $status) {
+			$this->received($status[0], $status[1], $status[2]);
+		}
+
+		$einvoicing = new EInvoicing($db);
+		$this->assertFalse($einvoicing->isOnlyRejectedAtEmission(self::TEST_ELEMENT_ID));
+		$this->assertTrue($einvoicing->isSendLocked(self::TEST_ELEMENT_ID, 'TEST-LOCK-0001'));
 	}
 
 	/**
