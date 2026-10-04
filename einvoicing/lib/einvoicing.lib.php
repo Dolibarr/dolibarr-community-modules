@@ -1359,13 +1359,14 @@ function einvoicingDiagnosticPreviewLink($fileName)
 /**
  * Returns the active and usable UNTDID codes for extra entrie
  *
- * @param DoliDB $db
- * @param Translate $langs
- * @param int $entity
- * @param array<int,string> $excludedCodes
- * @return array<string,array{rowid:int,code:string,label:string}>
+ * @param   DoliDB              $db             Database handler
+ * @param   Translate           $langs          Translation
+ * @param   int                 $entity         Entity
+ * @param   array<int,string>   $excludedCodes  Code exclude already managed
+ * @return  array<string,array{rowid:int,code:string,label:string}>
  */
-function einvoicingGetActiveUntdid4451Codes($db, $langs, $entity, array $excludedCodes = array()) {
+function einvoicingGetActiveUntdid4451Codes($db, $langs, $entity, array $excludedCodes = array())
+{
 	$result = array();
 	$sql = 'SELECT rowid, code, label, position';
 	$sql .= ' FROM '.MAIN_DB_PREFIX.'c_einvoicing_untdid4451';
@@ -1375,7 +1376,7 @@ function einvoicingGetActiveUntdid4451Codes($db, $langs, $entity, array $exclude
 
 	$resql = $db->query($sql);
 	if (!$resql) {
-		dol_syslog(__METHOD__.' SQL error: '.$db->lasterror(), LOG_ERR);
+		dol_syslog('einvoicingGetActiveUntdid4451Codes SQL error: '.$db->lasterror(), LOG_ERR);
 		return $result;
 	}
 
@@ -1405,13 +1406,14 @@ function einvoicingGetActiveUntdid4451Codes($db, $langs, $entity, array $exclude
 /**
  * Check to see if a code is active in the UNTDID 4451 dictionary.
  *
- * @param DoliDB $db
- * @param string $code
- * @param int $entity
- * @param array<int,string> $excludedCodes
- * @return bool
+ * @param   DoliDB              $db             Database handler
+ * @param   string              $code           Code
+ * @param   int                 $entity         Entity
+ * @param   array<int,string>   $excludedCodes  Code exclude already managed
+ * @return  bool
  */
-function einvoicingIsActiveUntdid4451Code($db, $code, $entity, array $excludedCodes = array()) {
+function einvoicingIsActiveUntdid4451Code($db, $code, $entity, array $excludedCodes = array())
+{
 	$code = strtoupper(trim((string) $code));
 
 	if (!preg_match('/^[A-Z0-9]{3}$/', $code)) {
@@ -1425,17 +1427,14 @@ function einvoicingIsActiveUntdid4451Code($db, $code, $entity, array $excludedCo
 	$sql = 'SELECT rowid';
 	$sql .= ' FROM '.MAIN_DB_PREFIX.'c_einvoicing_untdid4451';
 	$sql .= " WHERE code = '".$db->escape($code)."'";
+	$sql .= " entity IN (0, '.((int) $entity).')";
 	$sql .= ' AND active = 1';
 	$sql .= $db->plimit(1);
 
 	$resql = $db->query($sql);
 
 	if (!$resql) {
-		dol_syslog(
-			__METHOD__.' SQL error: '.$db->lasterror(),
-			LOG_ERR
-		);
-
+		dol_syslog('einvoicingIsActiveUntdid4451Code SQL error: '.$db->lasterror(), LOG_ERR);
 		return false;
 	}
 
