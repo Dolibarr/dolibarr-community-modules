@@ -552,10 +552,11 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 	 * Call CIIProtocol::resolveLineAmounts() through reflection, the same way LineWithoutQuantityTest
 	 * does: it is what tells whether the line the import is about to write rebuilds BT-131.
 	 *
-	 * @param	array	$parsedLine		One line as parseInvoiceLines() returns it
-	 * @param	float	$qty			Quantity read from the document
-	 * @param	float	$subprice		Unit price resolved by the caller
-	 * @param	float	$remisePercent	Discount percent resolved by the caller
+	 * @param	array	$parsedLine			One line as parseInvoiceLines() returns it
+	 * @param	float	$qty				Quantity read from the document
+	 * @param	float	$subprice			Unit price resolved by the caller
+	 * @param	float	$remisePercent		Discount percent resolved by the caller
+	 * @param	bool	$mergeLineCharges	True when the line's charges are folded into its description (issue #969)
 	 * @return	array{qty:float,subprice:float,remise_percent:float,warning:string}	What the import would store
 	 */
 	private function amounts(array $parsedLine, $qty, $subprice, $remisePercent = 0.0, $mergeLineCharges = false)
