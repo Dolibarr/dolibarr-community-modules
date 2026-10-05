@@ -312,7 +312,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->helpText = $langs->transnoentities('EINVOICING_MAX_FILE_SIZE_MB_HELP');
 	$item->cssClass = 'maxwidth100';
 	$item->fieldAttr['type'] = 'number';
-	$item->fieldAttr['min'] = '0';
+	$item->fieldAttr['min'] = 0;
 	$item->fieldAttr['step'] = '0.1';
 
 	// The three notices below are never sent empty: the generation falls back on the translations the
