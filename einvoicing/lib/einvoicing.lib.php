@@ -532,15 +532,15 @@ if (!function_exists('einvoicingDolGetButtonActionDropdown')) {
 }
 
 /**
- * Url for the 'url' key of a dropdown entry of dolGetButtonAction(), which every core prefixes with DOL_URL_ROOT.
+ * Url for the 'url' key of a dropdown entry, which Dolibarr 18 and 19 prefix with DOL_URL_ROOT.
  *
- * @param	string	$url		Url as dol_buildpath() returns it with type 1
- * @param	string	$urlroot	Prefix the core puts in front of the url
- * @return	string				Url without that prefix
+ * @param	string	$url			Url as dol_buildpath() returns it with type 1
+ * @param	string	$dolurlroot		Value of DOL_URL_ROOT
+ * @return	string					Url without DOL_URL_ROOT
  */
-function einvoicingDropdownEntryUrl($url, $urlroot = DOL_URL_ROOT)
+function einvoicingDropdownEntryUrl($url, $dolurlroot = DOL_URL_ROOT)
 {
-	return (string) preg_replace('/^' . preg_quote($urlroot, '/') . '/', '', $url);
+	return (string) preg_replace('/^' . preg_quote($dolurlroot, '/') . '/', '', $url);
 }
 
 
