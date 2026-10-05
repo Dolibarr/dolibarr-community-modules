@@ -7,24 +7,10 @@
 ModuleEInvoicingName = EInvoicing
 ModuleEInvoicingDesc = Gestion des factures électroniques. Ce module permet de générer (automatiquement ou manuellement) des factures au format électronique et de les envoyer à une Plateforme Agréée (PA, anciennement PDP) pour la facturation électronique. Il permet également de récupérer les factures d'achat auprès de cette PA. Seuls certains pays (France) et certaines PA sont prises en charge.
 
-# Keys of the core that the supported cores do not all carry: absent from 18 (RefSupplierBill), 18-19
-# (AccessToken, Message), 18-21 (Automatic, Input, Output), 18-22 (InvoiceType) or 18-23 (the rest).
-AccessToken=Jeton d'accès
-Message=Message
-RefSupplierBill=Référence de la facture fournisseur
-Automatic=Automatique
-ErrorThirdPartyNotFound=Erreur : tiers introuvable
-Input=Saisie
-InvoiceType=Type de facture
-Output=Sortie
-Success=Succès
-VATExemptionCode=Code d'exonération de la TVA
-
 #
 # Admin page
 #
 EInvoicingSetup = Configuration du module Facture électronique
-Settings = Paramètres
 EInvoicingSetupPage = Configuration de l'accès à la Plateforme Agréée. Vous devez sélectionner ici la Plateforme Agréée choisie par votre entreprise.
 NewSection=Nouvelle section
 
@@ -32,7 +18,6 @@ NewSection=Nouvelle section
 #
 # About page
 #
-About = À propos
 EInvoicingAbout = À propos de EInvoicing
 EInvoicingAboutPage = Page À propos de EInvoicing
 
@@ -152,7 +137,6 @@ RoutingIdInfo=Libellé (facultatif)
 FailedToSaveRoutingID=Impossible d'enregistrer l'adresse de routage
 FailedToDeleteRoutingID=Échec de la suppression de l'adresse de routage
 FailedToSetDefaultRoutingID=Impossible de définir l'adresse de routage par défaut
-SetAsDefault=Définir comme valeur par défaut
 FxCheckErrorRoutingID=Votre entreprise ne dispose pas d'une adresse de facturation électronique valide.
 FxCheckErrorRoutingIDFR=Vous avez définie une adresse de facture électronique spécifique. En France, une telle adresse doit être votre SIREN ou commencer par le SIREN, ce qui ne semble pas le cas.
 sendToPDP=Transmettre
@@ -194,7 +178,6 @@ EINVOICING_DEBUG=Déboguer
 EINVOICING_DEBUG_MODE=Conserver le détail complet des appels API dans l'historique
 EINVOICING_DEBUG_MODE_HELP=Activez le mode débogage pour consigner tous les détails des appels de synchronisation à des fins de dépannage (mode détaillé). Notez que les appels de synchronisation peuvent prendre plus de temps lorsque ce mode est activé.
 DateSyncro=Date de synchronisation
-Status=Statut
 call_id=Identification de l'appelant
 flow_id=ID de flux
 FlowId=ID du flux
@@ -750,7 +733,6 @@ EntityNumber=Numéro d'entité
 ConfirmChangeEntity=Êtes-vous sûr de vouloir déplacer la facture fournisseur <b>%s</b> vers une autre entité ?
 EntityChangedSuccess=Facture fournisseur transférée à l'entité %s
 ErrorEntityRequired=Un numéro d'entité valide est requis.
-DisabledBecauseNotEditable=Cette facture n'est pas modifiable.
 ErrorSupplierNotVisibleInEntity=Le fournisseur « %s » n'est pas visible dans l'entité « %s ». Vous devez d'abord le partager ou le créer dans l'entité cible.
 WarningEntityChangedFileMoveFailed=L'entité a été modifiée, mais les fichiers de factures n'ont pas pu être déplacés vers le répertoire de la nouvelle entité. Vous devrez peut-être les déplacer manuellement.
 EInvoicingInfoManagedByMasterSetup=La configuration de la facturation électronique est gérée par l'entité principale (ID %s)
@@ -850,17 +832,14 @@ SelectAThirdParty=Sélectionner un tiers
 OverwriteExistingIds=Écraser les identifiants existants
 OverwriteExistingIdsHelp=Si le tiers possède déjà un SIREN / SIRET / numéro de TVA différent, l'écraser (uniquement s'il s'agit réellement de la même entité).
 Associate=Associer
-SelectAThirdPartyFirst=Sélectionnez d'abord un tiers.
 ThirdpartyIdConflictWarning=Le tiers "%s" possède déjà des identifiants différents. Vérifiez qu'il s'agit bien de la même entité, puis activez « Écraser » pour confirmer :
 ThirdpartyLinkedAndFlowSynchronized=Tiers "%s" mis à jour et flux %s synchronisé.
 ThirdpartyLinkedButFlowStillPending=Tiers "%s" mis à jour, mais le flux nécessite toujours une action.
 ThirdpartyUpdatedButNoProvider=Tiers "%s" mis à jour, mais aucune plateforme agréée active pour relancer la synchronisation.
 CompareFields=Comparer les champs
 CompareFieldsIntro=Cochez les champs à inscrire sur le tiers à partir de la facture. Les identifiants vides sont précochés ; les conflits (une valeur différente) restent décochés - ne les cochez que s'il s'agit réellement de la même entité.
-Field=Champ
 ValueFromInvoice=Valeur (facture)
 CurrentThirdpartyValue=Valeur actuelle (tiers)
-Apply=Appliquer
 Identical=Identique
 Empty=Vide
 Overwrite=Remplacer

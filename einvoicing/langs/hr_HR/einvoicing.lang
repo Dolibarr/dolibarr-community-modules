@@ -7,24 +7,10 @@
 ModuleEInvoicingName = Elektroničko fakturiranje
 ModuleEInvoicingDesc = Support for E-invoice management. This module allows generating (automatically or manually) invoices in E-invoice format and send them to an E-invoice Access Point. It can also retrieve purchase invoices from this E-invoice Access Point. Only a few countries (France) and Access Points (also called PDP/PA) are supported.
 
-# Keys of the core that the supported cores do not all carry: absent from 18 (RefSupplierBill), 18-19
-# (AccessToken, Message), 18-21 (Automatic, Input, Output), 18-22 (InvoiceType) or 18-23 (the rest).
-AccessToken=Access Token
-Message=Message
-RefSupplierBill=Supplier invoice ref
-Automatic=Automatic
-ErrorThirdPartyNotFound=Error ThirdParty Not Found
-Input=Input
-InvoiceType=Invoice type
-Output=Output
-Success=Success
-VATExemptionCode=VAT exemption code
-
 #
 # Admin page
 #
 EInvoicingSetup = Postavljanje modula E-račun
-Settings = Postavke
 EInvoicingSetupPage = Postavljanje pristupne točke. Ovdje morate odabrati pristupnu točku koju ste pretplatili kao službenu pristupnu točku za svoju tvrtku.
 NewSection=Novi odjeljak
 
@@ -32,7 +18,6 @@ NewSection=Novi odjeljak
 #
 # About page
 #
-About = O modulu
 EInvoicingAbout = O E-računima
 EInvoicingAboutPage = Stranica o elektroničkom fakturiranju
 
@@ -156,7 +141,6 @@ RoutingIdInfo=Label (optional)
 FailedToSaveRoutingID=Failed to save routing address
 FailedToDeleteRoutingID=Failed to delete routing address
 FailedToSetDefaultRoutingID=Failed to set default routing address
-SetAsDefault=Set as default
 FxCheckErrorRoutingID=Your company does not have a valid E-invoicing address.
 FxCheckErrorRoutingIDFR=In France, the E-invoice address must be or start with the SIREN.
 sendToPDP=Prijenos
@@ -198,7 +182,6 @@ EINVOICING_DEBUG=Debug
 EINVOICING_DEBUG_MODE=Store full detail of API calls in history
 EINVOICING_DEBUG_MODE_HELP=Enable the debug mode to log full details of synchronization calls for troubleshooting purposes (verbose). Note that synchronization calls may take longer when this mode is enabled.
 DateSyncro=Datum sinkronizacije
-Status=Status
 call_id=ID poziva
 flow_id=ID toka
 FlowId=Flow ID
@@ -730,7 +713,6 @@ EntityNumber=Entity number
 ConfirmChangeEntity=Are you sure you want to move the supplier invoice <b>%s</b> to another entity?
 EntityChangedSuccess=Supplier invoice moved to entity %s
 ErrorEntityRequired=A valid entity number is required
-DisabledBecauseNotEditable=This invoice is not editable
 ErrorSupplierNotVisibleInEntity=The supplier "%s" is not visible in entity %s. You must share or create it in the target entity first.
 WarningEntityChangedFileMoveFailed=The entity was changed but the invoice files could not be moved to the new entity's directory. You may need to move them manually.
 EInvoicingInfoManagedByMasterSetup=The einvoicing setup is managed by the master entity (ID %s)

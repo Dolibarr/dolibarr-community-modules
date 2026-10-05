@@ -419,7 +419,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				if ($urltogeneratetoken && (getDolGlobalString('EINVOICING_PDP') != 'SUPERPDPViaPartner' || !empty($tokenData['token']))) {
 					$item = $formSetup->newItem($prefix . 'TOKEN'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
-					$item->nameText = $langs->trans('AccessToken');
+					$item->nameText = $langs->trans('EInvAccessToken');
 					$item->cssClass = 'maxwidth500 ';
 					$item->fieldOverride = "";
 					if (!empty($tokenData['token'])) {
@@ -938,7 +938,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 					//$s = $form->textwithpicto('', $langs->trans("Message").': '.$directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . $directory['ppf_message']);
 					//$lines[] = $langs->trans('RemoteInfoPPFDetection', 'SuperPDP', $paName).' '.$s;
 					$lines[] = $langs->trans('RemoteInfoPPFDetection', 'SuperPDP', $paName);
-					$lines[] = '<span class="smallimp">'. $langs->trans("Message").': '.$directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . $directory['ppf_message'].']</span>';
+					$lines[] = '<span class="smallimp">'. $langs->trans("EInvMessage").': '.$directory['ppf_identifier'] . ' - ' . $langs->trans('RemoteInfoPPFStatusDetail', $directory['ppf_status']) . ' - ' . $directory['ppf_message'].']</span>';
 				}
 			}
 			if (!empty($directory['listof_other_ppf_identifiers'])) {

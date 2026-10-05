@@ -2227,7 +2227,7 @@ trait CommonProtocol
 				$langs->load("compta");
 				$urltovatdic = DOL_URL_ROOT.'/admin/dict.php?id=10';
 				$errormsg = $langs->trans("UnknownVATEX1", $id, '0', $vat_src_code);
-				$errormsg .= '<br>'.$langs->trans("UnknownVATEX2b", '0', ($vat_src_code ? $vat_src_code : "''"), $urltovatdic, $langs->trans("VATExemptionCode"));
+				$errormsg .= '<br>'.$langs->trans("UnknownVATEX2b", '0', ($vat_src_code ? $vat_src_code : "''"), $urltovatdic, $langs->trans("EInvVATExemptionCode"));
 
 				throw new Exception('MISSINGSETUP: '.$errormsg);
 			}
@@ -2370,7 +2370,7 @@ trait CommonProtocol
 							$langs->load("compta");
 							$urltovatdic = DOL_URL_ROOT.'/admin/dict.php?id=10';
 							$errormsg = $langs->trans("UnknownVATEX1", $id, '0', $vat_src_code);
-							$errormsg .= '<br>'.$langs->trans("UnknownVATEX2b", '0', ($vat_src_code ? $vat_src_code : "''"), $urltovatdic, $langs->trans("VATExemptionCode"));
+							$errormsg .= '<br>'.$langs->trans("UnknownVATEX2b", '0', ($vat_src_code ? $vat_src_code : "''"), $urltovatdic, $langs->trans("EInvVATExemptionCode"));
 							//$errormsg .= ' '.$langs->trans("ClickHere", $constantforvatex);		// Go on dictionary page
 
 							throw new Exception('MISSINGSETUP: '.$errormsg);

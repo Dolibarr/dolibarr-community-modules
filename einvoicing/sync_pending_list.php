@@ -70,7 +70,7 @@ include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php'; // @phpstan-ignore incl
 dol_include_once('/einvoicing/class/einvoicingsyncpending.class.php');
 
 // Load translation files required by the page
-$langs->loadLangs(array("einvoicing@einvoicing", "other", "bills", "products", "companies"));
+$langs->loadLangs(array("einvoicing@einvoicing", "admin", "other", "bills", "products", "companies"));
 
 /**
  * Extract the manual actions from the HTML action block the module computes for a flow.

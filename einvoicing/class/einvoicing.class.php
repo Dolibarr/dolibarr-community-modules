@@ -2538,7 +2538,7 @@ class EInvoicing
 
 		// Detect thirdparties that are structurally outside the e-invoicing scope (view/edit mode only).
 		// B2C is an invoice-level check and is intentionally omitted here.
-		$langs->load("einvoicing@einvoicing");
+		$langs->loadLangs(array("admin", "einvoicing@einvoicing"));
 		$outOfScopeReason = null;
 		if ($object->country_code != 'FR') {
 			$outOfScopeReason = $langs->trans('EInvoiceIgnoreReasonNotFR');
@@ -2617,7 +2617,7 @@ class EInvoicing
 			}
 			$resprints .= '</table>';
 		} else {
-			$resprints .= '<span class="opacitymedium">' . $langs->trans("Automatic") . '</span>';
+			$resprints .= '<span class="opacitymedium">' . $langs->trans("EInvAutomatic") . '</span>';
 		}
 
 		// Add new routing — use a JS-submitted form appended to body to avoid nested form issue

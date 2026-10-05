@@ -593,7 +593,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				print '<a class="butAction" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?id=' . $object->id . '&action=change_entity&token=' . newToken() . '">'
 					. $langs->trans('ChangeEntity') . '</a>';
 			} else {
-				print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('DisabledBecauseNotEditable')) . '">'
+				print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('EInvDisabledBecauseNotEditable')) . '">'
 					. $langs->trans('ChangeEntity') . '</span>';
 			}
 		}

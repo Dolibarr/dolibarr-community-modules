@@ -7,24 +7,10 @@
 ModuleEInvoicingName = E-fakturering
 ModuleEInvoicingDesc = Understøttelse af e-fakturahåndtering. Dette modul giver mulighed for at generere (automatisk eller manuelt) fakturaer i e-fakturaformat og sende dem til et e-fakturaadgangspunkt. Det kan også hente købsfakturaer fra dette e-fakturaadgangspunkt. Kun få lande (Frankrig) og adgangspunkter (også kaldet PDP/PA) understøttes.
 
-# Keys of the core that the supported cores do not all carry: absent from 18 (RefSupplierBill), 18-19
-# (AccessToken, Message), 18-21 (Automatic, Input, Output), 18-22 (InvoiceType) or 18-23 (the rest).
-AccessToken=Adgangstoken
-Message=Besked
-RefSupplierBill=Leverandørfakturareference
-Automatic=Automatisk
-ErrorThirdPartyNotFound=Fejl Tredjepart ikke fundet
-Input=Input
-InvoiceType=Fakturatype
-Output=Produktion
-Success=Succes
-VATExemptionCode=Momsfritagelseskode
-
 #
 # Admin page
 #
 EInvoicingSetup = Opsætning af modul E-faktura
-Settings = Indstillinger
 EInvoicingSetupPage = Opsætning af adgangspunktet. Du skal her vælge det adgangspunkt, du har abonneret på, som det officielle adgangspunkt for din virksomhed.
 NewSection=Ny sektion
 
@@ -32,7 +18,6 @@ NewSection=Ny sektion
 #
 # About page
 #
-About = Om
 EInvoicingAbout = Om eFakturering
 EInvoicingAboutPage = E-fakturering om siden
 
@@ -152,7 +137,6 @@ RoutingIdInfo=Etiket (valgfrit)
 FailedToSaveRoutingID=Kunne ikke gemme routingadressen
 FailedToDeleteRoutingID=Kunne ikke slette routingadressen
 FailedToSetDefaultRoutingID=Kunne ikke angive standard routingadresse
-SetAsDefault=Angiv som standard
 FxCheckErrorRoutingID=Din virksomhed har ikke en gyldig e-faktureringsadresse.
 FxCheckErrorRoutingIDFR=I Frankrig skal e-fakturaadressen være eller starte med SIREN.
 sendToPDP=Send
@@ -194,7 +178,6 @@ EINVOICING_DEBUG=Fejlfinding
 EINVOICING_DEBUG_MODE=Gem alle detaljer om API-kald i historikken
 EINVOICING_DEBUG_MODE_HELP=Aktivér fejlfindingstilstanden for at logge alle detaljer om synkroniseringskald til fejlfindingsformål (udførlig). Bemærk, at synkroniseringskald kan tage længere tid, når denne tilstand er aktiveret.
 DateSyncro=Synkroniseringsdato
-Status=Status
 call_id=Opkalds-ID
 flow_id=Flow-ID
 FlowId=Flow-ID
@@ -750,7 +733,6 @@ EntityNumber=Enhedsnummer
 ConfirmChangeEntity=Er du sikker på, at du vil flytte leverandørfakturaen <b>%s</b> til en anden enhed?
 EntityChangedSuccess=Leverandørfaktura flyttet til enhed %s
 ErrorEntityRequired=Et gyldigt enhedsnummer er påkrævet
-DisabledBecauseNotEditable=Denne faktura kan ikke redigeres
 ErrorSupplierNotVisibleInEntity=Leverandøren "%s" er ikke synlig i enheden %s. Du skal først dele eller oprette den i målenheden.
 WarningEntityChangedFileMoveFailed=Enheden blev ændret, men fakturafilerne kunne ikke flyttes til den nye enheds mappe. Du skal muligvis flytte dem manuelt.
 EInvoicingInfoManagedByMasterSetup=Opsætningen af e-fakturering administreres af masterenheden (ID %s)
@@ -850,17 +832,14 @@ SelectAThirdParty=Vælg en tredjepart
 OverwriteExistingIds=Overskriv eksisterende identifikatorer
 OverwriteExistingIdsHelp=Hvis tredjeparten allerede har en anden SIREN / SIRET / VAT, skal den overskrives (kun hvis det virkelig er den samme enhed).
 Associate=Medarbejder
-SelectAThirdPartyFirst=Vælg først en tredjepart.
 ThirdpartyIdConflictWarning=Tredjeparts-ID'en "%s" har allerede forskellige identifikatorer. Kontroller, at det virkelig er den samme enhed, og aktiver derefter "Overskriv" for at bekræfte:
 ThirdpartyLinkedAndFlowSynchronized=Tredjeparts "%s" er opdateret, og flowet %s er synkroniseret.
 ThirdpartyLinkedButFlowStillPending=Tredjeparts-kommandoen "%s" er opdateret, men flowet kræver stadig en handling.
 ThirdpartyUpdatedButNoProvider=Tredjepartsudbyderen "%s" er opdateret, men der er ingen aktiv PDP-udbyder til at forsøge synkroniseringen igen.
 CompareFields=Sammenlign felter
 CompareFieldsIntro=Markér felterne for at skrive på tredjeparten fra fakturaen. Tomme identifikatorer er forhåndskontrolleret; konflikter (en anden værdi) er ikke markeret - markér dem kun, hvis det virkelig er den samme enhed.
-Field=Felt
 ValueFromInvoice=Værdi (faktura)
 CurrentThirdpartyValue=Aktuel værdi (tredjepart)
-Apply=Anvende
 Identical=Identisk
 Empty=Tom
 Overwrite=Erstatte
