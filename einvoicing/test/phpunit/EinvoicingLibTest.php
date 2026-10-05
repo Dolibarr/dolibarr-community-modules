@@ -697,7 +697,7 @@ class EinvoicingLibTest extends CommonClassTest
 		$this->assertSame('384', einvoicingDocumentTypeCode($replacement, $db));
 	}
 
-	/** 
+	/**
 	 * The core puts the URL root in front of a dropdown entry, so the entry must not carry it already.
 	 *
 	 * @return void
