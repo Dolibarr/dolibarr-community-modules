@@ -1133,7 +1133,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			}
 
 			if ($error > 0) {
-				if (in_array($rescode, array('THIRDPARTY_NOT_FOUND','PRODUCT_NOT_FOUND'))) {
+				if (in_array($rescode, array('THIRDPARTY_NOT_FOUND','PRODUCT_NOT_FOUND','DEFAULT_ROUTING_MIXED_UNSET'))) {
 					$results_messages[] = "Aborting synchronization due to a business error. There is a manual action to do.";
 				} else {
 					$results_messages[] = "Aborting synchronization due to errors.";
