@@ -181,7 +181,8 @@ $item->defaultFieldValue = '0';
 $item->cssClass = 'minwidth500';
 $item->fieldParams['warningifon'] = 1;
 
-include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php'; // @phpstan-ignore include.fileNotFound (PHPStan takes DOL_DOCUMENT_ROOT from install/inc.php of the core, where it is '..')
+// @phpstan-ignore include.fileNotFound
+include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
 //print getDolGlobalString('EINVOICING_PDP');
 

@@ -254,7 +254,8 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 	// all postpone flow that were discarded.
 }
 
-include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php'; // @phpstan-ignore include.fileNotFound (PHPStan takes DOL_DOCUMENT_ROOT from install/inc.php of the core, where it is '..')
+// @phpstan-ignore include.fileNotFound
+include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
 //print getDolGlobalString('EINVOICING_PDP');
 
