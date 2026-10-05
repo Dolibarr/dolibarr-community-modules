@@ -1068,7 +1068,7 @@ class CIIProtocol extends AbstractProtocol
 				? DOL_URL_ROOT.'/fourn/facture/card.php?id='.$conflictingId
 				: DOL_URL_ROOT.'/fourn/facture/list.php?search_refsupplier='.urlencode($parsedHeader['documentno'] ?? '').'&socid='.(int) $socId;
 
-			$action = $langs->trans('FixTheAmountOrModifySupplierRef', $langs->transnoentitiesnoconv("RefSupplierBill"), $parsedHeader['documentno'] ?? '', $langs->trans("Duplicate"));
+			$action = $langs->trans('FixTheAmountOrModifySupplierRef', $langs->transnoentitiesnoconv("EInvRefSupplierBill"), $parsedHeader['documentno'] ?? '', $langs->trans("Duplicate"));
 			$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . $modifyurl . '" target="_blank">';
 			$action .= '<i class="fas fa-pen"></i> ';
 			$action .= $langs->trans('ModifySupplierInvoice');
