@@ -541,6 +541,18 @@ if (!function_exists('einvoicingDolGetButtonActionDropdown')) {
 	}
 }
 
+/**
+ * Url for the 'url' key of a dropdown entry, which Dolibarr 18 and 19 prefix with DOL_URL_ROOT.
+ *
+ * @param	string	$url			Url as dol_buildpath() returns it with type 1
+ * @param	string	$dolurlroot		Value of DOL_URL_ROOT
+ * @return	string					Url without DOL_URL_ROOT
+ */
+function einvoicingDropdownEntryUrl($url, $dolurlroot = DOL_URL_ROOT)
+{
+	return (string) preg_replace('/^' . preg_quote($dolurlroot, '/') . '/', '', $url);
+}
+
 
 if (!method_exists('Societe', 'findNearest')) {
 	/**
