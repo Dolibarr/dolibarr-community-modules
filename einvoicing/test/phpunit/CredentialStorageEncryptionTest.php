@@ -89,11 +89,10 @@ class CredentialStorageEncryptionProvider extends TestPDPProvider
 /**
  * Tests on the storage of the credentials.
  *
- * The constants written here happen inside the transaction CommonClassTest opens for the class and
- * rolls back afterwards. The token is different: the module stores it on a connection of its own, so
- * that a rollback of the caller cannot bring a rotated token back. It is therefore committed at once,
- * and the tests plant it and read it on that same connection, then put back what was there before.
- * Either way a run leaves neither constant nor token row behind.
+ * The module stores the token on a connection of its own, so that a rollback of the caller cannot
+ * bring a rotated token back. The tests write on that connection too, the setup secret included: a
+ * row locked by the transaction CommonClassTest keeps open for the class would make the token wait
+ * up to the lock timeout. Everything is committed at once, so tearDown() puts back what was there.
  *
  * @backupGlobals disabled
  */
@@ -133,6 +132,7 @@ class CredentialStorageEncryptionTest extends CommonClassTest
 	{
 		$tokendb = $this->tokenDb();
 
+		$tokendb->query("DELETE FROM " . MAIN_DB_PREFIX . "const WHERE name = " . $tokendb->encrypt(self::SECRET_CONST) . " AND entity = " . ((int) $GLOBALS['conf']->entity));
 		$tokendb->query("DELETE FROM " . $this->tokenTable() . " WHERE " . $this->tokenRowsFilter());
 		foreach ($this->savedTokenRows as $row) {
 			$values = array();
@@ -385,16 +385,19 @@ class CredentialStorageEncryptionTest extends CommonClassTest
 		require_once DOL_DOCUMENT_ROOT . '/core/class/html.formsetup.class.php';
 
 		$provider = new CredentialStorageEncryptionProvider($db);
+		$tokendb = $provider->exposeTokenStorageDb();
 
-		$formSetup = new FormSetup($db);
+		// The item takes the global connection on some cores, whatever the FormSetup was given.
+		$formSetup = new FormSetup($tokendb);
 		$item = $formSetup->newItem(self::SECRET_CONST);
+		$item->db = $tokendb;
 		$item->fieldValue = 'secret-1013-clear';
 		$provider->exposeStoreThisFieldEncrypted($item);
 
 		$this->assertSame(1, $item->saveConfValue());
 
-		$this->assertStringStartsWith('dolcrypt:', $this->rawConstValue(self::SECRET_CONST), 'The secret of the setup field reached the database in clear');
-		$this->assertSame('secret-1013-clear', dolibarr_get_const($db, self::SECRET_CONST, (int) $conf->entity));
+		$this->assertStringStartsWith('dolcrypt:', $this->rawConstValue(self::SECRET_CONST, $tokendb), 'The secret of the setup field reached the database in clear');
+		$this->assertSame('secret-1013-clear', dolibarr_get_const($tokendb, self::SECRET_CONST, (int) $conf->entity));
 	}
 
 	/**
