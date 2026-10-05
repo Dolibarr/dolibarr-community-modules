@@ -896,3 +896,14 @@ MatchingThirdpartyCandidates=Matching Dolibarr thirdparties (candidates)
 MatchedOn=Matched on
 NoMatchingThirdpartyCandidate=No matching thirdparty (neither by SIREN/SIRET/VAT nor by name). Create the supplier, or search one below.
 OrSelectAnotherThirdparty=Or search another thirdparty:
+
+# Merge line charges into the description of their line (community decision, issue #969)
+EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION=Fold a line's charges into its own description instead of a line of their own
+EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION_HELP=By default, the charges of an incoming invoice line (BG-28, e.g. a handling fee or a fuel surcharge) are imported as Dolibarr lines of their own, so the product line keeps the price announced net of its charges (down to a single unit at 0.00 when the charge is the whole of the line). When enabled, the charges are instead described inside the product line itself (one entry per charge, its label in bold when the WYSIWYG line editor is active) and the line totals the full amount the document announces for it, charges included. Can be overridden per supplier from its thirdparty card.
+EInvoicingLineChargeLabel=Charge
+EInvoicingMergeLineChargesField=Fold line charges into description
+EInvoicingMergeLineChargesHelp=Overrides, for this supplier only, whether the charges of an invoice line (BG-28) are folded into the description of the product line instead of being imported as a line of their own. Leave on the global default unless this supplier specifically needs the other behaviour.
+EInvoicingMergeLineChargesDefault=Use the global default (currently: %s)
+EInvoicingMergeLineChargesInherited=inherited from the global default
+EInvoicingMergeLineChargesOverridden=overridden for this supplier
+FailedToSaveMergeLineChargesOption=Failed to save the line charges option
