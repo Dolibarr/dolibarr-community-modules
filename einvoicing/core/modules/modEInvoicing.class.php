@@ -43,7 +43,7 @@ class modEInvoicing extends DolibarrModules
 	 */
 	public function __construct($db)
 	{
-		global $conf;
+		global $conf, $langs;
 
 		$this->db = $db;
 
@@ -281,7 +281,8 @@ class modEInvoicing extends DolibarrModules
 			'tabfieldvalue' => array('code,label'),
 			'tabfieldinsert' => array('code,label'),
 			'tabrowid' => array('rowid'),
-			'tabcond' => array(isModEnabled('einvoicing'))
+			'tabcond' => array(isModEnabled('einvoicing')),
+			'tabhelp' => array(array('code' => $langs->trans('CodeTooltipHelpEInvoicing')))
 		);
 		/* END MODULEBUILDER DICTIONARIES */
 

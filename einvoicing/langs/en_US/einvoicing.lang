@@ -41,6 +41,7 @@ EINVOICING_INVALID_UNTDID_CODE=The selected UNTDID code is invalid or inactive.
 EINVOICING_EMPTY_UNTDID_TEXT=The note text cannot be empty.
 EINVOICING_EXTRA_MENTION_SAVED=The additional note %s has been saved.
 EINVOICING_EXTRA_MENTION_DELETED=The additional note %s has been deleted.
+CodeTooltipHelpEInvoicing=This code is limited to 3 characters and is part of a defined reference framework
 
 #
 # About page
