@@ -695,9 +695,9 @@ class EinvoicingLibTest extends CommonClassTest
 		$replacement = new Facture($db);
 		$replacement->type = Facture::TYPE_REPLACEMENT;
 		$this->assertSame('384', einvoicingDocumentTypeCode($replacement, $db));
-  }
+	}
 
-  /** 
+	/** 
 	 * The core puts the URL root in front of a dropdown entry, so the entry must not carry it already.
 	 *
 	 * @return void
