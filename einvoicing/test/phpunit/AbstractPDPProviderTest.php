@@ -18,7 +18,8 @@
 /**
  *      \file       test/phpunit/AbstractPDPProviderTest.php
  *      \ingroup    test
- *      \brief      PHPUnit test for AbstractPDPProvider::makeStorableDebugPayload(): the payloads written
+ *      \brief      PHPUnit test for AbstractPDPProvider::addEvent(): the event is linked to its object on every
+ *                  core. And makeStorableDebugPayload(): the payloads written
  *                  in the trace of an API call stay inside their column. A response bigger than the column
  *                  had its INSERT refused whole, so the call left no trace at all (issue #995).
  *      \remarks    To run this script as CLI: phpunit filename.php
@@ -36,6 +37,8 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 }
 
 require_once $dolibarrHtdocs . '/master.inc.php';
+require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
 dol_include_once('einvoicing/class/providers/AbstractPDPProvider.class.php');
 // AbstractPDPProvider is abstract: its reference implementation is the one instantiated here.
 dol_include_once('einvoicing/class/providers/TestPDPProvider.class.php');
@@ -63,6 +66,42 @@ $conf->global->MAIN_DISABLE_ALL_MAILS = 1;
  */
 class AbstractPDPProviderTest extends CommonClassTest
 {
+	/**
+	 * The event written about an object is linked to it, so the agenda tab of that object shows it.
+	 * Dolibarr 18 stores fk_element only and 22 and later elementid only: on 18, every event of the
+	 * module was left with no object, and the agenda tab of the invoice stayed empty (issue #1022).
+	 *
+	 * @return	void
+	 */
+	public function testAnEventIsLinkedToItsObject()
+	{
+		global $db, $user;
+
+		$supplier = new Societe($db);
+		$supplier->name = 'EINVOICING TEST EVENT LINK';
+		$supplier->fournisseur = 1;
+		$supplier->code_fournisseur = 'auto';
+		$this->assertGreaterThan(0, $supplier->create($user), 'the supplier is created: ' . $supplier->error);
+
+		$invoice = new FactureFournisseur($db);
+		$invoice->socid = $supplier->id;
+		$invoice->ref_supplier = 'EVT-' . dol_now();
+		$invoice->date = dol_now();
+		$this->assertGreaterThan(0, $invoice->create($user), 'the supplier invoice is created: ' . $invoice->error);
+
+		$provider = (new ReflectionClass('TestPDPProvider'))->newInstanceWithoutConstructor();
+		$eventid = $provider->addEvent('TEST', 'EINVOICING - test', 'test', $invoice);
+		$this->assertGreaterThan(0, $eventid, 'the event is created');
+
+		$obj = $db->fetch_object($db->query("SELECT elementtype, fk_element FROM " . MAIN_DB_PREFIX . "actioncomm WHERE id = " . ((int) $eventid)));
+		$db->query("DELETE FROM " . MAIN_DB_PREFIX . "actioncomm WHERE id = " . ((int) $eventid));
+		$invoice->delete($user);
+		$supplier->delete($supplier->id);
+
+		$this->assertSame('invoice_supplier', (string) $obj->elementtype);
+		$this->assertSame((int) $invoice->id, (int) $obj->fk_element, 'the event must point at the invoice it is about');
+	}
+
 	/**
 	 * Call the protected makeStorableDebugPayload() of AbstractPDPProvider.
 	 *
