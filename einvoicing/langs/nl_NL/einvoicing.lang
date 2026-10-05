@@ -7,24 +7,10 @@
 ModuleEInvoicingName = E-facturering
 ModuleEInvoicingDesc = Support for E-invoice management. This module allows generating (automatically or manually) invoices in E-invoice format and send them to an E-invoice Access Point. It can also retrieve purchase invoices from this E-invoice Access Point. Only a few countries (France) and Access Points (also called PDP/PA) are supported.
 
-# Keys of the core that the supported cores do not all carry: absent from 18 (RefSupplierBill), 18-19
-# (AccessToken, Message), 18-21 (Automatic, Input, Output), 18-22 (InvoiceType) or 18-23 (the rest).
-AccessToken=Access Token
-Message=Message
-RefSupplierBill=Supplier invoice ref
-Automatic=Automatic
-ErrorThirdPartyNotFound=Error ThirdParty Not Found
-Input=Input
-InvoiceType=Invoice type
-Output=Output
-Success=Success
-VATExemptionCode=VAT exemption code
-
 #
 # Admin page
 #
 EInvoicingSetup = Instellen van de module E-factuur
-Settings = Instellingen
 EInvoicingSetupPage = Instellen van het toegangspunt. Hier moet u het toegangspunt selecteren dat u als officieel toegangspunt voor uw bedrijf hebt aangemeld.
 NewSection=Nieuwe sectie
 
@@ -32,7 +18,6 @@ NewSection=Nieuwe sectie
 #
 # About page
 #
-About = Over
 EInvoicingAbout = Over e-facturering
 EInvoicingAboutPage = E-facturering: over ons
 
@@ -156,7 +141,6 @@ RoutingIdInfo=Label (optioneel)
 FailedToSaveRoutingID=Het opslaan van het routeringsadres is mislukt.
 FailedToDeleteRoutingID=Het verwijderen van het routeringsadres is mislukt.
 FailedToSetDefaultRoutingID=Het instellen van het standaard routeringsadres is mislukt.
-SetAsDefault=Instellen als standaard
 FxCheckErrorRoutingID=Uw bedrijf beschikt niet over een geldig e-factuuradres.
 FxCheckErrorRoutingIDFR=In Frankrijk moet het e-factuuradres het SIREN-nummer bevatten of ermee beginnen.
 sendToPDP=Verzenden
@@ -198,7 +182,6 @@ EINVOICING_DEBUG=Foutopsporing
 EINVOICING_DEBUG_MODE=Bewaar alle details van API-aanroepen in de geschiedenis.
 EINVOICING_DEBUG_MODE_HELP=Schakel de debugmodus in om alle details van synchronisatieaanroepen vast te leggen voor het oplossen van problemen (uitgebreid). Houd er rekening mee dat synchronisatieaanroepen langer kunnen duren wanneer deze modus is ingeschakeld.
 DateSyncro=Synchronisatiedatum
-Status=Status
 call_id=Beller-ID
 flow_id=Stroom-ID
 FlowId=Flow ID
@@ -730,7 +713,6 @@ EntityNumber=Entiteitsnummer
 ConfirmChangeEntity=Weet u zeker dat u de leveranciersfactuur <b>%s</b> naar een andere entiteit wilt verplaatsen?
 EntityChangedSuccess=Leveranciersfactuur verplaatst naar entiteit %s
 ErrorEntityRequired=Een geldig vestigingsnummer is vereist.
-DisabledBecauseNotEditable=Deze factuur is niet bewerkbaar.
 ErrorSupplierNotVisibleInEntity=De leverancier "%s" is niet zichtbaar in entiteit %s. U moet deze eerst delen of aanmaken in de doelentiteit.
 WarningEntityChangedFileMoveFailed=De entiteit is gewijzigd, maar de factuurbestanden konden niet naar de map van de nieuwe entiteit worden verplaatst. Mogelijk moet u ze handmatig verplaatsen.
 EInvoicingInfoManagedByMasterSetup=De e-factureringsinstellingen worden beheerd door de master-entiteit (ID %s).

@@ -190,8 +190,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 								$PDPManager = new PDPProviderManager($db);
 								$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 								$precheckAvailable = $provider->hasValidator();
-								if (!empty($currentStatusDetails['file']) && $currentStatusDetails['file'] == 1 && $precheckAvailable) {
-									$einvoiceFilePath = $einvoicing->getEInvoiceFilePath($invoiceObject->ref);
+								// generateInvoice() returns -1 or the path of the file it wrote: past the test above, $result is
+								// that path. The status read before generating said 'file' = 0 at validation (the definitive
+								// ref had no file yet), so the precheck was skipped on the only generation that auto-sends.
+								if ($precheckAvailable) {
+									$einvoiceFilePath = $result;
 									$result = $provider->validateEInvoiceFile($invoiceObject->id, $einvoiceFilePath);
 									if ($result['res'] > 0) {
 										$precheckresult = 1;
@@ -552,12 +555,15 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					// Dolibarr 22 - there it says "not enough permissions" instead.
 					$reimportofadraft = ((int) $object->status === FactureFournisseur::STATUS_DRAFT);
 					$reimportallowed = $user->hasRight('einvoicing', 'write');
+					$reimporturl = dol_buildpath('/einvoicing/document_card.php', 1) . '?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken();
 					$reimportentry = array(
 						'lang' => 'einvoicing',
 						'enabled' => true,
 						'perm' => (($reimportallowed && $reimportofadraft) ? 1 : 0),
 						'label' => 'EInvoiceReimport',
-						'url' => dol_buildpath('/einvoicing/document_card.php', 1).'?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken()
+						'urlroot' => $reimporturl,
+						// 'url' is defined for backward compatibility with v18 and v19, which ignore 'urlroot'
+						'url' => einvoicingDropdownEntryUrl($reimporturl)
 					);
 					if (!$reimportallowed) {
 						$reimportentry['attr'] = array('title' => $langs->trans('NotEnoughPermissions'));
@@ -594,7 +600,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				print '<a class="butAction" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?id=' . $object->id . '&action=change_entity&token=' . newToken() . '">'
 					. $langs->trans('ChangeEntity') . '</a>';
 			} else {
-				print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('DisabledBecauseNotEditable')) . '">'
+				print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('EInvDisabledBecauseNotEditable')) . '">'
 					. $langs->trans('ChangeEntity') . '</span>';
 			}
 		}
@@ -1031,18 +1037,20 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					}
 				}
 
-				// Default product for import
-				$routingProductId = GETPOST('routing_product_id', 'aZ09');
-				if ($routingProductId !== '' && $routingProductId !== '-1' && !einvoicingReceptionDisabled()) {
-					$existing = $einvoicing->fetchDefaultRouting($socId, 'product');
-					if (empty($existing)) {
-						$result = $einvoicing->addRouting($socId, $routingProductId, '', 'product');
-					} else {
-						$result = $einvoicing->setDefaultRouting($socId, $routingProductId, '', '', '', 'product');
-					}
-					if ($result < 0) {
-						$error++;
-						setEventMessages($langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error, null, 'errors');
+				// Default product and default service for import
+				foreach (array('product', 'service') as $routingType) {
+					$routingProductId = GETPOST('routing_' . $routingType . '_id', 'aZ09');
+					if ($routingProductId !== '' && $routingProductId !== '-1' && !einvoicingReceptionDisabled()) {
+						$existing = $einvoicing->fetchDefaultRouting($socId, $routingType);
+						if (empty($existing)) {
+							$result = $einvoicing->addRouting($socId, $routingProductId, '', $routingType);
+						} else {
+							$result = $einvoicing->setDefaultRouting($socId, $routingProductId, '', '', '', $routingType);
+						}
+						if ($result < 0) {
+							$error++;
+							setEventMessages($langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error, null, 'errors');
+						}
 					}
 				}
 			}

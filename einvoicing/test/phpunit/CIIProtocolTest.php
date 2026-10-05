@@ -28,6 +28,8 @@
  *                  whatever the timezone of the server that reads it.
  *                  Product reference: an absent one must not be used as a search key, and "0" is a
  *                  reference like any other, in both directions.
+ *                  Import (issue #1050): a line with no product falls back on the default product or the
+ *                  default service of the vendor, as the billing framework of the document (BT-23) says.
  *                  Import (issue #1031): the payment method of the document (BT-81) must reach the
  *                  supplier invoice for every code the dictionary of Dolibarr can answer.
  *                  Import made again (issue #1022): the draft is rebuilt in place, what the user added
@@ -683,6 +685,150 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
+	 * A vendor identified by its SIREN, as the automatic creation of the import leaves it.
+	 *
+	 * @param	string	$siren	SIREN identifying the vendor
+	 * @return	int				Id of the created thirdparty
+	 */
+	private function createSellerVendor($siren)
+	{
+		global $db, $user;
+
+		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+		require_once DOL_DOCUMENT_ROOT . '/core/lib/company.lib.php';	// Societe::create() of Dolibarr 21 calls getCountry() without loading it
+
+		$thirdparty = new Societe($db);
+		$thirdparty->name = 'Vendor of the seller lookup test';
+		$thirdparty->country_code = 'FR';
+		$thirdparty->idprof1 = $siren;
+		$thirdparty->fournisseur = 1;
+		$thirdparty->code_fournisseur = 'auto';
+
+		$id = $thirdparty->create($user);
+		$this->assertGreaterThan(0, $id, 'Could not create the vendor of the test: ' . $thirdparty->error . ' ' . implode(', ', $thirdparty->errors));
+
+		return $id;
+	}
+
+	/**
+	 * Seller block of a received document, reduced to what the vendor lookup reads.
+	 *
+	 * @param	string	$siren	SIREN carried by the document
+	 * @return	array			Seller information, as the protocols parse it
+	 */
+	private function sellerInfo($siren)
+	{
+		return array(
+			'sellername' => 'Vendor of the seller lookup test',
+			'sellerlineone' => '1 rue du Test',
+			'sellerpostcode' => '86000',
+			'sellercity' => 'Poitiers',
+			'sellercountry' => 'FR',
+			'sellerGlobalIds' => array('0002' => $siren),
+		);
+	}
+
+	/**
+	 * The vendor lookup the import runs before anything else, called on its own. product_mapping.php
+	 * names the vendor of a flow with it, so its answer has to stay the answer of the import.
+	 *
+	 * @param	array	$sellerInfo	Seller information
+	 * @return	array				Answer of findThirdpartyFromEInvoiceSeller()
+	 */
+	private function lookupSeller($sellerInfo)
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		return $protocol->findThirdpartyFromEInvoiceSeller($sellerInfo);
+	}
+
+	/**
+	 * Number of thirdparties carrying a SIREN, to tell a lookup that found nothing from one that
+	 * created what it was looking for. The column of idprof1 is named after what it holds in France.
+	 *
+	 * @param	string	$siren	SIREN to count
+	 * @return	int				Number of rows
+	 */
+	private function nbThirdpartiesWithSiren($siren)
+	{
+		global $db;
+
+		$sql = "SELECT COUNT(*) as nb FROM " . MAIN_DB_PREFIX . "societe WHERE siren = '" . $db->escape($siren) . "'";
+		$resql = $db->query($sql);
+		$this->assertNotFalse($resql, 'Could not count the thirdparties: ' . $db->lasterror());
+		$obj = $db->fetch_object($resql);
+
+		return (int) $obj->nb;
+	}
+
+	/**
+	 * The lookup answers the vendor the SIREN of the document identifies.
+	 *
+	 * @return void
+	 */
+	public function testSellerLookupFindsTheVendorByItsLegalIdentifier()
+	{
+		$siren = '000000015';
+		$socid = $this->createSellerVendor($siren);
+
+		$res = $this->lookupSeller($this->sellerInfo($siren));
+
+		$this->assertEquals($socid, $res['res'], 'The lookup did not find the vendor by its SIREN: ' . $res['message']);
+	}
+
+	/**
+	 * An unknown seller is answered with 0, and nothing is created: the lookup is read only, where the
+	 * synchronization around it creates the vendor when the option says so.
+	 *
+	 * @return void
+	 */
+	public function testSellerLookupCreatesNothingWhenTheSellerIsUnknown()
+	{
+		global $conf;
+
+		// On, so a lookup that would go on creating like the synchronization does would be caught here.
+		$saved = $conf->global->EINVOICING_THIRDPARTIES_AUTO_GENERATION ?? null;
+		$conf->global->EINVOICING_THIRDPARTIES_AUTO_GENERATION = 1;
+
+		try {
+			$siren = '000000016';
+			$this->assertEquals(0, $this->nbThirdpartiesWithSiren($siren), 'The SIREN of the test is already used');
+
+			$res = $this->lookupSeller($this->sellerInfo($siren));
+
+			$this->assertEquals(0, $res['res'], 'The lookup answered a thirdparty for a SIREN nobody carries');
+			$this->assertEquals(0, $this->nbThirdpartiesWithSiren($siren), 'The lookup created the vendor it was only asked about');
+		} finally {
+			if ($saved === null) {
+				unset($conf->global->EINVOICING_THIRDPARTIES_AUTO_GENERATION);
+			} else {
+				$conf->global->EINVOICING_THIRDPARTIES_AUTO_GENERATION = $saved;
+			}
+		}
+	}
+
+	/**
+	 * A name is not an identity (BT-27 and BT-28 are descriptive): a document carrying no structured
+	 * identifier is not attached to the vendor that merely bears the same name (issue #739).
+	 *
+	 * @return void
+	 */
+	public function testSellerLookupDoesNotMatchOnTheNameAlone()
+	{
+		$siren = '000000017';
+		$this->createSellerVendor($siren);
+
+		$sellerInfo = $this->sellerInfo($siren);
+		unset($sellerInfo['sellerGlobalIds']);
+
+		$res = $this->lookupSeller($sellerInfo);
+
+		$this->assertEquals(0, $res['res'], 'The lookup attached the document to a vendor on its name alone');
+	}
+
+	/**
 	 * Real aggregated invoice line, as a payroll provider sends it: one line standing for the whole
 	 * invoice, with no vendor reference, no buyer reference and no GTIN, and a label far longer than
 	 * the 128 characters of product_fournisseur_price.ref_fourn. Anonymized sample of a document
@@ -857,6 +1003,175 @@ class CIIProtocolTest extends CommonClassTest
 		$obj = $db->fetch_object($resql);
 
 		return (int) $obj->freesoc;
+	}
+
+	/**
+	 * A vendor with a default product and, when asked, a default service, each pointing at a product
+	 * created for the test. Returns the ids so a test can tell which default a line fell back on.
+	 *
+	 * @param	bool	$withProduct	Give the vendor a default product
+	 * @param	bool	$withService	Give the vendor a default service
+	 * @return	array{socid:int, product:int, service:int}
+	 */
+	private function vendorWithDefaults($withProduct, $withService)
+	{
+		global $conf, $db;
+
+		// A vendor id free of any price and of any routing, so two vendors of the same test never share one
+		$sql = "SELECT GREATEST((SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "product_fournisseur_price),";
+		$sql .= " (SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "einvoicing_routing)) + 1 as freesoc";
+		$resql = $db->query($sql);
+		$this->assertNotFalse($resql, 'could not find a free vendor id: ' . $db->lasterror());
+		$socid = (int) $db->fetch_object($resql)->freesoc;
+		$ids = array('socid' => $socid, 'product' => 0, 'service' => 0);
+		$einvoicing = new EInvoicing($db);
+		foreach (array('product' => $withProduct, 'service' => $withService) as $type => $wanted) {
+			$sql = "INSERT INTO " . MAIN_DB_PREFIX . "product (entity, datec, ref, label, fk_product_type, tosell, tobuy, tva_tx)";
+			$sql .= " VALUES (" . ((int) $conf->entity) . ", '" . $db->idate(dol_now()) . "'";
+			$sql .= ", 'EI1050-" . $db->escape(uniqid()) . "', 'Default " . $type . " of the bench vendor', " . ($type == 'service' ? 1 : 0) . ", 0, 1, 20)";
+			$this->assertNotFalse($db->query($sql), 'could not create the bench ' . $type . ': ' . $db->lasterror());
+			$ids[$type] = (int) $db->last_insert_id(MAIN_DB_PREFIX . 'product');
+			if ($wanted) {
+				$this->assertGreaterThan(0, $einvoicing->addRouting($socid, 'idprod_' . $ids[$type], '', $type), 'could not set the default ' . $type . ': ' . $einvoicing->error);
+			}
+		}
+
+		return $ids;
+	}
+
+	/**
+	 * Match a line that no product answers, on a document carrying the given billing framework.
+	 *
+	 * @param	int		$socid		Vendor id
+	 * @param	string	$framework	BT-23 of the document
+	 * @param	string	$mixed		EINVOICING_DEFAULT_ROUTING_MIXED for the call
+	 * @return	array<string,mixed>	Answer of findProductFromEinvoiceLine()
+	 */
+	private function matchUnknownLine($socid, $framework, $mixed = '')
+	{
+		global $conf, $db;
+
+		$saved = $conf->global->EINVOICING_DEFAULT_ROUTING_MIXED ?? null;
+		$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = $mixed;
+		try {
+			$protocol = new CIIProtocol($db);
+			return $protocol->findProductFromEinvoiceLine(array(
+				'prodsellerid' => 'NO-SUCH-REF-' . uniqid(),
+				'prodname' => 'A label that matches no product at all ' . uniqid(),
+				'supplierId' => $socid,
+				'businessProcessId' => $framework,
+			));
+		} finally {
+			if ($saved === null) {
+				unset($conf->global->EINVOICING_DEFAULT_ROUTING_MIXED);
+			} else {
+				$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = $saved;
+			}
+		}
+	}
+
+	/**
+	 * The first letter of BT-23 picks the default: B and an absent framework the product, S the service,
+	 * M whatever the setup says, and nothing while it says nothing.
+	 *
+	 * @return void
+	 */
+	public function testBillingFrameworkPicksTheDefaultOfTheVendor()
+	{
+		global $conf;
+
+		$saved = $conf->global->EINVOICING_DEFAULT_ROUTING_MIXED ?? null;
+		try {
+			$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = '';
+			$this->assertSame('product', CIIProtocol::defaultRoutingTypeForFramework('B1'));
+			$this->assertSame('product', CIIProtocol::defaultRoutingTypeForFramework(''));
+			$this->assertSame('service', CIIProtocol::defaultRoutingTypeForFramework('S4'));
+			$this->assertSame('service', CIIProtocol::defaultRoutingTypeForFramework(' s1'));
+			$this->assertSame('', CIIProtocol::defaultRoutingTypeForFramework('M1'));
+			$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = 'service';
+			$this->assertSame('service', CIIProtocol::defaultRoutingTypeForFramework('M2'));
+			$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = 'product';
+			$this->assertSame('product', CIIProtocol::defaultRoutingTypeForFramework('M1'));
+			$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = 'garbage';
+			$this->assertSame('', CIIProtocol::defaultRoutingTypeForFramework('M1'));
+		} finally {
+			if ($saved === null) {
+				unset($conf->global->EINVOICING_DEFAULT_ROUTING_MIXED);
+			} else {
+				$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = $saved;
+			}
+		}
+	}
+
+	/**
+	 * A goods invoice (B) and one with no framework fall back on the default product, a services
+	 * invoice (S) on the default service.
+	 *
+	 * @return void
+	 */
+	public function testALineFallsBackOnTheDefaultTheFrameworkNames()
+	{
+		$ids = $this->vendorWithDefaults(true, true);
+
+		$found = $this->matchUnknownLine($ids['socid'], 'B1');
+		$this->assertSame($ids['product'], (int) $found['res'], 'B1 must use the default product');
+		$this->assertSame('defaultrouting', $found['matchtype'] ?? '');
+		$this->assertSame('product', $found['routingtype'] ?? '');
+
+		$this->assertSame($ids['product'], (int) $this->matchUnknownLine($ids['socid'], '')['res'], 'no BT-23 must use the default product');
+
+		$found = $this->matchUnknownLine($ids['socid'], 'S1');
+		$this->assertSame($ids['service'], (int) $found['res'], 'S1 must use the default service');
+		$this->assertSame('service', $found['routingtype'] ?? '');
+	}
+
+	/**
+	 * A vendor with a single default keeps using it whatever the framework says, as before the default
+	 * service existed.
+	 *
+	 * @return void
+	 */
+	public function testAVendorWithOneDefaultKeepsUsingIt()
+	{
+		$onlyproduct = $this->vendorWithDefaults(true, false);
+		$this->assertSame($onlyproduct['product'], (int) $this->matchUnknownLine($onlyproduct['socid'], 'S1')['res'], 'S1 must fall back on the default product when there is no default service');
+
+		$onlyservice = $this->vendorWithDefaults(false, true);
+		$this->assertSame($onlyservice['service'], (int) $this->matchUnknownLine($onlyservice['socid'], 'B1')['res'], 'B1 must fall back on the default service when there is no default product');
+	}
+
+	/**
+	 * A mixed invoice (M) uses the default the setup chooses, and stops with an error the user can act
+	 * on while the setup chooses none.
+	 *
+	 * @return void
+	 */
+	public function testAMixedInvoiceNeedsTheSetupToChoose()
+	{
+		$ids = $this->vendorWithDefaults(true, true);
+
+		$found = $this->matchUnknownLine($ids['socid'], 'M1', '');
+		$this->assertSame(-1, (int) $found['res'], 'M1 with no choice in the setup must stop');
+		$this->assertSame('DEFAULT_ROUTING_MIXED_UNSET', $found['actioncode'] ?? '');
+		$this->assertStringContainsString('setup_options.php', (string) ($found['actionurl'] ?? ''));
+
+		$this->assertSame($ids['service'], (int) $this->matchUnknownLine($ids['socid'], 'M1', 'service')['res'], 'M1 must use the default service when the setup says so');
+		$this->assertSame($ids['product'], (int) $this->matchUnknownLine($ids['socid'], 'M2', 'product')['res'], 'M2 must use the default product when the setup says so');
+	}
+
+	/**
+	 * A mixed invoice from a vendor with no default at all has nothing to choose between: the line is
+	 * simply not found, as any other line, and no setup error is raised.
+	 *
+	 * @return void
+	 */
+	public function testAMixedInvoiceFromAVendorWithoutDefaultIsNotASetupError()
+	{
+		$ids = $this->vendorWithDefaults(false, false);
+
+		$found = $this->matchUnknownLine($ids['socid'], 'M1', '');
+		$this->assertSame(0, (int) $found['res']);
+		$this->assertArrayNotHasKey('actioncode', $found);
 	}
 
 	/**
