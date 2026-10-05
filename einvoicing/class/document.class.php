@@ -287,6 +287,13 @@ class Document extends CommonObject
 	 */
 	public function create(User $user, $notrigger = 0)
 	{
+		// The label and reason of a lifecycle status are free text in the CDAR, the columns hold 255 characters,
+		// the notes keep the whole text in cdar_reason_detail.
+		foreach (array('cdar_lifecycle_label', 'cdar_reason_desc') as $field) {
+			if (isset($this->$field)) {
+				$this->$field = dol_substr((string) $this->$field, 0, 255);
+			}
+		}
 		$result = $this->createCommon($user, $notrigger);
 
 		// uncomment lines below if you want to validate object after creation
@@ -514,6 +521,103 @@ class Document extends CommonObject
 
 			return -1;
 		}
+	}
+
+	/**
+	 * List the incoming invoice flows a manual product mapping can be started from, most useful first.
+	 *
+	 * Two sources, because a flow is worth mapping on both sides of the import: the queue of the flows a
+	 * synchronization could not import (llx_einvoicing_sync_pending, where a PRODUCT_NOT_FOUND lands) and
+	 * the incoming documents already received (llx_einvoicing_document). A flow held by both is listed
+	 * once, as a pending one: that is the state the user has something to do about.
+	 *
+	 * The vendor is only the one Dolibarr already knows: the supplier invoice of a received document
+	 * names it, a queued flow does not (it is often queued because no third party was found), so the
+	 * issuer name carried by the document is shown instead. Nothing is guessed here - the mapping page
+	 * reads the identifiers of the seller in the document itself.
+	 *
+	 * @param	DoliDB	$db			Database handler
+	 * @param	int		$limit		Maximum number of flows read per source
+	 * @return	array<int,array{flowid:string,ref:string,date:int,socid:int,socname:string,reason:string,pending:int}>	Flows, the queued ones first, most recent first
+	 */
+	public static function listIncomingFlowsForMapping($db, $limit = 50)
+	{
+		$flows = array();
+		$seen = array();
+
+		// Flows a synchronization left in the queue: a missing product is what this list is for, but a
+		// flow queued for another reason may carry unmapped lines too, so the reason is shown, not filtered.
+		$sql = "SELECT sp.flow_id, sp.tracking_idref, sp.reason_code, sp.match_data, sp.flow_updatedat, sp.date_creation";
+		$sql .= " FROM ".$db->prefix()."einvoicing_sync_pending as sp";
+		$sql .= " WHERE sp.entity IN (".getEntity('einvoicing').")";
+		$sql .= " AND sp.status = 0";
+		$sql .= " AND (sp.flow_direction IS NULL OR sp.flow_direction <> 'Out')";
+		$sql .= " ORDER BY sp.date_creation DESC, sp.rowid DESC";
+		$sql .= $db->plimit($limit);
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__.' '.$db->lasterror(), LOG_ERR);
+		} else {
+			while ($obj = $db->fetch_object($resql)) {
+				$flowid = (string) $obj->flow_id;
+				if ($flowid === '' || isset($seen[$flowid])) {
+					continue;
+				}
+				$seen[$flowid] = 1;
+				$matchdata = json_decode((string) $obj->match_data, true);
+				$flows[] = array(
+					'flowid' => $flowid,
+					'ref' => (string) $obj->tracking_idref,
+					'date' => (int) $db->jdate($obj->flow_updatedat ? $obj->flow_updatedat : $obj->date_creation),
+					'socid' => 0,
+					'socname' => is_array($matchdata) ? (string) ($matchdata['name'] ?? '') : '',
+					'reason' => (string) $obj->reason_code,
+					'pending' => 1,
+				);
+			}
+			$db->free($resql);
+		}
+
+		// Documents already received. The vendor comes from the supplier invoice the flow was booked on,
+		// which is the only link between a flow and a third party this table holds.
+		$sql = "SELECT d.flow_id, d.tracking_idref, d.submittedat, s.rowid as socid, s.nom as socname";
+		$sql .= " FROM ".$db->prefix()."einvoicing_document as d";
+		$sql .= " LEFT JOIN ".$db->prefix()."facture_fourn as ff ON (d.fk_element_type = 'invoice_supplier' AND ff.rowid = d.fk_element_id)";
+		$sql .= " LEFT JOIN ".$db->prefix()."societe as s ON s.rowid = ff.fk_soc";
+		$sql .= " WHERE d.entity IN (".getEntity('document').")";
+		$sql .= " AND d.flow_direction = 'In'";
+		$sql .= " AND d.flow_type = 'SupplierInvoice'";
+		$sql .= " AND d.flow_id IS NOT NULL AND d.flow_id <> ''";
+		$sql .= " ORDER BY d.submittedat DESC, d.rowid DESC";
+		$sql .= $db->plimit($limit);
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__.' '.$db->lasterror(), LOG_ERR);
+
+			return $flows;
+		}
+
+		while ($obj = $db->fetch_object($resql)) {
+			$flowid = (string) $obj->flow_id;
+			if ($flowid === '' || isset($seen[$flowid])) {
+				continue;
+			}
+			$seen[$flowid] = 1;
+			$flows[] = array(
+				'flowid' => $flowid,
+				'ref' => (string) $obj->tracking_idref,
+				'date' => (int) $db->jdate($obj->submittedat),
+				'socid' => (int) $obj->socid,
+				'socname' => (string) $obj->socname,
+				'reason' => '',
+				'pending' => 0,
+			);
+		}
+		$db->free($resql);
+
+		return $flows;
 	}
 
 	/**
@@ -1613,7 +1717,7 @@ class Document extends CommonObject
 			// it re-lists that are already stored are cheaply discarded by the alreadyProcessedFlowIds
 			// pre-check in syncFlows(), which queries only the flowIds of the current listing.
 			$syncFromDate = $provider->getLastSyncDate(getDolGlobalInt('EINVOICING_SYNC_MARGIN_TIME_HOURS'));
-			$maxflows = getDolGlobalInt('EINVOICING_FLOWS_SYNC_CRON_SIZE', 100);
+			$maxflows = self::getCronSyncBatchSize();
 
 			// Sync all flows
 			$sync_result = $provider->syncFlows($syncFromDate, $maxflows);
@@ -1667,6 +1771,16 @@ class Document extends CommonObject
 		dol_syslog(__METHOD__." end", LOG_INFO);
 
 		return $error ?: 0;
+	}
+
+	/**
+	 * The hidden EINVOICING_FLOWS_SYNC_CRON_SIZE must keep falling back on EINVOICING_FLOWS_SYNC_CALL_SIZE, the admin setting.
+	 *
+	 * @return int	Number of flows the scheduled sync asks for
+	 */
+	public static function getCronSyncBatchSize()
+	{
+		return getDolGlobalInt('EINVOICING_FLOWS_SYNC_CRON_SIZE', getDolGlobalInt('EINVOICING_FLOWS_SYNC_CALL_SIZE', 100));
 	}
 
 	/**

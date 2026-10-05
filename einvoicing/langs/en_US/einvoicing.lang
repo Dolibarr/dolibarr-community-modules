@@ -7,24 +7,24 @@
 ModuleEInvoicingName = EInvoicing
 ModuleEInvoicingDesc = Support for E-invoice management. This module allows generating (automatically or manually) invoices in E-invoice format and send them to an E-invoice Access Point. It can also retrieve purchase invoices from this E-invoice Access Point. Only a few countries (France) and Access Points (also called PDP/PA) are supported.
 
-# Keys of the core that the supported cores do not all carry: absent from 18 (RefSupplierBill), 18-19
-# (AccessToken, Message), 18-21 (Automatic, Input, Output), 18-22 (InvoiceType) or 18-23 (the rest).
-AccessToken=Access Token
-Message=Message
-RefSupplierBill=Supplier invoice ref
-Automatic=Automatic
-ErrorThirdPartyNotFound=Error ThirdParty Not Found
-Input=Input
-InvoiceType=Invoice type
-Output=Output
-Success=Success
-VATExemptionCode=VAT exemption code
+# Same text as keys of the core that some supported cores lack. A core key is never redefined here,
+# as the first file loaded wins: the module would replace the label of the core on every page.
+EInvAccessToken=Access Token
+EInvMessage=Message
+EInvRefSupplierBill=Supplier invoice ref
+EInvAutomatic=Automatic
+EInvErrorThirdPartyNotFound=Error ThirdParty Not Found
+EInvInput=Input
+EInvInvoiceType=Invoice type
+EInvOutput=Output
+EInvSuccess=Success
+EInvVATExemptionCode=VAT exemption code
+EInvDisabledBecauseNotEditable=This invoice is not editable
 
 #
 # Admin page
 #
 EInvoicingSetup = Setup of module E-invoice
-Settings = Settings
 EInvoicingSetupPage = Setup of the Access Point. You must choose here the Access Point you subscribed as the official Access Point for your company.
 NewSection=New section
 
@@ -32,7 +32,6 @@ NewSection=New section
 #
 # About page
 #
-About = About
 EInvoicingAbout = About EInvoicing
 EInvoicingAboutPage = EInvoicing about page
 
@@ -144,7 +143,7 @@ EInvoiceFlowInternationalNoLifecycle=The Access Point filed this invoice as B2B 
 EInvoiceFlowInternationalStatusRefused=This status cannot be sent: the Access Point filed this invoice as B2B international (processing rule %s) and accepts no lifecycle status on it.
 InvoiceNotSentToPDPDueToThirdpartyIssues=The invoice was not sent to the Access Point due to errors in the third-party data
 EINVOICING_ENABLE_API_VALIDATION=Enable third-party data validation via government APIs (SIREN, VAT)
-EINVOICING_ENABLE_API_VALIDATION_HELP=If enabled, third-party data (Prof id/SIREN/SIRET or VAT number) is verified in real time via a default Business Registry (example: data.gouv.fr) and the VIES service (EU) before generating and sending the e-invoice. If these services are unavailable, the check is skipped (non-blocking warning). WARNING: Your processes may beslowed, blocked or failed with errors if the remote services does not respond.
+EINVOICING_ENABLE_API_VALIDATION_HELP=If enabled, third-party data (Prof id/SIREN/SIRET or VAT number) is verified in real time via a default Business Registry (example: data.gouv.fr) and the VIES service (EU) before generating and sending the e-invoice. If these services are unavailable, the check is skipped (non-blocking warning).<br>WARNING: Using this option is discouraged. Your processes may beslowed, blocked or failed with errors if the remote services does not respond.
 InvoiceRoutingOverride=E-invoice target address
 InvoiceRoutingOverrideHelp=You can set here an e-invoice routing address specific to this invoice (BT-49). Keep empty to use the default e-invoice address of the third party
 InvoiceRoutingOverrideDefault=Third-party default address
@@ -152,7 +151,6 @@ RoutingIdInfo=Label (optional)
 FailedToSaveRoutingID=Failed to save routing address
 FailedToDeleteRoutingID=Failed to delete routing address
 FailedToSetDefaultRoutingID=Failed to set default routing address
-SetAsDefault=Set as default
 FxCheckErrorRoutingID=Your company does not have a valid E-invoicing address.
 FxCheckErrorRoutingIDFR=In France, the E-invoice address must be or start with the SIREN.
 sendToPDP=Transmit
@@ -182,6 +180,10 @@ EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS=Cancel invoice recording if the aut
 EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS2=By default, the invoice creation is done even if E-invoice generation fails. In such a case, you can re-generate this E-invoice later.
 EINVOICING_PRODUCTS_AUTO_GENERATION=Automatic generation of missing products
 EINVOICING_PRODUCTS_AUTO_GENERATION_HELP=When importing a supplier invoice, if the bought product can't be found in the database, and if there is no default product to use on the supplier card, enabling this option will automatically create missing products during Access Point synchronization, otherwise the synchronization process is stopped until the product has been created manually or a default product for import is set on the vendor card.
+EINVOICING_DEFAULT_ROUTING_MIXED=Default of the vendor used by a mixed invoice
+EINVOICING_DEFAULT_ROUTING_MIXED_HELP=A received invoice tells in its billing framework (BT-23) whether it bills goods (B), services (S) or both (M). Its lines with no matching product fall back on the default product of the vendor for B, on its default service for S. A mixed invoice does not say which lines are goods, so this option chooses the default its lines use. As long as it is empty, the import of a mixed invoice stops with an error when one of its lines needs a default.
+ErrorDefaultRoutingMixedUnset=This invoice bills both goods and services (billing framework BT-23 starting with M) without providing information on the type of line (product versus service). Choose in the setup of the module which type of item we must use (product vs service) when no type if provided by the seller.
+SetDefaultRoutingMixed=Choose the type of item to use for mixed invoices
 EINVOICING_PRODUCTS_MATCH_CANONICAL_REF=Match vendor product references whatever their writing
 EINVOICING_PRODUCTS_MATCH_CANONICAL_REF_HELP=When a line of an incoming invoice carries a vendor product reference that no supplier price matches exactly, compare it again ignoring separators, case and accents, so that 'A1234-10_42' and 'A1234|10|42' are read as the same reference. This comparison is an approximation and can merge two references that differ only by their separators, so it is disabled by default. The exact comparison is always tried first. When several products of the supplier share the same simplified form, the line is left to the manual product mapping and a warning is written in the log.
 EINVOICING_IMPORT_AS_FREE_LINES=Import lines without product as free description lines
@@ -194,7 +196,6 @@ EINVOICING_DEBUG=Debug
 EINVOICING_DEBUG_MODE=Store full detail of API calls in history
 EINVOICING_DEBUG_MODE_HELP=Enable the debug mode to log full details of synchronization calls for troubleshooting purposes (verbose). Note that synchronization calls may take longer when this mode is enabled.
 DateSyncro=Sync date
-Status=Status
 call_id=Call ID
 flow_id=Flow ID
 FlowId=Flow ID
@@ -329,6 +330,8 @@ SkippedFlows=Skipped flows
 TotalFlows=Total flows
 SuccessfullFlows=Successful flows
 EInvoiceEventsLabel=E-invoicing events
+EInvoicingEventImportLabel=Import of the received invoice %s
+EInvoicingEventImportNote=Imported from the flow %s received from %s, by version %s of the module.
 EInvoiceFile=E-invoice File
 PDPSyncStatus=E-invoice Status
 EInvCurrentStatus=Current status
@@ -367,6 +370,7 @@ ConfirmSendStatusMessageAndValidate=Are you sure you want to update the status o
 EInvoiceApprovalValidatedTheInvoice=Invoice %s has been validated: accepting a received invoice records it in the accounts.
 EInvoiceApprovalCouldNotValidate=The invoice could not be validated, so no status was sent to the Access Point.
 EInvoiceApprovalNeedsValidateRight=Accepting this invoice would validate it in Dolibarr, which your permissions do not allow.
+EInvoiceStatusAlreadySentToPlatform=The status <b>%s</b> was already sent to the Access Point for this invoice, it has not been sent a second time.
 SelectStatusReason=Reason
 TryToIncreaseStartDateOrMax=No new flow processed. Try to increase the "%s"
 ErrorGeneratingXML=Error when generating the e-invoice XML file
@@ -416,7 +420,9 @@ YourSoftwareSeemsConnectedWith=Your software seems linked to the E-invoicing Acc
 YourSoftwareDoesNotSeemsConnectedWith=Your software does NOT appear to be linked to an E-invoicing Access Point Platform yet. Go into the e-invoicing module setup to connect it.
 ClickHereToRemoveConnection=Click here to remove this connection
 DefaultProductEBilling=Default product
-DefaultProductEBillingHelp=Default product to use when importing an invoice if no existing product can be found.
+DefaultProductEBillingHelp=Default product to use when importing an invoice if no existing product can be found. It applies to invoices billing goods (billing framework BT-23 starting with B, or absent), and to every invoice when no default service is set.
+DefaultServiceEBilling=Default service
+DefaultServiceEBillingHelp=Default service to use when importing an invoice billing services (billing framework BT-23 starting with S) if no existing product can be found. Without it, the default product is used.
 InvoiceFormat=Invoice format
 WarningIfYouSetAnIDItMustExistsInAnnuary=WARNING: If you set a specific E-invoice ID here, it must exist in the directory.
 CheckYourIDInEInvoiceAnnuary=Check your e-invoice ID
@@ -660,6 +666,9 @@ EInvoiceGeneratedButRecipientReachabilityUnconfirmed=E-invoice generated, but th
 EInvoiceNotSentRecipientReachabilityUnconfirmed=Invoice not sent: the recipient reachability could not be confirmed
 EInvStatus212PaymentRefunded=Refund reported to the platform
 EInvoiceCashInNotReportedDepositRefused=Cash-in of the invoice %s not reported to the Approved Platform: it refused the deposit of that e-invoice, so it holds no invoice to report a payment on. Correct and send the e-invoice again, then report the cash-in.
+EInvoiceReportPayment=Report a payment (212)
+ConfirmReportPayment=Report the payment chosen below of invoice <b>%s</b> to the Approved Platform with the status "Paid" (212)?<br>The invoice has %s payment(s), and %s payment status(es) have already been sent for it: report only a payment that went unreported, or the platform counts it twice.
+EInvoiceNoPaymentToReport=No payment of the invoice %s has to be reported to the Approved Platform: it is out of the e-invoicing scope, its VAT is not due on collection, or it has never been transmitted.
 EINVOICING_JOB_MANUAL_ACTION_REQUIRED=Manual action is required. The job has been interrupted.
 NoPDPProviderConfigured=No Approved Platform configured: nothing to synchronize
 
@@ -676,8 +685,13 @@ NbOfLinesToMap=Number of lines to map
 NotMappable=Cannot be mapped
 NotMappableBecauseNoVendorRef=This line has no vendor product reference, so there is nothing to map the product on. Create the product instead, or define a default product for this vendor.
 LineRoutedToDefaultProduct=Falls back on the default product:
+LineRoutedToDefaultService=Falls back on the default service:
 LineRoutedToDefaultProductHelp=No product was found for this line, so the import will use the default product of this vendor. This is a catch-all applying to every line, not a mapping: as long as the line carries a vendor product reference, you can still link it to the right product below.
 SelectTheSupplierOfThisFlow=Select the vendor of this flow to be able to map its products
+OrAnotherFlowId=Or another flow id
+VendorIdentifiedFromTheDocument=Vendor identified from the document:
+VendorDiffersFromTheDocument=The selected vendor is not the seller named by this document:
+VendorOfTheDocumentNotFound=No third party carries the identifiers of the seller named by this document (%s). Choose the vendor these references must be saved on.
 SaveMappingAndCreateVendorRefs=Save the mapping
 BackToSynchronization=Back to synchronization
 AllLinesOfFlowAreMapped=All the lines of this flow are linked to a product. You can relaunch the synchronization.
@@ -757,7 +771,6 @@ EntityNumber=Entity number
 ConfirmChangeEntity=Are you sure you want to move the supplier invoice <b>%s</b> to another entity?
 EntityChangedSuccess=Supplier invoice moved to entity %s
 ErrorEntityRequired=A valid entity number is required
-DisabledBecauseNotEditable=This invoice is not editable
 ErrorSupplierNotVisibleInEntity=The supplier "%s" is not visible in entity %s. You must share or create it in the target entity first.
 WarningEntityChangedFileMoveFailed=The entity was changed but the invoice files could not be moved to the new entity's directory. You may need to move them manually.
 EInvoicingInfoManagedByMasterSetup=The einvoicing setup is managed by the master entity (ID %s)
@@ -840,6 +853,7 @@ IgnoreFlowHelp=Marks this flow as ignored: it disappears from the "Pending" list
 ReopenFlowHelp=Puts this flow back to "Pending" (undoes Ignored / Resolved) so it can be processed again.
 DeletePendingFlowHelp=Permanently deletes this entry from the queue.
 ReasonProductNotFoundShort=Product not found
+ReasonDefaultRoutingMixedUnsetShort=Mixed invoice, no default chosen
 ReasonThirdpartyNotFoundShort=Thirdparty not found
 ReasonBadAmountShort=Different amount
 CreateSupplierShort=Create supplier
@@ -861,17 +875,14 @@ SelectAThirdParty=Select a thirdparty
 OverwriteExistingIds=Overwrite existing identifiers
 OverwriteExistingIdsHelp=If the thirdparty already has a different SIREN / SIRET / VAT, overwrite it (only if it really is the same entity).
 Associate=Associate
-SelectAThirdPartyFirst=Select a thirdparty first.
 ThirdpartyIdConflictWarning=Thirdparty "%s" already has different identifiers. Check that it really is the same entity, then enable "Overwrite" to confirm:
 ThirdpartyLinkedAndFlowSynchronized=Thirdparty "%s" updated and flow %s synchronized.
 ThirdpartyLinkedButFlowStillPending=Thirdparty "%s" updated, but the flow still needs an action.
 ThirdpartyUpdatedButNoProvider=Thirdparty "%s" updated, but no active PDP provider to retry the synchronization.
 CompareFields=Compare fields
 CompareFieldsIntro=Tick the fields to write on the thirdparty from the invoice. Empty identifiers are pre-checked; conflicts (a different value) are left unchecked - only tick them if it really is the same entity.
-Field=Field
 ValueFromInvoice=Value (invoice)
 CurrentThirdpartyValue=Current value (thirdparty)
-Apply=Apply
 Identical=Identical
 Empty=Empty
 Overwrite=Replace
@@ -888,3 +899,14 @@ MatchingThirdpartyCandidates=Matching Dolibarr thirdparties (candidates)
 MatchedOn=Matched on
 NoMatchingThirdpartyCandidate=No matching thirdparty (neither by SIREN/SIRET/VAT nor by name). Create the supplier, or search one below.
 OrSelectAnotherThirdparty=Or search another thirdparty:
+
+# Merge line charges into the description of their line (community decision, issue #969)
+EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION=Fold a line's charges into its own description instead of a line of their own
+EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION_HELP=By default, the charges of an incoming invoice line (BG-28, e.g. a handling fee or a fuel surcharge) are imported as Dolibarr lines of their own, so the product line keeps the price announced net of its charges (down to a single unit at 0.00 when the charge is the whole of the line). When enabled, the charges are instead described inside the product line itself (one entry per charge, its label in bold when the WYSIWYG line editor is active) and the line totals the full amount the document announces for it, charges included. Can be overridden per supplier from its thirdparty card.
+EInvoicingLineChargeLabel=Charge
+EInvoicingMergeLineChargesField=Fold line charges into description
+EInvoicingMergeLineChargesHelp=Overrides, for this supplier only, whether the charges of an invoice line (BG-28) are folded into the description of the product line instead of being imported as a line of their own. Leave on the global default unless this supplier specifically needs the other behaviour.
+EInvoicingMergeLineChargesDefault=Use the global default (currently: %s)
+EInvoicingMergeLineChargesInherited=inherited from the global default
+EInvoicingMergeLineChargesOverridden=overridden for this supplier
+FailedToSaveMergeLineChargesOption=Failed to save the line charges option

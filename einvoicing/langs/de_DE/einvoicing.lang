@@ -7,24 +7,10 @@
 ModuleEInvoicingName = E-Rechnung
 ModuleEInvoicingDesc = Support for E-invoice management. This module allows generating (automatically or manually) invoices in E-invoice format and send them to an E-invoice Access Point. It can also retrieve purchase invoices from this E-invoice Access Point. Only a few countries (France) and Access Points (also called PDP/PA) are supported.
 
-# Keys of the core that the supported cores do not all carry: absent from 18 (RefSupplierBill), 18-19
-# (AccessToken, Message), 18-21 (Automatic, Input, Output), 18-22 (InvoiceType) or 18-23 (the rest).
-AccessToken=Access Token
-Message=Message
-RefSupplierBill=Supplier invoice ref
-Automatic=Automatic
-ErrorThirdPartyNotFound=Error ThirdParty Not Found
-Input=Input
-InvoiceType=Invoice type
-Output=Output
-Success=Success
-VATExemptionCode=VAT exemption code
-
 #
 # Admin page
 #
 EInvoicingSetup = Einrichtung des Moduls E-Rechnung
-Settings = Einstellungen
 EInvoicingSetupPage = Einrichtung des Zugangspunkts. Hier müssen Sie den Zugangspunkt auswählen, den Sie als offiziellen Zugangspunkt für Ihr Unternehmen abonniert haben.
 NewSection=Neuer Abschnitt
 
@@ -32,7 +18,6 @@ NewSection=Neuer Abschnitt
 #
 # About page
 #
-About = Um
 EInvoicingAbout = Über die elektronische Rechnungsstellung
 EInvoicingAboutPage = Über uns zur E-Rechnung
 
@@ -156,7 +141,6 @@ RoutingIdInfo=Etikett (optional)
 FailedToSaveRoutingID=Speichern der Routingadresse fehlgeschlagen
 FailedToDeleteRoutingID=Fehler beim Löschen der Routing-Adresse
 FailedToSetDefaultRoutingID=Fehler beim Festlegen der Standard-Routingadresse
-SetAsDefault=Als Standard festlegen
 FxCheckErrorRoutingID=Ihr Unternehmen besitzt keine gültige E-Rechnungsadresse.
 FxCheckErrorRoutingIDFR=In Frankreich muss die Adresse der elektronischen Rechnung mit SIREN beginnen oder lauten.
 sendToPDP=Übertragen
@@ -198,7 +182,6 @@ EINVOICING_DEBUG=Debuggen
 EINVOICING_DEBUG_MODE=Speichern Sie alle Details der API-Aufrufe im Verlauf
 EINVOICING_DEBUG_MODE_HELP=Aktivieren Sie den Debug-Modus, um detaillierte Protokolle der Synchronisierungsaufrufe zu Fehlerbehebungszwecken zu erhalten (ausführlich). Beachten Sie, dass Synchronisierungsaufrufe in diesem Modus länger dauern können.
 DateSyncro=Synchronisierungsdatum
-Status=Status
 call_id=Anrufer-ID
 flow_id=Flow-ID
 FlowId=Flow ID
@@ -730,7 +713,6 @@ EntityNumber=Entitätsnummer
 ConfirmChangeEntity=Sind Sie sicher, dass Sie die Lieferantenrechnung <b>%s</b> an ein anderes Unternehmen übertragen möchten?
 EntityChangedSuccess=Lieferantenrechnung an Entität %s verschoben
 ErrorEntityRequired=Eine gültige Unternehmensnummer ist erforderlich.
-DisabledBecauseNotEditable=Diese Rechnung kann nicht bearbeitet werden.
 ErrorSupplierNotVisibleInEntity=Der Lieferant „%s“ ist in der Entität „%s“ nicht sichtbar. Sie müssen ihn zuerst in der Zielentität freigeben oder erstellen.
 WarningEntityChangedFileMoveFailed=Die Entität wurde geändert, aber die Rechnungsdateien konnten nicht in das Verzeichnis der neuen Entität verschoben werden. Sie müssen sie möglicherweise manuell verschieben.
 EInvoicingInfoManagedByMasterSetup=Die Einrichtung der elektronischen Rechnungsstellung wird von der Master-Entität (ID %s) verwaltet.

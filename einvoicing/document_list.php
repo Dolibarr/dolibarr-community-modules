@@ -1423,7 +1423,7 @@ while ($i < $imaxinloop) {
 				print '>';
 				if ($key == 'flow_direction') {
 					$isOut = ($object->flow_direction === 'Out');
-					$label = $isOut ? $langs->trans('Output') : $langs->trans('Input');
+					$label = $isOut ? $langs->trans('EInvOutput') : $langs->trans('EInvInput');
 					$picto = $isOut ? '1uparrow' : '1downarrow';
 					//$class = $isOut ? 'stockmovementexit' : 'stockmovemententry';
 					$class = $isOut ? 'badge badge-primary' : 'badge badge-secondary';

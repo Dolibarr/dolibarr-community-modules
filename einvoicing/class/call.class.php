@@ -961,10 +961,10 @@ class Call extends CommonObject
 			global $langs;
 			//$langs->load("einvoicing@einvoicing");
 			$this->labelStatus[self::STATUS_FAILED] = $langs->transnoentitiesnoconv('Failed');
-			$this->labelStatus[self::STATUS_SUCCESS] = $langs->transnoentitiesnoconv('Success');
+			$this->labelStatus[self::STATUS_SUCCESS] = $langs->transnoentitiesnoconv('EInvSuccess');
 			$this->labelStatus[self::STATUS_CANCELED] = $langs->transnoentitiesnoconv('Disabled');
 			$this->labelStatusShort[self::STATUS_FAILED] = $langs->transnoentitiesnoconv('Failed');
-			$this->labelStatusShort[self::STATUS_SUCCESS] = $langs->transnoentitiesnoconv('Success');
+			$this->labelStatusShort[self::STATUS_SUCCESS] = $langs->transnoentitiesnoconv('EInvSuccess');
 			$this->labelStatusShort[self::STATUS_CANCELED] = $langs->transnoentitiesnoconv('Disabled');
 		}
 

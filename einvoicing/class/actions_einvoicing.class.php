@@ -190,8 +190,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 								$PDPManager = new PDPProviderManager($db);
 								$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 								$precheckAvailable = $provider->hasValidator();
-								if (!empty($currentStatusDetails['file']) && $currentStatusDetails['file'] == 1 && $precheckAvailable) {
-									$einvoiceFilePath = $einvoicing->getEInvoiceFilePath($invoiceObject->ref);
+								// generateInvoice() returns -1 or the path of the file it wrote: past the test above, $result is
+								// that path. The status read before generating said 'file' = 0 at validation (the definitive
+								// ref had no file yet), so the precheck was skipped on the only generation that auto-sends.
+								if ($precheckAvailable) {
+									$einvoiceFilePath = $result;
 									$result = $provider->validateEInvoiceFile($invoiceObject->id, $einvoiceFilePath);
 									if ($result['res'] > 0) {
 										$precheckresult = 1;
@@ -324,6 +327,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			// (immutable invoice; correct with a credit note / corrective invoice). Opt out with
 			// EINVOICING_ALLOW_RESEND_TRANSMITTED.
 			$locked = $einvoicing->isTransmittedLockActive($object->id, $object->ref);
+			// Regenerate and send are also offered again on an invoice the seller's AP rejected at emission.
+			$sendLocked = $locked && !$einvoicing->isOnlyRejectedAtEmission((int) $object->id);
 
 			if (!empty($currentStatusDetails['otherprovider'])) {
 				$forcedisabling = $langs->trans("WarningEinvoicingInvoiceStatusDifferentProvider", $currentStatusDetails['otherprovider']);
@@ -357,12 +362,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				// invoice (dev only: let's you rebuild the CII/Factur-X to inspect the XML; nothing is re-sent).
 				if (getDolGlobalString('EINVOICING_ALLOW_REGEN_TRANSMITTED')) {
 					$perm = (bool) $user->hasRight("facture", "creer");
-				} elseif (!$locked && in_array($currentStatusDetails['code'], [
+				} elseif (!$sendLocked && in_array($currentStatusDetails['code'], [
 					$einvoicing::STATUS_GENERATED,
 					$einvoicing::STATUS_ERROR,
 					$einvoicing::STATUS_UNKNOWN,
 					$einvoicing::STATUS_AWAITING_VALIDATION,		// We may retry to Regenerate/resend. We should get an error if we do, but it is interesting to test the retry.
-					$einvoicing::STATUS_AWAITING_ACK				// We may retry to Regenerate/resend. We should get an error if we do, but it is interesting to test the retry.
+					$einvoicing::STATUS_AWAITING_ACK,				// We may retry to Regenerate/resend. We should get an error if we do, but it is interesting to test the retry.
+					$einvoicing::STATUS_REJECTED					// unlocked only when rejected at emission, see EInvoicing::isOnlyRejectedAtEmission()
 				])) {
 					$perm = (bool) $user->hasRight("facture", "creer");
 				} else {
@@ -397,18 +403,18 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				// If the e-invoice is generated but not sent, or if it was sent and a validation error was
 				// received, display the button to (re)send the e-invoice.
 				// Re-send is offered for not-yet-transmitted states, plus AWAITING_*/REJECTED as a deliberate
-				// retry/correction affordance. Once REALLY transmitted (persistent flow_id) it is locked, and the
-				// only opt-out is the option EINVOICING_ALLOW_RESEND_TRANSMITTED. That option is read in a single
-				// place, EInvoicing::isTransmittedLockActive() (assigned to $locked above: it returns false as
-				// soon as EINVOICING_ALLOW_RESEND_TRANSMITTED is set), which the server-side send_to_pdp gate
+				// retry/correction affordance. Once REALLY transmitted (persistent flow_id) it is locked, unless the
+				// seller's AP only ever rejected it at emission, or EINVOICING_ALLOW_RESEND_TRANSMITTED is set. Both
+				// are read in a single place, EInvoicing::isSendLocked() (assigned to $sendLocked above),
+				// which the server-side send_to_pdp gate
 				// uses too, so the button visibility here and the real enforcement can never drift apart.
-				if (!$locked && !einvoicingIsSendDisabled() && in_array($currentStatusDetails['code'], [
+				if (!$sendLocked && !einvoicingIsSendDisabled() && in_array($currentStatusDetails['code'], [
 					$einvoicing::STATUS_GENERATED,
 					$einvoicing::STATUS_ERROR,
 					$einvoicing::STATUS_UNKNOWN,
 					$einvoicing::STATUS_AWAITING_VALIDATION,		// retry affordance (PA will refuse a duplicate)
 					$einvoicing::STATUS_AWAITING_ACK,				// retry affordance (PA will refuse a duplicate)
-					$einvoicing::STATUS_REJECTED					// resend after correcting a rejected e-invoice (gated by EINVOICING_ALLOW_RESEND_TRANSMITTED)
+					$einvoicing::STATUS_REJECTED					// resend after correcting a rejected e-invoice (unlocked only when rejected at emission)
 				])) {
 					$resend = false;
 					if (in_array($currentStatusDetails['code'], [$einvoicing::STATUS_AWAITING_VALIDATION, $einvoicing::STATUS_AWAITING_ACK, $einvoicing::STATUS_REJECTED])) {
@@ -423,6 +429,24 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 						//'help' => $langs->trans('SendToPDPHelp'),
 						'url' => '/compta/facture/card.php?id=' . $object->id . '&action=send_to_pdp&token=' . newToken()
 					);
+				}
+
+				// Report a payment (212) by hand: the payment trigger sends it once, and nothing sends it again
+				// when that fails (platform down, temporary directory not writable...).
+				if (!einvoicingIsSendDisabled()) {
+					'@phan-var-force Facture $object';
+					/** @var Facture $object */
+					$cashInState = $einvoicing->getCashInReportState($object);
+					if ($cashInState !== 0 && count($einvoicing->getCashInPayments($object->id)) > 0) {
+						$url_button[] = array(
+							'lang' => 'einvoicing',
+							'enabled' => true,
+							'perm' => (!$forcedisabling && $cashInState > 0 && $user->hasRight('einvoicing', 'write') && $user->hasRight('facture', 'creer')),
+							'label' => $langs->trans('EInvoiceReportPayment'),
+							'text' => ($cashInState < 0 ? $langs->trans('EInvoiceCashInNotReportedDepositRefused', (string) $object->ref) : $forcedisabling),
+							'url' => '/compta/facture/card.php?id=' . $object->id . '&action=report_payment&token=' . newToken()
+						);
+					}
 				}
 			}
 
@@ -547,12 +571,15 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					// (Document::reimport() refuses anything else). The reason travels as the entry tooltip, which the dropdown of the core cannot hold before
 					// Dolibarr 22 - there it says "not enough permissions" instead.
 					$reimportofadraft = ((int) $object->status === FactureFournisseur::STATUS_DRAFT);
+					$reimporturl = dol_buildpath('/einvoicing/document_card.php', 1) . '?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken();
 					$reimportentry = array(
 						'lang' => 'einvoicing',
 						'enabled' => true,
 						'perm' => ($reimportofadraft ? 1 : 0),
 						'label' => 'EInvoiceReimport',
-						'url' => dol_buildpath('/einvoicing/document_card.php', 1).'?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken()
+						'urlroot' => $reimporturl,
+						// 'url' is defined for backward compatibility with v18 and v19, which ignore 'urlroot'
+						'url' => einvoicingDropdownEntryUrl($reimporturl)
 					);
 					if (!$reimportofadraft) {
 						$reimportentry['attr'] = array('title' => $langs->trans('EInvoiceReimportOnlyOnADraft'));
@@ -587,7 +614,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				print '<a class="butAction" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?id=' . $object->id . '&action=change_entity&token=' . newToken() . '">'
 					. $langs->trans('ChangeEntity') . '</a>';
 			} else {
-				print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('DisabledBecauseNotEditable')) . '">'
+				print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('EInvDisabledBecauseNotEditable')) . '">'
 					. $langs->trans('ChangeEntity') . '</span>';
 			}
 		}
@@ -696,7 +723,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				? array('send_to_pdp')
 				: array('send_to_pdp', 'generate_einvoice');
 			if (in_array($action, $lockedActions) && isset($currentStatusDetails)
-				&& $einvoicing->isTransmittedLockActive($object->id, $object->ref)) {
+				&& $einvoicing->isSendLocked($object->id, $object->ref)) {
 				setEventMessages($langs->trans('EInvoiceAlreadyTransmittedLocked', $currentStatusDetails['flow_id']), null, 'warnings');
 				$action = '';
 			}
@@ -710,7 +737,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					$einvoicing::STATUS_GENERATED,
 					$einvoicing::STATUS_ERROR,
 					$einvoicing::STATUS_UNKNOWN,
-					$einvoicing::STATUS_REJECTED			// resend a corrected rejected e-invoice (gated by EINVOICING_ALLOW_RESEND_TRANSMITTED)
+					$einvoicing::STATUS_REJECTED			// resend a corrected rejected e-invoice (unlocked only when rejected at emission)
 				])
 			) {
 				// Same gates and same transmission as the mass action of the invoice list
@@ -794,6 +821,30 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				}
 			}
 
+			// Action to report a payment (212) by hand, with the same gates as the payment trigger
+			if ($action == 'confirm_report_payment' && GETPOST('confirm', 'alpha') == 'yes'
+				&& $permissiontoedit && $user->hasRight('einvoicing', 'write') && !einvoicingIsSendDisabled()) {
+				$payments = $einvoicing->getCashInPayments($object->id);
+				$payment = $payments[GETPOSTINT('paymentid')] ?? null;
+				if ($payment === null) {
+					setEventMessages($langs->trans('ErrorRecordNotFound'), null, 'errors');
+				} else {
+					// Rule P1.17: a cash-out carries the reason of the cancellation (MDT-126), the comment of the payment
+					$reason = ($payment['amount'] < 0 ? trim($payment['note']) : '');
+					$result = $einvoicing->reportCashIn($object, $payment['amount'], $reason);
+					if ($result['res'] > 0) {
+						setEventMessages($langs->trans($payment['amount'] < 0 ? 'EInvStatus212PaymentRefunded' : 'EInvStatus212PaymentReceived'), null, 'mesgs');
+					} elseif ($result['res'] == -2) {
+						setEventMessages($langs->trans('EInvoiceCashInNotReportedDepositRefused', (string) $object->ref), null, 'warnings');
+					} elseif ($result['res'] == 0) {
+						setEventMessages($langs->trans('EInvoiceNoPaymentToReport', (string) $object->ref), null, 'warnings');
+					} else {
+						// Not $error++: the lifecycle rows and the call log the provider wrote must survive the failure
+						setEventMessages($result['message'], null, 'errors');
+					}
+				}
+			}
+
 			if ($error) {
 				$db->rollback();
 				return -1;
@@ -859,6 +910,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				// validates it too. Validation comes first: a status accepted by the platform cannot be taken
 				// back, while a validation that fails (numbering, closed period, ...) must leave it untouched.
 				$sendtheanswer = true;
+				$justvalidated = false;
 				if (in_array($pdpstatuscode, EInvoicing::STATUSES_ACCEPTING_A_DOCUMENT, true) && (int) $object->status === FactureFournisseur::STATUS_DRAFT) {
 					if (!$permissiontovalidate) {
 						$message = $langs->trans('EInvoiceApprovalNeedsValidateRight');
@@ -882,12 +934,16 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 					setEventMessages($langs->trans('EInvoiceApprovalValidatedTheInvoice', (string) $object->ref), array(), 'mesgs');
 
-					// EINVOICING_SEND_APPROVED_ON_VALIDATION makes that validation answer the platform on
-					// its own: sending the status again here would duplicate the flow. Read what the
-					// validation actually recorded rather than the setting, so a status sent by any other
-					// path is not doubled either.
-					if ($einvoicing->hasSentStatusMessage($object->id, $object->element, $pdpstatuscode)) {
-						$sendtheanswer = false;
+					$justvalidated = true;
+				}
+
+				// A CDAR deposit is irreversible: a status the platform did not reject is never sent twice.
+				if ($einvoicing->hasLiveStatusMessage($object->id, $object->element, $pdpstatuscode)) {
+					$sendtheanswer = false;
+
+					// The validation above may have sent it already (EINVOICING_SEND_APPROVED_ON_VALIDATION).
+					if (!$justvalidated) {
+						setEventMessages($langs->trans('EInvoiceStatusAlreadySentToPlatform', $einvoicing->getStatusLabel($pdpstatuscode)), array(), 'warnings');
 					}
 				}
 
@@ -1019,18 +1075,20 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					}
 				}
 
-				// Default product for import
-				$routingProductId = GETPOST('routing_product_id', 'aZ09');
-				if ($routingProductId !== '' && $routingProductId !== '-1' && !einvoicingReceptionDisabled()) {
-					$existing = $einvoicing->fetchDefaultRouting($socId, 'product');
-					if (empty($existing)) {
-						$result = $einvoicing->addRouting($socId, $routingProductId, '', 'product');
-					} else {
-						$result = $einvoicing->setDefaultRouting($socId, $routingProductId, '', '', '', 'product');
-					}
-					if ($result < 0) {
-						$error++;
-						setEventMessages($langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error, null, 'errors');
+				// Default product and default service for import
+				foreach (array('product', 'service') as $routingType) {
+					$routingProductId = GETPOST('routing_' . $routingType . '_id', 'aZ09');
+					if ($routingProductId !== '' && $routingProductId !== '-1' && !einvoicingReceptionDisabled()) {
+						$existing = $einvoicing->fetchDefaultRouting($socId, $routingType);
+						if (empty($existing)) {
+							$result = $einvoicing->addRouting($socId, $routingProductId, '', $routingType);
+						} else {
+							$result = $einvoicing->setDefaultRouting($socId, $routingProductId, '', '', '', $routingType);
+						}
+						if ($result < 0) {
+							$error++;
+							setEventMessages($langs->trans('FailedToSaveRoutingID').' '.$einvoicing->error, null, 'errors');
+						}
 					}
 				}
 			}
@@ -1238,7 +1296,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// Regenerating a transmitted invoice resets its local status and re-opens the trap the send gate
 		// closes, so it is refused here as on the invoice card, unless EINVOICING_ALLOW_REGEN_TRANSMITTED.
 		if (!getDolGlobalString('EINVOICING_ALLOW_REGEN_TRANSMITTED')
-			&& $einvoicing->isTransmittedLockActive($invoice->id, (string) $invoice->ref)) {
+			&& $einvoicing->isSendLocked($invoice->id, (string) $invoice->ref)) {
 			$status = $einvoicing->fetchLastknownInvoiceStatus($invoice->id, (string) $invoice->ref);
 			$out['reason'] = $langs->trans('EInvoiceAlreadyTransmittedLocked', is_array($status) ? $status['flow_id'] : '');
 			return $out;
@@ -1334,7 +1392,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		// An invoice already transmitted is immutable: re-sending it makes the PA refuse a duplicate.
 		// Keyed on the persistent flow_id, like the invoice card, and honors EINVOICING_ALLOW_RESEND_TRANSMITTED.
-		if ($einvoicing->isTransmittedLockActive($invoice->id, (string) $invoice->ref)) {
+		if ($einvoicing->isSendLocked($invoice->id, (string) $invoice->ref)) {
 			$out['reason'] = $langs->trans('EInvoiceAlreadyTransmittedLocked', is_array($status) ? $status['flow_id'] : '');
 			return $out;
 		}
@@ -1342,7 +1400,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		if (!is_array($status) || empty($status['file']) || !in_array($status['code'], array(
 			$einvoicing::STATUS_GENERATED,
 			$einvoicing::STATUS_ERROR,
-			$einvoicing::STATUS_UNKNOWN
+			$einvoicing::STATUS_UNKNOWN,
+			$einvoicing::STATUS_REJECTED	// past the lock above: rejected at emission only, or EINVOICING_ALLOW_RESEND_TRANSMITTED
 		))) {
 			$out['reason'] = $langs->trans("EInvoiceNotGeneratedYetSoNotSent");
 			return $out;
@@ -1393,7 +1452,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function formConfirm($parameters, $object, &$action, $hookmanager)
 	{
-		global $db, $langs, $form;
+		global $conf, $db, $langs, $form, $user;
 
 		if (empty($object->element)) {
 			return 0;
@@ -1406,6 +1465,35 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			return 0;
 		}
 		$langs->load("einvoicing@einvoicing");
+
+		// Confirmation of the payment to report (212) by hand. The count of statuses already sent is what tells
+		// the operator which payment went unreported: none of them names the payment it reports.
+		if (in_array($object->element, ['facture']) && $action == 'report_payment') {
+			$form = new Form($db);
+			'@phan-var-force Facture $object';
+
+			$values = array();
+			$default = '';
+			foreach ($einvoicing->getCashInPayments($object->id) as $paymentId => $payment) {
+				$values[$paymentId] = $payment['ref'] . ' - ' . dol_print_date($payment['date'], 'day') . ' - ' . price($payment['amount'], 0, $langs, 1, -1, -1, $conf->currency);
+				$default = $paymentId;	// The most recent one
+			}
+			$formquestion = array(
+				array('type' => 'select', 'name' => 'paymentid', 'label' => $langs->trans('Payment'), 'values' => $values, 'default' => $default, 'select_show_empty' => 0)
+			);
+			$question = $langs->trans('ConfirmReportPayment', (string) $object->ref, count($values), $einvoicing->countSentStatusMessages($object->id, $object->element, 212));
+
+			$this->resprints .= $form->formconfirm(
+				DOL_URL_ROOT . '/compta/facture/card.php?id=' . $object->id,
+				$langs->trans('EInvoiceReportPayment'),
+				$question,
+				'confirm_report_payment',
+				$formquestion,
+				'yes',
+				1,
+				250
+			);
+		}
 
 		if (in_array($object->element, ['invoice_supplier']) && !einvoicingReceptionDisabled()) {
 			// Clone confirmation

@@ -70,7 +70,7 @@ include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php'; // @phpstan-ignore incl
 dol_include_once('/einvoicing/class/einvoicingsyncpending.class.php');
 
 // Load translation files required by the page
-$langs->loadLangs(array("einvoicing@einvoicing", "other", "bills", "products", "companies"));
+$langs->loadLangs(array("einvoicing@einvoicing", "admin", "other", "bills", "products", "companies"));
 
 /**
  * Extract the manual actions from the HTML action block the module computes for a flow.
@@ -117,6 +117,9 @@ function einvsp_actionsFromHtml($html)
  */
 function einvsp_actionMetaFromUrl($url)
 {
+	if (strpos($url, 'admin/setup_options.php') !== false) {
+		return array('label' => 'SetDefaultRoutingMixed', 'help' => 'EINVOICING_DEFAULT_ROUTING_MIXED_HELP', 'icon' => 'fa-cog');
+	}
 	if (strpos($url, 'product_mapping.php') !== false) {
 		return array('label' => 'AssociateExistingProductShort', 'help' => 'ActionAssociateProductHelp', 'icon' => 'fa-link');
 	}
@@ -287,6 +290,8 @@ if ($action == 'confirm_linkthirdparty' && $rowid > 0 && $permissiontowrite) {
 			setEventMessages($langs->trans("RecordNotFound"), null, 'errors');
 			$action = 'linkthirdparty';
 		} else {
+			// Societe::update() accepts a code out of the current numbering mask only when oldcopy holds it unchanged.
+			$soc->oldcopy = clone $soc;
 			// Write only the fields the user ticked on the comparison screen (apply_<key>).
 			$idmap = array('name' => 'name', 'vatnumber' => 'tva_intra', 'idprof1' => 'idprof1', 'idprof2' => 'idprof2', 'idprof3' => 'idprof3', 'email' => 'email');
 			$nbwritten = 0;
@@ -698,6 +703,7 @@ $statuslabels = array(
 // Short explanation of each business reason code, shown in the tooltip of the reason badge.
 $reasonhelp = array(
 	'PRODUCT_NOT_FOUND' => $langs->trans("ReasonProductNotFoundHelp"),
+	'DEFAULT_ROUTING_MIXED_UNSET' => $langs->trans("EINVOICING_DEFAULT_ROUTING_MIXED_HELP"),
 	'THIRDPARTY_NOT_FOUND' => $langs->trans("ReasonThirdpartyNotFoundHelp"),
 	'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT' => $langs->trans("ReasonBadAmountHelp"),
 );
@@ -705,6 +711,7 @@ $reasonhelp = array(
 // Short human label of each reason code (the raw code stays in the tooltip), kept on a single line.
 $reasonshort = array(
 	'PRODUCT_NOT_FOUND' => $langs->trans("ReasonProductNotFoundShort"),
+	'DEFAULT_ROUTING_MIXED_UNSET' => $langs->trans("ReasonDefaultRoutingMixedUnsetShort"),
 	'THIRDPARTY_NOT_FOUND' => $langs->trans("ReasonThirdpartyNotFoundShort"),
 	'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT' => $langs->trans("ReasonBadAmountShort"),
 );
@@ -717,6 +724,7 @@ $actionmeta = array(
 	'createthirdparty'    => array('icon' => 'fa-plus-circle', 'label' => 'CreateSupplierShort',           'help' => 'ActionCreateThirdpartyHelp'),
 	'addsupplierrefprice' => array('icon' => 'fa-link',        'label' => 'AssociateExistingProductShort', 'help' => 'ActionAssociateProductHelp'),
 	'setdefaultproduct'   => array('icon' => 'fa-star',        'label' => 'SetDefaultProductShort',        'help' => 'ActionSetDefaultProductHelp'),
+	'setdefaultroutingmixed' => array('icon' => 'fa-cog',      'label' => 'SetDefaultRoutingMixed',        'help' => 'EINVOICING_DEFAULT_ROUTING_MIXED_HELP'),
 );
 
 $imaxinloop = ($limit ? min($num, $limit) : $num);
