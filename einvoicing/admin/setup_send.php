@@ -70,8 +70,7 @@ if (!$res) {
  * @var Societe $mysoc
  */
 // Libraries
-// @phpstan-ignore requireOnce.fileNotFound
-require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
+require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php"; // @phpstan-ignore requireOnce.fileNotFound (PHPStan takes DOL_DOCUMENT_ROOT from install/inc.php of the core, where it is '..')
 require_once __DIR__.'/../lib/einvoicing.lib.php';
 require_once __DIR__.'/../class/providers/PDPProviderManager.class.php';
 require_once __DIR__.'/../class/protocols/ProtocolManager.class.php';
@@ -102,8 +101,7 @@ $setupnotempty = 0;
 $useFormSetup = 1;
 
 if (!class_exists('FormSetup')) {
-	// @phpstan-ignore requireOnce.fileNotFound
-	require_once DOL_DOCUMENT_ROOT.'/core/class/html.formsetup.class.php';
+	require_once DOL_DOCUMENT_ROOT.'/core/class/html.formsetup.class.php'; // @phpstan-ignore requireOnce.fileNotFound (PHPStan takes DOL_DOCUMENT_ROOT from install/inc.php of the core, where it is '..')
 }
 
 $formSetup = new FormSetup($db);
@@ -400,8 +398,7 @@ if ($action == 'delete_extra_untdid' && GETPOST('token', 'alpha') === newToken()
 	exit;
 }
 
-// @phpstan-ignore requireOnce.fileNotFound
-include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
+include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php'; // @phpstan-ignore include.fileNotFound (PHPStan takes DOL_DOCUMENT_ROOT from install/inc.php of the core, where it is '..')
 
 //print getDolGlobalString('EINVOICING_PDP');
 
