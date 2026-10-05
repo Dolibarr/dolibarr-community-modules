@@ -137,6 +137,18 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 				}
 			}
 
+			// Per-supplier override of EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION (community decision,
+			// issue #969). '' means "use the global default" and deletes any existing override;
+			// insertOrUpdateExtraField() already turns an empty value into that delete.
+			if (GETPOSTISSET('merge_line_charges')) {
+				$mergeLineCharges = GETPOST('merge_line_charges', 'aZ09');
+				$result = $einvoicing->insertOrUpdateExtraField($socId, 'societe', EInvoicing::EXTRAFIELD_MERGE_LINE_CHARGES, ($mergeLineCharges === '1' || $mergeLineCharges === '0') ? $mergeLineCharges : '');
+				if ($result < 0) {
+					$error++;
+					$this->errors[] = $langs->trans('FailedToSaveMergeLineChargesOption').' '.$einvoicing->error;
+				}
+			}
+
 			if ($error) {
 				return -4;
 			}

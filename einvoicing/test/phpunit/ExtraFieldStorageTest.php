@@ -89,6 +89,46 @@ class ExtraFieldStorageTest extends CommonClassTest
 		$this->assertSame(array(), $recordingDb->idReadsWithoutInsert);
 		$this->assertNull($einvoicing->getExtraFieldValue(self::TEST_ELEMENT_ID, 'invoice_supplier', EInvoicing::EXTRAFIELD_TOTALS_MISMATCH));
 	}
+
+	/**
+	 * shouldMergeLineChargesIntoDescription() (issue #969): a supplier with no override follows the
+	 * global default, '1' or '0' overrides it regardless of the global value, and deleting the override
+	 * (an empty value, which insertOrUpdateExtraField() reads as a delete) falls back to the global
+	 * default again.
+	 *
+	 * @return void
+	 */
+	public function testMergeLineChargesFollowsTheOverrideThenTheGlobalDefault()
+	{
+		global $conf, $db;
+
+		$einvoicing = new EInvoicing($db);
+		$savedDefault = $conf->global->EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION ?? null;
+
+		try {
+			$conf->global->EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION = 0;
+			$this->assertFalse($einvoicing->shouldMergeLineChargesIntoDescription(self::TEST_ELEMENT_ID), 'no override: follows the global default (off)');
+
+			$this->assertGreaterThan(0, $einvoicing->insertOrUpdateExtraField(self::TEST_ELEMENT_ID, 'societe', EInvoicing::EXTRAFIELD_MERGE_LINE_CHARGES, '1'));
+			$this->assertTrue($einvoicing->shouldMergeLineChargesIntoDescription(self::TEST_ELEMENT_ID), 'overridden on, although the global default is off');
+
+			$conf->global->EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION = 1;
+			$this->assertTrue($einvoicing->shouldMergeLineChargesIntoDescription(self::TEST_ELEMENT_ID), 'still on: the override does not depend on the global value');
+
+			$this->assertSame(1, $einvoicing->insertOrUpdateExtraField(self::TEST_ELEMENT_ID, 'societe', EInvoicing::EXTRAFIELD_MERGE_LINE_CHARGES, '0'));
+			$this->assertFalse($einvoicing->shouldMergeLineChargesIntoDescription(self::TEST_ELEMENT_ID), 'overridden off, although the global default is now on');
+
+			// Deleting the override (empty value) falls back to the global default again.
+			$this->assertSame(1, $einvoicing->insertOrUpdateExtraField(self::TEST_ELEMENT_ID, 'societe', EInvoicing::EXTRAFIELD_MERGE_LINE_CHARGES, ''));
+			$this->assertTrue($einvoicing->shouldMergeLineChargesIntoDescription(self::TEST_ELEMENT_ID), 'override deleted: back to the global default (on)');
+		} finally {
+			if ($savedDefault === null) {
+				unset($conf->global->EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION);
+			} else {
+				$conf->global->EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION = $savedDefault;
+			}
+		}
+	}
 }
 
 /**

@@ -593,6 +593,13 @@ class EInvoicing
 	const EXTRAFIELD_BUYER_REFERENCE = 'buyer_reference';
 
 	/**
+	 * Name, into llx_einvoicing_extrafields (element_type 'societe'), of the per-supplier override of
+	 * EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION. '1' forces the behaviour on for that supplier, '0'
+	 * forces it off, no row inherits the global default. See shouldMergeLineChargesIntoDescription().
+	 */
+	const EXTRAFIELD_MERGE_LINE_CHARGES = 'merge_line_charges';
+
+	/**
 	 * ISO/IEC 6523 scheme identifier of the French routing code ("code de routage"), the scheme the
 	 * Chorus Pro "code service exécutant" is declared under as BT-46 by BR-FR-CPRO-11 and
 	 * BR-FR-CPRO-13 of XP Z12-012. Not to be confused with 0225 (e-invoice address) nor with 0002 /
@@ -2543,6 +2550,16 @@ class EInvoicing
 				$resprints .= $this->selectVendorProduct($form, $object->id, $service_id, 'routing_service_id', '1');
 				$resprints .= '</td>';
 				$resprints .= '</tr>';
+
+				// Whether this supplier's line charges (BG-28) are folded into the product line's
+				// description instead of imported as a line of their own. Defaults to "use the global
+				// default": a new supplier has no override of its own.
+				$resprints .= '<tr class="treinvoicing_collapseseparator trmerge_line_charges '.($expand_display ? '' : 'hidden').'">';
+				$resprints .= '<td>' . $form->textwithpicto($langs->trans("EInvoicingMergeLineChargesField"), $langs->trans("EInvoicingMergeLineChargesHelp")) . '</td>';
+				$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
+				$resprints .= $this->mergeLineChargesSelectHtml($form, '');
+				$resprints .= '</td>';
+				$resprints .= '</tr>';
 			}
 
 			return $resprints;
@@ -2697,7 +2714,47 @@ class EInvoicing
 			}
 		}
 
+		// Whether this supplier's line charges (BG-28) are folded into the product line's description
+		// instead of imported as a line of their own. Reception only, like the block above.
+		if ($object->fournisseur > 0 && !einvoicingReceptionDisabled()) {
+			$mergeOverride = $this->getExtraFieldValue($object->id, 'societe', self::EXTRAFIELD_MERGE_LINE_CHARGES);
+
+			$resprints .= '<tr class="treinvoicing_collapseseparator '.($expand_display ? '' : 'hidden').'">';
+			$resprints .= '<td>' . $form->textwithpicto($langs->trans("EInvoicingMergeLineChargesField"), $langs->trans("EInvoicingMergeLineChargesHelp")) . '</td>';
+			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
+			if ($mode == 'edit') {
+				$resprints .= $this->mergeLineChargesSelectHtml($form, $mergeOverride ?? '');
+			} else {
+				$effective = $this->shouldMergeLineChargesIntoDescription($object->id) ? $langs->trans("Yes") : $langs->trans("No");
+				$resprints .= dol_escape_htmltag($effective);
+				$resprints .= ' <span class="opacitymedium small">— ' . $langs->trans($mergeOverride === '0' || $mergeOverride === '1' ? "EInvoicingMergeLineChargesOverridden" : "EInvoicingMergeLineChargesInherited") . '</span>';
+			}
+			$resprints .= '</td>';
+			$resprints .= '</tr>';
+		}
+
 		return $resprints;
+	}
+
+	/**
+	 * Select to choose, for one supplier, whether its line charges override the global default.
+	 *
+	 * @param	Form	$form		Form handler
+	 * @param	string	$current	Value currently stored ('', '0' or '1')
+	 * @return	string				HTML of the select
+	 */
+	private function mergeLineChargesSelectHtml($form, $current)
+	{
+		global $langs;
+
+		$defaultLabel = getDolGlobalInt('EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION') ? $langs->trans("Yes") : $langs->trans("No");
+		$options = array(
+			''  => $langs->trans("EInvoicingMergeLineChargesDefault", $defaultLabel),
+			'1' => $langs->trans("Yes"),
+			'0' => $langs->trans("No"),
+		);
+
+		return $form->selectarray('merge_line_charges', $options, $current, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
 	}
 
 	/**
@@ -3376,6 +3433,27 @@ class EInvoicing
 		$this->db->free($resql);
 
 		return $value;
+	}
+
+	/**
+	 * Whether the charges of a received invoice line (BG-28) must be folded into the description of the
+	 * product line they belong to, instead of being imported as a Dolibarr line of their own.
+	 *
+	 * The supplier can override the global default (EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION) with
+	 * its own EXTRAFIELD_MERGE_LINE_CHARGES on element_type 'societe'; no override (and no row at all)
+	 * falls back to the global setting.
+	 *
+	 * @param	int		$socid		Id of the supplier thirdparty
+	 * @return	bool				True when line charges must be folded into the line description
+	 */
+	public function shouldMergeLineChargesIntoDescription($socid)
+	{
+		$override = $this->getExtraFieldValue((int) $socid, 'societe', self::EXTRAFIELD_MERGE_LINE_CHARGES);
+		if ($override === '0' || $override === '1') {
+			return $override === '1';
+		}
+
+		return (bool) getDolGlobalInt('EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION');
 	}
 
 
