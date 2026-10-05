@@ -1674,7 +1674,7 @@ class CIIProtocol extends AbstractProtocol
 			if ($mergeLineCharges && !$is_deposit_line) {
 				$chargesDescription = $this->buildLineChargesDescription($parsedLine);
 				if ($chargesDescription !== '') {
-					$line->desc = trim(dol_concatdesc($line->desc ?? '', $chargesDescription));
+					$line->desc = trim(dol_concatdesc($line->desc, $chargesDescription));
 				}
 			}
 
