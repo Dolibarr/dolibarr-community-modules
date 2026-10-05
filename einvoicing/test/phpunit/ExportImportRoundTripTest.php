@@ -122,17 +122,14 @@ class ExportImportRoundTripTest extends CommonClassTest
 	}
 
 	/**
-	 * Generate an invoice, import the document it produces, and return both.
+	 * Run a scenario with the two parties of a round trip created and the environment pinned for it.
 	 *
-	 * @return array{invoice:Facture,imported:FactureFournisseur}
+	 * @param	callable	$scenario	Called with the buyer (Societe) and the protocol (CIIProtocol)
+	 * @return	mixed					What the scenario returns
 	 */
-	private function roundTrip()
+	private function inRoundTripEnvironment(callable $scenario)
 	{
-		global $conf, $db, $langs, $mysoc, $user;
-
-		if (self::$roundTrip !== null) {
-			return self::$roundTrip;
-		}
+		global $conf, $db, $mysoc, $user;
 
 		// The import writes as the user who is logged in, and reads that user from the global. A test
 		// process has none: the invoice is then written with an author of 0, which the foreign key of
@@ -202,44 +199,7 @@ class ExportImportRoundTripTest extends CommonClassTest
 			$buyer->tva_intra = $buyerIdentity['vat'];
 			$this->assertGreaterThan(0, $buyer->create($user), 'the buyer third party is created: ' . $buyer->error . ' ' . implode(', ', (array) $buyer->errors));
 
-			$invoice = new Facture($db);
-			$invoice->socid = $buyer->id;
-			$invoice->type = Facture::TYPE_STANDARD;
-			$invoice->date = dol_now();
-			$this->assertGreaterThan(0, $invoice->create($user), 'the invoice is created: ' . $invoice->error);
-
-			foreach (self::LINES as $index => $line) {
-				list($description, $price, $qty, $rate, $discount, $type) = $line;
-				$added = $invoice->addline($description, $price, $qty, $rate, 0, 0, 0, $discount, '', '', 0, 0, 0, 'HT', 0, $type);
-				$this->assertGreaterThan(0, $added, 'line ' . ($index + 1) . ' is added: ' . $invoice->error);
-			}
-
-			$reloaded = new Facture($db);
-			$this->assertGreaterThan(0, $reloaded->fetch($invoice->id), 'the invoice is read back');
-			$reloaded->fetch_lines();
-			$reloaded->fetch_thirdparty();
-
-			$protocol = new CIIProtocol($db);
-			$path = $protocol->generateXML($reloaded, $langs);
-			$this->assertNotEmpty($path, 'the document is generated: ' . $protocol->error . ' ' . implode(', ', (array) $protocol->errors));
-			$this->assertFileExists((string) $path, 'the generated document is written');
-
-			$result = $protocol->createSupplierInvoiceFromSource((string) file_get_contents((string) $path), basename((string) $path));
-			$importedId = is_array($result) ? (int) ($result['res'] ?? 0) : (int) $result;
-			$answer = is_array($result) ? trim(strip_tags((string) ($result['message'] ?? ''))) : '';
-			$this->assertGreaterThan(
-				0,
-				$importedId,
-				'the document the module wrote is read back by the module: ' . $answer . ' ' . $protocol->error . ' ' . implode(', ', (array) $protocol->errors)
-			);
-
-			$imported = new FactureFournisseur($db);
-			$this->assertGreaterThan(0, $imported->fetch($importedId), 'the imported invoice is read back');
-			$imported->fetch_lines();
-
-			self::$roundTrip = array('invoice' => $reloaded, 'imported' => $imported);
-
-			return self::$roundTrip;
+			return $scenario($buyer, new CIIProtocol($db));
 		} finally {
 			$user = $savUser;
 			$conf->global->EINVOICING_PDP = $savPdp;
@@ -248,6 +208,72 @@ class ExportImportRoundTripTest extends CommonClassTest
 				$mysoc->$property = $value;
 			}
 		}
+	}
+
+	/**
+	 * Generate the document of an invoice and import it the way a received one is.
+	 *
+	 * @param	CIIProtocol	$protocol	The protocol that writes and reads the document
+	 * @param	Facture		$invoice	The invoice to send, lines already added
+	 * @return	array{invoice:Facture,imported:FactureFournisseur}	The invoice read back, and what the import made of it
+	 */
+	private function sendAndImport($protocol, $invoice)
+	{
+		global $db, $langs;
+
+		$reloaded = new Facture($db);
+		$this->assertGreaterThan(0, $reloaded->fetch($invoice->id), 'the invoice is read back');
+		$reloaded->fetch_lines();
+		$reloaded->fetch_thirdparty();
+
+		$path = $protocol->generateXML($reloaded, $langs);
+		$this->assertNotEmpty($path, 'the document is generated: ' . $protocol->error . ' ' . implode(', ', (array) $protocol->errors));
+		$this->assertFileExists((string) $path, 'the generated document is written');
+
+		$result = $protocol->createSupplierInvoiceFromSource((string) file_get_contents((string) $path), basename((string) $path));
+		$importedId = is_array($result) ? (int) ($result['res'] ?? 0) : (int) $result;
+		$answer = is_array($result) ? trim(strip_tags((string) ($result['message'] ?? ''))) : '';
+		$this->assertGreaterThan(
+			0,
+			$importedId,
+			'the document the module wrote is read back by the module: ' . $answer . ' ' . $protocol->error . ' ' . implode(', ', (array) $protocol->errors)
+		);
+
+		$imported = new FactureFournisseur($db);
+		$this->assertGreaterThan(0, $imported->fetch($importedId), 'the imported invoice is read back');
+		$imported->fetch_lines();
+
+		return array('invoice' => $reloaded, 'imported' => $imported);
+	}
+
+	/**
+	 * Generate an invoice, import the document it produces, and return both.
+	 *
+	 * @return array{invoice:Facture,imported:FactureFournisseur}
+	 */
+	private function roundTrip()
+	{
+		if (self::$roundTrip === null) {
+			self::$roundTrip = $this->inRoundTripEnvironment(function ($buyer, $protocol) {
+				global $db, $user;
+
+				$invoice = new Facture($db);
+				$invoice->socid = $buyer->id;
+				$invoice->type = Facture::TYPE_STANDARD;
+				$invoice->date = dol_now();
+				$this->assertGreaterThan(0, $invoice->create($user), 'the invoice is created: ' . $invoice->error);
+
+				foreach (self::LINES as $index => $line) {
+					list($description, $price, $qty, $rate, $discount, $type) = $line;
+					$added = $invoice->addline($description, $price, $qty, $rate, 0, 0, 0, $discount, '', '', 0, 0, 0, 'HT', 0, $type);
+					$this->assertGreaterThan(0, $added, 'line ' . ($index + 1) . ' is added: ' . $invoice->error);
+				}
+
+				return $this->sendAndImport($protocol, $invoice);
+			});
+		}
+
+		return self::$roundTrip;
 	}
 
 	/**
@@ -305,5 +331,40 @@ class ExportImportRoundTripTest extends CommonClassTest
 		$this->assertEqualsWithDelta((float) $sent->total_ht, (float) $read->total_ht, 0.011, 'the net total');
 		$this->assertEqualsWithDelta((float) $sent->total_tva, (float) $read->total_tva, 0.011, 'the VAT total');
 		$this->assertEqualsWithDelta((float) $sent->total_ttc, (float) $read->total_ttc, 0.011, 'the gross total');
+	}
+
+	/**
+	 * The credit note of a deposit comes back at its own amount. It references the deposit it credits
+	 * (BT-25), which the import took for a deposit to deduct: a second line doubled the amount.
+	 *
+	 * @return void
+	 */
+	public function testACreditNoteOfADepositComesBackAtItsAmount()
+	{
+		$roundTrip = $this->inRoundTripEnvironment(function ($buyer, $protocol) {
+			global $db, $user;
+
+			$deposit = new Facture($db);
+			$deposit->socid = $buyer->id;
+			$deposit->type = Facture::TYPE_DEPOSIT;
+			$deposit->date = dol_now();
+			$this->assertGreaterThan(0, $deposit->create($user), 'the deposit is created: ' . $deposit->error);
+			$this->assertGreaterThan(0, $deposit->addline('Deposit', 100, 1, 20.0), 'the deposit line is added: ' . $deposit->error);
+			$this->sendAndImport($protocol, $deposit);
+
+			$creditNote = new Facture($db);
+			$creditNote->socid = $buyer->id;
+			$creditNote->type = Facture::TYPE_CREDIT_NOTE;
+			$creditNote->fk_facture_source = $deposit->id;
+			$creditNote->date = dol_now();
+			$this->assertGreaterThan(0, $creditNote->create($user), 'the credit note is created: ' . $creditNote->error);
+			$this->assertGreaterThan(0, $creditNote->addline('Deposit refunded', -100, 1, 20.0), 'the credit note line is added: ' . $creditNote->error);
+
+			return $this->sendAndImport($protocol, $creditNote);
+		});
+
+		$this->assertSame(FactureFournisseur::TYPE_CREDIT_NOTE, (int) $roundTrip['imported']->type, 'it is imported as a credit note');
+		$this->assertCount(count($roundTrip['invoice']->lines), $roundTrip['imported']->lines, 'no deposit line is added to it');
+		$this->assertEqualsWithDelta((float) $roundTrip['invoice']->total_ttc, (float) $roundTrip['imported']->total_ttc, 0.011, 'the gross total');
 	}
 }
