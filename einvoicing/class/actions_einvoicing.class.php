@@ -547,12 +547,15 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					// (Document::reimport() refuses anything else). The reason travels as the entry tooltip, which the dropdown of the core cannot hold before
 					// Dolibarr 22 - there it says "not enough permissions" instead.
 					$reimportofadraft = ((int) $object->status === FactureFournisseur::STATUS_DRAFT);
+					$reimporturl = dol_buildpath('/einvoicing/document_card.php', 1) . '?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken();
 					$reimportentry = array(
 						'lang' => 'einvoicing',
 						'enabled' => true,
 						'perm' => ($reimportofadraft ? 1 : 0),
 						'label' => 'EInvoiceReimport',
-						'url' => einvoicingDropdownEntryUrl(dol_buildpath('/einvoicing/document_card.php', 1)) . '?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken()
+						'urlroot' => $reimporturl,
+						// 'url' is defined for backward compatibility with v18 and v19, which ignore 'urlroot'
+						'url' => einvoicingDropdownEntryUrl($reimporturl)
 					);
 					if (!$reimportofadraft) {
 						$reimportentry['attr'] = array('title' => $langs->trans('EInvoiceReimportOnlyOnADraft'));
