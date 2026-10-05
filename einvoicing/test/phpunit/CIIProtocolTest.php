@@ -630,6 +630,150 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
+	 * A vendor identified by its SIREN, as the automatic creation of the import leaves it.
+	 *
+	 * @param	string	$siren	SIREN identifying the vendor
+	 * @return	int				Id of the created thirdparty
+	 */
+	private function createSellerVendor($siren)
+	{
+		global $db, $user;
+
+		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+		require_once DOL_DOCUMENT_ROOT . '/core/lib/company.lib.php';	// Societe::create() of Dolibarr 21 calls getCountry() without loading it
+
+		$thirdparty = new Societe($db);
+		$thirdparty->name = 'Vendor of the seller lookup test';
+		$thirdparty->country_code = 'FR';
+		$thirdparty->idprof1 = $siren;
+		$thirdparty->fournisseur = 1;
+		$thirdparty->code_fournisseur = 'auto';
+
+		$id = $thirdparty->create($user);
+		$this->assertGreaterThan(0, $id, 'Could not create the vendor of the test: ' . $thirdparty->error . ' ' . implode(', ', $thirdparty->errors));
+
+		return $id;
+	}
+
+	/**
+	 * Seller block of a received document, reduced to what the vendor lookup reads.
+	 *
+	 * @param	string	$siren	SIREN carried by the document
+	 * @return	array			Seller information, as the protocols parse it
+	 */
+	private function sellerInfo($siren)
+	{
+		return array(
+			'sellername' => 'Vendor of the seller lookup test',
+			'sellerlineone' => '1 rue du Test',
+			'sellerpostcode' => '86000',
+			'sellercity' => 'Poitiers',
+			'sellercountry' => 'FR',
+			'sellerGlobalIds' => array('0002' => $siren),
+		);
+	}
+
+	/**
+	 * The vendor lookup the import runs before anything else, called on its own. product_mapping.php
+	 * names the vendor of a flow with it, so its answer has to stay the answer of the import.
+	 *
+	 * @param	array	$sellerInfo	Seller information
+	 * @return	array				Answer of findThirdpartyFromEInvoiceSeller()
+	 */
+	private function lookupSeller($sellerInfo)
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		return $protocol->findThirdpartyFromEInvoiceSeller($sellerInfo);
+	}
+
+	/**
+	 * Number of thirdparties carrying a SIREN, to tell a lookup that found nothing from one that
+	 * created what it was looking for. The column of idprof1 is named after what it holds in France.
+	 *
+	 * @param	string	$siren	SIREN to count
+	 * @return	int				Number of rows
+	 */
+	private function nbThirdpartiesWithSiren($siren)
+	{
+		global $db;
+
+		$sql = "SELECT COUNT(*) as nb FROM " . MAIN_DB_PREFIX . "societe WHERE siren = '" . $db->escape($siren) . "'";
+		$resql = $db->query($sql);
+		$this->assertNotFalse($resql, 'Could not count the thirdparties: ' . $db->lasterror());
+		$obj = $db->fetch_object($resql);
+
+		return (int) $obj->nb;
+	}
+
+	/**
+	 * The lookup answers the vendor the SIREN of the document identifies.
+	 *
+	 * @return void
+	 */
+	public function testSellerLookupFindsTheVendorByItsLegalIdentifier()
+	{
+		$siren = '000000015';
+		$socid = $this->createSellerVendor($siren);
+
+		$res = $this->lookupSeller($this->sellerInfo($siren));
+
+		$this->assertEquals($socid, $res['res'], 'The lookup did not find the vendor by its SIREN: ' . $res['message']);
+	}
+
+	/**
+	 * An unknown seller is answered with 0, and nothing is created: the lookup is read only, where the
+	 * synchronization around it creates the vendor when the option says so.
+	 *
+	 * @return void
+	 */
+	public function testSellerLookupCreatesNothingWhenTheSellerIsUnknown()
+	{
+		global $conf;
+
+		// On, so a lookup that would go on creating like the synchronization does would be caught here.
+		$saved = $conf->global->EINVOICING_THIRDPARTIES_AUTO_GENERATION ?? null;
+		$conf->global->EINVOICING_THIRDPARTIES_AUTO_GENERATION = 1;
+
+		try {
+			$siren = '000000016';
+			$this->assertEquals(0, $this->nbThirdpartiesWithSiren($siren), 'The SIREN of the test is already used');
+
+			$res = $this->lookupSeller($this->sellerInfo($siren));
+
+			$this->assertEquals(0, $res['res'], 'The lookup answered a thirdparty for a SIREN nobody carries');
+			$this->assertEquals(0, $this->nbThirdpartiesWithSiren($siren), 'The lookup created the vendor it was only asked about');
+		} finally {
+			if ($saved === null) {
+				unset($conf->global->EINVOICING_THIRDPARTIES_AUTO_GENERATION);
+			} else {
+				$conf->global->EINVOICING_THIRDPARTIES_AUTO_GENERATION = $saved;
+			}
+		}
+	}
+
+	/**
+	 * A name is not an identity (BT-27 and BT-28 are descriptive): a document carrying no structured
+	 * identifier is not attached to the vendor that merely bears the same name (issue #739).
+	 *
+	 * @return void
+	 */
+	public function testSellerLookupDoesNotMatchOnTheNameAlone()
+	{
+		$siren = '000000017';
+		$this->createSellerVendor($siren);
+
+		$sellerInfo = $this->sellerInfo($siren);
+		unset($sellerInfo['sellerGlobalIds']);
+
+		$res = $this->lookupSeller($sellerInfo);
+
+		$this->assertEquals(0, $res['res'], 'The lookup attached the document to a vendor on its name alone');
+	}
+
+	/**
 	 * Real aggregated invoice line, as a payroll provider sends it: one line standing for the whole
 	 * invoice, with no vendor reference, no buyer reference and no GTIN, and a label far longer than
 	 * the 128 characters of product_fournisseur_price.ref_fourn. Anonymized sample of a document
