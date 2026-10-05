@@ -187,7 +187,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item = $formSetup->newItem('EINVOICING_ENABLE_API_VALIDATION')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_ENABLE_API_VALIDATION_HELP');
 	$item->defaultFieldValue = '0';
-	//$item->fieldParams['warningifon'] = 1;
+	$item->fieldParams['warningifon'] = 1;
 	$item->cssClass = 'minwidth500';
 
 	// Local EN 16931 business rules check (BR, BR-CO, BR-FR subset) on the generated XML.
@@ -230,6 +230,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 		$item->helpText = $langs->transnoentities('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS').'<br>'.$langs->transnoentities('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS2');
 		$item->defaultFieldValue = '0';
 		$item->cssClass = 'minwidth500';
+		$item->fieldParams['warningifon'] = 1;
 	}
 
 	// Setup conf to choose to block generation/send of an invoice if no routing ID is found for the third party otherwise use SIREN
