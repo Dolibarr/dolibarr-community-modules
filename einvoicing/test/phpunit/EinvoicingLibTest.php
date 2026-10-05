@@ -21,8 +21,8 @@
  *      \ingroup    test
  *      \brief      PHPUnit test for the functions of einvoicing/lib/einvoicing.lib.php: the tax
  *                  identifier of the seller (BT-31 / BT-32), the VAT point date code (BT-8), the
- *                  invoicing period derived from the lines (BG-14) and the redirect allowlist of
- *                  the OAuth callback page.
+ *                  invoicing period derived from the lines (BG-14), the redirect allowlist of
+ *                  the OAuth callback page and the url of a dropdown entry.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -633,5 +633,19 @@ class EinvoicingLibTest extends CommonClassTest
 		$this->assertFalse(einvoicingIsAllowedRedirectUrl('javascript:alert(1)'), 'A javascript payload must be refused');
 		$this->assertFalse(einvoicingIsAllowedRedirectUrl('ftp://partner.tld/callback'), 'A scheme other than http(s) must be refused');
 		$this->assertFalse(einvoicingIsAllowedRedirectUrl('https:///callback'), 'An URL without a host must be refused');
+	}
+
+	/**
+	 * The core puts the URL root in front of a dropdown entry, so the entry must not carry it already.
+	 *
+	 * @return void
+	 */
+	public function testADropdownEntryGetsTheUrlRootOnceFromTheCore()
+	{
+		$page = dol_buildpath('/einvoicing/document_card.php', 1);
+
+		$this->assertSame($page, DOL_URL_ROOT . einvoicingDropdownEntryUrl($page), 'The core must land on the page of this instance');
+		$this->assertSame('/custom/einvoicing/document_card.php', einvoicingDropdownEntryUrl('/dolibarr/custom/einvoicing/document_card.php', '/dolibarr'), 'An instance in a sub-path must not get it twice');
+		$this->assertSame('/custom/einvoicing/document_card.php', einvoicingDropdownEntryUrl('/custom/einvoicing/document_card.php', ''), 'An instance at the root of its domain has nothing to remove');
 	}
 }

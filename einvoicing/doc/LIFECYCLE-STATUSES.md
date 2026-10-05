@@ -8,7 +8,7 @@ Reference: DGFiP *Dossier de spécifications externes B2B* v3.x (AFNOR XP Z12-01
 model, XP Z12-014 annex A — normative — for the use cases and the order of the statuses). Only
 **four** statuses are mandatory: **200, 210, 212, 213**. Everything else is optional — "strongly
 recommended" for transparency, but a platform is free not to implement it, and a missing optional
-status proves nothing. Written 2026-08-26 against `main` of the module.
+status proves nothing. Written 2026-08-26, revised 2026-10-04 against `main` of the module.
 
 Wording note: the codes are named here with their official French labels, since that is what the
 platforms return; the module's own English labels (`langs/en_US/einvoicing.lang`) are in the third
@@ -32,11 +32,12 @@ column.
 | 209 | Complétée | Completed | seller | Optional | **Nothing.** The answer to a 208 (the seller supplies the missing attachment); not implemented. Displayed inbound. |
 | 210 | Refusée | Refused by customer | buyer | **Mandatory** | **Manual button only**, never automatic. Asks for a reason code. Terminal: closes the exchange. |
 | 211 | Paiement transmis | Payment transmitted | buyer | Optional | **Option** `EINVOICING_SEND_PAYMENT_SENT_STATUS` (off by default) → sent automatically when the supplier invoice is classified paid. Also available as a **manual button**. |
-| 212 | Encaissée | Payment received | seller | **Mandatory** (when VAT is due on collection) | **Automatic, no option**: sent on every customer payment recorded, per cash-in. Not manually sendable. |
-| 213 | Rejetée | Rejected by seller AP | seller's PA | **Mandatory** | **Inbound only.** Technical rejection; the only reliable negative signal. Displayed. |
+| 212 | Encaissée | Payment received | seller | **Mandatory** (when VAT is due on collection) | **Automatic, no option**: sent on every customer payment recorded, per cash-in, and on every refund as a cash-out (negative amounts, the payment note as the reason, MDT-126). Not manually sendable. |
+| 213 | Rejetée | Rejected by an AP (by seller's / buyer's AP when known) | seller's PA (emission) or buyer's PA (reception) | **Mandatory** | **Inbound only**, on customer and supplier invoices. Technical rejection; the only reliable negative signal. A `DOUBLON` rejection of an invoice already transmitted is kept in the history only and does not demote it. |
 
 Reading the "Emitted by" column: on a **customer** invoice Dolibarr is the seller (it receives
-200→213 and sends 212); on a **supplier** invoice Dolibarr is the buyer (it may send 205, 210, 211).
+200→213 and sends 212); on a **supplier** invoice Dolibarr is the buyer: it may send 205, 210, 211,
+and it receives what the vendor side posts (a 212 with the amount it reports, a 213 from its own AP).
 
 ---
 
@@ -56,7 +57,9 @@ Reading the "Emitted by" column: on a **customer** invoice Dolibarr is the selle
                 |                       |
                 v                       v
           [200] Deposee           [213] Rejetee           .....  TERMINAL
-         MANDATORY   in          MANDATORY   in                  fix, then redeposit
+         MANDATORY   in          MANDATORY   in                  fix, then redeposit (needs
+                                                                 EINVOICING_ALLOW_RESEND_TRANSMITTED
+                                                                 once the invoice was transmitted)
                 |
                 v
           [201] Emise par la plateforme                   optional   in    PA-E -> PA-R
@@ -98,7 +101,7 @@ Reading the "Emitted by" column: on a **customer** invoice Dolibarr is the selle
                 |
                 v
           [212] Encaissee                                 MANDATORY when VAT is due on collection
-          the seller reports every cash-in                AUTOMATIC  (no option)
+          the seller reports every cash-in and refund     AUTOMATIC  (no option)
 
   Legend of the right-hand markers, module side:
     in         the module only receives this status and displays it
@@ -113,8 +116,13 @@ Reading the "Emitted by" column: on a **customer** invoice Dolibarr is the selle
 ## 3. Code by code, in the module
 
 ### 200 / 201 / 202 / 203 / 213 — the platform's own statuses
-Purely inbound. The synchronization cron stores whatever the platform reports and the card shows the
-label from `EInvoicing::STATUS_LABEL_KEYS` (`class/einvoicing.class.php`). They are removed from the
+Purely inbound. The synchronization stores what the platform reports (`llx_einvoicing_lifecycle_msg`,
+and the invoice status in `llx_einvoicing_extlinks`); the card names the status with
+`EInvoicing::getStatusLabel()`, which tells a 213 from the buyer's AP from one from the seller's AP.
+A 213 `DOUBLON` on an invoice already transmitted only refuses the new delivery
+(`isTransmissionOnlyRejection()`): it is kept in the history and the invoice keeps its status. A
+status the database fails to record is not marked processed, and is read again on the next
+synchronization. They are removed from the
 sendable list on purpose (`getEinvoiceStatusOptions()`, `$onlySendable`): a plain user has no
 business claiming its own invoice was deposited.
 
@@ -129,15 +137,19 @@ declared (`REASONS_CODE_FOR_STATUS`, `STATUS_REQUIRING_REASONS`), so the missing
 the provider call, not the data model.
 
 ### 205 Approuvée — the only optional status the module can automate
-- Manual: button on the supplier invoice card, from
+- Manual: an entry of the e-invoice dropdown on the supplier invoice card, from
   `getSendableStatusesForReceivedInvoice()` (`class/einvoicing.class.php`), rendered in
-  `class/actions_einvoicing.class.php`.
+  `class/actions_einvoicing.class.php`. On a draft it validates the invoice first, so it needs the
+  validate right. It is withheld while the invoice does not total what its document announces
+  (issue #861) — refusing stays offered.
 - Automatic: option **`EINVOICING_SEND_APPROVED_ON_VALIDATION`**, *off by default*
   (`admin/setup_options.php`). When on, `BILL_SUPPLIER_VALIDATE` sends it
   (`core/triggers/interface_98_modEInvoicing_EInvoicingTriggers.class.php`), the rationale being that
   validating a supplier invoice in Dolibarr *is* the act of accepting it.
 - Guards (`SupplierInvoiceHelper::shouldSendApprovedOnValidation()`): once per invoice, never on an
-  invoice that already got a 205 or a 210, never on the credit note of a refused invoice.
+  invoice that already got a 205 or a 210, never on the credit note of a refused invoice, nor on an
+  invoice that did not come from the platform, a flow filed as B2B international, or when sending is
+  disabled (generation-only mode included).
 - A send failure never rolls back the validation; it is logged and shown, and the button remains.
 
 ⚠ Automating 205 **closes the lifecycle for a refusal**: once approved, 210 is no longer offered.
@@ -146,8 +158,10 @@ That is exactly why the option is off by default — nothing in the norm asks fo
 ### 210 Refusée — mandatory, but manual by design
 The norm requires that a buyer be *able* to refuse; it never asks for an automatic refusal, and no
 automatism could decide it. Manual button only, with a reason code picked from
-`REASONS_CODE_FOR_STATUS[STATUS_REFUSED]`. Terminal: once sent, the whole button group disappears
-(`getSendableStatusesForReceivedInvoice()` returns an empty array).
+`REASONS_CODE_FOR_STATUS[STATUS_REFUSED]`. Terminal: once the platform accepts it, the whole group
+disappears (`getSendableStatusesForReceivedInvoice()` returns an empty array), and the supplier invoice
+is abandoned in Dolibarr — validated if still a draft, then cancelled with a dedicated close code that
+keeps it out of the accountancy transfer.
 
 ### 211 Paiement transmis — courtesy to the vendor
 Option **`EINVOICING_SEND_PAYMENT_SENT_STATUS`**, *off by default*: it costs one platform flow per
@@ -159,12 +173,14 @@ Also reachable by hand, and it **needs no prior 205**: only the transmission sta
 the processing ones *« peuvent être posés de façon indépendante »* (XP Z12-014 annex A, normative,
 § 2.1). Approve then pay is the nominal case (issue #548), not a precondition — and 205 is optional
 anyway, so requiring it would put the button out of reach of anyone who never approves. The manual
-button is hidden in two cases only: after an accepted **210**, which ends the exchange, and on a
-**draft** invoice, which is not in the accounts and cannot have been paid.
+button is hidden after an accepted **210**, which ends the exchange; on a **draft** invoice, which is
+not in the accounts and cannot have been paid; once a 211 of its own was accepted; and on a flow
+filed as B2B international.
 
 ### 212 Encaissée — the only outbound status with no off switch
 Sent on `PAYMENT_CUSTOMER_CREATE`, **once per payment and not once per invoice**: the reform expects
-the date and amount of *every* cash-in, so a two-instalment invoice owes two statuses. Hooking the
+the date and amount of *every* cash-in, so a two-instalment invoice owes two statuses, and a refund
+owes one more, with negative amounts (XP Z12-012 P1.15 / P1.17). Hooking the
 payment creation also covers invoices that stay partially paid forever, and skips write-offs.
 
 It is only owed when VAT is due on collection: `needCashedInStatus()` answers from the VAT scheme of
@@ -176,14 +192,19 @@ Skipped when the invoice never reached the platform, or when its deposit was ref
 
 ## 4. Cross-cutting rules
 
-- **Kill switches**: `EINVOICING_DISABLE_SYNC_DOLI_TO_AP` suppresses every outbound status;
-  `EINVOICING_DISABLE_SYNC_AP_TO_DOLI` suppresses the inbound side and the buttons with it.
+- **Kill switches**: `EINVOICING_DISABLE_SYNC_DOLI_TO_AP` suppresses the automatic statuses (205,
+  211, 212); `EINVOICING_DISABLE_SYNC_AP_TO_DOLI` suppresses the inbound side and the supplier card
+  buttons with it; generation-only mode (`EINVOICING_ONLY_GENERATE`) suppresses both.
 - **Never undo a business act**: a failed status send is logged (`dol_syslog`) and shown, but never
-  escalated to a trigger error — it must not roll back a validation or a recorded payment.
-- **France only**: the setup screen marks 200/210/212/213 as *Mandatory* only when
+  escalated to a trigger error — it must not roll back a validation or a recorded payment. Except an
+  approval given by hand on a draft, which validates and sends in one transaction: a failed send
+  leaves it a draft.
+- **France only**: the status dropdowns mark 200/210/212/213 as *Mandatory* only when
   `$mysoc->country_code == 'FR'`.
 - **The status list is narrowed by history**, not by a state machine: a status already accepted by the
-  platform is not offered again; 210 closes everything; 205 closes only the refusal.
+  platform is not offered again, and a status already sent and not rejected (pending included) is
+  never deposited twice — a rejected one may be sent again; 210 closes everything; 205 closes only the
+  refusal.
 - **A flow the platform filed as B2B international** (`processingRule` = `B2BInt` in the flow metadata,
   kept in `llx_einvoicing_document.processing_rule`) gets no lifecycle answer at all: the platform
   refuses every status but the payment event, so nothing is offered and the card says why. A French
