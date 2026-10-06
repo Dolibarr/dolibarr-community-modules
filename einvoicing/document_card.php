@@ -215,9 +215,9 @@ if (empty($reshook)) {
 	// Action to build doc
 	include DOL_DOCUMENT_ROOT.'/core/actions_builddoc.inc.php';
 
-	// Import a received document again, once the data it is matched on has been fixed. The invoice
-	// it was booked on - a draft, or nothing left if it has already been deleted - is replaced by
-	// the one this new import creates, so there is nothing to come back to on this page.
+	// Import a received document again, once the data it is matched on has been fixed. The draft it
+	// was booked on is rebuilt in place, or a new one created if it has been deleted: the user is sent
+	// to the invoice, the result of the import.
 	if ($action == 'confirm_reimport' && $confirm == 'yes' && $permissiontoadd) {
 		$result = $object->reimport($user);
 		if ($result['res'] > 0) {
@@ -382,7 +382,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		$formconfirm = $form->formconfirm(
 			$_SERVER["PHP_SELF"].'?id='.$object->id,
 			$langs->trans('EInvoiceReimport'),
-			$langs->trans('EInvoiceReimportConfirm', $object->flow_id),
+			$langs->trans('EInvoiceReimportRebuildConfirm', $object->flow_id),
 			'confirm_reimport',
 			'',
 			0,

@@ -45,6 +45,12 @@ abstract class AbstractProtocol
 	/** @var array Non-blocking warning messages */
 	public $warnings = [];
 
+	/**
+	 * @var int Draft supplier invoice the next import rebuilds instead of creating one, 0 for none.
+	 *          Set by Document::reimport() around the synchronization of the flow, reset right after.
+	 */
+	public static $rebuildSupplierInvoiceId = 0;
+
 	/** @const string Invoice file extension (without the dot, example 'xml') */
 	const INVOICE_FILE_EXTENSION = ''; // Must be overridden by subclasses
 
