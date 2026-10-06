@@ -95,6 +95,8 @@ $id = GETPOSTINT('id');
 $mode = GETPOST('mode', 'aZ09');
 // 'supplier' reads the document received for a supplier invoice, otherwise the one sent to a customer
 $element = GETPOST('element', 'aZ09');
+// For a supplier invoice, the format to show ('converted', 'original'...), checked against a fixed list
+$format = GETPOST('format', 'aZ09');
 
 // 'diag' reads the document of the last incoming invoice that could not be processed
 $source = GETPOST('source', 'aZ09');
@@ -141,7 +143,7 @@ $einvoicing = new EInvoicing($db);
 if ($isdiag) {
 	$einvoicefile = dol_is_file($conf->einvoicing->dir_temp.'/'.$diagfile) ? $conf->einvoicing->dir_temp.'/'.$diagfile : '';
 } elseif ($issupplier) {
-	$einvoicefile = $einvoicing->getSupplierEInvoiceXmlFilePath($object);
+	$einvoicefile = $einvoicing->getSupplierEInvoiceXmlFilePath($object, (string) $format);
 } else {
 	$einvoicefile = $einvoicing->getEInvoiceXmlFilePath($object->ref);
 }
