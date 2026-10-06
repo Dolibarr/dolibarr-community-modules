@@ -380,8 +380,9 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 	$item->fieldParams['warningifon'] = 1;
 
 	// Setup conf to import lines as free description lines when no product is found and no default product exist on supplier
-	// This option is in conflict with EINVOICING_PRODUCTS_AUTO_GENERATION, so it is disabled if EINVOICING_PRODUCTS_AUTO_GENERATION is on
-	if (!getDolGlobalString("EINVOICING_PRODUCTS_AUTO_GENERATION")) {
+	// This option is in conflict with EINVOICING_PRODUCTS_AUTO_GENERATION and with MAIN_DISABLE_FREE_LINES,
+	// so it is disabled if EINVOICING_PRODUCTS_AUTO_GENERATION is on or MAIN_DISABLE_FREE_LINES is on
+	if (!getDolGlobalString("EINVOICING_PRODUCTS_AUTO_GENERATION") && !getDolGlobalString("MAIN_DISABLE_FREE_LINES")) {
 		$item = $formSetup->newItem('EINVOICING_IMPORT_AS_FREE_LINES')->setAsYesNo();
 		$item->helpText = $langs->transnoentities('EINVOICING_IMPORT_AS_FREE_LINES_HELP');
 		$item->defaultFieldValue = '0';
