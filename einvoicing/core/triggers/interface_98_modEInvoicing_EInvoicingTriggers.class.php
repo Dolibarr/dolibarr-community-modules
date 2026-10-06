@@ -191,52 +191,75 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			'@phan-var-force Facture $object';
 			/** @var Facture $object */
 
-			// Tell the afterPDFCreation() hook that the document rebuild about to happen is the one that
-			// follows a validation. Set unconditionally and before anything else: this only records a fact
-			// about the request, and the hook is the one place that decides what to do with it.
+			// Set a flag so the hook afterPDFCreation() can know with isEInvoiceGenerationInProgress() if PDF already generated and
+			// can decide to not regenerate the PDF a second time.
 			EInvoicing::setInvoiceValidatedInThisRequest($object->id);
 
 			if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {		// If sync Dolibarr to AP is on
 				$einvoicing = new EInvoicing($this->db);
 
-				// The known status and the configuration check are two different answers: keep them in two
-				// variables, the status is still needed after the check to decide what to write.
-				$statusinfo = $einvoicing->fetchLastknownInvoiceStatus($object->id, (string) $object->ref);
+				// Ask the boolean question: needEInvoiceManagement() answers with a status code, and the codes
+				// meaning "out of the e-invoicing scope" are truthy, so testing its answer for truth alone let an
+				// ignored invoice (a B2C one when EINVOICING_SKIP_B2C is on, typically) walk into the checks below
+				// and be reported as misconfigured.
 
-				// If $statusinfo is $einvoicing::STATUS_IGNORE or STATUS_IGNORE_2, we do nothing.
+				if ($einvoicing->mustManageEInvoice($object)) {
+					// Get current status of e-invoice
+					$statusinfo = $einvoicing->fetchLastknownInvoiceStatus($object->id, (string) $object->ref);
 
-				// If einvoice was set to $einvoicing::STATUS_NOT_GENERATED or $einvoicing::STATUS_UNKNOWN, we set it to STATUS_IGNORE (if not qualified for einvoice) or STATUS_NOT_GENERATED (if qualified for einvoice)
-				if ($statusinfo['code'] == $einvoicing::STATUS_NOT_GENERATED || $statusinfo['code'] == $einvoicing::STATUS_UNKNOWN) {
-					if (getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
-						// Check configuration
-						$checkresult = $einvoicing->checkRequiredinformations($object);
-						if ($checkresult['res'] < 0) {
-							$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $checkresult['message'];
-							dol_syslog(__METHOD__ . " " . $message);
+					// If $statusinfo is $einvoicing::STATUS_IGNORE or STATUS_IGNORE_2, we do nothing.
 
-							if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
-								$error++;
-								$this->errors[] = $checkresult['message'];
-								return -1;		// This should generate a rollback
+					// If einvoice was set to $einvoicing::STATUS_NOT_GENERATED or $einvoicing::STATUS_UNKNOWN, we set it to STATUS_IGNORE (if not qualified for einvoice) or STATUS_NOT_GENERATED (if qualified for einvoice)
+					if ($statusinfo['code'] == $einvoicing::STATUS_NOT_GENERATED || $statusinfo['code'] == $einvoicing::STATUS_UNKNOWN) {
+						if (getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
+							$messagecss = '';
+							$message = '';
+
+							// Check configuration
+							$checkresult = $einvoicing->checkRequiredinformations($object);
+							if ($checkresult['res'] < 0) {		// Error case
+								$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $checkresult['message'];
+								dol_syslog(__METHOD__ . " " . $message);
+
+								if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+									$error++;
+									$messagecss = 'errors';
+									$this->errors[] = $checkresult['message'];
+									return -1;		// This should generate a rollback. Note: if invoice was paid on an online payment, payment on provider may have been recorded, only an email has been set to admin to explain action after payment were canceled.
+								} else {
+									$messagecss = 'warnings';
+									if ((float) DOL_VERSION >= 23) {
+										$this->warnings[] = $message;
+									}
+								}
+							} elseif ($result['res'] == 0) {	// Warning case
+								$message = $langs->trans("InvoiceGeneratedWithWarnings") . ': <br>' . $checkresult['message'];
+								if ((float) DOL_VERSION >= 23) {
+									$this->warnings[] = $message;
+								}
+
+								dol_syslog(__METHOD__ . " " . $message);
+								$messagecss = 'warnings';
+								//setEventMessages($message, array(), $messagecss);
 							}
 						}
-					}
 
-					// Test if invoice need to be managed by EInvoice and set the new status to use
-					if ($statusinfo['code'] == $einvoicing::STATUS_UNKNOWN) {
-						$statustouse = $einvoicing::STATUS_IGNORE;	// default status to use if none of following rules match
-						$needEinvoice = $einvoicing->needEInvoiceManagement($object);
-						if ($needEinvoice) {
-							$statustouse = $needEinvoice;
-						}
+						// Test if invoice need to be managed by EInvoice and set the new status to use
+						if ($statusinfo['code'] == $einvoicing::STATUS_UNKNOWN) {
+							$statustouse = $einvoicing::STATUS_IGNORE;	// default status to use if none of following rules match
+							$needEinvoice = $einvoicing->needEInvoiceManagement($object);
+							if ($needEinvoice) {
+								$statustouse = $needEinvoice;
+							}
 
-						$newobject = dol_clone($object, 2);
-						$newobject->ref = (string) $object->newref;
+							$newobject = dol_clone($object, 2);
+							$newobject->ref = (string) $object->newref;
 
-						$result = $einvoicing->setEInvoiceStatus($newobject, $statustouse, '');
-						if ($result < 0) {
-							$this->errors = array_merge($this->errors, $einvoicing->errors);
-							return -1;
+							$result = $einvoicing->setEInvoiceStatus($newobject, $statustouse, '');
+							if ($result < 0) {
+								$this->errors = array_merge($this->errors, $einvoicing->errors);
+								return -1;
+							}
 						}
 					}
 				}
