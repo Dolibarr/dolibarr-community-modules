@@ -438,11 +438,13 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 	$item->fieldParams['forcereload'] = 1;
 	*/
 
-#	// Setup conf to keep, beside the imported document, the other formats the access point holds
-#	$item = $formSetup->newItem('EINVOICING_SAVE_ALL_RECEIVED_FORMATS')->setAsYesNo();
-#	$item->helpText = $langs->transnoentities('EINVOICING_SAVE_ALL_RECEIVED_FORMATS_HELP');
-#	$item->defaultFieldValue = '0';
-#	$item->cssClass = 'minwidth500';
+	/*
+	// Setup conf to keep, beside the imported document, the other formats the access point holds
+	$item = $formSetup->newItem('EINVOICING_SAVE_ALL_RECEIVED_FORMATS')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_SAVE_ALL_RECEIVED_FORMATS_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+	*/
 
 	// Setup conf to enable or not the consistency check on supplier invoice validation. Off by default:
 	// it re-checks every e-invoice at validation, including the ones edited by hand afterwards, which is
