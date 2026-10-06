@@ -47,6 +47,13 @@ if (isset($conf, $langs) && is_object($langs)) {
 	$langs->setDefaultLang('en_US');
 }
 
+// The module must work on a standard Dolibarr, where both options are off: on, the core keeps the sign
+// of each credit note line instead of forcing it negative. Pinned off in memory the same way.
+if (isset($conf) && is_object($conf)) {
+	$conf->global->FACTURE_ENABLE_NEGATIVE_LINES = 0;
+	$conf->global->INVOICE_KEEP_DISCOUNT_LINES_AS_IN_ORIGIN = 0;
+}
+
 $coreCommonClassTest = DOL_DOCUMENT_ROOT . '/../test/phpunit/CommonClassTest.class.php';
 
 if (file_exists($coreCommonClassTest)) {
