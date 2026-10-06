@@ -7,16 +7,26 @@ permissions:
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the main branch
+  # Triggers the workflow on push or pull request events but only for the main branch.
+  # A change that carries no PHP is left out: the files of the pull request drive phpcs itself, but
+  # var-dump-check, parallel-lint and actionlint read the whole tree on every event, and
+  # documentation, a module descriptor or an issue template give none of them anything to read.
+  # The workflow files stay in: actionlint is here for them.
   push:
     branches: [ main ]
     paths-ignore:
       - '.agents/**'
+      - '**.md'
+      - '**index.yaml'
+      - '.github/ISSUE_TEMPLATE/**'
 
   pull_request:
     branches: [ main ]
     paths-ignore:
       - '.agents/**'
+      - '**.md'
+      - '**index.yaml'
+      - '.github/ISSUE_TEMPLATE/**'
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:

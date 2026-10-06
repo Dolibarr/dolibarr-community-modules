@@ -275,7 +275,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 			$buyerId = $tmpthirdparty->id;
 			if (!$buyerId) {
 				$langs->load("errors");
-				setEventMessages($langs->trans("ErrorThirdPartyNotFound"), null, 'warnings');
+				setEventMessages($langs->trans("EInvErrorThirdPartyNotFound"), null, 'warnings');
 			}
 		}
 	}
@@ -288,7 +288,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 			$sellerId = $tmpthirdparty->id;
 			if (!$sellerId) {
 				$langs->load("errors");
-				setEventMessages($langs->trans("ErrorThirdPartyNotFound"), null, 'warnings');
+				setEventMessages($langs->trans("EInvErrorThirdPartyNotFound"), null, 'warnings');
 			}
 		}
 	}
@@ -331,7 +331,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 	print '<br>';
 
 	// Invoice type
-	print '<span class="width150 inline-block">'.$langs->trans("InvoiceType").'</span> ';
+	print '<span class="width150 inline-block">'.$langs->trans("EInvInvoiceType").'</span> ';
 	if ((float) DOL_VERSION >= 24.0) {
 		$typeofinvoice = array(
 			Facture::TYPE_STANDARD => array('label' => $langs->trans('InvoiceStandard')),

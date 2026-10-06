@@ -476,7 +476,7 @@ function checkAndCompleteChangelog($mod, $version, $project, $repo)
 	$newEntry = $header . "\n\n";
 	if (!empty($prTitles)) {
 		foreach ($prTitles as $title) {
-			$newEntry .= $title . "\n";
+			$newEntry .= '- ' . $title . "\n";
 		}
 	} else {
 		$newEntry .= "No merged pull requests found since previous version.\n";

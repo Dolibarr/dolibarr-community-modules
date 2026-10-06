@@ -524,6 +524,103 @@ class Document extends CommonObject
 	}
 
 	/**
+	 * List the incoming invoice flows a manual product mapping can be started from, most useful first.
+	 *
+	 * Two sources, because a flow is worth mapping on both sides of the import: the queue of the flows a
+	 * synchronization could not import (llx_einvoicing_sync_pending, where a PRODUCT_NOT_FOUND lands) and
+	 * the incoming documents already received (llx_einvoicing_document). A flow held by both is listed
+	 * once, as a pending one: that is the state the user has something to do about.
+	 *
+	 * The vendor is only the one Dolibarr already knows: the supplier invoice of a received document
+	 * names it, a queued flow does not (it is often queued because no third party was found), so the
+	 * issuer name carried by the document is shown instead. Nothing is guessed here - the mapping page
+	 * reads the identifiers of the seller in the document itself.
+	 *
+	 * @param	DoliDB	$db			Database handler
+	 * @param	int		$limit		Maximum number of flows read per source
+	 * @return	array<int,array{flowid:string,ref:string,date:int,socid:int,socname:string,reason:string,pending:int}>	Flows, the queued ones first, most recent first
+	 */
+	public static function listIncomingFlowsForMapping($db, $limit = 50)
+	{
+		$flows = array();
+		$seen = array();
+
+		// Flows a synchronization left in the queue: a missing product is what this list is for, but a
+		// flow queued for another reason may carry unmapped lines too, so the reason is shown, not filtered.
+		$sql = "SELECT sp.flow_id, sp.tracking_idref, sp.reason_code, sp.match_data, sp.flow_updatedat, sp.date_creation";
+		$sql .= " FROM ".$db->prefix()."einvoicing_sync_pending as sp";
+		$sql .= " WHERE sp.entity IN (".getEntity('einvoicing').")";
+		$sql .= " AND sp.status = 0";
+		$sql .= " AND (sp.flow_direction IS NULL OR sp.flow_direction <> 'Out')";
+		$sql .= " ORDER BY sp.date_creation DESC, sp.rowid DESC";
+		$sql .= $db->plimit($limit);
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__.' '.$db->lasterror(), LOG_ERR);
+		} else {
+			while ($obj = $db->fetch_object($resql)) {
+				$flowid = (string) $obj->flow_id;
+				if ($flowid === '' || isset($seen[$flowid])) {
+					continue;
+				}
+				$seen[$flowid] = 1;
+				$matchdata = json_decode((string) $obj->match_data, true);
+				$flows[] = array(
+					'flowid' => $flowid,
+					'ref' => (string) $obj->tracking_idref,
+					'date' => (int) $db->jdate($obj->flow_updatedat ? $obj->flow_updatedat : $obj->date_creation),
+					'socid' => 0,
+					'socname' => is_array($matchdata) ? (string) ($matchdata['name'] ?? '') : '',
+					'reason' => (string) $obj->reason_code,
+					'pending' => 1,
+				);
+			}
+			$db->free($resql);
+		}
+
+		// Documents already received. The vendor comes from the supplier invoice the flow was booked on,
+		// which is the only link between a flow and a third party this table holds.
+		$sql = "SELECT d.flow_id, d.tracking_idref, d.submittedat, s.rowid as socid, s.nom as socname";
+		$sql .= " FROM ".$db->prefix()."einvoicing_document as d";
+		$sql .= " LEFT JOIN ".$db->prefix()."facture_fourn as ff ON (d.fk_element_type = 'invoice_supplier' AND ff.rowid = d.fk_element_id)";
+		$sql .= " LEFT JOIN ".$db->prefix()."societe as s ON s.rowid = ff.fk_soc";
+		$sql .= " WHERE d.entity IN (".getEntity('document').")";
+		$sql .= " AND d.flow_direction = 'In'";
+		$sql .= " AND d.flow_type = 'SupplierInvoice'";
+		$sql .= " AND d.flow_id IS NOT NULL AND d.flow_id <> ''";
+		$sql .= " ORDER BY d.submittedat DESC, d.rowid DESC";
+		$sql .= $db->plimit($limit);
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__.' '.$db->lasterror(), LOG_ERR);
+
+			return $flows;
+		}
+
+		while ($obj = $db->fetch_object($resql)) {
+			$flowid = (string) $obj->flow_id;
+			if ($flowid === '' || isset($seen[$flowid])) {
+				continue;
+			}
+			$seen[$flowid] = 1;
+			$flows[] = array(
+				'flowid' => $flowid,
+				'ref' => (string) $obj->tracking_idref,
+				'date' => (int) $db->jdate($obj->submittedat),
+				'socid' => (int) $obj->socid,
+				'socname' => (string) $obj->socname,
+				'reason' => '',
+				'pending' => 0,
+			);
+		}
+		$db->free($resql);
+
+		return $flows;
+	}
+
+	/**
 	 * Update object into database
 	 *
 	 * @param	User		$user		User that modifies
@@ -549,15 +646,16 @@ class Document extends CommonObject
 	}
 
 	/**
-	 * Import a received document again, from the access point, as if it had never been imported.
+	 * Import a received document again, from the access point, into the draft it was booked on.
 	 *
-	 * The vendor of a supplier invoice cannot be changed once it exists, so a document booked on the
-	 * wrong third party has no way back short of this: fix the third party data, then import again.
-	 * The local draft is deleted first; a validated invoice is refused, it is an accounting record.
-	 * A failed import leaves this record in place, detached, rather than losing the document.
+	 * The draft is rebuilt in place: its lines and the files the previous import attached are replaced,
+	 * its header is read again - vendor included, the reason this exists: fix the third party data, then
+	 * import again. It keeps its id and reference, and with them the files attached by hand, the events,
+	 * the contacts, the notes and the lifecycle statuses. A validated invoice is refused, it is an
+	 * accounting record. With no invoice left, the document is imported as a new one.
 	 *
 	 * @param	User				$user		User asking for the import
-	 * @return	array{res:int,message:string}	res > 0 is the id of the supplier invoice created
+	 * @return	array{res:int,message:string}	res > 0 is the id of the supplier invoice
 	 */
 	public function reimport(User $user)
 	{
@@ -565,6 +663,7 @@ class Document extends CommonObject
 
 		require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
 		require_once __DIR__.'/providers/PDPProviderManager.class.php';
+		require_once __DIR__.'/protocols/AbstractProtocol.class.php';
 
 		$langs->load('einvoicing@einvoicing');
 
@@ -581,63 +680,39 @@ class Document extends CommonObject
 			return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportNoProvider'));
 		}
 
-		// The invoice this document was booked on, if it is still there. Deleting it detaches this
-		// record (see the BILL_SUPPLIER_DELETE trigger), which is why the id is read before. Its
-		// reference is read for the same reason: the draft it names is about to disappear, and the
-		// import that follows creates another one, which is given that same reference back.
-		$previousInvoiceId = (int) $this->fk_element_id;
-		$previousInvoiceRef = '';
-		$previousInvoiceRecords = array();
-		if ($previousInvoiceId > 0) {
-			$previousInvoice = new FactureFournisseur($this->db);
-			if ($previousInvoice->fetch($previousInvoiceId) > 0) {
-				if ((int) $previousInvoice->status !== FactureFournisseur::STATUS_DRAFT) {
-					return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportInvoiceIsNotADraft', $previousInvoice->ref));
+		// The draft this document was booked on, if it is still there: the import rebuilds it.
+		$draftId = 0;
+		if ((int) $this->fk_element_id > 0) {
+			$draft = new FactureFournisseur($this->db);
+			if ($draft->fetch((int) $this->fk_element_id) > 0) {
+				if ((int) $draft->status !== FactureFournisseur::STATUS_DRAFT) {
+					return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportInvoiceIsNotADraft', $draft->ref));
 				}
-				$previousInvoiceRef = (string) $previousInvoice->ref;
-				// The other flows of that invoice - the lifecycle statuses its vendor has already sent -
-				// are listed before it goes: deleting it detaches every record it has at once, and a
-				// detached record no longer says which invoice it came from.
-				$previousInvoiceRecords = $this->fetchOtherRecordsOfInvoice($previousInvoiceId);
-				if ($previousInvoice->delete($user) <= 0) {
-					$reason = $previousInvoice->error ? $previousInvoice->error : implode(', ', (array) $previousInvoice->errors);
-					return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportFailedToDeleteTheDraft', $previousInvoice->ref).' '.$reason);
-				}
+				$draftId = (int) $draft->id;
 			}
 		}
 
-		$res = $provider->syncFlow($this->flow_id);
+		AbstractProtocol::$rebuildSupplierInvoiceId = $draftId;
+		try {
+			$res = $provider->syncFlow($this->flow_id);
+		} finally {
+			AbstractProtocol::$rebuildSupplierInvoiceId = 0;
+		}
 		if (!isset($res['res']) || $res['res'] <= 0) {
 			return array('res' => -1, 'message' => (string) ($res['message'] ?? ''));
 		}
 
 		// The record the import has just written for this flow. Without it there is nothing to move
-		// onto this line, which then stays as it is - detached, and the only line of the flow.
+		// onto this line, which then stays as it is.
 		$importedRecord = $this->fetchRecordWrittenByImport();
 		if (!($importedRecord instanceof Document)) {
 			dol_syslog(__METHOD__.' imported flow '.$this->flow_id.' again but found no record written by the import to move onto record '.$this->id, LOG_WARNING);
 
-			return array('res' => 1, 'message' => (string) ($res['message'] ?? ''));
+			return array('res' => ($draftId > 0 ? $draftId : 1), 'message' => (string) ($res['message'] ?? ''));
 		}
 
 		// The invoice the import has just booked the document on, to send the user straight to it.
-		$newInvoiceId = (int) $importedRecord->fk_element_id;
-
-		// Give that invoice back the number of the draft it replaces. Nothing in the core reads an id
-		// out of a "(PROV...)" reference - it only tests the prefix - and the number of the draft that
-		// has just been deleted is free, so the operator keeps looking at the number they know.
-		if ($newInvoiceId > 0 && $previousInvoiceRef !== '') {
-			$newInvoice = new FactureFournisseur($this->db);
-			if ($newInvoice->fetch($newInvoiceId) > 0 && $this->reuseDraftRef($newInvoice, $previousInvoiceRef) > 0) {
-				$importedRecord->tracking_idref = $previousInvoiceRef;
-			}
-		}
-
-		// The statuses the vendor has already sent for this invoice describe the document, not the
-		// local row it was booked on, so they follow it onto the invoice the import has just created.
-		if ($newInvoiceId > 0 && $previousInvoiceId > 0) {
-			$this->moveHistoryToInvoice($previousInvoiceId, $newInvoiceId, $previousInvoiceRecords, (string) $importedRecord->tracking_idref);
-		}
+		$invoiceId = (int) $importedRecord->fk_element_id;
 
 		// Move that record onto this line, so the flow keeps the line it already had in the list
 		// instead of losing it for a new one describing the same flow.
@@ -645,7 +720,7 @@ class Document extends CommonObject
 			dol_syslog(__METHOD__.' imported flow '.$this->flow_id.' again but could not move record '.$importedRecord->id.' onto record '.$this->id.': '.$this->error, LOG_WARNING);
 		}
 
-		return array('res' => ($newInvoiceId > 0 ? $newInvoiceId : 1), 'message' => (string) ($res['message'] ?? ''));
+		return array('res' => ($invoiceId > 0 ? $invoiceId : 1), 'message' => (string) ($res['message'] ?? ''));
 	}
 
 	/**
@@ -727,186 +802,6 @@ class Document extends CommonObject
 		}
 
 		$this->db->commit();
-
-		return 1;
-	}
-
-	/**
-	 * List the records of a supplier invoice other than this one, that is the lifecycle statuses its
-	 * vendor has sent for it.
-	 *
-	 * @param	int			$invoiceid	Supplier invoice the records are attached to
-	 * @return	int[]					Row ids, empty when there is none
-	 */
-	private function fetchOtherRecordsOfInvoice($invoiceid)
-	{
-		$ids = array();
-
-		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX.$this->table_element;
-		$sql .= " WHERE fk_element_type = 'invoice_supplier'";
-		$sql .= " AND fk_element_id = ".((int) $invoiceid);
-		$sql .= " AND rowid <> ".((int) $this->id);
-		$sql .= " AND entity IN (".getEntity($this->element).")";
-
-		$resql = $this->db->query($sql);
-		if (!$resql) {
-			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
-
-			return $ids;
-		}
-
-		while ($obj = $this->db->fetch_object($resql)) {
-			$ids[] = (int) $obj->rowid;
-		}
-		$this->db->free($resql);
-
-		return $ids;
-	}
-
-	/**
-	 * Attach to a supplier invoice the lifecycle history of the one it replaces.
-	 *
-	 * A status sent by the vendor is about the document, not about the row Dolibarr booked it on, so an
-	 * import made again must carry it over. Left in place it would point at a deleted invoice.
-	 *
-	 * @param	int			$previousinvoiceid	Supplier invoice the import has just replaced
-	 * @param	int			$newinvoiceid		Supplier invoice the import has just created
-	 * @param	int[]		$recordids			Records of the previous invoice, listed before it was deleted
-	 * @param	string		$newref				Reference of the new invoice, as the flow list shows it
-	 * @return	int<-1,1>						1 when the history has been moved, -1 on error
-	 */
-	private function moveHistoryToInvoice($previousinvoiceid, $newinvoiceid, $recordids, $newref)
-	{
-		$this->db->begin();
-
-		if (!empty($recordids)) {
-			$sql = "UPDATE ".MAIN_DB_PREFIX.$this->table_element;
-			$sql .= " SET fk_element_id = ".((int) $newinvoiceid);
-			$sql .= ", tracking_idref = '".$this->db->escape($newref)."'";
-			$sql .= " WHERE rowid IN (".$this->db->sanitize(implode(',', $recordids)).")";
-			if (!$this->db->query($sql)) {
-				dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
-				$this->db->rollback();
-
-				return -1;
-			}
-		}
-
-		$sql = "UPDATE ".MAIN_DB_PREFIX."einvoicing_lifecycle_msg";
-		$sql .= " SET element_id = ".((int) $newinvoiceid);
-		$sql .= " WHERE element_type = 'invoice_supplier'";
-		$sql .= " AND element_id = ".((int) $previousinvoiceid);
-		if (!$this->db->query($sql)) {
-			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
-			$this->db->rollback();
-
-			return -1;
-		}
-
-		$this->db->commit();
-
-		return 1;
-	}
-
-	/**
-	 * Give a draft supplier invoice the temporary reference of the draft it replaces.
-	 *
-	 * The core never reads an id back out of a "(PROV1234)" reference, it only tests the prefix, so the
-	 * number of the deleted draft can be given back to the new row, files included.
-	 * Only a temporary reference is moved this way, and only onto a draft: a validated invoice carries
-	 * a number of the numbering module, which belongs to it alone.
-	 *
-	 * @param	FactureFournisseur	$invoice	Draft the import has just created, renamed in place on success
-	 * @param	string				$wantedref	Reference of the draft it replaces
-	 * @return	int<-1,1>						1 when renamed, 0 when there was nothing to do, -1 on error
-	 */
-	private function reuseDraftRef(FactureFournisseur $invoice, $wantedref)
-	{
-		global $conf;
-
-		require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
-
-		$currentref = (string) $invoice->ref;
-		if ($wantedref === '' || $wantedref === $currentref) {
-			return 0;
-		}
-		if (!preg_match('/^[\(]?PROV/i', $wantedref) || !preg_match('/^[\(]?PROV/i', $currentref)) {
-			return 0;
-		}
-		if ((int) $invoice->status !== FactureFournisseur::STATUS_DRAFT) {
-			return 0;
-		}
-
-		// Same path as the one the import writes its attachments to, and the same the card reads.
-		$folderpart = get_exdir($invoice->id, 2, 0, 0, $invoice, 'invoice_supplier');
-		$dirsource = $conf->fournisseur->facture->dir_output.'/'.$folderpart.dol_sanitizeFileName($currentref);
-		$dirdest = $conf->fournisseur->facture->dir_output.'/'.$folderpart.dol_sanitizeFileName($wantedref);
-
-		$moved = false;
-		if (file_exists($dirsource)) {
-			if (file_exists($dirdest)) {
-				// Left over by something else: merging two directories is not this method's business.
-				dol_syslog(__METHOD__.' cannot reuse reference '.$wantedref.': '.$dirdest.' already exists', LOG_WARNING);
-
-				return 0;
-			}
-			if (!@rename($dirsource, $dirdest)) {
-				dol_syslog(__METHOD__.' failed to rename '.$dirsource.' into '.$dirdest, LOG_ERR);
-
-				return -1;
-			}
-			$moved = true;
-		}
-
-		$relativesource = 'fournisseur/facture/'.$folderpart.dol_sanitizeFileName($currentref);
-		$relativedest = 'fournisseur/facture/'.$folderpart.dol_sanitizeFileName($wantedref);
-
-		$this->db->begin();
-
-		// Files named after the reference, then the directory they are indexed under: the two updates
-		// the core itself makes when it renames a draft (FactureFournisseur::validate()).
-		$sql = "UPDATE ".MAIN_DB_PREFIX."ecm_files SET";
-		$sql .= " filename = CONCAT('".$this->db->escape($wantedref)."', SUBSTR(filename, ".(strlen($currentref) + 1).")),";
-		$sql .= " filepath = '".$this->db->escape($relativedest)."'";
-		$sql .= " WHERE filename LIKE '".$this->db->escape($this->db->escapeforlike($currentref))."%'";
-		$sql .= " AND filepath = '".$this->db->escape($relativesource)."'";
-		$sql .= " AND entity = ".((int) $conf->entity);
-		$ok = (bool) $this->db->query($sql);
-
-		if ($ok) {
-			$sql = "UPDATE ".MAIN_DB_PREFIX."ecm_files SET filepath = '".$this->db->escape($relativedest)."'";
-			$sql .= " WHERE filepath = '".$this->db->escape($relativesource)."'";
-			$sql .= " AND entity = ".((int) $conf->entity);
-			$ok = (bool) $this->db->query($sql);
-		}
-
-		if ($ok) {
-			$sql = "UPDATE ".MAIN_DB_PREFIX."facture_fourn SET ref = '".$this->db->escape($wantedref)."'";
-			$sql .= " WHERE rowid = ".((int) $invoice->id);
-			$ok = (bool) $this->db->query($sql);
-		}
-
-		if (!$ok) {
-			dol_syslog(__METHOD__.' '.$this->db->lasterror(), LOG_ERR);
-			$this->db->rollback();
-			if ($moved) {
-				@rename($dirdest, $dirsource);
-			}
-
-			return -1;
-		}
-
-		$this->db->commit();
-
-		// The files themselves, when their name starts with the reference that has just changed.
-		if ($moved) {
-			foreach (dol_dir_list($dirdest, 'files', 1, '^'.preg_quote(dol_sanitizeFileName($currentref), '/')) as $fileentry) {
-				$newname = preg_replace('/^'.preg_quote(dol_sanitizeFileName($currentref), '/').'/', dol_sanitizeFileName($wantedref), $fileentry['name']);
-				@rename($fileentry['path'].'/'.$fileentry['name'], $fileentry['path'].'/'.$newname);
-			}
-		}
-
-		$invoice->ref = $wantedref;
 
 		return 1;
 	}

@@ -389,6 +389,17 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 		$item->fieldParams['warningifon'] = 1;
 	}
 
+	// Setup conf to choose the default of the vendor a line of a mixed invoice (BT-23 in M) falls back on.
+	// Empty by default: such an invoice then stops at import when one of its lines needs a default.
+	$item = $formSetup->newItem('EINVOICING_DEFAULT_ROUTING_MIXED')->setAsSelect(array(
+		'' => '',
+		'product' => $langs->transnoentities('DefaultProductEBilling'),
+		'service' => $langs->transnoentities('DefaultServiceEBilling'),
+	));
+	$item->helpText = $langs->transnoentities('EINVOICING_DEFAULT_ROUTING_MIXED_HELP');
+	$item->defaultFieldValue = '';
+	$item->cssClass = 'minwidth500';
+
 	// Setup conf to match a vendor product reference written with separators other than the recorded one.
 	// Off by default: the comparison ignores separators, so it is an approximation.
 	$item = $formSetup->newItem('EINVOICING_PRODUCTS_MATCH_CANONICAL_REF')->setAsYesNo();
@@ -396,6 +407,15 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 	$item->fieldParams['warningifon'] = 1;
+
+	// Setup conf to fold a line's charges (BG-28) into the description of the product line they belong
+	// to instead of importing them as a Dolibarr line of their own (community decision, issue #969).
+	// Off by default: matches the behaviour the module has always had. Can be overridden per supplier
+	// from its thirdparty card.
+	$item = $formSetup->newItem('EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
 
 	// Setup conf to choose use of auto generation or not of third parties
 	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_AUTO_GENERATION')->setAsYesNo();

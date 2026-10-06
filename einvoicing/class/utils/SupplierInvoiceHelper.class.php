@@ -1010,9 +1010,10 @@ class SupplierInvoiceHelper
 	 * @param	int			$socId		Id of the supplier thirdparty
 	 * @param	float		$total_ttc	If set, check that the total amount of the invoice is the expected one. 0 to look the reference up without checking any amount.
 	 * @param	float		$tolerance	Difference still read as the same invoice, on top of the cent the amounts are compared to. BT-114 is passed here: a document carrying a rounding amount was imported without it before the rounding line existed, and it is the same invoice (issue #994).
+	 * @param	int			$excludeId	Invoice left out of the search: the draft an import is rebuilding is not a duplicate of itself
 	 * @return	int						Invoice id (>0) on a single certain match, 0 when not found, -1 on database error, -2 when several invoices match, -3 when the reference matches but not with the expected amount
 	 */
-	public static function findIdByRef($ref, int $socId, float $total_ttc = 0, float $tolerance = 0.0): int
+	public static function findIdByRef($ref, int $socId, float $total_ttc = 0, float $tolerance = 0.0, int $excludeId = 0): int
 	{
 		global $db;
 
@@ -1025,6 +1026,9 @@ class SupplierInvoiceHelper
 		$sql = "SELECT rowid, total_ttc FROM " . $db->prefix() . "facture_fourn";
 		$sql .= " WHERE ref_supplier = '" . $db->escape($ref) . "'";
 		$sql .= " AND fk_soc = " . ((int) $socId);
+		if ($excludeId > 0) {
+			$sql .= " AND rowid <> " . ((int) $excludeId);
+		}
 
 		$listofentityids = getEntity('facture_fourn');
 		if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE')) {
@@ -1060,6 +1064,9 @@ class SupplierInvoiceHelper
 			$sql = "SELECT rowid, ref_supplier, total_ttc FROM " . $db->prefix() . "facture_fourn";
 			$sql .= " WHERE REPLACE(ref_supplier, ' ', '') LIKE '%" . $db->escape($db->escapeforlike($refNoSpaces)) . "%'";
 			$sql .= " AND fk_soc = " . ((int) $socId);
+			if ($excludeId > 0) {
+				$sql .= " AND rowid <> " . ((int) $excludeId);
+			}
 
 			$listofentityids = getEntity('facture_fourn');
 			if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE')) {

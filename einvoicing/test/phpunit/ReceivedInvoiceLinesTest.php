@@ -552,20 +552,21 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 	 * Call CIIProtocol::resolveLineAmounts() through reflection, the same way LineWithoutQuantityTest
 	 * does: it is what tells whether the line the import is about to write rebuilds BT-131.
 	 *
-	 * @param	array	$parsedLine		One line as parseInvoiceLines() returns it
-	 * @param	float	$qty			Quantity read from the document
-	 * @param	float	$subprice		Unit price resolved by the caller
-	 * @param	float	$remisePercent	Discount percent resolved by the caller
+	 * @param	array	$parsedLine			One line as parseInvoiceLines() returns it
+	 * @param	float	$qty				Quantity read from the document
+	 * @param	float	$subprice			Unit price resolved by the caller
+	 * @param	float	$remisePercent		Discount percent resolved by the caller
+	 * @param	bool	$mergeLineCharges	True when the line's charges are folded into its description (issue #969)
 	 * @return	array{qty:float,subprice:float,remise_percent:float,warning:string}	What the import would store
 	 */
-	private function amounts(array $parsedLine, $qty, $subprice, $remisePercent = 0.0)
+	private function amounts(array $parsedLine, $qty, $subprice, $remisePercent = 0.0, $mergeLineCharges = false)
 	{
 		global $db;
 
 		$method = new ReflectionMethod(CIIProtocol::class, 'resolveLineAmounts');
 		$method->setAccessible(true);
 
-		return $method->invoke(new CIIProtocol($db), $parsedLine, $qty, $subprice, $remisePercent);
+		return $method->invoke(new CIIProtocol($db), $parsedLine, $qty, $subprice, $remisePercent, $mergeLineCharges);
 	}
 
 	/**
@@ -1501,6 +1502,157 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 			array('lineid' => '1', 'rateApplicablePercent' => 20.0, 'lineAllowances' => $chargeOnly),
 		)));
 	}
+
+	/**
+	 * EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION (issue #969): with charges folded into the line's
+	 * own description, resolveLineAmounts() must total the line at the full BT-131, not BT-131 less the
+	 * charges - there being no charge line left to carry that difference. Same FedEx figures as
+	 * testAChargeThatIsTheWholeOfTheLineIsNotCountedTwice() (net price 15, one charge of 15, BT-131
+	 * announcing 15), but this time the line itself must be worth the full 15, not 0.
+	 *
+	 * @return	void
+	 */
+	public function testMergedChargesKeepTheFullAmountOnTheLine()
+	{
+		$parsedLine = array(
+			'lineid' => '7',
+			'lineTotalAmount' => 15.0,
+			'lineAllowances' => array(
+				array('indicator' => 'true', 'actualAmount' => 15.0, 'reason' => 'Frais de dossier'),
+			),
+		);
+
+		$amounts = $this->amounts($parsedLine, 1.0, 15.0, 0.0, true);
+
+		$this->assertSame(1.0, $amounts['qty']);
+		$this->assertSame(15.0, $amounts['subprice'], 'the line carries the whole amount, the charge is only described');
+		$this->assertSame('', $amounts['warning'], 'quantity and price already rebuild the full BT-131, nothing to correct');
+	}
+
+	/**
+	 * Without merging, the same figures still behave exactly as testAChargeThatIsTheWholeOfTheLineIsNotCountedTwice():
+	 * the new $mergeLineCharges parameter defaults to false and changes nothing for every caller that
+	 * does not know about it.
+	 *
+	 * @return	void
+	 */
+	public function testUnmergedChargesDefaultBehaviourIsUnchanged()
+	{
+		$parsedLine = array(
+			'lineid' => '7',
+			'lineTotalAmount' => 15.0,
+			'lineAllowances' => array(
+				array('indicator' => 'true', 'actualAmount' => 15.0, 'reason' => 'Frais de dossier'),
+			),
+		);
+
+		$amounts = $this->amounts($parsedLine, 1.0, 15.0);
+
+		$this->assertSame(0.0, $amounts['subprice'], 'the base line still carries nothing by default, the charge leaves on its own line');
+	}
+
+	/**
+	 * buildLineChargesDescription() describes each charge of the line (BG-28) the way
+	 * EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION folds it into the product line: plain text by
+	 * default, the reason kept, the amount signed positive - matching the wording the issuer's own
+	 * reconstructed document already uses (e.g. "Charge: Handling : +7.00").
+	 *
+	 * @return	void
+	 */
+	public function testChargesDescriptionListsEachChargeWithItsSignedAmount()
+	{
+		global $conf;
+
+		$saved = $conf->global->FCKEDITOR_ENABLE_DETAILS ?? null;
+		$conf->global->FCKEDITOR_ENABLE_DETAILS = 0;
+		try {
+			$description = $this->call('buildLineChargesDescription', array(
+				array('lineid' => '6', 'lineAllowances' => $this->allowanceAndCharge()),
+			));
+		} finally {
+			if ($saved === null) {
+				unset($conf->global->FCKEDITOR_ENABLE_DETAILS);
+			} else {
+				$conf->global->FCKEDITOR_ENABLE_DETAILS = $saved;
+			}
+		}
+
+		$this->assertStringContainsString('Handling', $description, 'the reason of the charge is kept');
+		$this->assertStringContainsString('+7.00', $description, 'the amount is signed positive');
+		$this->assertStringNotContainsString('50.03', $description, 'the allowance is not a charge: it stays out of the description');
+		$this->assertStringNotContainsString('EInvoicing', $description, 'the language file is loaded, so no raw translation key survives');
+		$this->assertStringNotContainsString('<b>', $description, 'plain text when the WYSIWYG line editor is off');
+	}
+
+	/**
+	 * A line with no charge (no allowance at all, an allowance only, or a charge worth zero) describes
+	 * nothing: this is the control that EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION changes nothing
+	 * on a line it has nothing to fold.
+	 *
+	 * @return	void
+	 */
+	public function testChargesDescriptionIsEmptyWithoutAnyCharge()
+	{
+		$this->assertSame('', $this->call('buildLineChargesDescription', array(array('lineid' => '1'))));
+		$this->assertSame('', $this->call('buildLineChargesDescription', array(array('lineid' => '1', 'lineAllowances' => array()))));
+		$this->assertSame('', $this->call('buildLineChargesDescription', array(array('lineid' => '1', 'lineAllowances' => array(
+			array('indicator' => 'false', 'actualAmount' => 10.0),
+		)))));
+		$this->assertSame('', $this->call('buildLineChargesDescription', array(array('lineid' => '1', 'lineAllowances' => array(
+			array('indicator' => 'true', 'actualAmount' => 0.0, 'reason' => 'Nothing'),
+		)))));
+	}
+
+	/**
+	 * Several charges on one line each get their own entry, in the order of the document - the
+	 * description equivalent of testSeveralChargesOnOneLine().
+	 *
+	 * @return	void
+	 */
+	public function testChargesDescriptionListsSeveralChargesInOrder()
+	{
+		$description = $this->call('buildLineChargesDescription', array(array('lineid' => '3', 'lineAllowances' => array(
+			array('indicator' => 'true', 'actualAmount' => 7.00, 'reason' => 'Handling'),
+			array('indicator' => 'true', 'actualAmount' => 2.50, 'reason' => 'Packaging'),
+		))));
+
+		$handlingPos = strpos($description, 'Handling');
+		$packagingPos = strpos($description, 'Packaging');
+		$this->assertNotFalse($handlingPos);
+		$this->assertNotFalse($packagingPos);
+		$this->assertLessThan($packagingPos, $handlingPos, 'Handling comes first, in the order of the document');
+	}
+
+	/**
+	 * The label of the charge is wrapped in bold when the WYSIWYG line editor is active
+	 * (FCKEDITOR_ENABLE_DETAILS), matching how the issuer's own reconstructed PDF shows it.
+	 *
+	 * @return	void
+	 */
+	public function testChargesDescriptionLabelIsBoldWithTheWysiwygEditor()
+	{
+		global $conf;
+
+		$saved = $conf->global->FCKEDITOR_ENABLE_DETAILS ?? null;
+		$conf->global->FCKEDITOR_ENABLE_DETAILS = 1;
+		try {
+			$description = $this->call('buildLineChargesDescription', array(
+				array('lineid' => '1', 'lineAllowances' => array(
+					array('indicator' => 'true', 'actualAmount' => 7.00, 'reason' => 'Handling'),
+				)),
+			));
+		} finally {
+			if ($saved === null) {
+				unset($conf->global->FCKEDITOR_ENABLE_DETAILS);
+			} else {
+				$conf->global->FCKEDITOR_ENABLE_DETAILS = $saved;
+			}
+		}
+
+		$this->assertStringContainsString('<b>', $description, 'the label is bold when the WYSIWYG editor is active');
+		$this->assertStringContainsString('Handling', $description);
+	}
+
 	/**
 	 * Call CIIProtocol::buildHeaderChargeLines() through reflection: the whole decision, no database
 	 * access and no side effect.

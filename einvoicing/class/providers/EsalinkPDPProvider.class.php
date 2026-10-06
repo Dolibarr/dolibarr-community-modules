@@ -192,7 +192,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			$urltogeneratetoken = $_SERVER["PHP_SELF"] . "?action=set" . $prefix . "TOKEN&token=" . newToken();
 
 			$item = $formSetup->newItem($prefix . 'TOKEN'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
-			$item->nameText = $langs->trans('AccessToken');
+			$item->nameText = $langs->trans('EInvAccessToken');
 			$item->cssClass = 'maxwidth500 ';
 			$item->fieldOverride = "";
 			if (!empty($tokenData['token'])) {
@@ -1133,7 +1133,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			}
 
 			if ($error > 0) {
-				if (in_array($rescode, array('THIRDPARTY_NOT_FOUND','PRODUCT_NOT_FOUND'))) {
+				if (in_array($rescode, array('THIRDPARTY_NOT_FOUND','PRODUCT_NOT_FOUND','DEFAULT_ROUTING_MIXED_UNSET'))) {
 					$results_messages[] = "Aborting synchronization due to a business error. There is a manual action to do.";
 				} else {
 					$results_messages[] = "Aborting synchronization due to errors.";
@@ -1442,6 +1442,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 						$cleanedXmlData = Document::cleanXmlData($res['xml_data'] ?? '');
 						if (!empty($cleanedXmlData) && Document::checkXmlDataMaxSize($cleanedXmlData)) {
 							$document->xml_data = $cleanedXmlData;
+						}
+
+						// Only when this call is what brought the invoice in: a flow read again must not
+						// write a second import event on an invoice that was already there.
+						if (!empty($res['created']) && !empty($supplierInvoiceObj->id)) {
+							$this->addSupplierInvoiceImportEvent($supplierInvoiceObj, $document);
 						}
 
 						//return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
