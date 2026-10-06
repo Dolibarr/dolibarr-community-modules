@@ -301,9 +301,7 @@ class PayeeBankAccountHelper
 			// @phan-suppress-next-line PhanDeprecatedProperty
 			$rib->proprio = (string) ($account['accountName'] ?? '');
 		}
-		$rib->status = Account::STATUS_OPEN;
 		$rib->datec = dol_now();
-		$rib->default_rib = 0;
 
 		$db->begin();
 
