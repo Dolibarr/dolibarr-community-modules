@@ -104,6 +104,7 @@ class PayeeBankAccountHelperTest extends CommonClassTest
 		$this->assertSame('ACME SAS', $db->fetch_object($res)->proprio, 'The account holder (BT-85) must reach the column');
 		$this->assertStringContainsString('FA-1031', (string) $rib->label, 'The label must say which document announced the account');
 		$this->assertStringContainsString('0189', (string) $rib->label, 'The label must say which account it holds');
+		$this->assertSame(1, $this->defaultRibOf($ribid), 'The core makes the first account of a vendor its default one');
 
 		// Asked again, with the IBAN written differently: the account is already there
 		$again = array('iban' => 'FR7630006000011234567890189', 'bic' => 'OTHERBIC', 'accountName' => 'SOMEONE ELSE');
@@ -116,8 +117,11 @@ class PayeeBankAccountHelperTest extends CommonClassTest
 
 		// A second, different account of the same vendor is recorded next to the first one
 		$other = array('iban' => 'DE89370400440532013000', 'bic' => '', 'accountName' => '');
-		$this->assertGreaterThan(0, PayeeBankAccountHelper::addAccountToThirdparty($db, $user, $socid, $other, 'FA-1031', $error), $error);
+		$otherid = PayeeBankAccountHelper::addAccountToThirdparty($db, $user, $socid, $other, 'FA-1031', $error);
+		$this->assertGreaterThan(0, $otherid, $error);
 		$this->assertCount(2, PayeeBankAccountHelper::thirdpartyAccounts($db, $socid));
+		$this->assertSame(0, $this->defaultRibOf($otherid), 'An account added next to another one must not become the default one');
+		$this->assertSame(1, $this->defaultRibOf($ribid), 'The default account of the vendor must stay the default one');
 
 		$this->deleteVendor($socid);
 	}
@@ -180,6 +184,22 @@ class PayeeBankAccountHelperTest extends CommonClassTest
 		$this->assertGreaterThan(0, $id, 'Could not create the vendor of the test: ' . $thirdparty->error . ' ' . implode(', ', $thirdparty->errors));
 
 		return $id;
+	}
+
+	/**
+	 * Read whether a recorded account is the default one of its vendor, from the column.
+	 *
+	 * @param	int		$ribid	Id of the account
+	 * @return	int				Value of default_rib, -1 when the account cannot be read
+	 */
+	private function defaultRibOf($ribid)
+	{
+		global $db;
+
+		$res = $db->query("SELECT default_rib FROM " . MAIN_DB_PREFIX . "societe_rib WHERE rowid = " . ((int) $ribid));
+		$obj = ($res ? $db->fetch_object($res) : null);
+
+		return ($obj ? (int) $obj->default_rib : -1);
 	}
 
 	/**
