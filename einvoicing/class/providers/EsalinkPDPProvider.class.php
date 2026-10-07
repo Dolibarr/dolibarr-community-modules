@@ -1001,7 +1001,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		// Loop on each flow received in list
 		$i = 0;
-		foreach ($response['response']['results'] ?? [] as $flow) {
+		foreach ($results as $flow) {
 			$i++;
 			if (in_array($flow['flowId'], $alreadyProcessedFlowIds)) {
 				dol_syslog(__METHOD__ . " #" . $i . " Flow " . $flow['flowId'] . " already processed, discard it.", LOG_DEBUG, 0, "_einvoicing");
