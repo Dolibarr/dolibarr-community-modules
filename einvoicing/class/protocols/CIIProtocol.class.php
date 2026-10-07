@@ -1782,6 +1782,27 @@ class CIIProtocol extends AbstractProtocol
 	 XML parsing methods
 	======================================================================================== */
 	/**
+	 * Make a received XML parsable when an emitter or an access point stacked several XML declarations.
+	 *
+	 * Some documents arrive as "<?xml ...?>\n" + BOM + "<?xml ...?><rsm:CrossIndustryInvoice>": a declaration
+	 * is only legal at the very start, so libxml refuses the whole document and every field reads as empty.
+	 * Only the leading declarations and BOMs are dropped, the last declaration is kept.
+	 *
+	 * @param  string $xml Received XML
+	 * @return string      XML with at most one declaration, at the start
+	 */
+	protected static function stripStrayXmlDeclarations($xml)
+	{
+		$bom = "\xEF\xBB\xBF";
+		$xml = ltrim($xml, $bom . " \t\r\n");
+		if (!preg_match('/^(<\?xml\b[^>]*\?>)((?:[\s\x{FEFF}]|\xEF\xBB\xBF)*<\?xml\b[^>]*\?>)+/u', $xml)) {
+			return $xml;
+		}
+		// Keep the last declaration: it is the emitter's own, so its encoding is the one that is true.
+		return preg_replace('/^(?:<\?xml\b[^>]*\?>(?:[\s\x{FEFF}]|\xEF\xBB\xBF)*)+(?=<\?xml\b)/u', '', $xml) ?? $xml;
+	}
+
+	/**
 	 * Initialise DOMDocument + DOMXPath with the three CII namespaces.
 	 *
 	 * @param string $xml XML string to parse
@@ -1790,7 +1811,13 @@ class CIIProtocol extends AbstractProtocol
 	private function initXPath($xml)
 	{
 		$doc = new \DOMDocument();
-		$doc->loadXML($xml);
+		$previous = libxml_use_internal_errors(true);
+		if (!$doc->loadXML(self::stripStrayXmlDeclarations($xml))) {
+			$error = libxml_get_last_error();
+			dol_syslog(__METHOD__ . ' received XML is not well formed: ' . ($error ? trim($error->message) . ' (line ' . $error->line . ')' : 'unknown error'), LOG_ERR, 0, '_einvoicing');
+		}
+		libxml_clear_errors();
+		libxml_use_internal_errors($previous);
 
 		$xpath = new \DOMXPath($doc);
 		$xpath->registerNamespace('rsm', 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100');
@@ -4739,6 +4766,7 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	public static function removeAttachmentFromXml(string $xmlData, string $note = self::ATTACHMENT_REMOVED_NOTE): string
 	{
+		$xmlData = self::stripStrayXmlDeclarations($xmlData);
 		$xmlDoc = new DOMDocument();
 		if (!$xmlDoc->loadXML($xmlData)) {
 			throw new Exception(__METHOD__ . " : failed to load XML data");
@@ -4783,7 +4811,7 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		$xmlDoc = new DOMDocument();
-		if (!@$xmlDoc->loadXML($xmlData)) {
+		if (!@$xmlDoc->loadXML(self::stripStrayXmlDeclarations($xmlData))) {
 			dol_syslog(__METHOD__ . " failed to load XML data, no attachment extracted", LOG_WARNING, 0, '_einvoicing');
 			return $attachments;
 		}
