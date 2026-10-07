@@ -37,6 +37,12 @@ dol_include_once('einvoicing/class/providers/PDPProviderManager.class.php');
 class InterfaceEInvoicingTriggers extends DolibarrTriggers
 {
 	/**
+	 * Warnings reported by the trigger (declared by DolibarrTriggers only since Dolibarr 23)
+	 * @var string[]
+	 */
+	public $warnings = array();
+
+	/**
 	 * Constructor
 	 *
 	 * @param DoliDB $db Database handler
@@ -232,7 +238,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 										$this->warnings[] = $message;
 									}
 								}
-							} elseif ($result['res'] == 0) {	// Warning case
+							} elseif ($checkresult['res'] == 0) {	// Warning case
 								$message = $langs->trans("InvoiceGeneratedWithWarnings") . ': <br>' . $checkresult['message'];
 								if ((float) DOL_VERSION >= 23) {
 									$this->warnings[] = $message;
