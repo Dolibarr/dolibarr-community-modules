@@ -988,6 +988,9 @@ class SupplierInvoiceHelper
 	/**
 	 * Whether the total of an invoice already in base is the one a received document expects.
 	 *
+	 * Compared on absolute values: announcedTotalTtc() is absolute, while Dolibarr stores a credit note
+	 * with negative totals, so an already imported credit note was reported with a different amount.
+	 *
 	 * @param	float	$invoiceTtc		Total of the invoice found, VAT included
 	 * @param	float	$expectedTtc	Total the document announces, VAT included
 	 * @param	float	$tolerance		Difference still read as the same invoice
@@ -995,7 +998,7 @@ class SupplierInvoiceHelper
 	 */
 	private static function amountMatchesInvoice(float $invoiceTtc, float $expectedTtc, float $tolerance = 0.0): bool
 	{
-		return abs($invoiceTtc - $expectedTtc) <= abs($tolerance) + 0.004;
+		return abs(abs($invoiceTtc) - abs($expectedTtc)) <= abs($tolerance) + 0.004;
 	}
 
 	/**

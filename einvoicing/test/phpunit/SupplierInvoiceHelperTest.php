@@ -1204,6 +1204,28 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	}
 
 	/**
+	 * A credit note already in base is found by the amount its document announces: Dolibarr stores its
+	 * totals negative, while the announced total is absolute, and the two are the same invoice.
+	 *
+	 * @return void
+	 */
+	public function testFindIdByRefMatchesACreditNoteStoredWithNegativeTotals()
+	{
+		global $db;
+
+		$ref = $this->uniqueSupplierRef();
+		$invoice = $this->createSupplierInvoiceWithRef($ref);
+
+		$sql = "UPDATE " . MAIN_DB_PREFIX . "facture_fourn";
+		$sql .= " SET type = " . (int) FactureFournisseur::TYPE_CREDIT_NOTE . ", total_ht = -2065.72, total_tva = -413.14, total_ttc = -2478.86";
+		$sql .= " WHERE rowid = " . (int) $invoice->id;
+		$this->assertNotFalse($db->query($sql), (string) $db->lasterror());
+
+		$this->assertSame((int) $invoice->id, SupplierInvoiceHelper::findIdByRef($ref, (int) $invoice->socid, 2478.86), 'the same amount, whatever its sign');
+		$this->assertSame(-3, SupplierInvoiceHelper::findIdByRef($ref, (int) $invoice->socid, 2000.00), 'a different amount is still reported');
+	}
+
+	/**
 	 * A reference nothing carries is not found, and an empty one is not looked for at all.
 	 *
 	 * @return void
