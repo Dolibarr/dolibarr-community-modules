@@ -4850,6 +4850,17 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
+	 * The files a received container carries beside the invoice, in the shape of extractEmbeddedAttachments().
+	 *
+	 * @param  string $file The received document, as the access point returned it
+	 * @return array<int,array{filename:string,mimecode:string,extension:string,content:string}>
+	 */
+	public static function extractContainerAttachments(string $file): array
+	{
+		return array();
+	}
+
+	/**
 	 * Store the files the issuer embedded (BT-125) as attached files of the supplier invoice.
 	 *
 	 * This is what makes them reachable at all: the readers of this module only ever look at the
@@ -5089,6 +5100,15 @@ class CIIProtocol extends AbstractProtocol
 	protected function storeEmbeddedAttachments($supplierInvoice, $sourceXml, $file, $tempFile, array &$return_messages)
 	{
 		$attachments = static::extractEmbeddedAttachments((string) $sourceXml);
+		$hashes = array();
+		foreach ($attachments as $attachment) {
+			$hashes[] = md5($attachment['content']);
+		}
+		foreach (static::extractContainerAttachments((string) $file) as $attachment) {
+			if (!in_array(md5($attachment['content']), $hashes, true)) {
+				$attachments[] = $attachment;
+			}
+		}
 		if (empty($attachments)) {
 			return;
 		}
