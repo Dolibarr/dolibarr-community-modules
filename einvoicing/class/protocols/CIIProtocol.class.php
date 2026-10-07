@@ -1795,11 +1795,11 @@ class CIIProtocol extends AbstractProtocol
 	{
 		$bom = "\xEF\xBB\xBF";
 		$xml = ltrim($xml, $bom . " \t\r\n");
-		if (!preg_match('/^(<\?xml\b[^>]*\?>)((?:[\s\x{FEFF}]|\xEF\xBB\xBF)*<\?xml\b[^>]*\?>)+/u', $xml)) {
+		if (!preg_match('/^(<\?xml\b[^>]*\?>)((?:\s|\xEF\xBB\xBF)*<\?xml\b[^>]*\?>)+/', $xml)) {
 			return $xml;
 		}
 		// Keep the last declaration: it is the emitter's own, so its encoding is the one that is true.
-		return preg_replace('/^(?:<\?xml\b[^>]*\?>(?:[\s\x{FEFF}]|\xEF\xBB\xBF)*)+(?=<\?xml\b)/u', '', $xml) ?? $xml;
+		return preg_replace('/^(?:<\?xml\b[^>]*\?>(?:\s|\xEF\xBB\xBF)*)+(?=<\?xml\b)/', '', $xml) ?? $xml;
 	}
 
 	/**
