@@ -194,8 +194,8 @@ if ($objectID) {
 
 		// Log an event in the invoice timeline if status not pending and it has changed
 		if ($statusvalidationlabel != 'Pending' && $statusvalidationlabel !== $lcValidationStatus) {
-			$eventLabel = "EINVOICING - ".$langs->trans("CheckStatus");
-			$eventMessage = "EINVOICING - ".$langs->trans("CheckStatus")." (From ajax checksupplierinvoicestatus) - [Dolibarr: " . $currentLCStatusLabel . ', '.$langs->trans("ResultOnAP").': '.$statusvalidationlabel . (!empty($statusvalidationinfo) ? " - " . $statusvalidationinfo : "") . (!empty($lcReasonCode) ? " - Reason: " . $currentLCReasonLabel : "")."]";
+			$eventLabel = "EINVOICING - ".$langs->trans("CheckingStatus");
+			$eventMessage = "EINVOICING - ".$langs->trans("CheckingStatus")." (From ajax checksupplierinvoicestatus) - [Dolibarr: " . $currentLCStatusLabel . ', '.$langs->trans("ResultOnAP").': '.$statusvalidationlabel . (!empty($statusvalidationinfo) ? " - " . $statusvalidationinfo : "") . (!empty($lcReasonCode) ? " - Reason: " . $currentLCReasonLabel : "")."]";
 
 			$resLogEvent = $provider->addEvent('STATUS', $eventLabel, $eventMessage, $invoice);
 			if ($resLogEvent < 0) {
