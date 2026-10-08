@@ -7,24 +7,10 @@
 ModuleEInvoicingName = Fatturazione elettronica
 ModuleEInvoicingDesc = Support for E-invoice management. This module allows generating (automatically or manually) invoices in E-invoice format and send them to an E-invoice Access Point. It can also retrieve purchase invoices from this E-invoice Access Point. Only a few countries (France) and Access Points (also called PDP/PA) are supported.
 
-# Keys of the core that the supported cores do not all carry: absent from 18 (RefSupplierBill), 18-19
-# (AccessToken, Message), 18-21 (Automatic, Input, Output), 18-22 (InvoiceType) or 18-23 (the rest).
-AccessToken=Access Token
-Message=Message
-RefSupplierBill=Supplier invoice ref
-Automatic=Automatic
-ErrorThirdPartyNotFound=Error ThirdParty Not Found
-Input=Input
-InvoiceType=Invoice type
-Output=Output
-Success=Success
-VATExemptionCode=VAT exemption code
-
 #
 # Admin page
 #
 EInvoicingSetup = Configurazione del modulo Fattura elettronica
-Settings = Impostazioni
 EInvoicingSetupPage = Configurazione dell'Access Point. Qui è necessario selezionare l'Access Point a cui si è sottoscritto l'abbonamento come Access Point ufficiale per la propria azienda.
 NewSection=Nuova sezione
 
@@ -32,7 +18,6 @@ NewSection=Nuova sezione
 #
 # About page
 #
-About = Di
 EInvoicingAbout = Informazioni sulla fatturazione elettronica
 EInvoicingAboutPage = Pagina relativa alla fatturazione elettronica
 
@@ -156,7 +141,6 @@ RoutingIdInfo=Etichetta (facoltativa)
 FailedToSaveRoutingID=Impossibile salvare l'indirizzo di routing
 FailedToDeleteRoutingID=Impossibile eliminare l'indirizzo di routing
 FailedToSetDefaultRoutingID=Impossibile impostare l'indirizzo di routing predefinito
-SetAsDefault=Imposta come predefinito
 FxCheckErrorRoutingID=La vostra azienda non dispone di un indirizzo valido per la fatturazione elettronica.
 FxCheckErrorRoutingIDFR=In Francia, l'indirizzo della fattura elettronica deve essere SIREN o iniziare con tale sigla.
 sendToPDP=Trasmettere
@@ -198,7 +182,6 @@ EINVOICING_DEBUG=Debug
 EINVOICING_DEBUG_MODE=Memorizza i dettagli completi delle chiamate API nella cronologia.
 EINVOICING_DEBUG_MODE_HELP=Attiva la modalità di debug per registrare tutti i dettagli delle chiamate di sincronizzazione a scopo di risoluzione dei problemi (modalità dettagliata). Tieni presente che le chiamate di sincronizzazione potrebbero richiedere più tempo quando questa modalità è attiva.
 DateSyncro=Data di sincronizzazione
-Status=Stato
 call_id=ID chiamata
 flow_id=ID del flusso
 FlowId=Flow ID
@@ -730,7 +713,6 @@ EntityNumber=Numero dell'ente
 ConfirmChangeEntity=Sei sicuro di voler spostare la fattura del fornitore <b>%s</b> a un'altra entità?
 EntityChangedSuccess=Fattura del fornitore trasferita all'entità %s
 ErrorEntityRequired=È richiesto un numero di entità valido
-DisabledBecauseNotEditable=Questa fattura non è modificabile
 ErrorSupplierNotVisibleInEntity=Il fornitore "%s" non è visibile nell'entità %s. È necessario prima condividerlo o crearlo nell'entità di destinazione.
 WarningEntityChangedFileMoveFailed=L'entità è stata modificata, ma i file delle fatture non sono stati spostati nella directory della nuova entità. Potrebbe essere necessario spostarli manualmente.
 EInvoicingInfoManagedByMasterSetup=La configurazione della fatturazione elettronica è gestita dall'entità principale (ID %s)

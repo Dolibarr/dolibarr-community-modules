@@ -341,6 +341,22 @@ if ($chorus && $buyerParty->country_code == 'FR') {
 	// option was on, and the invoice may then be generated with the option off.
 }
 
+// SIRET of the seller (BT-29 under scheme 0009), which BR-FR-CPRO-03 and BR-FR-CPRO-09 require on a B2G
+// invoice whose seller is identified by a SIREN. Same shape as the buyer SIRET above: declared on top of
+// the setup identifier, only on an invoice that looks B2G, and emitted under the EXTENDED profile only.
+$sellerChorusSiret = '';
+if ($looksLikeB2GInvoice && $mysoc->country_code == 'FR') {
+	$sellerChorusSiret = removeAllSpaces((string) $mysoc->idprof2);
+	if ($sellerChorusSiret === '') {
+		$this->warnings[] = $outputlangs->trans('EInvoiceChorusSellerSiretMissing');
+	} elseif (!preg_match('/^\d{14}$/', $sellerChorusSiret)) {
+		$this->warnings[] = $outputlangs->trans('EInvoiceChorusSellerSiretMalformed', $mysoc->idprof2);
+		$sellerChorusSiret = '';
+	} elseif ($mySchemeGlobalIdProf === EInvoicing::SCHEME_FR_SIRET && $myGlobalIdProf === $sellerChorusSiret) {
+		$sellerChorusSiret = '';	// Already the setup identifier: a second copy would say nothing more
+	}
+}
+
 // Contract type (EXT-FR-FE-01) of a B2G invoice: the Chorus extrafield the contract reference comes from
 // is the market number, which BR-FR-CPRO-01 qualifies with "GC". An ordinary contract would be "CT", and
 // those are the only two values that rule accepts; the module has no field of its own for that case yet.
@@ -385,20 +401,15 @@ $invoiceRefDocs = [];
 // A replacement invoice (BT-3 = 384) references the invoice it corrects in the same BG-3 slot as a
 // credit note does, and BR-FR-CO-04 makes that reference mandatory for it, with a "fatal" flag: one
 // sent without it is refused by the access point, and a receiver has nothing to attach it to.
-$refDocTypeCode = '';
-if ($object->type == $object::TYPE_CREDIT_NOTE) {
-	$refDocTypeCode = '381';			// 381 = Credit note
-} elseif ($object->type == $object::TYPE_REPLACEMENT) {
-	$refDocTypeCode = '384';			// 384 = Corrected invoice
-}
-if ($refDocTypeCode !== '' && !empty($object->fk_facture_source)) {
+// The type written with it (EXT-FR-FE-02) is the one of the referenced invoice, not of this document.
+if (in_array($object->type, array($object::TYPE_CREDIT_NOTE, $object::TYPE_REPLACEMENT)) && !empty($object->fk_facture_source)) {
 	$sourceFact = new Facture($this->db);
 	if ($sourceFact->fetch($object->fk_facture_source) > 0) {
 		$sourceFactDate = new DateTime(dol_print_date($sourceFact->date, 'dayrfc', 'tzserver'));
 		$invoiceRefDocs[] = [
 			'ref' => $sourceFact->ref,
 			'date' => $sourceFactDate,
-			'type' => $refDocTypeCode
+			'type' => einvoicingDocumentTypeCode($sourceFact, $this->db) ?? '380'
 		];
 		dol_syslog(get_class($this) . '::generateXML Set source invoice reference ' . $sourceFact->ref . ' for ' . $object->ref);
 	} else {
@@ -408,7 +419,7 @@ if ($refDocTypeCode !== '' && !empty($object->fk_facture_source)) {
 			$invoiceRefDocs[] = [
 				'ref' => $specimenRefDoc,
 				'date' => $sourceFactDate,
-				'type' => $refDocTypeCode
+				'type' => '380'		// The specimen corrects a commercial invoice
 			];
 			dol_syslog(get_class($this) . '::generateXML Set source invoice reference ' . $specimenRefDoc . ' for specimen ' . $object->ref);
 		} else {
@@ -971,7 +982,7 @@ if ($object->element == 'facture' || $object->element == 'invoice') {
 				$invoiceRefDocs[] = [
 					'ref' => $sourceDiscountFact->ref,															// BT-25
 					'date' => new DateTime(dol_print_date($sourceDiscountFact->date, 'dayrfc', 'tzserver')),					// BT-26
-					'type' => $refDocTypeByInvoiceType[(int) $obj->sourcetype]
+					'type' => einvoicingDocumentTypeCode($sourceDiscountFact, $this->db) ?? $refDocTypeByInvoiceType[(int) $obj->sourcetype]
 				];
 				dol_syslog("EInvoicing invoice " . $object->id . " refers to " . $sourceDiscountFact->ref
 					. " for the discount " . $obj->description . " applied on it", LOG_DEBUG);
@@ -1116,6 +1127,8 @@ $invoiceData = [
 	// Legal mention that goes with the "TVA d'après les débits" option, mandatory on the invoices of a
 	// seller who took it. The structured form of the same information is the VAT point date code below.
 	'documentNoteTXD'      => $vatOnDebits ? $outputlangs->transnoentities('VATOnDebitsMention') : '',
+	// BR-FR-CPRO-00: a note with subject code ADN and content B2G flags the invoice as B2G for the platforms.
+	'documentNoteADN'      => $looksLikeB2GInvoice ? 'B2G' : '',
 	'documentNotes'        => [],
 
 	// BT-8 (VAT point date code), which tells the buyer when the VAT falls due, hence from when it can be
@@ -1144,6 +1157,7 @@ $invoiceData = [
 	'sellerCommunicationUri'    => $myUri,
 
 	'sellerGlobalIds'           => $sellerGlobalIds,
+	'sellerChorusSiret'         => $sellerChorusSiret,
 	// BT-31 or BT-32, whichever the VAT regime of the seller calls for - see
 	// einvoicingSellerTaxRegistrations(). A seller that does not charge VAT has no BT-31 to declare and
 	// must still identify itself, or every exempt line trips BR-E-02 (issue #560).

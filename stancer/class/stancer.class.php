@@ -97,120 +97,158 @@ class Stancer extends CommonObject
 		// debug
 		$savlog = getDolGlobalString('SYSLOG_FILE');
 		$conf->global->SYSLOG_FILE = 'DOL_DATA_ROOT/dolibarr_doScheduledJobStancer.log';
-
-		if (empty($conf->stancer->enabled)) {
-			$this->error='Error, Stancer module not enabled';
-			return -1;
-		}
-		if (getDolGlobalString('STANCER_IS_PROD', '0') == '0') {
-			$this->error='Error, Stancer module is not in production mode';
-			return -1;
-		}
-
-		$job = new Cronjob($this->db);
-		$res = $job->fetch(0, 'Stancer', 'doScheduledJob');
-		if ($res) {
-			$lastrun = $job->datelastresult;
-			if (empty($lastrun)) {
-				$lastrun = $job->datelastrun - (24*3600);
+		try {
+			if (empty($conf->stancer->enabled)) {
+				$this->error = 'Error, Stancer module not enabled';
+				dol_syslog(__METHOD__ . ' ' . $this->error, LOG_WARNING);
+				return -1;
 			}
-			if (!empty($lastrun)) {
-				//lastrun -6 day (time to stancer to make job)
-				$lastrun -= (6*24*3600);
+			if (getDolGlobalString('STANCER_IS_PROD', '0') == '0') {
+				$this->error = 'Error, Stancer module is not in production mode';
+				dol_syslog(__METHOD__ . ' ' . $this->error, LOG_WARNING);
+				return -1;
 			}
+
+			$job = new Cronjob($this->db);
+			$res = $job->fetch(0, 'Stancer', 'doScheduledJob');
+			if ($res) {
+				$lastrun = $job->datelastresult;
+				if (empty($lastrun)) {
+					$lastrun = $job->datelastrun - (24*3600);
+				}
+				if (!empty($lastrun)) {
+					//lastrun -6 day (time to stancer to make job)
+					$lastrun -= (6*24*3600);
+				}
+			}
+
+			//lancé manuellement -> on force le lastrun a vide
+			if ($action == "confirm_execute") {
+				$lastrun = null;
+			}
+
+			// print "<p>doScheduledJob, lastrun = $lastrun</p>";exit;
+
+
+			$error = 0;
+			$this->output = '';
+			$this->error = '';
+
+			dol_syslog(__METHOD__, LOG_DEBUG);
+
+			//prev time for that scheduled job
+			$lastTime = '';
+
+			//refresh all payments
+			$res = stancerRefreshAllPayments(false, $lastrun);
+			$message = "";
+			if ($res->error != '') {
+				$this->error = $res->error;
+				$message = $res->error;
+				// $error++;
+			} else {
+				$message = $res->message;
+				$this->output = $res->message;
+			}
+
+			//refresh all payments from local dolibarr entries ? or from stancer list ?
+			$res = stancerRefreshAllPaymentsFromDolibarr(false, $lastrun);
+			if ($res->error != '') {
+				$this->error .= $res->error;
+				$message .= $res->error;
+				// $error++;
+			} else {
+				$message .= $res->message;
+				$this->output .= $res->message;
+			}
+
+			// Re-audit recently captured payments to catch late status changes (refused,
+			// disputed, refunded after the polling window). Bounded by a sliding window
+			// (STANCER_AUDIT_CAPTURED_WINDOW_DAYS). Skipped when disabled (0 days).
+			$res = stancerAuditRecentCapturedPayments($lastrun);
+			if ($res->error != '') {
+				$this->error .= $res->error;
+				$message .= $res->error;
+			} else {
+				$message .= $res->message;
+				$this->output .= $res->message;
+			}
+
+			if (getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', '') != '' && !empty($message)) {
+				dol_syslog("call stancerSendMail (1)");
+				$header = [
+					$langs->trans('StancerMailTableHeaderStancer'),
+					$langs->trans('StancerMailTableHeaderDolibarr'),
+					$langs->trans('StancerMailTableHeaderAmount'),
+					$langs->trans('StancerMailTableHeaderMessage'),
+					$langs->trans('StancerMailTableHeaderDate'),
+				];
+				$messageHTML = stancerCSVtoHTML($header, $message);
+				stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''), $langs->trans('StancerMailSubjectPayment'), $langs->transnoentitiesnoconv('StancerMailPayment', $messageHTML));
+			}
+
+			//then all payouts
+			$res = stancerRefreshAllPayouts(false, $lastrun);
+			if ($res->error != '') {
+				$this->error .= $res->error;
+				$message = $res->error;
+				// $error++;
+			} else {
+				$message = $res->message;
+				$this->output .= $res->message;
+			}
+			if (getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT', '') != '' && !empty($message)) {
+				dol_syslog("call stancerSendMail (2)");
+				$header = [
+					$langs->trans('StancerMailTableHeaderStancer'),
+					$langs->trans('StancerMailTableHeaderDolibarr'),
+					$langs->trans('StancerMailTableHeaderAmount'),
+					$langs->trans('StancerMailTableHeaderMessage'),
+					$langs->trans('StancerMailTableHeaderDate'),
+				];
+				$messageHTML = stancerCSVtoHTML($header, $message);
+				stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT', ''), $langs->trans('StancerMailSubjectPayout'), $langs->transnoentitiesnoconv('StancerMailPayout', $messageHTML));
+			}
+			return $error;
+		} finally {
+			// Every exit, early returns included, gives the log file back
+			$conf->global->SYSLOG_FILE = $savlog;
 		}
-
-		//lancé manuellement -> on force le lastrun a vide
-		if ($action == "confirm_execute") {
-			$lastrun = null;
-		}
-
-		// print "<p>doScheduledJob, lastrun = $lastrun</p>";exit;
-
-
-		$error = 0;
-		$this->output = '';
-		$this->error = '';
-
-		dol_syslog(__METHOD__, LOG_DEBUG);
-
-		//prev time for that scheduled job
-		$lastTime = '';
-
-		//refresh all payments
-		$res = stancerRefreshAllPayments(false, $lastrun);
-		$message = "";
-		if ($res->error != '') {
-			$this->error = $res->error;
-			$message = $res->error;
-			// $error++;
-		} else {
-			$message = $res->message;
-			$this->output = $res->message;
-		}
-
-		//refresh all payments from local dolibarr entries ? or from stancer list ?
-		$res = stancerRefreshAllPaymentsFromDolibarr(false, $lastrun);
-		if ($res->error != '') {
-			$this->error .= $res->error;
-			$message .= $res->error;
-			// $error++;
-		} else {
-			$message .= $res->message;
-			$this->output .= $res->message;
-		}
-
-		// Re-audit recently captured payments to catch late status changes (refused,
-		// disputed, refunded after the polling window). Bounded by a sliding window
-		// (STANCER_AUDIT_CAPTURED_WINDOW_DAYS). Skipped when disabled (0 days).
-		$res = stancerAuditRecentCapturedPayments($lastrun);
-		if ($res->error != '') {
-			$this->error .= $res->error;
-			$message .= $res->error;
-		} else {
-			$message .= $res->message;
-			$this->output .= $res->message;
-		}
-
-		if (getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', '') != '' && !empty($message)) {
-			dol_syslog("call stancerSendMail (1)");
-			$header = [
-				$langs->trans('StancerMailTableHeaderStancer'),
-				$langs->trans('StancerMailTableHeaderDolibarr'),
-				$langs->trans('StancerMailTableHeaderAmount'),
-				$langs->trans('StancerMailTableHeaderMessage'),
-				$langs->trans('StancerMailTableHeaderDate'),
-			];
-			$messageHTML = stancerCSVtoHTML($header, $message);
-			stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''), $langs->trans('StancerMailSubjectPayment'), $langs->transnoentitiesnoconv('StancerMailPayment', $messageHTML));
-		}
-
-		//then all payouts
-		$res = stancerRefreshAllPayouts(false, $lastrun);
-		if ($res->error != '') {
-			$this->error .= $res->error;
-			$message = $res->error;
-			// $error++;
-		} else {
-			$message = $res->message;
-			$this->output .= $res->message;
-		}
-		if (getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT', '') != '' && !empty($message)) {
-			dol_syslog("call stancerSendMail (2)");
-			$header = [
-				$langs->trans('StancerMailTableHeaderStancer'),
-				$langs->trans('StancerMailTableHeaderDolibarr'),
-				$langs->trans('StancerMailTableHeaderAmount'),
-				$langs->trans('StancerMailTableHeaderMessage'),
-				$langs->trans('StancerMailTableHeaderDate'),
-			];
-			$messageHTML = stancerCSVtoHTML($header, $message);
-			stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT', ''), $langs->trans('StancerMailSubjectPayout'), $langs->transnoentitiesnoconv('StancerMailPayout', $messageHTML));
-		}
-		$conf->global->SYSLOG_FILE = $savlog;
-		return $error;
 	}
 
+
+	/**
+	 * SQL selecting the unpaid invoices to collect for one payment mode type.
+	 *
+	 * @param	string		$mode					Payment mode type of llx_societe_rib ('ban' or 'card')
+	 * @param	int			$idpaiement				Id of the payment mode of the invoices (c_paiement)
+	 * @param	int|null	$thirdparty_id			Restrict to one thirdparty
+	 * @param	int			$companypaymentmodeid	Restrict to one payment mode of llx_societe_rib, 0 for all
+	 * @return	string								SQL request
+	 */
+	public function sqlInvoicesToProcess($mode, $idpaiement, $thirdparty_id = null, $companypaymentmodeid = 0)
+	{
+		$sql = 'SELECT f.rowid, f.fk_soc as socid, sr.rowid as companypaymentmodeid';
+		$sql .= ' FROM '.MAIN_DB_PREFIX.'facture as f, '.MAIN_DB_PREFIX.'societe_rib as sr';
+		$sql .= ' WHERE sr.fk_soc = f.fk_soc';
+		$sql .= " AND f.fk_mode_reglement = ".((int) $idpaiement);
+		$sql .= " AND f.paye = 0 AND f.type = " . Facture::TYPE_STANDARD . " AND f.fk_statut = ".Facture::STATUS_VALIDATED;
+		$sql .= " AND sr.type = '".$this->db->escape($mode)."'";	// This exclude payment mode of other types
+		$sql .= " AND sr.stancer_account <> ''";	// Only if stancer account exists
+		$sql .= " AND sr.stancer_object_ref <> ''";	// and stancer payment too
+		$sql .= " AND f.fk_account = " . getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS'); //only stancer target
+		$sql .= " AND f.entity IN (" . getEntity('invoice') . ")";
+		if (!empty($thirdparty_id) && (int) $thirdparty_id > 0) {
+			$sql .= " AND sr.fk_soc = " . ((int) $thirdparty_id);	//for take payment only for one company
+		}
+		if ((int) $companypaymentmodeid > 0) {
+			$sql .= " AND sr.rowid = " . ((int) $companypaymentmodeid);	// only the payment mode chosen by the user
+		}
+		// We must add a sort on sr.default_rib to get the default first, and then the last recent if no default found.
+		$sql .= " ORDER BY f.datef ASC, f.rowid ASC, sr.default_rib DESC, sr.tms DESC";	// Lines may be duplicated. Never mind, we will exclude duplicated invoice later.
+
+		return $sql;
+	}
 
 	/**
 	 * Take payment for every validated and unpaid invoice matching a payment mode.
@@ -227,9 +265,10 @@ class Stancer extends CommonObject
 	 * @param	int			$maxnbofinvoicetotry				Max number of invoices to process, 0 for no limit
 	 * @param	int|null	$thirdparty_id						Restrict the run to this thirdparty id, null or 0 to process them all
 	 * @param	boolean		$isautomatic						True when called by the scheduled job, enables the anti-duplicate and contract-only checks
+	 * @param	int			$companypaymentmodeid				Restrict the run to this payment mode of llx_societe_rib, 0 for all
 	 * @return	int												Number of errors, 0 if OK
 	 */
-	public function processInvoicesForPaymentMode($mode, $idpaiement, &$invoiceprocessed, &$invoiceprocessedok, &$invoiceprocessedko, &$invoiceprocessedinfo, &$invoiceprocessedwaitingduedate, $maxnbofinvoicetotry = 0, $thirdparty_id = null, $isautomatic = false)
+	public function processInvoicesForPaymentMode($mode, $idpaiement, &$invoiceprocessed, &$invoiceprocessedok, &$invoiceprocessedko, &$invoiceprocessedinfo, &$invoiceprocessedwaitingduedate, $maxnbofinvoicetotry = 0, $thirdparty_id = null, $isautomatic = false, $companypaymentmodeid = 0)
 	{
 		global $conf;
 		$error = 0;
@@ -237,20 +276,12 @@ class Stancer extends CommonObject
 		$isautomaticlog = (int) $isautomatic;
 		dol_syslog("stancer processInvoicesForPaymentMode mode=$mode idpaiement=$idpaiement thirdparty_id=$thirdparty_id isautomatic=$isautomaticlog", LOG_DEBUG);
 
-		$sql = 'SELECT f.rowid, f.fk_soc as socid, sr.rowid as companypaymentmodeid';
-		$sql .= ' FROM '.MAIN_DB_PREFIX.'facture as f, '.MAIN_DB_PREFIX.'societe_rib as sr';
-		$sql .= ' WHERE sr.fk_soc = f.fk_soc';
-		$sql .= " AND f.fk_mode_reglement = ".((int) $idpaiement);
-		$sql .= " AND f.paye = 0 AND f.type = " . Facture::TYPE_STANDARD . " AND f.fk_statut = ".Facture::STATUS_VALIDATED;
-		$sql .= " AND sr.type = '".$this->db->escape($mode)."'";	// This exclude payment mode of other types
-		$sql .= " AND sr.stancer_account <> ''";	// Only if stancer account exists
-		$sql .= " AND sr.stancer_object_ref <> ''";	// and stancer payment too
-		$sql .= " AND fk_account ='" . $this->db->escape(getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS', '')) . "'"; //only stancer target
-		if (!empty($thirdparty_id) && (int) $thirdparty_id > 0) {
-			$sql .= " AND sr.fk_soc = " . ((int) $thirdparty_id);	//for take payment only for one company
+		if (getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS') <= 0) {
+			$this->error = 'STANCER_BANK_ACCOUNT_FOR_PAYMENTS is not set, no invoice can be collected';
+			dol_syslog("stancer processInvoicesForPaymentMode: " . $this->error, LOG_ERR);
+			return 1;
 		}
-		// We must add a sort on sr.default_rib to get the default first, and then the last recent if no default found.
-		$sql .= " ORDER BY f.datef ASC, f.rowid ASC, sr.default_rib DESC, sr.tms DESC";	// Lines may be duplicated. Never mind, we will exclude duplicated invoice later.
+		$sql = $this->sqlInvoicesToProcess($mode, (int) $idpaiement, (int) $thirdparty_id, (int) $companypaymentmodeid);
 		// print $sql;exit;
 
 		$resql = $this->db->query($sql);
@@ -456,129 +487,149 @@ class Stancer extends CommonObject
 	 * @param	int		$noemailtocustomeriferror		1=No email sent to customer if there is a payment error (can be used when error is already reported on screen)
 	 * @param	int|null		$thirdparty_id					id of thirdpart
 	 * @param	bool	$isautomatic					set true if called by cron task, then do not force payment if it could be a duplicate one
+	 * @param	int		$companypaymentmodeid			Only collect with this payment mode of llx_societe_rib, 0 for all
 	 *
 	 * @return	int			                    		0 if OK, <>0 if KO (this function is used also by cron so only 0 is OK)
 	 */
-	public function doTakePaymentStancer($maxnbofinvoicetotry = 0, $noemailtocustomeriferror = 0, $thirdparty_id = null, $isautomatic = true)
+	public function doTakePaymentStancer($maxnbofinvoicetotry = 0, $noemailtocustomeriferror = 0, $thirdparty_id = null, $isautomatic = true, $companypaymentmodeid = 0)
 	{
 		global $conf, $langs, $mysoc;
 		// debug
 		$savlog = getDolGlobalString('SYSLOG_FILE');
 		$conf->global->SYSLOG_FILE = 'DOL_DATA_ROOT/dolibarr_doTakePaymentStancer.log';
+		try {
+			$langs->load("stancer@stancer");
 
-		$langs->load("stancer@stancer");
+			include_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+			include_once DOL_DOCUMENT_ROOT.'/societe/class/companypaymentmode.class.php';
 
-		include_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
-		include_once DOL_DOCUMENT_ROOT.'/societe/class/companypaymentmode.class.php';
+			$error = 0;
+			$this->output = '';
+			$this->error = '';
 
-		$error = 0;
-		$this->output = '';
-		$this->error = '';
+			$invoiceprocessed = array();
+			$invoiceprocessedok = array();
+			$invoiceprocessedko = array();
+			$invoiceprocessedinfoSEPA = array();
+			$invoiceprocessedSEPAwaitingduedate = array();
+			$invoiceprocessedwaitingduedate = array();
 
-		$invoiceprocessed = array();
-		$invoiceprocessedok = array();
-		$invoiceprocessedko = array();
-		$invoiceprocessedinfoSEPA = array();
-		$invoiceprocessedSEPAwaitingduedate = array();
-		$invoiceprocessedwaitingduedate = array();
-
-		if (empty($conf->stancer->enabled)) {
-			$this->error='Error, Stancer module not enabled';
-			return -1;
-		}
-		if (getDolGlobalString('STANCER_IS_PROD', '0') == '0') {
-			$this->error='Error, Stancer module is not in production mode';
-			return -1;
-		}
-
-		dol_syslog("stancer doTakePaymentStancer maxnbofinvoicetotry=".$maxnbofinvoicetotry." noemailtocustomeriferror=".$noemailtocustomeriferror, LOG_DEBUG);
-
-		//paiements SEPA
-		if (getDolGlobalString('STANCER_ENABLE_SEPA', '') != '') {
-			$idpaiementpre = dol_getIdFromCode($this->db, 'PRE', 'c_paiement', 'code', 'id', 1);
-			if ($idpaiementpre) {
-				$this->processInvoicesForPaymentMode('ban', $idpaiementpre, $invoiceprocessed, $invoiceprocessedok, $invoiceprocessedko, $invoiceprocessedinfoSEPA, $invoiceprocessedSEPAwaitingduedate, 0, $thirdparty_id, $isautomatic);
-			} else {
-				dol_syslog("stancer doTakePaymentStancer there is no id for code=PRE", LOG_DEBUG);
+			if (empty($conf->stancer->enabled)) {
+				$this->error = 'Error, Stancer module not enabled';
+				dol_syslog(__METHOD__ . ' ' . $this->error, LOG_WARNING);
+				return -1;
 			}
-		}
+			if (getDolGlobalString('STANCER_IS_PROD', '0') == '0') {
+				$this->error = 'Error, Stancer module is not in production mode';
+				dol_syslog(__METHOD__ . ' ' . $this->error, LOG_WARNING);
+				return -1;
+			}
 
-		//paiements CB
-		if (getDolGlobalString('STANCER_ENABLE_CB', '') != '') {
-			$idpaiementcard = dol_getIdFromCode($this->db, 'CB', 'c_paiement', 'code', 'id', 1);
-			if ($idpaiementcard) {
-				$this->processInvoicesForPaymentMode('card', $idpaiementcard, $invoiceprocessed, $invoiceprocessedok, $invoiceprocessedko, $invoiceprocessedinfoCB, $invoiceprocessedwaitingduedate, 0, $thirdparty_id, $isautomatic);
-			} else {
-				dol_syslog("stancer doTakePaymentStancer there is no id for code=CB", LOG_DEBUG);
-			}
-		}
+			dol_syslog("stancer doTakePaymentStancer maxnbofinvoicetotry=".$maxnbofinvoicetotry." noemailtocustomeriferror=".$noemailtocustomeriferror, LOG_DEBUG);
 
-		$listeFactureOKLink = $listeFactureKOLink = $listeFactureMailLink = $listeFactureInfoLink = $invoiceprocessedSEPAwaitingduedateLink = "";
-		$fac = new Facture($this->db);
-		foreach ($invoiceprocessedok as $fid) {
-			// print $fid;
-			if ($fac->fetch(0, $fid)) {
-				$listeFactureOKLink .= " " . $fac->getNomUrl(0, '', 0, 0, '', 1);
+			//paiements SEPA
+			if (getDolGlobalString('STANCER_ENABLE_SEPA', '') != '') {
+				$idpaiementpre = dol_getIdFromCode($this->db, 'PRE', 'c_paiement', 'code', 'id', 1);
+				if ($idpaiementpre) {
+					$this->processInvoicesForPaymentMode('ban', $idpaiementpre, $invoiceprocessed, $invoiceprocessedok, $invoiceprocessedko, $invoiceprocessedinfoSEPA, $invoiceprocessedSEPAwaitingduedate, 0, $thirdparty_id, $isautomatic, $companypaymentmodeid);
+				} else {
+					dol_syslog("stancer doTakePaymentStancer there is no id for code=PRE", LOG_DEBUG);
+				}
 			}
-		}
-		foreach ($invoiceprocessedko as $fid) {
-			// print $fid;
-			if ($fac->fetch(0, $fid)) {
-				$listeFactureKOLink .= " " . $fac->getNomUrl(0, '', 0, 0, '', 1);
-			}
-		}
-		foreach ($invoiceprocessedinfoSEPA as $fid) {
-			// print $fid;
-			if ($fac->fetch(0, $fid)) {
-				$listeFactureInfoLink .= " " . $fac->getNomUrl(0, '', 0, 0, '', 1);
-			}
-		}
-		foreach ($invoiceprocessedSEPAwaitingduedate as $fid) {
-			// print $fid;
-			if ($fac->fetch(0, $fid)) {
-				$invoiceprocessedSEPAwaitingduedateLink .= " " . $fac->getNomUrl(0, '', 0, 0, '', 1);
-			}
-		}
 
-		$message = "";
-		if (@count($invoiceprocessedok) == 1) {
-			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageA", (string) count($invoiceprocessed), $listeFactureOKLink);
-		} elseif (@count($invoiceprocessedok) > 1) {
-			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageAP", (string) count($invoiceprocessedok), (string) count($invoiceprocessed), $listeFactureOKLink);
-		}
-		if (!empty($message)) {
-			$message .= "<br />";
-		}
-		if (@count($invoiceprocessedinfoSEPA) == 1) {
-			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageC", $listeFactureInfoLink);
-		} elseif (@count($invoiceprocessedinfoSEPA) > 1) {
-			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageCP", (string) count($invoiceprocessedinfoSEPA), $listeFactureInfoLink);
-		}
-		if (!empty($message)) {
-			$message .= "<br />";
-		}
-		if (@count($invoiceprocessedSEPAwaitingduedate) == 1) {
-			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageD", $invoiceprocessedSEPAwaitingduedateLink);
-		} elseif (@count($invoiceprocessedSEPAwaitingduedate) > 1) {
-			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageDP", (string) count($invoiceprocessedSEPAwaitingduedate), $invoiceprocessedSEPAwaitingduedateLink);
-		}
-		if (!empty($message)) {
-			$message .= "<br />";
-		}
-		if (@count($invoiceprocessedko) == 1) {
-			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageB", $listeFactureKOLink);
-		} elseif (@count($invoiceprocessedko) > 1) {
-			$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageBP", (string) count($invoiceprocessedko), $listeFactureKOLink);
-		}
-		$this->output = $message;
+			//paiements CB
+			if (getDolGlobalString('STANCER_ENABLE_CB', '') != '') {
+				$idpaiementcard = dol_getIdFromCode($this->db, 'CB', 'c_paiement', 'code', 'id', 1);
+				if ($idpaiementcard) {
+					$this->processInvoicesForPaymentMode('card', $idpaiementcard, $invoiceprocessed, $invoiceprocessedok, $invoiceprocessedko, $invoiceprocessedinfoCB, $invoiceprocessedwaitingduedate, 0, $thirdparty_id, $isautomatic, $companypaymentmodeid);
+				} else {
+					dol_syslog("stancer doTakePaymentStancer there is no id for code=CB", LOG_DEBUG);
+				}
+			}
 
-		$conf->global->SYSLOG_FILE = $savlog;
-		return $error;
+			$listeFactureOKLink = $listeFactureKOLink = $listeFactureMailLink = $listeFactureInfoLink = $invoiceprocessedSEPAwaitingduedateLink = "";
+			$fac = new Facture($this->db);
+			foreach ($invoiceprocessedok as $fid) {
+				// print $fid;
+				if ($fac->fetch(0, $fid)) {
+					$listeFactureOKLink .= " " . $fac->getNomUrl(0, '', 0, 0, '', 1);
+				}
+			}
+			foreach ($invoiceprocessedko as $fid) {
+				// print $fid;
+				if ($fac->fetch(0, $fid)) {
+					$listeFactureKOLink .= " " . $fac->getNomUrl(0, '', 0, 0, '', 1);
+				}
+			}
+			foreach ($invoiceprocessedinfoSEPA as $fid) {
+				// print $fid;
+				if ($fac->fetch(0, $fid)) {
+					$listeFactureInfoLink .= " " . $fac->getNomUrl(0, '', 0, 0, '', 1);
+				}
+			}
+			foreach ($invoiceprocessedSEPAwaitingduedate as $fid) {
+				// print $fid;
+				if ($fac->fetch(0, $fid)) {
+					$invoiceprocessedSEPAwaitingduedateLink .= " " . $fac->getNomUrl(0, '', 0, 0, '', 1);
+				}
+			}
+
+			$message = "";
+			if (@count($invoiceprocessedok) == 1) {
+				$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageA", (string) count($invoiceprocessed), $listeFactureOKLink);
+			} elseif (@count($invoiceprocessedok) > 1) {
+				$message = $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageAP", (string) count($invoiceprocessedok), (string) count($invoiceprocessed), $listeFactureOKLink);
+			}
+			if (!empty($message)) {
+				$message .= "<br />";
+			}
+			if (@count($invoiceprocessedinfoSEPA) == 1) {
+				$message .= $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageC", $listeFactureInfoLink);
+			} elseif (@count($invoiceprocessedinfoSEPA) > 1) {
+				$message .= $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageCP", (string) count($invoiceprocessedinfoSEPA), $listeFactureInfoLink);
+			}
+			if (!empty($message)) {
+				$message .= "<br />";
+			}
+			if (@count($invoiceprocessedSEPAwaitingduedate) == 1) {
+				$message .= $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageD", $invoiceprocessedSEPAwaitingduedateLink);
+			} elseif (@count($invoiceprocessedSEPAwaitingduedate) > 1) {
+				$message .= $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageDP", (string) count($invoiceprocessedSEPAwaitingduedate), $invoiceprocessedSEPAwaitingduedateLink);
+			}
+			if (!empty($message)) {
+				$message .= "<br />";
+			}
+			if (@count($invoiceprocessedko) == 1) {
+				$message .= $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageB", $listeFactureKOLink);
+			} elseif (@count($invoiceprocessedko) > 1) {
+				$message .= $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageBP", (string) count($invoiceprocessedko), $listeFactureKOLink);
+			}
+			$this->output = $message;
+
+			return $error;
+		} finally {
+			// Every exit, early returns included, gives the log file back
+			$conf->global->SYSLOG_FILE = $savlog;
+		}
 	}
 
 	//2 invoice(s) paid among 2 qualified invoice(s) with a valid Stancer default payment mode processed : FA2303-0003,FA2303-0005 (ran in mode ) (search done on SellYourSaas customers only) - 0 discarded (missing Stancer customer/card id, payment error or other reason)
 	// Same sample output, French wording: 2 invoices paid out of 2 qualified ones (Stancer payment mode)
 
+
+	/**
+	 * SQL selecting the validated invoices of the current entity still flagged as unpaid.
+	 *
+	 * @return	string	SQL request
+	 */
+	public function sqlUnpaidInvoicesToCheck()
+	{
+		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture";
+		$sql .= " WHERE fk_statut = " . ((int) CommonInvoice::STATUS_VALIDATED) . " AND paye = 0";
+		$sql .= " AND entity IN (" . getEntity('invoice') . ")";
+
+		return $sql;
+	}
 
 	/**
 	 * Action executed by scheduler
@@ -599,60 +650,73 @@ class Stancer extends CommonObject
 		// debug
 		$savlog = getDolGlobalString('SYSLOG_FILE');
 		$conf->global->SYSLOG_FILE = 'DOL_DATA_ROOT/dolibarr_doCheckInvoicesPaid.log';
+		try {
+			$langs->load("stancer@stancer");
 
-		$langs->load("stancer@stancer");
 
+			include_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+			include_once DOL_DOCUMENT_ROOT.'/societe/class/companypaymentmode.class.php';
 
-		include_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
-		include_once DOL_DOCUMENT_ROOT.'/societe/class/companypaymentmode.class.php';
+			$error = 0;
+			$this->output = '';
+			$this->error = '';
 
-		$error = 0;
-		$this->output = '';
-		$this->error = '';
+			$invoiceprocessed = array();
+			$invoiceprocessedok = array();
+			$invoiceprocessedko = array();
 
-		$invoiceprocessed = array();
-		$invoiceprocessedok = array();
-		$invoiceprocessedko = array();
-
-		if (empty($conf->stancer->enabled)) {
-			$this->error='Error, Stancer module not enabled';
-			return -1;
-		}
-		if (getDolGlobalString('STANCER_IS_PROD', '0') == '0') {
-			$this->error='Error, Stancer module is not in production mode';
-			return -1;
-		}
-
-		dol_syslog("stancer doCheckInvoicesPaid maxnbofinvoicetotry=".$maxnbofinvoicetotry." noemailtocustomeriferror=".$noemailtocustomeriferror, LOG_DEBUG);
-		$message = $listeFactureOKLink = "";
-		$invoiceprocessed = $invoiceprocessedok = [];
-
-		// List of invoices flagged as unpaid
-		$sql = "SELECT rowid FROM ".MAIN_DB_PREFIX."facture WHERE fk_statut='". CommonInvoice::STATUS_VALIDATED . "' AND paye = '0'";
-		$resql = $this->db->query($sql);
-		if ($resql) {
-			while ($obj = $this->db->fetch_object($resql)) {
-				$facture = new Facture($this->db);
-				$facture->fetch($obj->rowid);
-				$paid = $facture->getSommePaiement() ?? 0;
-				$invoiceprocessed[] = $facture->ref;
-				if ($paid == $facture->total_ttc) {
-					$facture->setPaid($user);
-					$listeFactureOKLink .= " " . $facture->getNomUrl(0, '', 0, 0, '', 1);
-					$invoiceprocessedok[] = $facture->ref;
-				}
+			if (empty($conf->stancer->enabled)) {
+				$this->error = 'Error, Stancer module not enabled';
+				dol_syslog(__METHOD__ . ' ' . $this->error, LOG_WARNING);
+				return -1;
 			}
-		}
+			if (getDolGlobalString('STANCER_IS_PROD', '0') == '0') {
+				$this->error = 'Error, Stancer module is not in production mode';
+				dol_syslog(__METHOD__ . ' ' . $this->error, LOG_WARNING);
+				return -1;
+			}
 
-		if (@count($invoiceprocessedok) == 1) {
-			$message = $langs->transnoentitiesnoconv("StancerdoCheckInvoicesPaidResultMessageA", (string) count($invoiceprocessed), $listeFactureOKLink);
-		} elseif (@count($invoiceprocessedok) > 1) {
-			$message = $langs->transnoentitiesnoconv("StancerdoCheckInvoicesPaidResultMessageAP", (string) count($invoiceprocessedok), (string) count($invoiceprocessed), $listeFactureOKLink);
-		}
-		$this->output = $message;
+			dol_syslog("stancer doCheckInvoicesPaid maxnbofinvoicetotry=".$maxnbofinvoicetotry." noemailtocustomeriferror=".$noemailtocustomeriferror, LOG_DEBUG);
+			$message = $listeFactureOKLink = "";
+			$invoiceprocessed = $invoiceprocessedok = [];
 
-		$conf->global->SYSLOG_FILE = $savlog;
-		return $error;
+			// List of invoices flagged as unpaid
+			$sql = $this->sqlUnpaidInvoicesToCheck();
+			$resql = $this->db->query($sql);
+			if ($resql) {
+				while ($obj = $this->db->fetch_object($resql)) {
+					$facture = new Facture($this->db);
+					if ($facture->fetch($obj->rowid) <= 0) {
+						dol_syslog("stancer doCheckInvoicesPaid: cannot fetch invoice " . $obj->rowid . ": " . $facture->error, LOG_ERR);
+						$error++;
+						continue;
+					}
+					$paid = $facture->getSommePaiement() ?? 0;
+					$invoiceprocessed[] = $facture->ref;
+					if ((float) price2num($paid, 'MT') >= (float) price2num($facture->total_ttc, 'MT') - 0.005) {
+						$facture->setPaid($user);
+						$listeFactureOKLink .= " " . $facture->getNomUrl(0, '', 0, 0, '', 1);
+						$invoiceprocessedok[] = $facture->ref;
+					}
+				}
+			} else {
+				$this->error = $this->db->lasterror();
+				dol_syslog("stancer doCheckInvoicesPaid: " . $this->error, LOG_ERR);
+				$error++;
+			}
+
+			if (@count($invoiceprocessedok) == 1) {
+				$message = $langs->transnoentitiesnoconv("StancerdoCheckInvoicesPaidResultMessageA", (string) count($invoiceprocessed), $listeFactureOKLink);
+			} elseif (@count($invoiceprocessedok) > 1) {
+				$message = $langs->transnoentitiesnoconv("StancerdoCheckInvoicesPaidResultMessageAP", (string) count($invoiceprocessedok), (string) count($invoiceprocessed), $listeFactureOKLink);
+			}
+			$this->output = $message;
+
+			return $error;
+		} finally {
+			// Every exit, early returns included, gives the log file back
+			$conf->global->SYSLOG_FILE = $savlog;
+		}
 	}
 
 	/**
@@ -669,226 +733,255 @@ class Stancer extends CommonObject
 
 		$savlog = getDolGlobalString('SYSLOG_FILE');
 		$conf->global->SYSLOG_FILE = 'DOL_DATA_ROOT/dolibarr_doSendPaymentReminders.log';
+		try {
+			$langs->load("stancer@stancer");
 
-		$langs->load("stancer@stancer");
+			include_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+			include_once DOL_DOCUMENT_ROOT . '/comm/action/class/actioncomm.class.php';
+			dol_include_once('/stancer/class/stancer_payments.class.php');
 
-		include_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
-		include_once DOL_DOCUMENT_ROOT . '/comm/action/class/actioncomm.class.php';
-		dol_include_once('/stancer/class/stancer_payments.class.php');
+			$error = 0;
+			$this->output = '';
+			$this->error = '';
 
-		$error = 0;
-		$this->output = '';
-		$this->error = '';
-
-		if (empty($conf->stancer->enabled)) {
-			$this->error = 'Error, Stancer module not enabled';
-			dol_syslog("stancer doSendPaymentReminders " . $this->error, LOG_ERR);
-			return -1;
-		}
-		if (getDolGlobalString('STANCER_IS_PROD', '0') == '0') {
-			$this->error = 'Error, Stancer module is not in production mode';
-			dol_syslog("stancer doSendPaymentReminders " . $this->error, LOG_ERR);
-			return -1;
-		}
-		if (!getDolGlobalString('STANCER_PAYMENT_REMINDER_ENABLED')) {
-			$this->output = 'Payment reminders are not enabled';
-			dol_syslog("stancer doSendPaymentReminders " . $this->output, LOG_DEBUG);
-			$conf->global->SYSLOG_FILE = $savlog;
-			return 0;
-		}
-
-		$mailTemplateFallback = getDolGlobalString('STANCER_PAYMENT_REMINDER_MAILTYPE', '');
-		$mailTemplateSoft     = getDolGlobalString('STANCER_PAYMENT_REMINDER_MAILTYPE_SOFT', '');
-		$mailTemplateHard     = getDolGlobalString('STANCER_PAYMENT_REMINDER_MAILTYPE_HARD', '');
-		$mailTemplateMonthly  = getDolGlobalString('STANCER_PAYMENT_REMINDER_MAILTYPE_MONTHLY', '');
-		if (empty($mailTemplateFallback) && empty($mailTemplateSoft) && empty($mailTemplateHard) && empty($mailTemplateMonthly)) {
-			$this->error = 'Error, no STANCER_PAYMENT_REMINDER_MAILTYPE* template is configured';
-			dol_syslog("stancer doSendPaymentReminders " . $this->error, LOG_ERR);
-			return -1;
-		}
-
-		// Parse reminder schedule (default: J+7 SOFT, J+14 HARD, then monthly up to 6 months)
-		$scheduleStr = getDolGlobalString('STANCER_PAYMENT_REMINDER_SCHEDULE', '7,14,44,74,104,134,164');
-		$schedule = array_map('intval', array_filter(explode(',', $scheduleStr), function ($v) {
-			return is_numeric(trim($v)) && intval(trim($v)) > 0;
-		}));
-		sort($schedule);
-		if (empty($schedule)) {
-			$this->error = 'Error, STANCER_PAYMENT_REMINDER_SCHEDULE is invalid: ' . $scheduleStr;
-			dol_syslog("stancer doSendPaymentReminders " . $this->error, LOG_ERR);
-			return -1;
-		}
-
-		dol_syslog("stancer doSendPaymentReminders schedule=" . implode(',', $schedule) . " maxReminders=" . count($schedule), LOG_DEBUG);
-
-		$remindersSent = array();
-		$remindersError = array();
-		$invoicesProcessed = array();
-
-		// Fetch failed Stancer payments from the last 6 months
-		$sp = new Stancer_payments($this->db);
-		$failureStatuses = array(
-			Stancer_payments::STATUS_DISPUTED,
-			Stancer_payments::STATUS_EXPIRED,
-			Stancer_payments::STATUS_FAILED,
-			Stancer_payments::STATUS_REFUSED,
-		);
-		$statusList = implode("','", $failureStatuses);
-		// 6-month window: covers the longest reminder horizon (up to 164 days by default)
-		$dateLimit = dol_print_date((dol_now() - (3600 * 24 * 180)), '%Y-%m-%d');
-		$resList = $sp->fetchAll('ASC', '', 0, 0, array(
-			'customsql' => "live_mode = '" . getDolGlobalString('STANCER_IS_PROD') . "' AND status IN ('" . $statusList . "') AND date_creation > '" . $dateLimit . "'"
-		));
-
-		if (!is_array($resList)) {
-			dol_syslog("stancer doSendPaymentReminders no failed payments found", LOG_DEBUG);
-			$this->output = 'No failed payments found';
-			$conf->global->SYSLOG_FILE = $savlog;
-			return 0;
-		}
-
-		dol_syslog("stancer doSendPaymentReminders found " . count($resList) . " failed payment(s)", LOG_DEBUG);
-
-		foreach ($resList as $stancerPayment) {
-			// Resolve the linked invoice
-			$obj = getObjectFromTag($stancerPayment->unique_id);
-			if (empty($obj)) {
-				dol_syslog("stancer doSendPaymentReminders cannot resolve object from tag=" . $stancerPayment->unique_id . ", skip", LOG_DEBUG);
-				continue;
+			if (empty($conf->stancer->enabled)) {
+				$this->error = 'Error, Stancer module not enabled';
+				dol_syslog("stancer doSendPaymentReminders " . $this->error, LOG_ERR);
+				return -1;
 			}
-			if ($obj->element != 'facture') {
-				dol_syslog("stancer doSendPaymentReminders object is not an invoice (" . $obj->element . "), skip", LOG_DEBUG);
-				continue;
+			if (getDolGlobalString('STANCER_IS_PROD', '0') == '0') {
+				$this->error = 'Error, Stancer module is not in production mode';
+				dol_syslog("stancer doSendPaymentReminders " . $this->error, LOG_ERR);
+				return -1;
+			}
+			if (!getDolGlobalString('STANCER_PAYMENT_REMINDER_ENABLED')) {
+				$this->output = 'Payment reminders are not enabled';
+				dol_syslog("stancer doSendPaymentReminders " . $this->output, LOG_DEBUG);
+				return 0;
 			}
 
-			// Avoid processing the same invoice multiple times (multiple failed payments for the same invoice)
-			if (in_array($obj->id, $invoicesProcessed)) {
-				continue;
-			}
-			$invoicesProcessed[] = $obj->id;
-
-			// Skip if invoice is already paid or not in validated status
-			// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 still fills and writes; status == 2 also covers abandoned invoices
-			if ($obj->paye == 1 || $obj->status != Facture::STATUS_VALIDATED) {
-				dol_syslog("stancer doSendPaymentReminders invoice " . $obj->ref . " already paid or not validated, skip", LOG_DEBUG);
-				continue;
+			$mailTemplateFallback = getDolGlobalString('STANCER_PAYMENT_REMINDER_MAILTYPE', '');
+			$mailTemplateSoft     = getDolGlobalString('STANCER_PAYMENT_REMINDER_MAILTYPE_SOFT', '');
+			$mailTemplateHard     = getDolGlobalString('STANCER_PAYMENT_REMINDER_MAILTYPE_HARD', '');
+			$mailTemplateMonthly  = getDolGlobalString('STANCER_PAYMENT_REMINDER_MAILTYPE_MONTHLY', '');
+			if (empty($mailTemplateFallback) && empty($mailTemplateSoft) && empty($mailTemplateHard) && empty($mailTemplateMonthly)) {
+				$this->error = 'Error, no STANCER_PAYMENT_REMINDER_MAILTYPE* template is configured';
+				dol_syslog("stancer doSendPaymentReminders " . $this->error, LOG_ERR);
+				return -1;
 			}
 
-			// Check if invoice remaining amount is > 0
-			$remainToPay = $obj->total_ttc - ($obj->getSommePaiement() ?? 0);
-			if ($remainToPay <= 0) {
-				dol_syslog("stancer doSendPaymentReminders invoice " . $obj->ref . " nothing left to pay, skip", LOG_DEBUG);
-				continue;
+			// Parse reminder schedule (default: J+7 SOFT, J+14 HARD, then monthly up to 6 months)
+			$scheduleStr = getDolGlobalString('STANCER_PAYMENT_REMINDER_SCHEDULE', '7,14,44,74,104,134,164');
+			$schedule = array_map('intval', array_filter(explode(',', $scheduleStr), function ($v) {
+				return is_numeric(trim($v)) && intval(trim($v)) > 0;
+			}));
+			sort($schedule);
+			if (empty($schedule)) {
+				$this->error = 'Error, STANCER_PAYMENT_REMINDER_SCHEDULE is invalid: ' . $scheduleStr;
+				dol_syslog("stancer doSendPaymentReminders " . $this->error, LOG_ERR);
+				return -1;
 			}
 
-			// Count existing reminders via ActionComm
-			$actioncomm = new ActionComm($this->db);
-			// The module requires Dolibarr 15 minimum, where getActions() no longer takes $db as first argument.
-			$existingReminders = $actioncomm->getActions($obj->socid, $obj->id, "invoice", " AND code LIKE 'AC_BILL_RELANCE_%_SENTBYMAIL'");
-			$reminderCount = is_array($existingReminders) ? count($existingReminders) : 0;
+			dol_syslog("stancer doSendPaymentReminders schedule=" . implode(',', $schedule) . " maxReminders=" . count($schedule), LOG_DEBUG);
 
-			// All reminders already sent?
-			if ($reminderCount >= count($schedule)) {
-				dol_syslog("stancer doSendPaymentReminders invoice " . $obj->ref . " all " . count($schedule) . " reminders already sent, skip", LOG_DEBUG);
-				continue;
+			$remindersSent = array();
+			$remindersError = array();
+			$invoicesProcessed = array();
+
+			// Fetch failed Stancer payments from the last 6 months
+			$sp = new Stancer_payments($this->db);
+			$failureStatuses = array(
+				Stancer_payments::STATUS_DISPUTED,
+				Stancer_payments::STATUS_EXPIRED,
+				Stancer_payments::STATUS_FAILED,
+				Stancer_payments::STATUS_REFUSED,
+			);
+			$statusList = implode("','", $failureStatuses);
+			// 6-month window: covers the longest reminder horizon (up to 164 days by default)
+			$dateLimit = dol_print_date((dol_now() - (3600 * 24 * 180)), '%Y-%m-%d');
+			$resList = $sp->fetchAll('ASC', '', 0, 0, array(
+				'customsql' => "live_mode = '" . getDolGlobalString('STANCER_IS_PROD') . "' AND status IN ('" . $statusList . "') AND date_creation > '" . $dateLimit . "'"
+			));
+
+			if (!is_array($resList)) {
+				dol_syslog("stancer doSendPaymentReminders no failed payments found", LOG_DEBUG);
+				$this->output = 'No failed payments found';
+				return 0;
 			}
 
-			// Determine when the next reminder should be sent
-			$nextReminderDay = $schedule[$reminderCount];
-			$failureTimestamp = $stancerPayment->date_creation;
-			if (is_string($failureTimestamp)) {
-				$failureTimestamp = strtotime($failureTimestamp);
-			}
-			if (empty($failureTimestamp)) {
-				dol_syslog("stancer doSendPaymentReminders invoice " . $obj->ref . " cannot determine failure date, skip", LOG_DEBUG);
-				continue;
-			}
-			$nextReminderTimestamp = $failureTimestamp + ($nextReminderDay * 86400);
+			dol_syslog("stancer doSendPaymentReminders found " . count($resList) . " failed payment(s)", LOG_DEBUG);
 
-			if (dol_now() < $nextReminderTimestamp) {
-				dol_syslog("stancer doSendPaymentReminders invoice " . $obj->ref . " reminder " . ($reminderCount + 1) . " not due yet (due " . dol_print_date($nextReminderTimestamp, 'dayhour') . "), skip", LOG_DEBUG);
-				continue;
-			}
-
-			// Avoid double-send: check if the last reminder was sent less than 1 hour ago
-			if ($reminderCount > 0 && is_array($existingReminders)) {
-				$lastReminder = end($existingReminders);
-				if (is_object($lastReminder) && !empty($lastReminder->datep) && ($lastReminder->datep > (dol_now() - 3600))) {
-					dol_syslog("stancer doSendPaymentReminders invoice " . $obj->ref . " last reminder sent less than 1 hour ago, skip", LOG_DEBUG);
+			foreach ($resList as $stancerPayment) {
+				// Resolve the linked invoice
+				$obj = getObjectFromTag($stancerPayment->unique_id);
+				if (empty($obj)) {
+					dol_syslog("stancer doSendPaymentReminders cannot resolve object from tag=" . $stancerPayment->unique_id . ", skip", LOG_DEBUG);
 					continue;
 				}
-			}
-
-			// Send the reminder
-			$nextReminderNumber = $reminderCount + 1;
-			$actionCode = 'BILL_RELANCE_' . $nextReminderNumber . '_SENTBYMAIL';
-
-			// Pick template per step: #1=SOFT, #2=HARD, #3+=MONTHLY. Fallback to global template if not set.
-			if ($nextReminderNumber == 1) {
-				$mailTemplate = !empty($mailTemplateSoft) ? $mailTemplateSoft : $mailTemplateFallback;
-				$reminderLevel = 'SOFT';
-			} elseif ($nextReminderNumber == 2) {
-				$mailTemplate = !empty($mailTemplateHard) ? $mailTemplateHard : $mailTemplateFallback;
-				$reminderLevel = 'HARD';
-			} else {
-				$mailTemplate = !empty($mailTemplateMonthly) ? $mailTemplateMonthly : $mailTemplateFallback;
-				$reminderLevel = 'MONTHLY';
-			}
-
-			if (empty($mailTemplate)) {
-				dol_syslog("stancer doSendPaymentReminders no template configured for level=$reminderLevel (reminder $nextReminderNumber) on invoice " . $obj->ref . ", skip", LOG_WARNING);
-				continue;
-			}
-
-			dol_syslog("stancer doSendPaymentReminders sending reminder " . $nextReminderNumber . " (level=$reminderLevel, template=$mailTemplate) for invoice " . $obj->ref . " (actionCode=$actionCode)", LOG_DEBUG);
-
-			$obj->fetch_thirdparty();
-			stancerSendInvoiceMailModele(
-				$mailTemplate,
-				$obj,
-				$actionCode,
-				0  // forceMail=0: dedup via ActionComm
-			);
-
-			$customerName = is_object($obj->thirdparty) && !empty($obj->thirdparty->name) ? $obj->thirdparty->name : '-';
-			$remindersSent[] = stancerBuildInvoiceLink($obj) . ' - ' . htmlspecialchars($customerName) . ' (relance ' . $nextReminderNumber . ' - ' . $reminderLevel . ')';
-		}
-
-		// Send admin summary
-		if (getDolGlobalString('STANCER_PAYMENT_REMINDER_ADMIN_SUMMARY')
-			&& getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', '') != ''
-			&& (!empty($remindersSent) || !empty($remindersError))
-		) {
-			$message = '';
-			if (!empty($remindersSent)) {
-				$message .= $langs->trans('StancerRemindersSentList') . " :\n<ul>";
-				foreach ($remindersSent as $ref) {
-					$message .= "<li>" . $ref . "</li>\n";
+				if ($obj->element != 'facture') {
+					dol_syslog("stancer doSendPaymentReminders object is not an invoice (" . $obj->element . "), skip", LOG_DEBUG);
+					continue;
 				}
-				$message .= "</ul>\n";
+
+				// Avoid processing the same invoice multiple times (multiple failed payments for the same invoice)
+				if (in_array($obj->id, $invoicesProcessed)) {
+					continue;
+				}
+				$invoicesProcessed[] = $obj->id;
+
+				// Skip if invoice is already paid or not in validated status
+				// @phan-suppress-next-line PhanDeprecatedProperty  $paye is the column Dolibarr 15..21 still fills and writes; status == 2 also covers abandoned invoices
+				if ($obj->paye == 1 || $obj->status != Facture::STATUS_VALIDATED) {
+					dol_syslog("stancer doSendPaymentReminders invoice " . $obj->ref . " already paid or not validated, skip", LOG_DEBUG);
+					continue;
+				}
+
+				// Check if invoice remaining amount is > 0
+				$remainToPay = $obj->total_ttc - ($obj->getSommePaiement() ?? 0);
+				if ($remainToPay <= 0) {
+					dol_syslog("stancer doSendPaymentReminders invoice " . $obj->ref . " nothing left to pay, skip", LOG_DEBUG);
+					continue;
+				}
+
+				// Count existing reminders via ActionComm
+				$actioncomm = new ActionComm($this->db);
+				// The module requires Dolibarr 15 minimum, where getActions() no longer takes $db as first argument.
+				$existingReminders = $actioncomm->getActions($obj->socid, $obj->id, "invoice", " AND code LIKE 'AC_BILL_RELANCE_%_SENTBYMAIL'");
+				$reminderCount = is_array($existingReminders) ? count($existingReminders) : 0;
+
+				// All reminders already sent?
+				if ($reminderCount >= count($schedule)) {
+					dol_syslog("stancer doSendPaymentReminders invoice " . $obj->ref . " all " . count($schedule) . " reminders already sent, skip", LOG_DEBUG);
+					continue;
+				}
+
+				// Determine when the next reminder should be sent
+				$nextReminderDay = $schedule[$reminderCount];
+				$failureTimestamp = $stancerPayment->date_creation;
+				if (is_string($failureTimestamp)) {
+					$failureTimestamp = strtotime($failureTimestamp);
+				}
+				if (empty($failureTimestamp)) {
+					dol_syslog("stancer doSendPaymentReminders invoice " . $obj->ref . " cannot determine failure date, skip", LOG_DEBUG);
+					continue;
+				}
+				$nextReminderTimestamp = $failureTimestamp + ($nextReminderDay * 86400);
+
+				if (dol_now() < $nextReminderTimestamp) {
+					dol_syslog("stancer doSendPaymentReminders invoice " . $obj->ref . " reminder " . ($reminderCount + 1) . " not due yet (due " . dol_print_date($nextReminderTimestamp, 'dayhour') . "), skip", LOG_DEBUG);
+					continue;
+				}
+
+				// Avoid double-send: check if the last reminder was sent less than 1 hour ago
+				if ($reminderCount > 0 && is_array($existingReminders)) {
+					if (stancerMostRecentActionDate($existingReminders) > (dol_now() - 3600)) {
+						dol_syslog("stancer doSendPaymentReminders invoice " . $obj->ref . " last reminder sent less than 1 hour ago, skip", LOG_DEBUG);
+						continue;
+					}
+				}
+
+				// Send the reminder
+				$nextReminderNumber = $reminderCount + 1;
+				$actionCode = 'BILL_RELANCE_' . $nextReminderNumber . '_SENTBYMAIL';
+
+				// Pick template per step: #1=SOFT, #2=HARD, #3+=MONTHLY. Fallback to global template if not set.
+				if ($nextReminderNumber == 1) {
+					$mailTemplate = !empty($mailTemplateSoft) ? $mailTemplateSoft : $mailTemplateFallback;
+					$reminderLevel = 'SOFT';
+				} elseif ($nextReminderNumber == 2) {
+					$mailTemplate = !empty($mailTemplateHard) ? $mailTemplateHard : $mailTemplateFallback;
+					$reminderLevel = 'HARD';
+				} else {
+					$mailTemplate = !empty($mailTemplateMonthly) ? $mailTemplateMonthly : $mailTemplateFallback;
+					$reminderLevel = 'MONTHLY';
+				}
+
+				if (empty($mailTemplate)) {
+					dol_syslog("stancer doSendPaymentReminders no template configured for level=$reminderLevel (reminder $nextReminderNumber) on invoice " . $obj->ref . ", skip", LOG_WARNING);
+					continue;
+				}
+
+				dol_syslog("stancer doSendPaymentReminders sending reminder " . $nextReminderNumber . " (level=$reminderLevel, template=$mailTemplate) for invoice " . $obj->ref . " (actionCode=$actionCode)", LOG_DEBUG);
+
+				$obj->fetch_thirdparty();
+				$mailRes = stancerSendInvoiceMailModele(
+					$mailTemplate,
+					$obj,
+					$actionCode,
+					0  // forceMail=0: dedup via ActionComm
+				);
+
+				$customerName = is_object($obj->thirdparty) && !empty($obj->thirdparty->name) ? $obj->thirdparty->name : '-';
+				if ($mailRes === null || $mailRes < 0) {
+					dol_syslog("stancer doSendPaymentReminders reminder " . $nextReminderNumber . " for invoice " . $obj->ref . " not sent (" . var_export($mailRes, true) . ")", LOG_ERR);
+					$remindersError[] = stancerBuildInvoiceLink($obj) . ' - ' . htmlspecialchars($customerName) . ' (relance ' . $nextReminderNumber . ' - ' . $reminderLevel . ')';
+					continue;
+				}
+				if ($mailRes == 0) {
+					dol_syslog("stancer doSendPaymentReminders reminder " . $nextReminderNumber . " for invoice " . $obj->ref . " already sent, skipped by dedup", LOG_DEBUG);
+					continue;
+				}
+				$remindersSent[] = stancerBuildInvoiceLink($obj) . ' - ' . htmlspecialchars($customerName) . ' (relance ' . $nextReminderNumber . ' - ' . $reminderLevel . ')';
 			}
+
+			// Send admin summary
+			if (getDolGlobalString('STANCER_PAYMENT_REMINDER_ADMIN_SUMMARY')
+				&& getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', '') != ''
+				&& (!empty($remindersSent) || !empty($remindersError))
+			) {
+				$message = '';
+				if (!empty($remindersSent)) {
+					$message .= $langs->trans('StancerRemindersSentList') . " :\n<ul>";
+					foreach ($remindersSent as $ref) {
+						$message .= "<li>" . $ref . "</li>\n";
+					}
+					$message .= "</ul>\n";
+				}
+				if (!empty($remindersError)) {
+					$message .= $langs->trans('StancerRemindersErrorList') . " :\n<ul>";
+					foreach ($remindersError as $ref) {
+						$message .= "<li>" . $ref . "</li>\n";
+					}
+					$message .= "</ul>\n";
+				}
+				stancerSendMail(
+					getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''),
+					$langs->trans('StancerMailSubjectReminders'),
+					$message
+				);
+			}
+
+			$this->output = count($remindersSent) . ' reminder(s) sent';
 			if (!empty($remindersError)) {
-				$message .= $langs->trans('StancerRemindersErrorList') . " :\n<ul>";
-				foreach ($remindersError as $ref) {
-					$message .= "<li>" . $ref . "</li>\n";
-				}
-				$message .= "</ul>\n";
+				$this->output .= ', ' . count($remindersError) . ' error(s)';
 			}
-			stancerSendMail(
-				getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''),
-				$langs->trans('StancerMailSubjectReminders'),
-				$message
-			);
-		}
+			dol_syslog("stancer doSendPaymentReminders done: " . $this->output, LOG_DEBUG);
 
-		$this->output = count($remindersSent) . ' reminder(s) sent';
-		if (!empty($remindersError)) {
-			$this->output .= ', ' . count($remindersError) . ' error(s)';
+			return $error;
+		} finally {
+			// Every exit, early returns included, gives the log file back
+			$conf->global->SYSLOG_FILE = $savlog;
 		}
-		dol_syslog("stancer doSendPaymentReminders done: " . $this->output, LOG_DEBUG);
+	}
 
-		$conf->global->SYSLOG_FILE = $savlog;
-		return $error;
+	/**
+	 * SQL selecting the pending invoice validation mails of the current entity whose date has elapsed.
+	 *
+	 * @param	int		$now	Current timestamp
+	 * @return	string			SQL request
+	 */
+	public function sqlPendingValidationMails($now)
+	{
+		$sql = "SELECT a.id, a.fk_element, a.fk_soc, a.datep, a.datec";
+		$sql .= " FROM " . MAIN_DB_PREFIX . "actioncomm AS a";
+		$sql .= " WHERE a.code = 'AC_BILL_VALIDATE_PENDING'";
+		$sql .= " AND a.percent < 100";
+		$sql .= " AND a.elementtype = 'invoice'";
+		$sql .= " AND a.datep <= '" . $this->db->idate($now) . "'";
+		$sql .= " AND a.entity IN (" . getEntity('agenda') . ")";
+		$sql .= " ORDER BY a.datep ASC";
+
+		return $sql;
 	}
 
 	/**
@@ -905,136 +998,129 @@ class Stancer extends CommonObject
 
 		$savlog = getDolGlobalString('SYSLOG_FILE');
 		$conf->global->SYSLOG_FILE = 'DOL_DATA_ROOT/dolibarr_doSendPendingValidationMails.log';
+		try {
+			$langs->load("stancer@stancer");
 
-		$langs->load("stancer@stancer");
+			include_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+			include_once DOL_DOCUMENT_ROOT . '/comm/action/class/actioncomm.class.php';
 
-		include_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
-		include_once DOL_DOCUMENT_ROOT . '/comm/action/class/actioncomm.class.php';
+			$error = 0;
+			$this->output = '';
+			$this->error = '';
 
-		$error = 0;
-		$this->output = '';
-		$this->error = '';
-
-		if (empty($conf->stancer->enabled)) {
-			$this->error = 'Error, Stancer module not enabled';
-			dol_syslog("stancer doSendPendingValidationMails " . $this->error, LOG_ERR);
-			$conf->global->SYSLOG_FILE = $savlog;
-			return -1;
-		}
-
-		if (getDolGlobalString('STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE', '') == '') {
-			$this->output = 'STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE not enabled, nothing to do';
-			dol_syslog("stancer doSendPendingValidationMails " . $this->output, LOG_DEBUG);
-			$conf->global->SYSLOG_FILE = $savlog;
-			return 0;
-		}
-
-		$mailtype = getDolGlobalString('STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_MAILTYPE', '');
-		if (empty($mailtype)) {
-			$this->error = 'Error, STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_MAILTYPE is not configured';
-			dol_syslog("stancer doSendPendingValidationMails " . $this->error, LOG_ERR);
-			$conf->global->SYSLOG_FILE = $savlog;
-			return -1;
-		}
-
-		// Find pending validation mails whose due date has elapsed
-		$now = dol_now();
-		$sql = "SELECT a.id, a.fk_element, a.socid, a.datep, a.datec";
-		$sql .= " FROM " . MAIN_DB_PREFIX . "actioncomm AS a";
-		$sql .= " WHERE a.code = 'AC_BILL_VALIDATE_PENDING'";
-		$sql .= " AND a.percentage < 100";
-		$sql .= " AND a.elementtype = 'invoice'";
-		$sql .= " AND a.datep <= '" . $this->db->idate($now) . "'";
-		$sql .= " ORDER BY a.datep ASC";
-
-		$resql = $this->db->query($sql);
-		if (!$resql) {
-			$this->error = 'SQL error: ' . $this->db->lasterror();
-			dol_syslog("stancer doSendPendingValidationMails " . $this->error, LOG_ERR);
-			$conf->global->SYSLOG_FILE = $savlog;
-			return -1;
-		}
-
-		$sentCount = 0;
-		$cancelledCount = 0;
-		$skippedCount = 0;
-
-		while ($row = $this->db->fetch_object($resql)) {
-			$pending = new ActionComm($this->db);
-			$resFetchPending = $pending->fetch($row->id);
-			if ($resFetchPending <= 0) {
-				dol_syslog("stancer doSendPendingValidationMails cannot fetch pending actioncomm id=" . $row->id, LOG_ERR);
-				continue;
+			if (empty($conf->stancer->enabled)) {
+				$this->error = 'Error, Stancer module not enabled';
+				dol_syslog("stancer doSendPendingValidationMails " . $this->error, LOG_ERR);
+				return -1;
 			}
 
-			$facture = new Facture($this->db);
-			$resFetchInv = $facture->fetch($row->fk_element);
-			if ($resFetchInv <= 0) {
-				dol_syslog("stancer doSendPendingValidationMails invoice id=" . $row->fk_element . " not found, mark pending as cancelled", LOG_WARNING);
-				$pending->percentage = 100;
-				$pending->note_private = (string) ($pending->note_private ?? '') . "\n" . dol_print_date($now, '%Y-%m-%d %H:%M:%S') . " - invoice not found";
-				$pending->update($user);
-				$cancelledCount++;
-				continue;
+			if (getDolGlobalString('STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE', '') == '') {
+				$this->output = 'STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE not enabled, nothing to do';
+				dol_syslog("stancer doSendPendingValidationMails " . $this->output, LOG_DEBUG);
+				return 0;
 			}
 
-			// Skip if invoice is no longer in validated state (draft, abandoned)
-			if ($facture->status != Facture::STATUS_VALIDATED && $facture->status != Facture::STATUS_CLOSED) {
-				dol_syslog("stancer doSendPendingValidationMails invoice " . $facture->ref . " not validated anymore (status=" . $facture->status . "), cancel pending", LOG_DEBUG);
-				$pending->percentage = 100;
-				$pending->note_private = (string) ($pending->note_private ?? '') . "\n" . dol_print_date($now, '%Y-%m-%d %H:%M:%S') . " - invoice no longer validated (status=" . $facture->status . ")";
-				$pending->update($user);
-				$cancelledCount++;
-				continue;
+			$mailtype = getDolGlobalString('STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_MAILTYPE', '');
+			if (empty($mailtype)) {
+				$this->error = 'Error, STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_MAILTYPE is not configured';
+				dol_syslog("stancer doSendPendingValidationMails " . $this->error, LOG_ERR);
+				return -1;
 			}
 
-			// Detect manual send: any AC_BILL_SENTBYMAIL or AC_BILL_VALIDATE_SENTBYMAIL created after the pending was scheduled
-			$pendingCreatedAt = is_numeric($pending->datec) ? $pending->datec : strtotime((string) $pending->datec);
-			$sqlManual = "SELECT id, code, datec FROM " . MAIN_DB_PREFIX . "actioncomm";
-			$sqlManual .= " WHERE elementtype = 'invoice'";
-			$sqlManual .= " AND fk_element = " . ((int) $facture->id);
-			$sqlManual .= " AND code IN ('AC_BILL_SENTBYMAIL', 'AC_BILL_VALIDATE_SENTBYMAIL', 'AC_BILL_VALIDATE_AUTOSENT')";
-			$sqlManual .= " AND datec >= '" . $this->db->idate($pendingCreatedAt) . "'";
-			$sqlManual .= " LIMIT 1";
-			$resManual = $this->db->query($sqlManual);
-			$manualSent = false;
-			if ($resManual) {
-				$manualRow = $this->db->fetch_object($resManual);
-				if ($manualRow) {
-					$manualSent = true;
+			// Find pending validation mails whose due date has elapsed
+			$now = dol_now();
+			$sql = $this->sqlPendingValidationMails((int) $now);
+
+			$resql = $this->db->query($sql);
+			if (!$resql) {
+				$this->error = 'SQL error: ' . $this->db->lasterror();
+				dol_syslog("stancer doSendPendingValidationMails " . $this->error, LOG_ERR);
+				return -1;
+			}
+
+			$sentCount = 0;
+			$cancelledCount = 0;
+			$skippedCount = 0;
+
+			while ($row = $this->db->fetch_object($resql)) {
+				$pending = new ActionComm($this->db);
+				$resFetchPending = $pending->fetch($row->id);
+				if ($resFetchPending <= 0) {
+					dol_syslog("stancer doSendPendingValidationMails cannot fetch pending actioncomm id=" . $row->id, LOG_ERR);
+					continue;
+				}
+
+				$facture = new Facture($this->db);
+				$resFetchInv = $facture->fetch($row->fk_element);
+				if ($resFetchInv <= 0) {
+					dol_syslog("stancer doSendPendingValidationMails invoice id=" . $row->fk_element . " not found, mark pending as cancelled", LOG_WARNING);
+					$pending->percentage = 100;
+					$pending->note_private = (string) ($pending->note_private ?? '') . "\n" . dol_print_date($now, '%Y-%m-%d %H:%M:%S') . " - invoice not found";
+					$pending->update($user);
+					$cancelledCount++;
+					continue;
+				}
+
+				// Skip if invoice is no longer in validated state (draft, abandoned)
+				if ($facture->status != Facture::STATUS_VALIDATED && $facture->status != Facture::STATUS_CLOSED) {
+					dol_syslog("stancer doSendPendingValidationMails invoice " . $facture->ref . " not validated anymore (status=" . $facture->status . "), cancel pending", LOG_DEBUG);
+					$pending->percentage = 100;
+					$pending->note_private = (string) ($pending->note_private ?? '') . "\n" . dol_print_date($now, '%Y-%m-%d %H:%M:%S') . " - invoice no longer validated (status=" . $facture->status . ")";
+					$pending->update($user);
+					$cancelledCount++;
+					continue;
+				}
+
+				// Detect manual send: any AC_BILL_SENTBYMAIL or AC_BILL_VALIDATE_SENTBYMAIL created after the pending was scheduled
+				$pendingCreatedAt = is_numeric($pending->datec) ? $pending->datec : strtotime((string) $pending->datec);
+				$sqlManual = "SELECT id, code, datec FROM " . MAIN_DB_PREFIX . "actioncomm";
+				$sqlManual .= " WHERE elementtype = 'invoice'";
+				$sqlManual .= " AND fk_element = " . ((int) $facture->id);
+				$sqlManual .= " AND code IN ('AC_BILL_SENTBYMAIL', 'AC_BILL_VALIDATE_SENTBYMAIL', 'AC_BILL_VALIDATE_AUTOSENT')";
+				$sqlManual .= " AND datec >= '" . $this->db->idate($pendingCreatedAt) . "'";
+				$sqlManual .= " LIMIT 1";
+				$resManual = $this->db->query($sqlManual);
+				$manualSent = false;
+				if ($resManual) {
+					$manualRow = $this->db->fetch_object($resManual);
+					if ($manualRow) {
+						$manualSent = true;
+					}
+				}
+
+				if ($manualSent) {
+					dol_syslog("stancer doSendPendingValidationMails invoice " . $facture->ref . " manually sent in the meantime, cancel pending", LOG_INFO);
+					$pending->percentage = 100;
+					$pending->note_private = (string) ($pending->note_private ?? '') . "\n" . dol_print_date($now, '%Y-%m-%d %H:%M:%S') . " - " . $langs->trans('StancerBillValidateManuallySent');
+					$pending->update($user);
+					$skippedCount++;
+					continue;
+				}
+
+				// Send the auto mail
+				dol_syslog("stancer doSendPendingValidationMails sending auto-validation mail for invoice " . $facture->ref . " (modele=$mailtype)", LOG_INFO);
+				$facture->fetch_thirdparty();
+				$mailRes = stancerSendInvoiceMailModele($mailtype, $facture, 'BILL_VALIDATE_AUTOSENT');
+				if ($mailRes > 0) {
+					$pending->percentage = 100;
+					$pending->note_private = (string) ($pending->note_private ?? '') . "\n" . dol_print_date($now, '%Y-%m-%d %H:%M:%S') . " - auto-sent";
+					$pending->update($user);
+					$sentCount++;
+				} else {
+					dol_syslog("stancer doSendPendingValidationMails failed to send mail for invoice " . $facture->ref . ": result=$mailRes", LOG_ERR);
+					$error++;
 				}
 			}
+			$this->db->free($resql);
 
-			if ($manualSent) {
-				dol_syslog("stancer doSendPendingValidationMails invoice " . $facture->ref . " manually sent in the meantime, cancel pending", LOG_INFO);
-				$pending->percentage = 100;
-				$pending->note_private = (string) ($pending->note_private ?? '') . "\n" . dol_print_date($now, '%Y-%m-%d %H:%M:%S') . " - " . $langs->trans('StancerBillValidateManuallySent');
-				$pending->update($user);
-				$skippedCount++;
-				continue;
-			}
+			$this->output = "auto-sent=$sentCount, manually-handled=$skippedCount, cancelled=$cancelledCount, errors=$error";
+			dol_syslog("stancer doSendPendingValidationMails done: " . $this->output, LOG_INFO);
 
-			// Send the auto mail
-			dol_syslog("stancer doSendPendingValidationMails sending auto-validation mail for invoice " . $facture->ref . " (modele=$mailtype)", LOG_INFO);
-			$facture->fetch_thirdparty();
-			$mailRes = stancerSendInvoiceMailModele($mailtype, $facture, 'BILL_VALIDATE_AUTOSENT');
-			if ($mailRes > 0) {
-				$pending->percentage = 100;
-				$pending->note_private = (string) ($pending->note_private ?? '') . "\n" . dol_print_date($now, '%Y-%m-%d %H:%M:%S') . " - auto-sent";
-				$pending->update($user);
-				$sentCount++;
-			} else {
-				dol_syslog("stancer doSendPendingValidationMails failed to send mail for invoice " . $facture->ref . ": result=$mailRes", LOG_ERR);
-				$error++;
-			}
+			return ($error > 0 ? -1 : 0);
+		} finally {
+			// Every exit, early returns included, gives the log file back
+			$conf->global->SYSLOG_FILE = $savlog;
 		}
-		$this->db->free($resql);
-
-		$this->output = "auto-sent=$sentCount, manually-handled=$skippedCount, cancelled=$cancelledCount, errors=$error";
-		dol_syslog("stancer doSendPendingValidationMails done: " . $this->output, LOG_INFO);
-
-		$conf->global->SYSLOG_FILE = $savlog;
-		return ($error > 0 ? -1 : 0);
 	}
 
 

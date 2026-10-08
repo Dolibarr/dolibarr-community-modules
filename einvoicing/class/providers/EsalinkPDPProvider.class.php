@@ -192,7 +192,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			$urltogeneratetoken = $_SERVER["PHP_SELF"] . "?action=set" . $prefix . "TOKEN&token=" . newToken();
 
 			$item = $formSetup->newItem($prefix . 'TOKEN'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
-			$item->nameText = $langs->trans('AccessToken');
+			$item->nameText = $langs->trans('EInvAccessToken');
 			$item->cssClass = 'maxwidth500 ';
 			$item->fieldOverride = "";
 			if (!empty($tokenData['token'])) {
@@ -1133,7 +1133,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			}
 
 			if ($error > 0) {
-				if (in_array($rescode, array('THIRDPARTY_NOT_FOUND','PRODUCT_NOT_FOUND'))) {
+				if (in_array($rescode, array('THIRDPARTY_NOT_FOUND','PRODUCT_NOT_FOUND','DEFAULT_ROUTING_MIXED_UNSET'))) {
 					$results_messages[] = "Aborting synchronization due to a business error. There is a manual action to do.";
 				} else {
 					$results_messages[] = "Aborting synchronization due to errors.";
@@ -1444,6 +1444,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 							$document->xml_data = $cleanedXmlData;
 						}
 
+						// Only when this call is what brought the invoice in: a flow read again must not
+						// write a second import event on an invoice that was already there.
+						if (!empty($res['created']) && !empty($supplierInvoiceObj->id)) {
+							$this->addSupplierInvoiceImportEvent($supplierInvoiceObj, $document);
+						}
+
 						//return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
 						$returnRes = 1;		// If invoice did already exists, we process one more line from list of flows, so we must return 1, even if nothing was done.
 						$returnMessage = "Supplier invoice " . $supplierInvoiceObj->ref . " created or already existing for flowId: " . $flowId . ". " . $res['message'];
@@ -1606,9 +1612,24 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 							if ($einvoicing->isTransmissionOnlyRejection($factureObj->id, $factureObj->element, $syncStatus, $document->cdar_reason_code)) {
 								$syncStatus = 0;
 							}
-							$einvoicing->insertOrUpdateExtLink($factureObj->id, $factureObj->element, $flowId, $syncStatus, $factureObj->ref, $syncComment);
+							// Neither write throws: a SQL failure comes back as -1. Left unread, the commit below ran anyway
+							// and the flow was stored as processed, so the status was never recorded, even on a later run.
+							$resExtLink = $einvoicing->insertOrUpdateExtLink($factureObj->id, $factureObj->element, $flowId, $syncStatus, $factureObj->ref, $syncComment);
 
-							$einvoicing->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code, $syncComment, $document->flow_direction, $flowId, $syncValidationStatus, $syncValidationComment, $document->submittedat, $document->cdar_reason_code, $recipientRoles);
+							$resStatusMessage = ($resExtLink < 0 ? -1 : $einvoicing->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code, $syncComment, $document->flow_direction, $flowId, $syncValidationStatus, $syncValidationComment, $document->submittedat, $document->cdar_reason_code, $recipientRoles));
+							if ($resExtLink < 0 || $resStatusMessage < 0) {
+								dol_syslog(__METHOD__ . " FlowId " . $flowId . " - failed to record the status of customer invoice " . $factureObj->ref . ": " . $db->lasterror(), LOG_ERR);
+								$db->rollback();
+								return array(
+									'res' => -1,
+									'postponeflow' => 1,
+									'message' => "FlowId " . $flowId . " - Failed to record the status on customer invoice " . $factureObj->ref,
+									'actioncode' => 'CANT_RECORD_SENT_INVOICE_LIFECYCLE_STATUS',
+									'actionurl' => '',
+									'action' => $langs->trans('CheckSyncLogCantRecordSentInvoiceStatus'),
+									'businessmessage' => $langs->trans('CantRecordTheStatusOfTheInvoiceYouSent', $flowId)
+								);
+							}
 						} else {
 							dol_syslog(__METHOD__ . " Customer invoice not found for flowId: {$flowId}, so we save the flow into document table but we don't create an entry into einvoicing_extlinks table", LOG_WARNING); // This can happen if the invoice was sent from another system using the same PDP account
 						}

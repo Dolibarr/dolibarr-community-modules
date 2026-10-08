@@ -45,6 +45,7 @@ function stancerGetFiscalLockDate()
 	}
 
 	$sql = "SELECT MAX(date_end) AS last_closed FROM " . MAIN_DB_PREFIX . "accounting_fiscalyear WHERE statut = 1";
+	$sql .= " AND entity IN (" . getEntity('fiscalyear') . ")";
 	$resql = $db->query($sql);
 	if ($resql) {
 		$obj = $db->fetch_object($resql);
@@ -283,6 +284,7 @@ function stancerAddPaimentFeeOnBank($ref, $totalamount, $fk_account, $stancer_id
 		$sqlUpdate = "UPDATE " . MAIN_DB_PREFIX . "bank SET amount='" . price2num($amount) . "'";
 		$sqlUpdate .= " WHERE rowid IN (" . implode(',', array_map('intval', $linesToUpdate)) . ")";
 		if (!$db->query($sqlUpdate)) {
+			$error++;
 			dol_syslog("stancerAddPaimentFeeOnBank UPDATE failed for $stancer_id: " . $db->lasterror(), LOG_ERR);
 		} else {
 			dol_syslog("stancerAddPaimentFeeOnBank updated amount to $amount for $stancer_id (rows: " . implode(',', $linesToUpdate) . ")");
@@ -307,7 +309,10 @@ function stancerAddPaimentFeeOnBank($ref, $totalamount, $fk_account, $stancer_id
 			'',
 			'',
 			$datev
-		);
+		);		if ($bank_line_id <= 0) {
+			$error++;
+			dol_syslog("stancerAddPaimentFeeOnBank cannot insert the fee line of " . $stancer_id . ": " . $acc->error, LOG_ERR);
+		}
 	}
 
 
@@ -893,7 +898,7 @@ function stancerAddPaymentOnObject($object, $data, &$errorMessage, $bypassCustom
 		}
 	}
 
-	$db->begin();
+	// Checked before begin(): an early return must not leave the transaction open
 	$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 	if (empty($conf->banque->enabled) || empty($bankaccountid)) {
 		$postactionmessages[] = "Setup of bank account to use in module Stancer was not set.";
@@ -902,6 +907,7 @@ function stancerAddPaymentOnObject($object, $data, &$errorMessage, $bypassCustom
 		dol_syslog($errorMessage, LOG_WARNING);
 		return -5;
 	}
+	$db->begin();
 
 	// Creation of payment line : warning donation is a special case
 	if ($object->element == 'don') {
@@ -927,7 +933,7 @@ function stancerAddPaymentOnObject($object, $data, &$errorMessage, $bypassCustom
 		$paiement->total 			= (float) price2num($data['FinalPaymentAmt']);
 		$paiement->datepaid 		= $data['date'];
 
-		dol_syslog("stancerAddPaymentOnObject ask PaymentDonation create with " . json_encode($paiement));
+		dol_syslog("stancerAddPaymentOnObject ask PaymentDonation create for donation " . $object->id . ", payment " . (isset($data['payment_id']) ? $data['payment_id'] : ''));
 		$paiement_id = $paiement->create($user, 1);
 		if ($paiement_id < 0) {
 			$postactionmessages[] = $paiement->error . ' ' . implode("<br>\n", array_filter($paiement->errors, 'strlen'));
@@ -957,7 +963,7 @@ function stancerAddPaymentOnObject($object, $data, &$errorMessage, $bypassCustom
 		$paiement->ext_payment_site = $data['service'];
 		$paiement->comment          = $data['paymentmethod'];
 
-		dol_syslog("stancerAddPaymentOnObject ask paiement create with " . json_encode($paiement));
+		dol_syslog("stancerAddPaymentOnObject ask paiement create for " . $object->element . " " . $object->ref . ", payment " . (isset($data['payment_id']) ? $data['payment_id'] : ''));
 		$paiement_id = $paiement->create($user, 1); // This include closing invoices and regenerating documents
 		if ($paiement_id < 0) {
 			dol_syslog("stancerAddPaymentOnObject paiement create error, result < 0", LOG_ERR);
@@ -978,7 +984,8 @@ function stancerAddPaymentOnObject($object, $data, &$errorMessage, $bypassCustom
 		}
 	}
 
-	if ($ispostactionok) {
+	// 1 only: -1 (payment creation failed) is truthy too
+	if ($ispostactionok === 1) {
 		dol_syslog("stancerAddPaymentOnObject call addPaymentToBank payment_type_for_bank=$payment_type_for_bank, label=$label bankaccountid=$bankaccountid");
 		$result = $paiement->addPaymentToBank($user, $payment_type_for_bank, $label, $bankaccountid, '', '');
 
@@ -1495,7 +1502,7 @@ function stancerUpdateAllDatesOnMainBankAccountFromBanking4Doli()
 function stancerAddRefundFeesToBank()
 {
 	global $db, $conf;
-	$stancerApi = StancerApi::getInstance();
+	$stancerApi = new StancerApi();
 	$sp = new Stancer_payouts($db);
 	$resList = $sp->fetchAll('ASC', '', 0, 0, array('customsql' => "amount < '0'"));
 	// Declared before the try because the catch block reports it.
@@ -1543,7 +1550,7 @@ function stancerAddRefundFeesToBank()
 /**
  * check lines on stancer bank account and (re)add if needed
  *
- * @return	int|null	-1 when the Stancer bank account cannot be loaded, null otherwise (including the rollback on add line failure)
+ * @return	int		1 on success, <0 on error (the caller shows the message, nothing is printed here)
  */
 function stancerCheckBankLines()
 {
@@ -1551,28 +1558,6 @@ function stancerCheckBankLines()
 	$error = 0;
 	$stancerApi = new StancerApi();
 	$bankaccountid = (int) getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
-
-
-	// $dateFiltre = time() - (3600*24*400);
-	// $list = Stancer\Payment::list(['created' => $dateFiltre, 'start'=>0, 'limit' => 100]);
-	// $json = $list->get();
-	// print json_encode($json);
-	// print "<br />";
-	// foreach($list as $p) {
-	// 	// $json = $p->populate()->get();
-	// 	print json_encode($p) . " amount=" . $p->getAmount() . ", method=" . $p->getMethod() . ", status=" . $p->getStatus();
-	// 	print "<br />";
-	// }
-	// exit;
-
-	// $payout = new Stancer\Payout("pout_oHTo1MF0v7n5BLYiLo2s3gnF");
-	// $json = $payout->populate()->get();
-
-	// //libelle du virement bancaire
-	// $details = $payout->getStatementDescription();
-	// print json_encode($details);exit;
-	// print json_encode($json);exit;
-
 
 	$sp = new Stancer_payments($db);
 	$spu = new Stancer_payments($db);
@@ -1583,15 +1568,12 @@ function stancerCheckBankLines()
 	$account = new Account($db);
 	$result = $account->fetch($bankaccountid);
 	if ($result < 0) {
-		print "<p>Error, fetching account</p>";
+		dol_syslog("stancerCheckBankLines cannot load bank account " . $bankaccountid . ": " . $account->error, LOG_ERR);
 		return -1;
 	}
 
 	$db->begin();
 	foreach ($resSP as $key => $oneSp) {
-		// print "<p>Key = $key, val=";
-		// print(json_encode($oneSp));
-		// print "</p>";exit;
 		$dateo = $oneSp->created;
 		$datev = $oneSp->date_bank;
 		// Stancer_payments names the column "fee" (singular). Reading "fees" here
@@ -1618,8 +1600,7 @@ function stancerCheckBankLines()
 		//double check with stancer api
 		$paymentData = $stancerApi->getPayment($ref);
 		if ($paymentData === false) {
-			print "<p>Stancer error : " . $stancerApi->error . " for $ref</p>";
-			print "<p>Local data : " . json_encode($oneSp) . "</p>";
+			dol_syslog("stancerCheckBankLines API error for " . $ref . ": " . $stancerApi->error, LOG_ERR);
 			$update = false;
 		} else {
 			$remotestatusTxt = isset($paymentData['status']) ? $paymentData['status'] : '';
@@ -1628,9 +1609,7 @@ function stancerCheckBankLines()
 		}
 
 		//mise à jour au passage
-		// print "<p>Faut il mettre à jour le status : avant=".$oneSp->status.", apres=".$remotestatus." pour ".$ref."</p>";
 		if ($update && $remotestatus != $oneSp->status) {
-			print "<p>Mise à jour de la base locale a partir des données distantes (avant=" . $oneSp->status . ", apres=" . $remotestatus . ") pour " . $ref . "</p>";
 			dol_syslog("stancer update local database from remote data (before=" . $oneSp->status . ", new=" . $remotestatus . ") for " . $ref);
 			$resSpu = $spu->fetch(0, '', $ref);
 			if ($resSpu) {
@@ -1641,15 +1620,16 @@ function stancerCheckBankLines()
 				}
 				$resupdate = $spu->setStatusCommon($user, $status, 1);
 				if ($resupdate < 0) {
-					print "<p>Erreur de mise à jour pour $ref</p>";
-					exit;
+					dol_syslog("stancerCheckBankLines cannot update the status of " . $ref . ": " . $spu->error, LOG_ERR);
+					$db->rollback();
+					return -2;
 				}
 				//passe au suivant si ce n'était pas un paiement capturé
 				if ($remotestatus != 2) {
 					continue;
 				}
 			} else {
-				print "<p>ERREUR fetch $ref</p>";
+				dol_syslog("stancerCheckBankLines cannot fetch " . $ref . " from the API: " . $stancerApi->error, LOG_ERR);
 			}
 		}
 
@@ -1657,10 +1637,9 @@ function stancerCheckBankLines()
 			dol_syslog("stancerCheckBankLines no duplicate entries found");
 			$bank_line_id = $account->addline($dateo, $type, $label, (float) price2num($amount), $ref, 0, $user);
 			if (!($bank_line_id > 0)) {
-				dol_syslog("stancerCheckBankLines add line error for " . $ref . "");
-				$error++;
+				dol_syslog("stancerCheckBankLines add line error for " . $ref . ": " . $account->error, LOG_ERR);
 				$db->rollback();
-				return;
+				return -3;
 			}
 		} else {
 			dol_syslog("stancerCheckBankLines duplicate entries for " . $ref . " found, do not add line");
@@ -1675,11 +1654,13 @@ function stancerCheckBankLines()
 	}
 
 	if ($error > 0) {
-		print "<p>Error, rollback transaction</p>";
+		dol_syslog("stancerCheckBankLines " . $error . " error(s), rollback", LOG_ERR);
 		$db->rollback();
-	} else {
-		$db->commit();
+		return -4;
 	}
+	$db->commit();
+
+	return 1;
 }
 
 /**
@@ -1692,7 +1673,7 @@ function stancerCheckBankLines()
 function stancerUpdateLabelOnMainAccount($payoutID)
 {
 	global $db, $conf;
-	$stancerApi = StancerApi::getInstance();
+	$stancerApi = new StancerApi();
 	$fk_account = getDolGlobalInt('STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS');
 	$payoutData = $stancerApi->getPayout($payoutID);
 	if ($payoutData === false) {

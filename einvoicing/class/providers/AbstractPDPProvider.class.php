@@ -678,6 +678,95 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
+	 * Serialize OAuth token refreshes for this service across concurrent requests (cron, page loads,
+	 * several browser tabs, ...).
+	 *
+	 * A refresh_token is single-use: if two requests both read the same (still valid) refresh_token
+	 * and submit it concurrently, the provider processes one and rejects the other as an already-used
+	 * token. Some providers treat that reuse as a theft signal and revoke the whole token family,
+	 * including the one the first, successful call just obtained - turning a benign race into a
+	 * permanent lockout that only a full re-authorization can fix.
+	 *
+	 * Uses a named/advisory lock on MySQL/MariaDB (GET_LOCK) and PostgreSQL (pg_try_advisory_lock,
+	 * polled since Postgres advisory locks have no built-in timeout). Both are released automatically
+	 * if the holding connection dies, so a crashed process cannot leave the lock stuck forever. No
+	 * portable equivalent on other drivers (sqlite3): a sqlite3 install is single-writer by nature, so
+	 * this race is far less of a concern there, and we proceed without a lock rather than block it.
+	 *
+	 * @param	int		$timeout	Max seconds to wait for the lock
+	 * @return	bool				True if the lock was acquired (false: proceed without it, e.g. a
+	 *								driver with no lock support here, or a lock still held past the timeout)
+	 */
+	protected function acquireRefreshLock($timeout = 10)
+	{
+		global $db;
+
+		$lockname = $this->getOAuthServiceName().'_refresh';
+
+		if ($db->type == 'mysqli') {
+			$resql = $db->query("SELECT GET_LOCK('".$db->escape($lockname)."', ".((int) $timeout).") as acquired");
+			if (!$resql) {
+				return false;
+			}
+
+			$obj = $db->fetch_object($resql);
+
+			return !empty($obj) && (int) $obj->acquired === 1;
+		}
+
+		if ($db->type == 'pgsql') {
+			// pg_advisory_lock() takes a bigint key, not a name: hash the lock name into one. No native
+			// timeout on Postgres advisory locks, so poll the non-blocking pg_try_advisory_lock() instead.
+			$lockkey = (int) crc32($lockname); // Fits an int8/bigint on any PHP build (32-bit CRC).
+			$deadline = time() + $timeout;
+			do {
+				$resql = $db->query("SELECT pg_try_advisory_lock(".$lockkey.") as acquired");
+				if ($resql) {
+					$obj = $db->fetch_object($resql);
+					if (!empty($obj) && ($obj->acquired === 't' || $obj->acquired == 1)) {
+						return true;
+					}
+				}
+				usleep(200000);
+			} while (time() < $deadline);
+
+			return false;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Release the lock acquired by acquireRefreshLock().
+	 *
+	 * @return	void
+	 */
+	protected function releaseRefreshLock()
+	{
+		global $db;
+
+		$lockname = $this->getOAuthServiceName().'_refresh';
+
+		if ($db->type == 'mysqli') {
+			$db->query("SELECT RELEASE_LOCK('".$db->escape($lockname)."')");
+		} elseif ($db->type == 'pgsql') {
+			$db->query("SELECT pg_advisory_unlock(".((int) crc32($lockname)).")");
+		}
+	}
+
+	/**
+	 * Service name used as the OAuth token storage key (and, by acquireRefreshLock(), as the lock
+	 * name) for this provider/environment. Same value saveOAuthTokenDB()/fetchOAuthTokenDB() build
+	 * inline; kept in sync manually since those two are not going through this helper.
+	 *
+	 * @return	string
+	 */
+	protected function getOAuthServiceName()
+	{
+		return $this->config['dol_prefix'] . '_' . ($this->config['live'] ? 'PROD' : 'TEST');
+	}
+
+	/**
 	 * Insert or update OAuth token for the given PDP.
 	 *
 	 * @param  string      $accessToken    Access token string
@@ -687,7 +776,9 @@ abstract class AbstractPDPProvider
 	 */
 	public function saveOAuthTokenDB($accessToken, $refreshToken = null, $expiresIn = null)
 	{
-		global $conf, $db;
+		global $conf;
+
+		$db = $this->getTokenStorageDb();
 
 		$now = dol_now();
 
@@ -785,13 +876,13 @@ abstract class AbstractPDPProvider
 	 */
 	public function fetchOAuthTokenDB($forceentity = 0)
 	{
-		global $conf, $db;
+		global $conf;
 
 		// Build service name depending on environment
 		$serviceName = $this->config['dol_prefix'] . '_' . ($this->config['live'] ? 'PROD' : 'TEST');
 
 		// For backward compatibility with Dolibarr versions < 23.0.0
-		if (version_compare(DOL_VERSION, '23.0.0', '<')) {
+		if (version_compare(DOL_VERSION, '23.0.0-alpha', '<')) {
 			$token = getDolGlobalString($serviceName.'_TOKEN');
 			$refresh = getDolGlobalString($serviceName.'_REFRESH');
 			$expire = getDolGlobalString($serviceName.'_EXPIRE');
@@ -799,9 +890,10 @@ abstract class AbstractPDPProvider
 			if ($forceentity) {
 				require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 
-				$token = dolibarr_get_const($this->db, $serviceName.'_TOKEN', (int) $forceentity);
-				$refresh = dolibarr_get_const($this->db, $serviceName.'_REFRESH', (int) $forceentity);
-				$expire = dolibarr_get_const($this->db, $serviceName.'_EXPIRE', (int) $forceentity);
+				$db = $this->getTokenStorageDb();
+				$token = dolibarr_get_const($db, $serviceName.'_TOKEN', (int) $forceentity);
+				$refresh = dolibarr_get_const($db, $serviceName.'_REFRESH', (int) $forceentity);
+				$expire = dolibarr_get_const($db, $serviceName.'_EXPIRE', (int) $forceentity);
 			}
 
 			if (empty($token)) {
@@ -814,6 +906,8 @@ abstract class AbstractPDPProvider
 				'token_expires_at' => $expire
 			];
 		}
+
+		$db = $this->getTokenStorageDb();
 
 		// Prepare SQL
 		$sql = "SELECT tokenstring, tokenstring_refresh, expire_at
@@ -842,6 +936,26 @@ abstract class AbstractPDPProvider
 		];
 	}
 
+	/**
+	 * Connection the OAuth token is read and written on, apart from the caller's transaction (same as logCall()).
+	 *
+	 * A refresh rotates the refresh_token on the platform at once: saved in a transaction the caller then rolled
+	 * back (a supplier invoice validation failing after BILL_SUPPLIER_VALIDATE, ...), the new token was lost and
+	 * the old one, already rejected, came back. Read on the same connection, or the caller's snapshot hides it.
+	 *
+	 * @return	DoliDB		Independent connection, or the main one when it cannot be opened
+	 */
+	protected function getTokenStorageDb()
+	{
+		global $conf, $dolibarr_main_db_pass, $dbhistory;
+
+		if (empty($dbhistory)) {
+			$dbhistory = getDoliDBInstance($conf->db->type, $conf->db->host, (string) $conf->db->user, $dolibarr_main_db_pass, (string) $conf->db->name, (int) $conf->db->port);
+		}
+
+		return empty($dbhistory->connected) ? $this->db : $dbhistory;
+	}
+
 
 	/**
 	 * Insert or update OAuth token for the given PDP.
@@ -858,7 +972,7 @@ abstract class AbstractPDPProvider
 		$serviceName = $this->config['dol_prefix'] . '_' . ($this->config['live'] ? 'PROD' : 'TEST');
 		// For backward compatibility with Dolibarr versions < 23.0.0
 
-		if (version_compare(DOL_VERSION, '23.0.0', '<')) {
+		if (version_compare(DOL_VERSION, '23.0.0-alpha', '<')) {
 			require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 
 			dolibarr_del_const($this->db, $serviceName.'_TOKEN', (int) ($forceentity ? $forceentity : $conf->entity));
@@ -1181,6 +1295,8 @@ abstract class AbstractPDPProvider
 		$actioncomm->percentage = -1;
 		$actioncomm->authorid = $user->id;
 		$actioncomm->userownerid = $user->id;
+		// Dolibarr 18 writes fk_element only, 22 and later read elementid: both, or the event is not linked.
+		$actioncomm->fk_element = $object->id;	// @phan-suppress-current-line PhanDeprecatedProperty
 		$actioncomm->elementid = $object->id;
 		$actioncomm->elementtype = $object->element;
 
@@ -1189,6 +1305,32 @@ abstract class AbstractPDPProvider
 		if ($res < 0) {
 			dol_syslog(__METHOD__ . " Error adding event: " . $actioncomm->error, LOG_ERR);
 			return -1;
+		}
+
+		return $res;
+	}
+
+	/**
+	 * Write on the timeline of an imported supplier invoice where it comes from (issue #1022): the flow,
+	 * the access point and the build of the module that read it. Same untranslated "EINVOICING - " prefix
+	 * as the status events, so one search on the label finds them all.
+	 *
+	 * @param   FactureFournisseur  $supplierInvoice    The supplier invoice the import created
+	 * @param   Document            $document           The flow record the invoice was imported from
+	 * @return  int                                     Id of the created event, < 0 if KO
+	 */
+	protected function addSupplierInvoiceImportEvent($supplierInvoice, $document)
+	{
+		global $langs;
+
+		$langs->load('einvoicing@einvoicing');
+		// transnoentitiesnoconv(): an event label is stored raw and escaped where it is printed.
+		$label = "EINVOICING - " . $langs->transnoentitiesnoconv('EInvoicingEventImportLabel', (string) ($supplierInvoice->ref_supplier ?: $supplierInvoice->ref));
+		$message = $langs->transnoentitiesnoconv('EInvoicingEventImportNote', (string) $document->flow_id, $this->name, einvoicingModuleStamp());
+
+		$res = $this->addEvent('IMPORT', $label, $message, $supplierInvoice);
+		if ($res < 0) {
+			dol_syslog(__METHOD__ . " Failed to log the import event of supplier invoice " . $supplierInvoice->id, LOG_WARNING);
 		}
 
 		return $res;

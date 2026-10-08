@@ -24,7 +24,7 @@
  */
 
 require_once __DIR__ . '/../../lib/einvoicing.lib.php';	// removeAllSpaces(), used to normalize an electronic address
-require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';	// @phpstan-ignore requireOnce.fileNotFound (PHPStan takes DOL_DOCUMENT_ROOT from install/inc.php of the core, where it is '..')
 
 
 /**
@@ -702,13 +702,8 @@ class CdarHandler
 	 */
 	private function getReferencedDocumentTypeCode($object)
 	{
-		$codes = array(
-			CommonInvoice::TYPE_CREDIT_NOTE => CdarHandler::DOC_CREDIT_NOTE,
-			CommonInvoice::TYPE_REPLACEMENT => CdarHandler::DOC_CORRECTIVE_INVOICE,
-			CommonInvoice::TYPE_DEPOSIT => CdarHandler::DOC_PREPAYMENT_INVOICE,
-		);
-
-		return isset($codes[(int) $object->type]) ? $codes[(int) $object->type] : CdarHandler::DOC_INVOICE;
+		// The code the invoice itself was sent with, 503 included for a credit note of a deposit
+		return einvoicingDocumentTypeCode($object, $this->db) ?? CdarHandler::DOC_INVOICE;
 	}
 
 	/**

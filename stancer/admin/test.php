@@ -98,38 +98,61 @@ print "</ul>";
 
 print "<h2>Test 1 : Création d'un client</h2>";
 
-$customerData = array(
-	'email' => 'test-api@cap-rel.fr',
-	'name' => 'Test API Dolibarr',
-	'mobile' => '+33600000000'
-);
-
-$customer = $api->createCustomer($customerData);
-
-if ($customer === false) {
-	print "<p style='color:orange;'>Création client : " . $api->error . "</p>";
-
-	// Try to extract existing customer ID from error
-	if (preg_match('/\((cust_\w+)\)/', $api->error, $matches)) {
-		$customerId = $matches[1];
-		print "<p>Client existant détecté : <a href='https://manage.stancer.com/fr/details-du-clients?id=" . $customerId . "' target='_blank'>" . $customerId . "</a></p>";
-
-		// Fetch existing customer
-		$customer = $api->getCustomer($customerId);
+$customer = false;
+$customerId = '';
+// Creating a customer writes on the Stancer account: explicit POST with the
+// token, and never with the production keys.
+if ($action == 'createtestcustomer') {
+	if (GETPOST('token', 'alpha') === '' || GETPOST('token', 'alpha') !== currentToken()) {
+		dol_syslog("stancer admin/test.php: test customer creation refused, missing or invalid token", LOG_WARNING);
+		accessforbidden();
 	}
+	if ($api->isLiveMode()) {
+		dol_syslog("stancer admin/test.php: test customer creation refused in production mode", LOG_WARNING);
+		print '<p class="warning">' . $langs->trans("StancerApiTestCreateCustomerLive") . '</p>';
+	} else {
+		$customerData = array(
+			'email' => 'test-api@cap-rel.fr',
+			'name' => 'Test API Dolibarr',
+			'mobile' => '+33600000000'
+		);
+
+		$customer = $api->createCustomer($customerData);
+
+		if ($customer === false) {
+			print "<p style='color:orange;'>Création client : " . dol_escape_htmltag($api->error) . "</p>";
+
+			// Try to extract existing customer ID from error
+			if (preg_match('/\((cust_\w+)\)/', $api->error, $matches)) {
+				$customerId = $matches[1];
+				print '<p>Client existant détecté : <a href="https://manage.stancer.com/fr/details-du-clients?id=' . urlencode($customerId) . '" target="_blank" rel="noopener noreferrer">' . dol_escape_htmltag($customerId) . "</a></p>";
+
+				// Fetch existing customer
+				$customer = $api->getCustomer($customerId);
+			}
+		} else {
+			$customerId = $customer['id'];
+			print "<p style='color:green;'>Client créé avec succès !</p>";
+			print '<p>ID : <a href="https://manage.stancer.com/fr/details-du-clients?id=' . urlencode($customerId) . '" target="_blank" rel="noopener noreferrer">' . dol_escape_htmltag($customerId) . "</a></p>";
+		}
+	}
+} elseif ($api->isLiveMode()) {
+	print '<p class="opacitymedium">' . $langs->trans("StancerApiTestCreateCustomerLive") . '</p>';
 } else {
-	$customerId = $customer['id'];
-	print "<p style='color:green;'>Client créé avec succès !</p>";
-	print "<p>ID : <a href='https://manage.stancer.com/fr/details-du-clients?id=" . $customerId . "' target='_blank'>" . $customerId . "</a></p>";
+	print '<form method="POST" action="' . $_SERVER["PHP_SELF"] . '">';
+	print '<input type="hidden" name="token" value="' . newToken() . '">';
+	print '<input type="hidden" name="action" value="createtestcustomer">';
+	print '<input type="submit" class="button" value="' . dol_escape_htmltag($langs->trans("StancerApiTestCreateCustomerButton")) . '">';
+	print '</form>';
 }
 
 if ($customer !== false) {
 	print "<h2>Test 2 : Lecture du client</h2>";
 	print "<ul>";
-	print "<li>ID : " . $customer['id'] . "</li>";
-	print "<li>Email : " . (isset($customer['email']) ? $customer['email'] : 'N/A') . "</li>";
-	print "<li>Nom : " . (isset($customer['name']) ? $customer['name'] : 'N/A') . "</li>";
-	print "<li>Mobile : " . (isset($customer['mobile']) ? $customer['mobile'] : 'N/A') . "</li>";
+	print "<li>ID : " . dol_escape_htmltag($customer['id'] ?? '') . "</li>";
+	print "<li>Email : " . dol_escape_htmltag(isset($customer['email']) ? $customer['email'] : 'N/A') . "</li>";
+	print "<li>Nom : " . dol_escape_htmltag(isset($customer['name']) ? $customer['name'] : 'N/A') . "</li>";
+	print "<li>Mobile : " . dol_escape_htmltag(isset($customer['mobile']) ? $customer['mobile'] : 'N/A') . "</li>";
 	print "</ul>";
 }
 
@@ -141,7 +164,7 @@ $payments = $api->listPayments(array(
 ));
 
 if ($payments === false) {
-	print "<p style='color:red;'>Erreur : " . $api->error . "</p>";
+	print "<p style='color:red;'>Erreur : " . dol_escape_htmltag($api->error) . "</p>";
 } else {
 	if (isset($payments['payments']) && is_array($payments['payments'])) {
 		$allPayments = $payments['payments'];
@@ -160,16 +183,16 @@ if ($payments === false) {
 			print "</tr>";
 			foreach ($lastPayments as $payment) {
 				print "<tr class='oddeven'>";
-				print "<td><a href='https://manage.stancer.com/fr/details-de-paiement?id=" . $payment['id'] . "' target='_blank'>" . $payment['id'] . "</a></td>";
-				print "<td>" . StancerApi::fromCents($payment['amount']) . " " . strtoupper($payment['currency']) . "</td>";
-				print "<td>" . $payment['status'] . "</td>";
+				print '<td><a href="https://manage.stancer.com/fr/details-de-paiement?id=' . urlencode((string) $payment['id']) . '" target="_blank" rel="noopener noreferrer">' . dol_escape_htmltag($payment['id']) . "</a></td>";
+				print "<td>" . price(StancerApi::fromCents($payment['amount'])) . " " . dol_escape_htmltag(strtoupper((string) $payment['currency'])) . "</td>";
+				print "<td>" . dol_escape_htmltag($payment['status']) . "</td>";
 				print "<td>" . dol_print_date($payment['created'], 'dayhour') . "</td>";
 				print "</tr>";
 			}
 			print "</table>";
 		}
 	} elseif (is_array($payments)) {
-		print "<p>Réponse brute : <pre>" . print_r($payments, true) . "</pre></p>";
+		print "<p>Réponse brute : <pre>" . dol_escape_htmltag(print_r($payments, true), 0, 1) . "</pre></p>";
 	}
 }
 
@@ -181,7 +204,7 @@ $payouts = $api->listPayouts(array(
 ));
 
 if ($payouts === false) {
-	print "<p style='color:red;'>Erreur : " . $api->error . "</p>";
+	print "<p style='color:red;'>Erreur : " . dol_escape_htmltag($api->error) . "</p>";
 } else {
 	if (isset($payouts['payouts']) && is_array($payouts['payouts'])) {
 		$allPayouts = $payouts['payouts'];
@@ -200,16 +223,16 @@ if ($payouts === false) {
 			print "</tr>";
 			foreach ($lastPayouts as $payout) {
 				print "<tr class='oddeven'>";
-				print "<td><a href='https://manage.stancer.com/fr/details-du-reversement?id=" . $payout['id'] . "' target='_blank'>" . $payout['id'] . "</a></td>";
-				print "<td>" . StancerApi::fromCents($payout['amount']) . " " . strtoupper($payout['currency']) . "</td>";
-				print "<td>" . $payout['status'] . "</td>";
+				print '<td><a href="https://manage.stancer.com/fr/details-du-reversement?id=' . urlencode((string) $payout['id']) . '" target="_blank" rel="noopener noreferrer">' . dol_escape_htmltag($payout['id']) . "</a></td>";
+				print "<td>" . price(StancerApi::fromCents($payout['amount'])) . " " . dol_escape_htmltag(strtoupper((string) $payout['currency'])) . "</td>";
+				print "<td>" . dol_escape_htmltag($payout['status']) . "</td>";
 				print "<td>" . dol_print_date($payout['date_payout'], 'dayhour') . "</td>";
 				print "</tr>";
 			}
 			print "</table>";
 		}
 	} elseif (is_array($payouts)) {
-		print "<p>Réponse brute : <pre>" . print_r($payouts, true) . "</pre></p>";
+		print "<p>Réponse brute : <pre>" . dol_escape_htmltag(print_r($payouts, true), 0, 1) . "</pre></p>";
 	}
 }
 
@@ -220,20 +243,20 @@ if (isset($payments['payments']) && count($payments['payments']) > 0) {
 	$paymentDetail = $api->getPayment($testPaymentId);
 
 	if ($paymentDetail === false) {
-		print "<p style='color:red;'>Erreur : " . $api->error . "</p>";
+		print "<p style='color:red;'>Erreur : " . dol_escape_htmltag($api->error) . "</p>";
 	} else {
-		print "<p>Détails du paiement " . $testPaymentId . " :</p>";
+		print "<p>Détails du paiement " . dol_escape_htmltag($testPaymentId) . " :</p>";
 		print "<ul>";
-		print "<li>Montant : " . StancerApi::fromCents($paymentDetail['amount']) . " " . strtoupper($paymentDetail['currency']) . "</li>";
-		print "<li>Statut : " . $paymentDetail['status'] . "</li>";
-		print "<li>Méthode : " . (isset($paymentDetail['method']) ? $paymentDetail['method'] : 'N/A') . "</li>";
-		print "<li>Description : " . (isset($paymentDetail['description']) ? $paymentDetail['description'] : 'N/A') . "</li>";
-		print "<li>Order ID : " . (isset($paymentDetail['order_id']) ? $paymentDetail['order_id'] : 'N/A') . "</li>";
-		print "<li>Unique ID : " . (isset($paymentDetail['unique_id']) ? $paymentDetail['unique_id'] : 'N/A') . "</li>";
+		print "<li>Montant : " . price(StancerApi::fromCents($paymentDetail['amount'])) . " " . dol_escape_htmltag(strtoupper((string) $paymentDetail['currency'])) . "</li>";
+		print "<li>Statut : " . dol_escape_htmltag($paymentDetail['status']) . "</li>";
+		print "<li>Méthode : " . dol_escape_htmltag(isset($paymentDetail['method']) ? $paymentDetail['method'] : 'N/A') . "</li>";
+		print "<li>Description : " . dol_escape_htmltag(isset($paymentDetail['description']) ? $paymentDetail['description'] : 'N/A') . "</li>";
+		print "<li>Order ID : " . dol_escape_htmltag(isset($paymentDetail['order_id']) ? $paymentDetail['order_id'] : 'N/A') . "</li>";
+		print "<li>Unique ID : " . dol_escape_htmltag(isset($paymentDetail['unique_id']) ? $paymentDetail['unique_id'] : 'N/A') . "</li>";
 		if (isset($paymentDetail['card']) && is_array($paymentDetail['card'])) {
-			print "<li>Carte : **** " . (isset($paymentDetail['card']['last4']) ? $paymentDetail['card']['last4'] : '?') . " (" . (isset($paymentDetail['card']['brand']) ? $paymentDetail['card']['brand'] : '?') . ")</li>";
+			print "<li>Carte : **** " . dol_escape_htmltag(isset($paymentDetail['card']['last4']) ? $paymentDetail['card']['last4'] : '?') . " (" . dol_escape_htmltag(isset($paymentDetail['card']['brand']) ? $paymentDetail['card']['brand'] : '?') . ")</li>";
 		} elseif (isset($paymentDetail['card'])) {
-			print "<li>Carte (ID) : " . $paymentDetail['card'] . "</li>";
+			print "<li>Carte (ID) : " . dol_escape_htmltag($paymentDetail['card']) . "</li>";
 		}
 		if (isset($paymentDetail['customer']) && is_array($paymentDetail['customer'])) {
 			$custName = isset($paymentDetail['customer']['name']) ? $paymentDetail['customer']['name'] : 'N/A';
@@ -246,9 +269,9 @@ if (isset($payments['payments']) && count($payments['payments']) > 0) {
 		if (isset($paymentDetail['sepa']) && is_array($paymentDetail['sepa'])) {
 			$sepaLast4 = isset($paymentDetail['sepa']['last4']) ? $paymentDetail['sepa']['last4'] : '?';
 			$sepaBic = isset($paymentDetail['sepa']['bic']) ? $paymentDetail['sepa']['bic'] : '?';
-			print "<li>SEPA : **** " . $sepaLast4 . " (BIC : " . $sepaBic . ")</li>";
+			print "<li>SEPA : **** " . dol_escape_htmltag($sepaLast4) . " (BIC : " . dol_escape_htmltag($sepaBic) . ")</li>";
 		} elseif (isset($paymentDetail['sepa'])) {
-			print "<li>SEPA (ID) : " . $paymentDetail['sepa'] . "</li>";
+			print "<li>SEPA (ID) : " . dol_escape_htmltag($paymentDetail['sepa']) . "</li>";
 		}
 		print "</ul>";
 	}
@@ -258,7 +281,7 @@ if (isset($payments['payments']) && count($payments['payments']) > 0) {
 
 print "<h2>Résumé</h2>";
 print "<p style='color:green;'>La classe StancerApi fonctionne correctement avec getURLContent() de Dolibarr.</p>";
-print "<p>Vous pouvez vérifier les données sur la <a href='https://manage.stancer.com/' target='_blank'>console Stancer</a>.</p>";
+print "<p>Vous pouvez vérifier les données sur la <a href='https://manage.stancer.com/' target='_blank' rel='noopener noreferrer'>console Stancer</a>.</p>";
 
 // Page end
 print dol_get_fiche_end();

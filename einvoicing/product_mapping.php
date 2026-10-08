@@ -106,7 +106,14 @@ function einvoicingLineUnitPrice($protocol, array $parsedLine)
 
 // Get parameters
 $action = GETPOST('action', 'aZ09');
+// The flow is picked in the list of the incoming flows the module knows about. The text field next to
+// that list answers the flow it does not hold - one older than the synchronization window, or one this
+// Dolibarr never received - and wins when it is filled: it is what the user just typed.
 $flowid = GETPOST('flowid', 'alphanohtml');
+$flowidmanual = trim(GETPOST('flowidmanual', 'alphanohtml'));
+if ($flowidmanual !== '') {
+	$flowid = $flowidmanual;
+}
 $socid = GETPOSTINT('socid');
 
 $form = new Form($db);
@@ -183,6 +190,30 @@ if (!empty($flowid)) {
 			}
 		}
 	}
+}
+
+
+/*
+ * Vendor of the flow
+ *
+ * A mapping is stored as a vendor price row, so it is written on a third party: the wrong one, and the
+ * references of this vendor end up on another one, without a word. The document names its seller, so
+ * the vendor is read from it the way the import reads it - same identifiers, same lookup, read only.
+ */
+
+// The lookup comes from the CommonProtocol trait, used by the protocols able to import an invoice.
+'@phan-var-force ?CIIProtocol $protocol';
+/** @var ?CIIProtocol $protocol */
+$socidfromdocument = 0;
+if (!empty($parsedHeader) && is_object($protocol) && method_exists($protocol, 'findThirdpartyFromEInvoiceSeller')) {
+	$sellerlookup = $protocol->findThirdpartyFromEInvoiceSeller($parsedHeader);
+	if (!empty($sellerlookup['res']) && $sellerlookup['res'] > 0) {
+		$socidfromdocument = (int) $sellerlookup['res'];
+	}
+}
+if ($socid <= 0 && $socidfromdocument > 0) {
+	// No vendor chosen yet: the one the document names is the answer. The user can still change it.
+	$socid = $socidfromdocument;
 }
 
 
@@ -275,7 +306,37 @@ print '</div><br>';
 // Form to select the flow to work on (prefilled when we come from the synchronization result)
 print '<form method="GET" action="'.$_SERVER["PHP_SELF"].'">';
 print '<div class="inline-block valignmiddle paddingright">'.$langs->trans("flow_id").' ';
-print '<input type="text" class="width200" name="flowid" value="'.dol_escape_htmltag($flowid).'">';
+// The incoming flows the module knows about, the ones waiting in the synchronization queue first.
+// A combo rather than a plain list: it comes with a search field, and a vendor looking for one of
+// its invoices reads the number, not the identifier the platform gave the flow.
+$flowchoices = array();
+$reasonkeys = array('PRODUCT_NOT_FOUND' => 'ReasonProductNotFoundShort', 'THIRDPARTY_NOT_FOUND' => 'ReasonThirdpartyNotFoundShort', 'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT' => 'ReasonBadAmountShort');
+foreach (Document::listIncomingFlowsForMapping($db) as $flowchoice) {
+	$reason = $flowchoice['reason'] ? $langs->trans($reasonkeys[$flowchoice['reason']] ?? $flowchoice['reason']) : '';
+	$flowchoices[$flowchoice['flowid']] = implode(' - ', array_filter(array($flowchoice['flowid'], $flowchoice['ref'],
+		$flowchoice['date'] ? dol_print_date($flowchoice['date'], 'day') : '', dol_trunc($flowchoice['socname'], 40), $reason)));
+}
+// The flow of the URL is always offered, even when neither table holds it any more, so refreshing
+// the page never silently switches the flow being mapped.
+if ($flowid !== '' && !isset($flowchoices[$flowid])) {
+	$flowchoices[$flowid] = $flowid;
+}
+// Written here rather than with Form::selectarray(), which prints the value of an option as it
+// stands: a flow id is read from a platform answer and lands in that attribute. ajax_combobox()
+// then turns the list into the searchable combo, exactly as selectarray() would have done.
+print '<select id="flowid" name="flowid" class="flat minwidth300 maxwidth500">';
+print '<option value="">&nbsp;</option>';
+foreach ($flowchoices as $choiceid => $choicelabel) {
+	print '<option value="'.dol_escape_htmltag($choiceid).'"'.((string) $choiceid === $flowid ? ' selected' : '').'>';
+	print dol_escape_htmltag($choicelabel).'</option>';
+}
+print '</select>';
+// ajax_combobox() lives in core/lib/ajax.lib.php, which main.inc.php loads unless the page asks it
+// not to (NOREQUIREAJAX), and this one does not.
+print ajax_combobox('flowid');
+print '</div>';
+print '<div class="inline-block valignmiddle paddingright">'.$langs->trans("OrAnotherFlowId").' ';
+print '<input type="text" class="width200" name="flowidmanual" value="" placeholder="'.dol_escape_htmltag($langs->trans("flow_id")).'">';
 print '</div>';
 print ' &nbsp; ';
 print '<div class="inline-block valignmiddle paddingright">'.$langs->trans("Supplier").' ';
@@ -290,6 +351,26 @@ print $form->select_company($socid, 'socid', $vendorfilter, 'SelectThirdParty', 
 print '</div>';
 print '<input type="submit" class="button small" value="'.$langs->trans("Refresh").'">';
 print '</form>';
+
+// What the document says about its seller. The mapping is written on that vendor, so it is said out
+// loud: a vendor chosen by hand against a document that names another one is a silent mistake.
+if ($socidfromdocument > 0) {
+	$vendorfromdocument = new Societe($db);
+	if ($vendorfromdocument->fetch($socidfromdocument) > 0) {
+		if ($socid == $socidfromdocument) {
+			print '<div class="opacitymedium paddingtop">'.$langs->trans("VendorIdentifiedFromTheDocument").' '.$vendorfromdocument->getNomUrl(1).'</div>';
+		} else {
+			print '<div class="warning paddingtop">'.$langs->trans("VendorDiffersFromTheDocument").' '.$vendorfromdocument->getNomUrl(1).'</div>';
+		}
+	}
+} elseif (!empty($parsedHeader)) {
+	// The name comes from the document, so it is escaped before it is handed to trans(), which does
+	// not escape what it substitutes.
+	$sellername = trim((string) ($parsedHeader['sellername'] ?? ''));
+	if ($sellername !== '') {
+		print '<div class="opacitymedium paddingtop">'.$langs->trans("VendorOfTheDocumentNotFound", dol_escape_htmltag($sellername)).'</div>';
+	}
+}
 
 print '<br>';
 
@@ -310,15 +391,21 @@ if (!empty($parsedLines)) {
 	$nbtomap = 0;
 	$matchresults = array();
 	$defaultrouted = array();
+	$mixedunset = null;
 	foreach ($parsedLines as $idx => $parsedLine) {
 		$hasvendorref = (trim((string) ($parsedLine['prodsellerid'] ?? '')) !== '');
 		$parsedLine['supplierId'] = $socid;
+		$parsedLine['businessProcessId'] = (string) ($parsedHeader['businessProcessId'] ?? '');
 		$matchresults[$idx] = ($socid > 0 && is_object($protocol)) ? $protocol->findProductFromEinvoiceLine($parsedLine) : array('res' => 0, 'message' => '');
 		// The default product of the vendor is a catch-all answering every line nothing was found for, so a
 		// line it caught is routed, not mapped. As long as the line carries a vendor reference it can still
 		// be bound to the right product, and it stays in the lines to map.
 		$defaultrouted[$idx] = (($matchresults[$idx]['matchtype'] ?? '') == 'defaultrouting');
-		if (empty($matchresults[$idx]['res']) || ($defaultrouted[$idx] && $hasvendorref)) {
+		// A mixed invoice whose lines need a default the setup does not choose: the import will stop on it
+		if ($matchresults[$idx]['res'] < 0) {
+			$mixedunset = $matchresults[$idx];
+		}
+		if ($matchresults[$idx]['res'] <= 0 || ($defaultrouted[$idx] && $hasvendorref)) {
 			$nbtomap++;
 		}
 	}
@@ -329,6 +416,10 @@ if (!empty($parsedLines)) {
 	}
 	print $langs->trans("NbOfLines").' : '.count($parsedLines).' - '.$langs->trans("NbOfLinesToMap").' : '.$nbtomap;
 	print '</div><br>';
+
+	if ($mixedunset !== null) {
+		print '<div class="warning">'.dol_escape_htmltag($mixedunset['message']).'<br>'.$mixedunset['action'].'</div><br>';
+	}
 
 	print '<form method="POST" action="'.$_SERVER["PHP_SELF"].'">';
 	print '<input type="hidden" name="token" value="'.newToken().'">';
@@ -364,7 +455,7 @@ if (!empty($parsedLines)) {
 		print '<td class="right">'.price((float) ($parsedLine['rateApplicablePercent'] ?? 0)).'%</td>';
 
 		print '<td>';
-		if (!empty($matchresults[$idx]['res']) && empty($defaultrouted[$idx])) {
+		if ($matchresults[$idx]['res'] > 0 && empty($defaultrouted[$idx])) {
 			// Line already resolved by the automatic matching
 			$producttmp = new Product($db);
 			if ($producttmp->fetch($matchresults[$idx]['res']) > 0) {
@@ -380,7 +471,8 @@ if (!empty($parsedLines)) {
 			if (!empty($defaultrouted[$idx])) {
 				$producttmp = new Product($db);
 				$routedto = ($producttmp->fetch($matchresults[$idx]['res']) > 0) ? $producttmp->getNomUrl(1) : $langs->trans("Product").' #'.((int) $matchresults[$idx]['res']);
-				print $form->textwithpicto('<span class="opacitymedium">'.$langs->trans("LineRoutedToDefaultProduct").'</span> '.$routedto, $langs->trans("LineRoutedToDefaultProductHelp"), 1, 'warning');
+				$routedkey = (($matchresults[$idx]['routingtype'] ?? '') == 'service') ? 'LineRoutedToDefaultService' : 'LineRoutedToDefaultProduct';
+				print $form->textwithpicto('<span class="opacitymedium">'.$langs->trans($routedkey).'</span> '.$routedto, $langs->trans("LineRoutedToDefaultProductHelp"), 1, 'warning');
 				print '<br>';
 			}
 			if ($reffourn === '') {

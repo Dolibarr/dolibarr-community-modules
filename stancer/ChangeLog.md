@@ -1,5 +1,34 @@
 # CHANGELOG STANCER FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 2.0.24 -- 2026-09-24
+
+Send the payment link from an order or an invoice (thanks to contrib from Axel)
+Allow a card payment without 3-D Secure, document by document (thanks to contrib from Axel)
+Let a customer pay again after a refused card payment (thanks to contrib from Axel)
+Show why a card payment could not start, instead of a blank page (thanks to contrib from Axel)
+Say on the return page what happened, and that nothing was charged (thanks to contrib from Axel)
+Take the payer email or mobile from the contacts too (thanks to contrib from Axel)
+Fix the delayed mail at invoice validation, never queued
+Report a payment link that could not be mailed
+Frame the Stancer payment button with its brand
+Translate the new keys into the five other languages
+Keep the customer account on a card saved after payment (thanks to contrib from Nicolas)
+Fix a setup page warning on an unreadable document model row (thanks to contrib from Nicolas)
+Record a card payment on its own invoice, order or proposal, never on one named by the URL
+Charge the amount Dolibarr computes for an invoice, order or proposal, not the URL one
+Close an invoice as paid only when its payments really cover it
+Ask for the write permission and a token before any debit, refund or bank booking
+Keep card numbers, CVC and the payment security key out of the logs
+Verify the TLS certificate of the Stancer API
+Keep payments, refunds, disputes and collections of each entity apart
+Send the delayed invoice validation mails again, the job always failed
+Record a forced SEPA payment as a direct debit, not as a card payment
+Book donation and event payments made with Stancer on the Stancer bank account
+Refuse a second copy of the same payout, refund or dispute
+Let a user who created Stancer records be deleted
+Ship the raw Stancer API window that the package left out
+Translate the messages shown when a payment starts
+
 ## 2.0.23 -- 2026-09-05
 
 Fix payments recorded nowhere when the customer paid from a link received by mail

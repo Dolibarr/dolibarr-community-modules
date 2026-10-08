@@ -140,7 +140,7 @@ class TestPDPProvider extends AbstractPDPProvider
 		// getAccessToken() below.
 		if (!empty($this->config['api_key'])) {
 			$item = $formSetup->newItem($prefix.'TOKEN'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
-			$item->nameText = $langs->trans('AccessToken');
+			$item->nameText = $langs->trans('EInvAccessToken');
 			$item->cssClass = 'maxwidth500';
 			$item->fieldOverride = '';
 			if (!empty($tokenData['token'])) {

@@ -70,7 +70,7 @@ include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php'; // @phpstan-ignore incl
 dol_include_once('/einvoicing/class/einvoicingsyncpending.class.php');
 
 // Load translation files required by the page
-$langs->loadLangs(array("einvoicing@einvoicing", "other", "bills", "products", "companies"));
+$langs->loadLangs(array("einvoicing@einvoicing", "admin", "other", "bills", "products", "companies"));
 
 /**
  * Extract the manual actions from the HTML action block the module computes for a flow.
@@ -117,6 +117,9 @@ function einvsp_actionsFromHtml($html)
  */
 function einvsp_actionMetaFromUrl($url)
 {
+	if (strpos($url, 'admin/setup_options.php') !== false) {
+		return array('label' => 'SetDefaultRoutingMixed', 'help' => 'EINVOICING_DEFAULT_ROUTING_MIXED_HELP', 'icon' => 'fa-cog');
+	}
 	if (strpos($url, 'product_mapping.php') !== false) {
 		return array('label' => 'AssociateExistingProductShort', 'help' => 'ActionAssociateProductHelp', 'icon' => 'fa-link');
 	}
@@ -131,6 +134,14 @@ function einvsp_actionMetaFromUrl($url)
 			return array('label' => 'CreateService', 'help' => 'ActionCreateProductHelp', 'icon' => 'fa-plus-circle');
 		}
 		return array('label' => 'CreateProduct', 'help' => 'ActionCreateProductHelp', 'icon' => 'fa-plus-circle');
+	}
+	// SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT: an invoice with this supplier ref already exists but with a
+	// different amount. The action opens the supplier invoice list filtered on that ref. Give it its own
+	// "modify" icon and an explanatory tooltip, otherwise it falls back to a bare plus that looks like a
+	// "create" and carries no help - the operator cannot tell what to do with the blocked flow.
+	if (strpos($url, '/fourn/facture/card.php') !== false
+		|| (strpos($url, '/fourn/facture/list.php') !== false && strpos($url, 'search_refsupplier=') !== false)) {
+		return array('label' => 'ModifySupplierInvoiceShort', 'help' => 'ActionModifySupplierInvoiceHelp', 'icon' => 'fa-pen');
 	}
 	return array('label' => '', 'help' => '', 'icon' => '');
 }
@@ -209,7 +220,7 @@ if ($action == 'confirm_retry' && $rowid > 0 && $permissiontowrite && $confirm =
 							$manualactions[] = array('key' => $akey, 'url' => $adata['url'], 'label' => ($adata['label'] ?? ''));
 						}
 					}
-				} elseif (is_array($syncres) && !empty($syncres['actionurl'])) {
+				} elseif (is_array($syncres) && !empty($syncres['actionurl']) && $syncres['actionurl'] !== 'none') {	// 'none' = action carried only by the HTML block (bad-amount "modify invoice" link), not a real URL
 					$manualactions[] = array('key' => ($reason == 'THIRDPARTY_NOT_FOUND' ? 'createthirdparty' : 'create'), 'url' => $syncres['actionurl'], 'label' => '');
 				}
 				$actionhtml = (is_array($syncres) && !empty($syncres['action'])) ? $syncres['action'] : '';
@@ -279,6 +290,8 @@ if ($action == 'confirm_linkthirdparty' && $rowid > 0 && $permissiontowrite) {
 			setEventMessages($langs->trans("RecordNotFound"), null, 'errors');
 			$action = 'linkthirdparty';
 		} else {
+			// Societe::update() accepts a code out of the current numbering mask only when oldcopy holds it unchanged.
+			$soc->oldcopy = clone $soc;
 			// Write only the fields the user ticked on the comparison screen (apply_<key>).
 			$idmap = array('name' => 'name', 'vatnumber' => 'tva_intra', 'idprof1' => 'idprof1', 'idprof2' => 'idprof2', 'idprof3' => 'idprof3', 'email' => 'email');
 			$nbwritten = 0;
@@ -690,6 +703,7 @@ $statuslabels = array(
 // Short explanation of each business reason code, shown in the tooltip of the reason badge.
 $reasonhelp = array(
 	'PRODUCT_NOT_FOUND' => $langs->trans("ReasonProductNotFoundHelp"),
+	'DEFAULT_ROUTING_MIXED_UNSET' => $langs->trans("EINVOICING_DEFAULT_ROUTING_MIXED_HELP"),
 	'THIRDPARTY_NOT_FOUND' => $langs->trans("ReasonThirdpartyNotFoundHelp"),
 	'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT' => $langs->trans("ReasonBadAmountHelp"),
 );
@@ -697,6 +711,7 @@ $reasonhelp = array(
 // Short human label of each reason code (the raw code stays in the tooltip), kept on a single line.
 $reasonshort = array(
 	'PRODUCT_NOT_FOUND' => $langs->trans("ReasonProductNotFoundShort"),
+	'DEFAULT_ROUTING_MIXED_UNSET' => $langs->trans("ReasonDefaultRoutingMixedUnsetShort"),
 	'THIRDPARTY_NOT_FOUND' => $langs->trans("ReasonThirdpartyNotFoundShort"),
 	'SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT' => $langs->trans("ReasonBadAmountShort"),
 );
@@ -709,6 +724,7 @@ $actionmeta = array(
 	'createthirdparty'    => array('icon' => 'fa-plus-circle', 'label' => 'CreateSupplierShort',           'help' => 'ActionCreateThirdpartyHelp'),
 	'addsupplierrefprice' => array('icon' => 'fa-link',        'label' => 'AssociateExistingProductShort', 'help' => 'ActionAssociateProductHelp'),
 	'setdefaultproduct'   => array('icon' => 'fa-star',        'label' => 'SetDefaultProductShort',        'help' => 'ActionSetDefaultProductHelp'),
+	'setdefaultroutingmixed' => array('icon' => 'fa-cog',      'label' => 'SetDefaultRoutingMixed',        'help' => 'EINVOICING_DEFAULT_ROUTING_MIXED_HELP'),
 );
 
 $imaxinloop = ($limit ? min($num, $limit) : $num);
@@ -752,7 +768,9 @@ while ($i < $imaxinloop) {
 			$tip .= '<br>'.dol_escape_htmltag($rhelp);
 		}
 		if (!empty($obj->reason_message)) {
-			$tip .= '<br><br>'.dol_escape_htmltag($obj->reason_message);
+			// The protocol builds this message with <br> separators (CIIProtocol). Keep them so the tooltip
+			// shows real line breaks instead of literal "<br>"; every other tag stays escaped (only <br> passes).
+			$tip .= '<br><br>'.dol_escape_htmltag($obj->reason_message, 1, 1, 'br');
 		}
 		print $form->textwithpicto('<span class="badge badge-status1 badge-status">'.dol_escape_htmltag($short).'</span>', $tip, 1, 'warning');
 	}

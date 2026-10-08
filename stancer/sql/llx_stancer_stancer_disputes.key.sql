@@ -20,5 +20,6 @@ ALTER TABLE llx_stancer_stancer_disputes ADD INDEX idx_stancer_stancer_disputes_
 ALTER TABLE llx_stancer_stancer_disputes ADD INDEX idx_stancer_stancer_disputes_payment_id (payment_id);
 ALTER TABLE llx_stancer_stancer_disputes ADD INDEX idx_stancer_stancer_disputes_status (status);
 ALTER TABLE llx_stancer_stancer_disputes ADD INDEX idx_stancer_stancer_disputes_fk_soc (fk_soc);
-ALTER TABLE llx_stancer_stancer_disputes ADD CONSTRAINT llx_stancer_stancer_disputes_fk_user_creat FOREIGN KEY (fk_user_creat) REFERENCES llx_user(rowid);
+ALTER TABLE llx_stancer_stancer_disputes ADD CONSTRAINT llx_stancer_stancer_disputes_fk_user_creat FOREIGN KEY (fk_user_creat) REFERENCES llx_user(rowid) ON DELETE SET NULL;
 -- END MODULEBUILDER INDEXES
+ALTER TABLE llx_stancer_stancer_disputes ADD UNIQUE INDEX uk_stancer_stancer_disputes_dispute_id (entity, dispute_id);
