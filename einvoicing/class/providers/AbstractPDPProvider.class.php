@@ -271,9 +271,25 @@ abstract class AbstractPDPProvider
 		if (isset($response['response']['results']) && is_array($response['response']['results'])) {
 			$lines = $response['response']['results'];
 		}
+		// The search answers one page (25 lines on SuperPDP): a SIREN with more addresses, like the French State
+		// with one per service, loses the address this invoice is sent to. Ask for that one by its exact identifier,
+		// still under the same SIREN, rather than paging through thousands of lines on every check.
+		$wanted = self::normalizeAddressingIdentifier($addressingidentifier);
+		if (!empty($lines) && $wanted !== '' && !in_array($wanted, array_map(function ($line) {
+			return self::normalizeAddressingIdentifier(isset($line['addressingIdentifier']) ? $line['addressingIdentifier'] : '');
+		}, $lines), true)) {
+			$exactbody = json_encode(array('filters' => array(
+				'siren' => array('op' => 'strict', 'value' => $siren),
+				'addressingIdentifier' => array('op' => 'strict', 'value' => $wanted),
+			)));
+			$exact = $this->callApi('afnor-directory/v1/directory-line/search', 'POST', $exactbody, array(), 'precheck_directory');
+			if ((int) (isset($exact['status_code']) ? $exact['status_code'] : 0) == 200 && isset($exact['response']['results']) && is_array($exact['response']['results'])) {
+				$lines = array_merge($lines, $exact['response']['results']);
+			}
+		}
 		$result['entries'] = count($lines);
 
-		if ($result['entries'] > 0 && ($wanted = self::normalizeAddressingIdentifier($addressingidentifier)) !== '') {
+		if ($result['entries'] > 0 && $wanted !== '') {
 			// Keep only the line of the address this invoice is sent to. Whoever recorded a routing
 			// identifier for that third party (or forced one on the invoice) took responsibility for the
 			// address: reporting on a sibling line, open or not, would answer a question nobody asked.
