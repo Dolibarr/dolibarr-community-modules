@@ -504,10 +504,16 @@ class InterfaceStancerTriggers extends DolibarrTriggers
 			return 0;
 		}
 
-		$mergefromid = $object->context['mergefromid'];
+		$mergefromid = isset($object->context['mergefromid']) ? (int) $object->context['mergefromid'] : 0;
+		if ($mergefromid <= 0) {
+			dol_syslog("stancer::trigger merge context without mergefromid, nothing to move", LOG_WARNING);
+			return 0;
+		}
+		// Every module table carrying a fk_soc (DOLIBARR_FUSION_TIERS.md)
 		$tables = array(
 			'stancer_stancer_payments',
 			'stancer_stancer_refunds',
+			'stancer_stancer_disputes',
 		);
 
 		foreach ($tables as $table) {

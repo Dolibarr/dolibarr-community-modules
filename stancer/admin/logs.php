@@ -60,7 +60,7 @@ dol_include_once('/stancer/lib/stancer.lib.php');
 //require_once "../class/myclass.class.php";
 
 // Translations
-$langs->loadLangs(array("admin", "stancer@stancer"));
+$langs->loadLangs(array("admin", "errors", "stancer@stancer"));
 
 // Initialize technical object to manage hooks of page. Note that conf->hooks_modules contains array of hook context
 $hookmanager->initHooks(array('stancersetup', 'globalsetup'));
@@ -88,12 +88,13 @@ $setupnotempty = 0;
 $useFormSetup = 1;
 
 if (!class_exists('FormSetup')) {
-	// For retrocompatibility Dolibarr < 16.0
-	// if (floatval(DOL_VERSION) < 16.0 && !class_exists('FormSetup')) {
+	// For retrocompatibility Dolibarr < 16.0: the core never preloads FormSetup,
+	// so without the version test the backport would replace it on every version
+	if (floatval(DOL_VERSION) < 16.0) {
 		dol_include_once('/stancer/backport/v16/core/class/html.formsetup.class.php');
-	// } else {
-	// require_once DOL_DOCUMENT_ROOT.'/core/class/html.formsetup.class.php';
-	// }
+	} else {
+		require_once DOL_DOCUMENT_ROOT.'/core/class/html.formsetup.class.php';
+	}
 }
 
 $formSetup = new FormSetup($db);
@@ -105,17 +106,19 @@ $form = new Form($db);
  */
 
 if ($action == 'down') {
-	$filename = dol_decode(GETPOST('hash'));
-	if ($filename) {
-		$fullfname = DOL_DATA_ROOT . '/' . $filename;
-		if (file_exists($fullfname)) {
-			header('Content-Type: application/octet-stream');
-			header("Content-Transfer-Encoding: Binary");
-			header("Content-disposition: attachment; filename=\"".basename($filename)."\"");
-			readfile($fullfname);
-			exit;
-		}
+	if (GETPOST('token', 'alpha') === '' || GETPOST('token', 'alpha') !== currentToken()) {
+		dol_syslog("stancer logs: download refused, missing or invalid token", LOG_WARNING);
+		accessforbidden();
 	}
+	$fullfname = stancerResolveLogFile(GETPOST('file', 'alpha'));
+	if ($fullfname !== '') {
+		header('Content-Type: application/octet-stream');
+		header("Content-Transfer-Encoding: Binary");
+		header("Content-disposition: attachment; filename=\"".basename($fullfname)."\"");
+		readfile($fullfname);
+		exit;
+	}
+	setEventMessages($langs->trans('ErrorFileNotFound', dol_escape_htmltag(basename(GETPOST('file', 'alpha')))), null, 'errors');
 }
 
 /*
@@ -147,7 +150,7 @@ $dir = opendir(DOL_DATA_ROOT);
 // Loop through the files in source directory
 while ($file = readdir($dir)) {
 	if (strpos($file, '.log')) {
-		print "<li><a href=".$_SERVER["PHP_SELF"]."?action=down&hash=".dol_encode($file).">" . $file . "</a></li>\n";
+		print '<li><a href="'.$_SERVER["PHP_SELF"].'?action=down&token='.newToken().'&file='.urlencode($file).'">' . dol_escape_htmltag($file) . "</a></li>\n";
 	}
 }
 closedir($dir);

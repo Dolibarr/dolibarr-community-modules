@@ -65,8 +65,6 @@ if (!function_exists('dolJSToSetRandomPassword')) {
 			$html .= '</script>';
 		}
 
-		print $html;
-		$html = "";
 		return $html;
 	}
 }

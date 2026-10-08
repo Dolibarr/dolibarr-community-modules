@@ -91,26 +91,18 @@ $langs->loadLangs(array("main", "other", "dict", "bills", "companies", "paybox",
 parse_str(base64_decode((string) GETPOST('s', 'alpha')), $args);
 // dol_syslog("stancer sepa-iban (args) is " . json_encode($args), LOG_DEBUG);
 
-$tst = '';
-if (isset($args['socid'])) {
-	$societe = new Societe($db);
-	$societe->fetch($args['socid']);
-	$tst = "SEPA-" . $args['socid'] . "-" . $societe->name . "-" . getDolGlobalString('PAYMENT_SECURITY_TOKEN');
-	$_SESSION['sepa-iban'] = 'new';
-} else {
+if (!isset($args['socid'])) {
 	print "<p class=''>" . $langs->transnoentitiesnoconv("StancerThereIsNoSocID") . "</p>";
 	exit;
 }
-// dol_syslog("stancer check securekey is from $tst");
-// dol_syslog("stancer securekey is " . json_encode($args['securekey'] . " compare with " . dol_hash($tst,'1')), LOG_DEBUG);
-if (dol_hash($tst, '1') != $args['securekey']) {
-	dol_syslog("stancer SEPA form error, securekey no confirmed !", LOG_ERR);
+$societe = null;
+if (!stancerCheckPublicCustomerKey('SEPA', $args, $societe)) {
 	accessforbidden($langs->trans('StancerIBANCBinpoutSecurekeyError'), 0, 0, 1);
 }
 
-if (isset($_SESSION['sepa-iban']) && $_SESSION['sepa-iban'] == 'done') {
-	$errmsg = 'stancer detect page reload';
-	dol_syslog($errmsg);
+// A reload of the result page re-posts the form: never create a second mandate
+if (stancerPublicFormAlreadyDone('sepa', $societe->id) && GETPOST('action', 'aZ09') == "stancerGetCustomerIBAN") {
+	dol_syslog("stancer public SEPA page: reload detected for thirdparty " . $societe->id);
 	print "<p class=''>" . $langs->transnoentitiesnoconv("StancerPublicIBANCBPageReload", dol_print_url($mysoc->url, '_blank', 0, 1)) . "</p>";
 	exit;
 }
@@ -124,35 +116,10 @@ $signLink = $signer = '';
 $signLinkAutoRedirect = false;
 
 //note : public page, user is not set, so we use user who create that company
-$user = new User($db);
-$res = $user->fetch(getDolGlobalInt('STANCER_USER_ACCOUNT_FOR_ACTIONS'));
-if ($res < 0) {
-	// Fallback on the user who last modified the thirdparty, then on its creator.
-	// Societe::fetch() fills user_modification/user_creation up to Dolibarr 18, and
-	// user_modification_id/user_creation_id from Dolibarr 19, so the four spellings
-	// are probed, modification before creation. The *_id properties are not declared
-	// at all on Dolibarr 15, so they are only ever reached through empty(): a direct
-	// read would raise a PHP 8 "Undefined property" warning on that version.
-	$uid = 0;
-	if (!empty($societe->user_modification_id)) {
-		$uid = $societe->user_modification_id;
-	}
-	if (empty($uid)) {
-		// @phan-suppress-next-line PhanDeprecatedProperty  only source up to Dolibarr 18
-		$uid = $societe->user_modification;
-	}
-	if (empty($uid) && !empty($societe->user_creation_id)) {
-		$uid = $societe->user_creation_id;
-	}
-	if (empty($uid)) {
-		// @phan-suppress-next-line PhanDeprecatedProperty  only source up to Dolibarr 18
-		$uid = $societe->user_creation;
-	}
-	if (empty($uid)) {
-		dol_syslog("stancer sepa-iban public: no fallback user found on thirdparty ".$societe->id, LOG_ERR);
-	} elseif ($user->fetch((int) $uid) <= 0) {
-		dol_syslog("stancer sepa-iban public: cannot load fallback user ".((int) $uid)." for thirdparty ".$societe->id.": ".$user->error, LOG_ERR);
-	}
+$user = stancerLoadPublicActionUser($societe);
+if (!is_object($user)) {
+	dol_syslog("stancer public sepa-iban: no user to act as, page stopped", LOG_ERR);
+	accessforbidden('', 0, 0, 1);
 }
 // loadRights() only exists from Dolibarr 20; getrights() is the only call valid on 15..21.
 // @phan-suppress-next-line PhanDeprecatedFunction
@@ -293,7 +260,7 @@ if ($action == "stancerGetCustomerIBAN") {
 					$ro = " readonly";
 					$disabled = "disabled";
 					$success = 1;
-					$_SESSION['sepa-iban'] = 'done'; //avoid F5
+					stancerPublicFormMarkDone('sepa', $societe->id);
 					//Creation du fichier PDF
 					if (getDolGlobalString('STANCER_MANDATE_AUTO', '') != '') {
 						$pdf = new pdf_sepamandate_stancer($db);
@@ -327,7 +294,7 @@ if ($action == "stancerGetCustomerIBAN") {
 									// print "<p>Liste des signataires possibles : " . json_encode($list_of_potential_signers) . "</p>";
 
 									//Un seul signataire possible -> bingo
-									if (is_countable($list_of_potential_signers) && count($list_of_potential_signers) == 1 || get_class($list_of_potential_signers) == 'Contact') {
+									if ((is_countable($list_of_potential_signers) && count($list_of_potential_signers) == 1) || (is_object($list_of_potential_signers) && get_class($list_of_potential_signers) == 'Contact')) {
 										$signer = $list_of_potential_signers;
 										if (is_array($signer)) {
 											$signer = reset($list_of_potential_signers);
@@ -478,9 +445,9 @@ if (!empty($conf->stancer->enabled)) {
 	  <p class="mb-4"><?php echo $langs->transnoentitiesnoconv("StancerPleaseEnterYourIBANWillBeSentByUptoSign", (string) $signer->email); ?></p>
 	  <p class="mb-4"><?php echo $langs->transnoentitiesnoconv("StancerPaymentDoneEndMessage", "<a href='" . $mysoc->url . "'>" . $mysoc->name . " - " . $mysoc->url . "</a>") ?></p>
 		<?php } elseif ($signLink != '' && $signLinkAutoRedirect) { ?>
-	  <p class="mb-4"><?php echo $langs->transnoentitiesnoconv("StancerPleaseEnterYourIBANisReadyToSignAutoRedir", '<a href="' . $signLink . '">', '</a><span class="fas fa-external-link-alt" style=""></span>'); ?></p>
+	  <p class="mb-4"><?php echo $langs->transnoentitiesnoconv("StancerPleaseEnterYourIBANisReadyToSignAutoRedir", '<a href="' . dol_escape_htmltag($signLink) . '">', '</a><span class="fas fa-external-link-alt" style=""></span>'); ?></p>
 		<?php } elseif ($signLink != '') { ?>
-	  <p class="mb-4"><?php echo $langs->transnoentitiesnoconv("StancerPleaseEnterYourIBANisReadyToSign", '<a href="' . $signLink . '">', '</a><span class="fas fa-external-link-alt" style=""></span>'); ?></p>
+	  <p class="mb-4"><?php echo $langs->transnoentitiesnoconv("StancerPleaseEnterYourIBANisReadyToSign", '<a href="' . dol_escape_htmltag($signLink) . '">', '</a><span class="fas fa-external-link-alt" style=""></span>'); ?></p>
 		<?php } else { ?>
 		<p class="mb-4"><?php echo $langs->trans("StancerPleaseEnterYourIBANWillBeSent"); ?></p>
 		<?php } ?>
@@ -490,7 +457,7 @@ if (!empty($conf->stancer->enabled)) {
 		<?php if ($signLinkAutoRedirect) { ?>
 <script language="javascript">
 	$(document).ready(function(){
-	  window.location.replace('<?php echo $signLink; ?>');
+	  window.location.replace('<?php echo dol_escape_js($signLink); ?>');
 	});
 </script>
 		<?php } ?>

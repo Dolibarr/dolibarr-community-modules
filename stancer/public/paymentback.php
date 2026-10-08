@@ -114,7 +114,6 @@ $suffix = '';
 
 $sp = new Stancer_payments($db);
 if (is_array($args) && !empty($args)) {
-	$FULLTAG = $args['fulltag'] ?? ($args['tag'] ?? '');
 	$source = $args['source'] ?? '';
 	$ref = $args['ref'] ?? '';
 	$securekey = $args['securekey'] ?? '';
@@ -124,7 +123,7 @@ if (is_array($args) && !empty($args)) {
 	dol_syslog("stancer paymentback fetch payment by uuid=$uuid", LOG_DEBUG);
 	$res = $sp->fetch(0, null, null, $uuid);
 	if ($res > 0) {
-		dol_syslog("stancer paymentback fetch OK (by uuid), socid=" . $sp->fk_soc . ", uuid=$uuid, source=$source, ref=$ref, fulltag=$FULLTAG", LOG_DEBUG);
+		dol_syslog("stancer paymentback fetch OK (by uuid), socid=" . $sp->fk_soc . ", uuid=$uuid, source=$source, ref=$ref", LOG_DEBUG);
 		$socid = $sp->fk_soc;
 	} elseif (isset($_SESSION["stancer_payment_id"])) {
 		dol_syslog("stancer paymentback fetch by uuid failed (res=$res), trying session stancer_payment_id=" . $_SESSION["stancer_payment_id"], LOG_DEBUG);
@@ -133,7 +132,7 @@ if (is_array($args) && !empty($args)) {
 			dol_syslog("stancer paymentback fetch OK (by session), socid=" . $sp->fk_soc, LOG_DEBUG);
 			$socid = $sp->fk_soc;
 		} else {
-			dol_syslog("stancer paymentback fetch FAILED (by session too), res=$res, uuid=$uuid, fulltag=$FULLTAG", LOG_ERR);
+			dol_syslog("stancer paymentback fetch FAILED (by session too), res=$res, uuid=$uuid", LOG_ERR);
 		}
 	} else {
 		dol_syslog("stancer paymentback fetch by uuid failed (res=$res) and no stancer_payment_id in session", LOG_ERR);
@@ -142,6 +141,8 @@ if (is_array($args) && !empty($args)) {
 	dol_syslog("stancer paymentback ERROR: no URI data (args is empty or not array)", LOG_ERR);
 	accessforbidden('', 0, 0, 1);
 }
+// The object to process is derived from the local row only, never from the URL
+$FULLTAG = stancerResolveReturnTag($sp, $args);
 
 // The customer can land here without any Dolibarr session: with
 // STANCER_AUTO_MAIL_ORDER_CB the payment link is sent by email, so the payment
@@ -239,13 +240,16 @@ if (!empty($logosmall) && is_readable($conf->mycompany->dir_output . '/logos/thu
 	$urllogofull = $dolibarr_main_url_root . '/viewimage.php?modulepart=mycompany&entity=' . $conf->entity . '&file=' . urlencode('logos/' . $logo);
 }
 
-$user = new User($db);
-$stancerUserAccountId = getDolGlobalInt('STANCER_USER_ACCOUNT_FOR_ACTIONS');
-dol_syslog("stancer paymentback fetch user for actions, STANCER_USER_ACCOUNT_FOR_ACTIONS=" . $stancerUserAccountId, LOG_DEBUG);
-$res = $user->fetch($stancerUserAccountId);
-if ($res <= 0) {
-	dol_syslog("stancer paymentback user fetch failed (res=$res), fallback to user id 1", LOG_WARNING);
-	$user->fetch(1);
+// No session on this page: act as the configured user, else as the author of
+// the thirdparty, never as the first administrator.
+$paymentSociete = new Societe($db);
+if ($paymentSociete->fetch((int) $socid) <= 0) {
+	$paymentSociete = null;
+}
+$user = stancerLoadPublicActionUser($paymentSociete);
+if (!is_object($user)) {
+	dol_syslog("stancer paymentback: no user to act as (check STANCER_USER_ACCOUNT_FOR_ACTIONS), payment " . $stancerPaymentId . " not processed here", LOG_ERR);
+	accessforbidden('', 0, 0, 1);
 }
 // loadRights() only exists from Dolibarr 20; getrights() is the only call valid on 15..21.
 // @phan-suppress-next-line PhanDeprecatedFunction
@@ -319,14 +323,14 @@ if (!empty($conf->stancer->enabled)) {
 					'stancer_object_ref' => $db->escape(isset($cb['id']) ? $cb['id'] : ''),
 					'last_four' => $db->escape(isset($cb['last4']) ? $cb['last4'] : ''),
 					'number' => 0000,
-					'proprio' => $db->escape(isset($cb['name']) ? $cb['name'] : ''),
-					'exp_date_month' => $db->escape(isset($cb['exp_month']) ? $cb['exp_month'] : ''),
-					'exp_date_year' => $db->escape(isset($cb['exp_year']) ? $cb['exp_year'] : ''),
+					'proprio' => isset($cb['name']) ? $cb['name'] : '',
+					'exp_date_month' => isset($cb['exp_month']) ? $cb['exp_month'] : '',
+					'exp_date_year' => isset($cb['exp_year']) ? $cb['exp_year'] : '',
 					'cvn' => null,
-					'card_type' => $db->escape(isset($cb['brand']) ? $cb['brand'] : ''),
+					'card_type' => isset($cb['brand']) ? $cb['brand'] : '',
 					'type' => 'card',
 					'entity' => $conf->entity,
-					'country_code' => $db->escape(isset($cb['country']) ? $cb['country'] : ''),
+					'country_code' => isset($cb['country']) ? $cb['country'] : '',
 					'status' => 1,
 					'default_rib' => 1,
 				];
@@ -484,339 +488,6 @@ if ($ispaymentok) {
 	$user->rights->facture->creer = 1;
 	$user->rights->adherent->cotisation->creer = 1;
 
-	//TODO gestion des adhésions
-	// if (array_key_exists('MEM', $tmptag) && $tmptag['MEM'] > 0) {
-	//     // Validate member
-	//     // Create subscription
-	//     // Create complementary actions (this include creation of thirdparty)
-	//     // Send confirmation email
-
-	//     $defaultdelay = 1;
-	//     $defaultdelayunit = 'y';
-
-	//     // Record subscription
-	//     include_once DOL_DOCUMENT_ROOT.'/adherents/class/adherent.class.php';
-	//     include_once DOL_DOCUMENT_ROOT.'/adherents/class/adherent_type.class.php';
-	//     include_once DOL_DOCUMENT_ROOT.'/adherents/class/subscription.class.php';
-	//     $adht = new AdherentType($db);
-	//     $object = new AdherentStancer($db);
-
-	//     $result1 = $object->fetch($tmptag['MEM']);
-	//     $result2 = $adht->fetch($object->typeid);
-
-	//     dol_syslog("stancer paymentback We have to process member with id=".$tmptag['MEM']." result1=".$result1." result2=".$result2, LOG_DEBUG, 0, '_payment');
-
-	//     if ($result1 > 0 && $result2 > 0) {
-	//         $paymentTypeId = 0;
-	//             $paymentType = $_SESSION["paymentType"];
-	//             if (empty($paymentType)) {
-	//                 $paymentType = 'CB';
-	//             }
-	//             $paymentTypeId = dol_getIdFromCode($db, $paymentType, 'c_paiement', 'code', 'id', 1);
-
-	//         $currencyCodeType = $_SESSION['currencyCodeType'];
-
-	//         dol_syslog("stancer paymentback FinalPaymentAmt=".$FinalPaymentAmt." paymentTypeId=".$paymentTypeId, LOG_DEBUG, 0, '_payment');
-
-	//         // Do action only if $FinalPaymentAmt is set (session variable is cleaned after this page to avoid duplicate actions when page is POST a second time)
-	//         if (!empty($FinalPaymentAmt) && $paymentTypeId > 0) {
-	//             $result = ($object->status == $object::STATUS_EXCLUDED) ? -1 : $object->validate($user); // if membre is excluded (status == -2) the new validation is not possible
-	//             if ($result < 0 || empty($object->datevalid)) {
-	//                 $error++;
-	//                 $errmsg = $object->error;
-	//                 $postactionmessages[] = $errmsg;
-	//                 $postactionmessages = array_merge($postactionmessages, $object->errors);
-	//                 $ispostactionok = -1;
-	//                 dol_syslog("stancer paymentback Failed to validate member: ".$errmsg, LOG_ERR, 0, '_payment');
-	//             }
-
-	//             // Subscription information
-	//             $datesubscription = $object->datevalid;
-	//             if ($object->datefin > 0) {
-	//                 $datesubscription = dol_time_plus_duree($object->datefin, 1, 'd');
-	//             }
-
-	//             $datesubend = null;
-	//             if ($datesubscription && $defaultdelay && $defaultdelayunit) {
-	//                 $datesubend = dol_time_plus_duree($datesubscription, $defaultdelay, $defaultdelayunit);
-	//                 // the new end date of subscription must be in futur
-	//                 while ($datesubend < $now) {
-	//                     $datesubend = dol_time_plus_duree($datesubend, $defaultdelay, $defaultdelayunit);
-	//                     $datesubscription = dol_time_plus_duree($datesubscription, $defaultdelay, $defaultdelayunit);
-	//                 }
-	//                 $datesubend = dol_time_plus_duree($datesubend, -1, 'd');
-	//             }
-
-	//             $paymentdate = $now;
-	//             $amount = $FinalPaymentAmt;
-	//             $label = 'Online subscription '.dol_print_date($now, 'standard').' using '.$paymentmethod.' from '.$ipaddress.' - Transaction ID = '.$TRANSACTIONID;
-
-	//             // Payment information
-	//             $accountid = 0;
-	//             if ($paymentmethod == 'stancer') {
-	//                 $accountid = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
-	//             }
-	//             if ($accountid < 0) {
-	//                 $error++;
-	//                 $errmsg = 'Setup of bank account to use for payment is not correctly done for payment method '.$paymentmethod;
-	//                 $postactionmessages[] = $errmsg;
-	//                 $ispostactionok = -1;
-	//                 dol_syslog("stancer paymentback Failed to get the bank account to record payment: ".$errmsg, LOG_ERR, 0, '_payment');
-	//             }
-
-	//             $operation = $paymentType; // Payment mode code
-	//             $num_chq = '';
-	//             $emetteur_nom = '';
-	//             $emetteur_banque = '';
-	//             // Define default choice for complementary actions
-	//             $option = '';
-	//             if (getDolGlobalString('ADHERENT_BANK_USE','') != '' && $conf->global->ADHERENT_BANK_USE == 'bankviainvoice' && !empty($conf->banque->enabled) && !empty($conf->societe->enabled) && !empty($conf->facture->enabled)) {
-	//                 $option = 'bankviainvoice';
-	//             } elseif (getDolGlobalString('ADHERENT_BANK_USE','') != '' && $conf->global->ADHERENT_BANK_USE == 'bankdirect' && !empty($conf->banque->enabled)) {
-	//                 $option = 'bankdirect';
-	//             } elseif (getDolGlobalString('ADHERENT_BANK_USE','') != '' && $conf->global->ADHERENT_BANK_USE == 'invoiceonly' && !empty($conf->banque->enabled) && !empty($conf->societe->enabled) && !empty($conf->facture->enabled)) {
-	//                 $option = 'invoiceonly';
-	//             }
-	//             if (empty($option)) {
-	//                 $option = 'none';
-	//             }
-	//             $sendalsoemail = 1;
-
-	//             // Record the subscription then complementary actions
-	//             $db->begin();
-
-	//             // Create subscription
-	//             if (!$error) {
-	//                 dol_syslog("stancer paymentback Call ->subscription to create subscription", LOG_DEBUG, 0, '_payment');
-
-	//                 $crowid = $object->subscription($datesubscription, $amount, $accountid, $operation, $label, $num_chq, $emetteur_nom, $emetteur_banque, $datesubend, $membertypeid);
-	//                 if ($crowid <= 0) {
-	//                     $error++;
-	//                     $errmsg = $object->error;
-	//                     $postactionmessages[] = $errmsg;
-	//                     $ispostactionok = -1;
-	//                 } else {
-	//                     $postactionmessages[] = 'Subscription created (id='.$crowid.')';
-	//                     $ispostactionok = 1;
-	//                 }
-	//             }
-
-	//             if (!$error) {
-	//                 dol_syslog("stancer paymentback Call ->subscriptionComplementaryActions option=".$option, LOG_DEBUG, 0, '_payment');
-
-	//                 $autocreatethirdparty = 1; // will create thirdparty if member not yet linked to a thirdparty
-
-	//                 $result = $object->subscriptionComplementaryActions($crowid, $option, $accountid, $datesubscription, $paymentdate, $operation, $label, $amount, $num_chq, $emetteur_nom, $emetteur_banque, $autocreatethirdparty, $TRANSACTIONID, $service);
-	//                 if ($result < 0) {
-	//                     dol_syslog("stancer paymentback Error ".$object->error." ".join(',', $object->errors), LOG_DEBUG, 0, '_payment');
-
-	//                     $error++;
-	//                     $postactionmessages[] = $object->error;
-	//                     $postactionmessages = array_merge($postactionmessages, $object->errors);
-	//                     $ispostactionok = -1;
-	//                 } else {
-	//                     if ($option == 'bankviainvoice') {
-	//                         $postactionmessages[] = 'Invoice, payment and bank record created';
-	//                         dol_syslog("stancer paymentback Invoice, payment and bank record created", LOG_DEBUG, 0, '_payment');
-	//                     }
-	//                     if ($option == 'bankdirect') {
-	//                         $postactionmessages[] = 'Bank record created';
-	//                         dol_syslog("stancer paymentback Bank record created", LOG_DEBUG, 0, '_payment');
-	//                     }
-	//                     if ($option == 'invoiceonly') {
-	//                         $postactionmessages[] = 'Invoice recorded';
-	//                         dol_syslog("stancer paymentback Invoice recorded", LOG_DEBUG, 0, '_payment');
-	//                     }
-	//                     $ispostactionok = 1;
-
-	//                     // If an invoice was created, it is into $object->invoice
-	//                 }
-	//             }
-
-	//             if (!$error) {
-	//                 if ($paymentmethod == 'stancer' && $autocreatethirdparty && $option == 'bankviainvoice') {
-	//                     $thirdparty_id = $object->fk_soc;
-
-	//                     dol_syslog("stancer paymentback Search existing Stancer customer profile for thirdparty_id=".$thirdparty_id, LOG_DEBUG, 0, '_payment');
-
-	//                     $service = 'StripeTest';
-	//                     $servicestatus = 0;
-	//                     if (getDolGlobalString('STRIPE_LIVE','') != '' && !GETPOST('forcesandbox', 'alpha')) {
-	//                         $service = 'StripeLive';
-	//                         $servicestatus = 1;
-	//                     }
-	//                     $stripeacc = null; // No Oauth/connect use for public pages
-
-	//                     $thirdparty = new Societe($db);
-	//                     $thirdparty->fetch($thirdparty_id);
-
-	//                     include_once DOL_DOCUMENT_ROOT.'/stripe/class/stripe.class.php';	// This also set $stripearrayofkeysbyenv
-	//                     $stripe = new Stripe($db);
-	//                     //$stripeacc = $stripe->getStripeAccount($service);		Already defined previously
-
-	//                     $customer = $stripe->customerStripe($thirdparty, $stripeacc, $servicestatus, 0);
-
-	//                     if (!$customer && $TRANSACTIONID) {	// Not linked to a stripe customer, we make the link
-	//                         dol_syslog("stancer paymentback No stripe profile found, so we add it for TRANSACTIONID = ".$TRANSACTIONID, LOG_DEBUG, 0, '_payment');
-
-	//                         try {
-	//                             global $stripearrayofkeysbyenv;
-	//                             \Stripe\Stripe::setApiKey($stripearrayofkeysbyenv[$servicestatus]['secret_key']);
-
-	//                             if (preg_match('/^pi_/', $TRANSACTIONID)) {
-	//                                 // This may throw an error if not found.
-	//                                 $chpi = \Stripe\PaymentIntent::retrieve($TRANSACTIONID);	// payment_intent (pi_...)
-	//                             } else {
-	//                                 // This throw an error if not found
-	//                                 $chpi = \Stripe\Charge::retrieve($TRANSACTIONID); // old method, contains the charge id (ch_...)
-	//                             }
-
-	//                             if ($chpi) {
-	//                                 $stripecu = $chpi->customer; // value 'cus_....'. WARNING: This property may be empty if first payment was recorded before the stripe customer was created.
-
-	//                                 if (empty($stripecu)) {
-	//                                     // This include the INSERT
-	//                                     $customer = $stripe->customerStripe($thirdparty, $stripeacc, $servicestatus, 1);
-
-	//                                     // Link this customer to the payment intent
-	//                                     if (preg_match('/^pi_/', $TRANSACTIONID) && $customer) {
-	//                                         \Stripe\PaymentIntent::update($chpi->id, array('customer' => $customer->id));
-	//                                     }
-	//                                 } else {
-	//                                     $sql = "INSERT INTO ".MAIN_DB_PREFIX."societe_account (fk_soc, login, key_account, site, site_account, status, entity, date_creation, fk_user_creat)";
-	//                                     $sql .= " VALUES (".$object->fk_soc.", '', '".$db->escape($stripecu)."', 'stripe', '".$db->escape($stripearrayofkeysbyenv[$servicestatus]['publishable_key'])."', ".$servicestatus.", ".$conf->entity.", '".$db->idate(dol_now())."', 0)";
-	//                                     $resql = $db->query($sql);
-	//                                     if (!$resql) {	// should not happen
-	//                                         $error++;
-	//                                         $errmsg = 'stancer paymentback Failed to insert customer stripe id in database : '.$db->lasterror();
-	//                                         dol_syslog($errmsg, LOG_ERR, 0, '_payment');
-	//                                         $postactionmessages[] = $errmsg;
-	//                                         $ispostactionok = -1;
-	//                                     }
-	//                                 }
-	//                             } else {	// should not happen
-	//                                 $error++;
-	//                                 $errmsg = 'stancer paymentback Failed to retrieve paymentintent or charge from id';
-	//                                 dol_syslog($errmsg, LOG_ERR, 0, '_payment');
-	//                                 $postactionmessages[] = $errmsg;
-	//                                 $ispostactionok = -1;
-	//                             }
-	//                         } catch (Exception $e) {	// should not happen
-	//                             $error++;
-	//                             $errmsg = 'stancer paymentback Failed to get or save customer stripe id in database : '.$e->getMessage();
-	//                             dol_syslog($errmsg, LOG_ERR, 0, '_payment');
-	//                             $postactionmessages[] = $errmsg;
-	//                             $ispostactionok = -1;
-	//                         }
-	//                     }
-	//                 }
-	//             }
-
-	//             if (!$error) {
-	//                 $db->commit();
-	//             } else {
-	//                 $db->rollback();
-	//             }
-
-	//             // Send email to member
-	//             if (!$error) {
-	//                 dol_syslog("stancer paymentback Send email to customer to ".$object->email." if we have to (sendalsoemail = ".$sendalsoemail.")", LOG_DEBUG, 0, '_payment');
-
-	//                 // Send confirmation Email
-	//                 if ($object->email && $sendalsoemail) {
-	//                     $subject = '';
-	//                     $msg = '';
-
-	//                     // Send subscription email
-	//                     include_once DOL_DOCUMENT_ROOT.'/core/class/html.formmail.class.php';
-	//                     $formmail = new FormMail($db);
-	//                     // Set output language
-	//                     $outputlangs = new Translate('', $conf);
-	//                     $outputlangs->setDefaultLang(empty($object->thirdparty->default_lang) ? $mysoc->default_lang : $object->thirdparty->default_lang);
-	//                     // Load traductions files required by page
-	//                     $outputlangs->loadLangs(array("main", "members"));
-	//                     // Get email content from template
-	//                     $arraydefaultmessage = null;
-	//                     $labeltouse = $conf->global->ADHERENT_EMAIL_TEMPLATE_SUBSCRIPTION;
-
-	//                     if (!empty($labeltouse)) {
-	//                         $arraydefaultmessage = $formmail->getEMailTemplate($db, 'member', $user, $outputlangs, 0, 1, $labeltouse);
-	//                     }
-
-	//                     if (!empty($labeltouse) && is_object($arraydefaultmessage) && $arraydefaultmessage->id > 0) {
-	//                         $subject = $arraydefaultmessage->topic;
-	//                         $msg     = $arraydefaultmessage->content;
-	//                     }
-
-	//                     $substitutionarray = getCommonSubstitutionArray($outputlangs, 0, null, $object);
-
-	//                     // Create external user
-	//                     if (getDolGlobalString('ADHERENT_CREATE_EXTERNAL_USER_LOGIN','') != '') {
-	//                         $infouserlogin = '';
-	//                         $nuser = new User($db);
-	//                         $tmpuser = dol_clone($object);
-
-	//                         $result = $nuser->create_from_member($tmpuser, $object->login);
-	//                         $newpassword = $nuser->setPassword($user, '');
-
-	//                         if ($result < 0) {
-	//                             $outputlangs->load("errors");
-	//                             $postactionmessages[] = 'Error in create external user : '.$nuser->error;
-	//                         } else {
-	//                             $infouserlogin = $outputlangs->trans("Login").': '.$nuser->login.' '."\n".$outputlangs->trans("Password").': '.$newpassword;
-	//                             $postactionmessages[] = $langs->trans("NewUserCreated", $nuser->login);
-	//                         }
-	//                         $substitutionarray['__MEMBER_USER_LOGIN_INFORMATION__'] = $infouserlogin;
-	//                     }
-
-	//                     complete_substitutions_array($substitutionarray, $outputlangs, $object);
-	//                     $subjecttosend = make_substitutions($subject, $substitutionarray, $outputlangs);
-	//                     $texttosend = make_substitutions(dol_concatdesc($msg, $adht->getMailOnSubscription()), $substitutionarray, $outputlangs);
-
-	//                     // Attach a file ?
-	//                     $file = '';
-	//                     $listofpaths = array();
-	//                     $listofnames = array();
-	//                     $listofmimes = array();
-	//                     if (is_object($object->invoice)) {
-	//                         $invoicediroutput = $conf->facture->dir_output;
-	//                         $fileparams = dol_most_recent_file($invoicediroutput.'/'.$object->invoice->ref, preg_quote($object->invoice->ref, '/').'[^\-]+');
-	//                         $file = $fileparams['fullname'];
-
-	//                         $listofpaths = array($file);
-	//                         $listofnames = array(basename($file));
-	//                         $listofmimes = array(dol_mimetype($file));
-	//                     }
-
-	//                     $moreinheader = 'X-Dolibarr-Info: send_an_email by public/payment/paymentok.php'."\r\n";
-
-	//                     $result = $object->send_an_email($texttosend, $subjecttosend, $listofpaths, $listofmimes, $listofnames, "", "", 0, -1, "", $moreinheader);
-
-	//                     if ($result < 0) {
-	//                         $errmsg = $object->error;
-	//                         $postactionmessages[] = $errmsg;
-	//                         $ispostactionok = -1;
-	//                     } else {
-	//                         if ($file) {
-	//                             $postactionmessages[] = 'Email sent to member (with invoice document attached)';
-	//                         } else {
-	//                             $postactionmessages[] = 'Email sent to member (without any attached document)';
-	//                         }
-
-	//                         // TODO Add actioncomm event
-	//                     }
-	//                 }
-	//             }
-	//         } else {
-	//             $postactionmessages[] = 'Failed to get a valid value for "amount paid" or "payment type" to record the payment of subscription for member '.$tmptag['MEM'].'. May be payment was already recorded.';
-	//             $ispostactionok = -1;
-	//         }
-	//     } else {
-	//         $postactionmessages[] = 'Member '.$tmptag['MEM'].' for subscription paid was not found';
-	//         $ispostactionok = -1;
-	//     }
-	// } else
-
 	//facture
 	if (array_key_exists('INV', $tmptag) && $tmptag['INV'] > 0) {
 		dol_syslog("stancerPaymentBack is invoice", LOG_DEBUG, 0, '_payment');
@@ -827,6 +498,10 @@ if ($ispaymentok) {
 		// can produce ('INV=FA2304-1134' passes the >0 test above under PHP 8), so
 		// only a strictly positive result means $object really holds an invoice.
 		$result = $object->fetch((int) $tmptag['INV']);
+		// The tag names an object; it must be the one the payment was issued for.
+		if ($result > 0 && !stancerReturnObjectMatchesPayment($object, $sp)) {
+			$result = 0;
+		}
 		// print "<p>facture 1</p>";
 		if ($result > 0) {
 			// M2: the recorded amount must come from the Stancer API (source of
@@ -896,7 +571,13 @@ if ($ispaymentok) {
 				$object->update($user, 1);
 
 				if (getDolGlobalString('STANCER_CB_AS_PAID', '') != '') {
-					$object->setPaid($user);
+					// Only close the invoice when the recorded payments really cover it
+					$object->fetch($object->id);
+					if (stancerInvoiceIsFullyPaid($object)) {
+						$object->setPaid($user);
+					} else {
+						dol_syslog("stancer paymentback invoice " . $object->ref . " not closed as paid, payments do not cover the total", LOG_WARNING, 0, '_payment');
+					}
 				}
 
 				//Envoi de la facture au client
@@ -916,6 +597,10 @@ if ($ispaymentok) {
 		// Same contract as Facture::fetch(): 1 found, 0 not found, <0 on error, and
 		// -1 right away for an id that casts to 0. Test the sign, not the truthiness.
 		$result = $object->fetch((int) $tmptag['ORD']);
+		// The tag names an object; it must be the one the payment was issued for.
+		if ($result > 0 && !stancerReturnObjectMatchesPayment($object, $sp)) {
+			$result = 0;
+		}
 		if ($result > 0) {
 			$FinalPaymentAmt = $_SESSION["FinalPaymentAmt"];
 			//if partialPayment=1 -> make a deposit
@@ -928,15 +613,6 @@ if ($ispaymentok) {
 			$paymentTypeId = 0;
 			if ($paymentmethod == 'stancer') {
 				$paymentTypeId = getDolGlobalString('STANCER_PAYMENT_MODE_FOR_PAYMENTS');
-			}
-			if ($paymentmethod == 'paybox') {
-				$paymentTypeId = getDolGlobalString('PAYBOX_PAYMENT_MODE_FOR_PAYMENTS');
-			}
-			if ($paymentmethod == 'paypal') {
-				$paymentTypeId = getDolGlobalString('PAYPAL_PAYMENT_MODE_FOR_PAYMENTS');
-			}
-			if ($paymentmethod == 'stripe') {
-				$paymentTypeId = getDolGlobalString('STRIPE_PAYMENT_MODE_FOR_PAYMENTS');
 			}
 			if (empty($paymentTypeId)) {
 				dol_syslog("stancer paymentType = " . $paymentType, LOG_DEBUG, 0, '_payment');
@@ -1072,13 +748,7 @@ if ($ispaymentok) {
 
 					if (!$error && isModEnabled("bank")) {
 						$bankaccountid = 0;
-						if ($paymentmethod == 'paybox') {
-							$bankaccountid = getDolGlobalInt('PAYBOX_BANK_ACCOUNT_FOR_PAYMENTS');
-						} elseif ($paymentmethod == 'paypal') {
-							$bankaccountid = getDolGlobalInt('PAYPAL_BANK_ACCOUNT_FOR_PAYMENTS');
-						} elseif ($paymentmethod == 'stripe') {
-							$bankaccountid = getDolGlobalInt('STRIPE_BANK_ACCOUNT_FOR_PAYMENTS');
-						} elseif ($paymentmethod == 'stancer') {
+						if ($paymentmethod == 'stancer') {
 							$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 						}
 
@@ -1099,7 +769,12 @@ if ($ispaymentok) {
 								$ispostactionok = 1;
 
 								if (getDolGlobalString('STANCER_CB_AS_PAID', '') != '') {
-									$invoice->setPaid($user);
+									$invoice->fetch($invoice->id);
+									if (stancerInvoiceIsFullyPaid($invoice)) {
+										$invoice->setPaid($user);
+									} else {
+										dol_syslog("stancer paymentback invoice " . $invoice->ref . " not closed as paid, payments do not cover the total", LOG_WARNING, 0, '_payment');
+									}
 								}
 							}
 						} else {
@@ -1138,7 +813,12 @@ if ($ispaymentok) {
 		$propal = new Propal($db);
 		$propalid = (int) $tmptag['PRO'];
 		$result = $propal->fetch($propalid);
-		if ($result) {
+		// The tag names an object; it must be the one the payment was issued for.
+		if ($result > 0 && !stancerReturnObjectMatchesPayment($propal, $sp)) {
+			$result = 0;
+		}
+		// 1 found, 0 not found, <0 error: -1 is truthy, test the sign
+		if ($result > 0) {
 			$FinalPaymentAmt = $_SESSION["FinalPaymentAmt"];
 			$paymentType = $_SESSION["paymentType"] ?? '';
 			if (empty($paymentType)) {
@@ -1244,7 +924,12 @@ if ($ispaymentok) {
 
 							// Mark invoice as paid if configured
 							if (!$error && getDolGlobalString('STANCER_CB_AS_PAID')) {
-								$invoice->setPaid($user);
+								$invoice->fetch($invoice->id);
+								if (stancerInvoiceIsFullyPaid($invoice)) {
+									$invoice->setPaid($user);
+								} else {
+									dol_syslog("stancer paymentback invoice " . $invoice->ref . " not closed as paid, payments do not cover the total", LOG_WARNING, 0, '_payment');
+								}
 							}
 
 							// Send invoice by mail if configured
@@ -1278,17 +963,8 @@ if ($ispaymentok) {
 		include_once DOL_DOCUMENT_ROOT . '/don/class/don.class.php';
 		$don = new Don($db);
 		$result = $don->fetch((int) $tmptag['DON']);
-		if ($result) {
+		if ($result > 0) {
 			$paymentTypeId = 0;
-			if ($paymentmethod == 'paybox') {
-				$paymentTypeId = getDolGlobalInt('PAYBOX_PAYMENT_MODE_FOR_PAYMENTS');
-			}
-			if ($paymentmethod == 'paypal') {
-				$paymentTypeId = getDolGlobalInt('global->PAYPAL_PAYMENT_MODE_FOR_PAYMENTS');
-			}
-			if ($paymentmethod == 'stripe') {
-				$paymentTypeId = getDolGlobalInt('STRIPE_PAYMENT_MODE_FOR_PAYMENTS');
-			}
 			if (empty($paymentTypeId)) {
 				dol_syslog("stancer paymentType = " . $paymentType, LOG_DEBUG, 0, '_payment');
 
@@ -1316,7 +992,7 @@ if ($ispaymentok) {
 				$totalpaid = $FinalPaymentAmt;
 
 				if ($currencyCodeType == $conf->currency) {
-					$paiement->amounts = array($object->id => $totalpaid); // Array with all payments dispatching with donation
+					$paiement->amounts = array($don->id => $totalpaid); // Array with all payments dispatching with donation
 				} else {
 					// PaymentDonation does not support multi currency
 					$postactionmessages[] = 'Payment donation can\'t be paid with different currency than ' . $conf->currency;
@@ -1352,12 +1028,9 @@ if ($ispaymentok) {
 
 				if (!$error && isModEnabled("bank")) {
 					$bankaccountid = 0;
-					if ($paymentmethod == 'paybox') {
-						$bankaccountid = getDolGlobalInt('PAYBOX_BANK_ACCOUNT_FOR_PAYMENTS');
-					} elseif ($paymentmethod == 'paypal') {
-						$bankaccountid = getDolGlobalInt('PAYPAL_BANK_ACCOUNT_FOR_PAYMENTS');
-					} elseif ($paymentmethod == 'stripe') {
-						$bankaccountid = getDolGlobalInt('STRIPE_BANK_ACCOUNT_FOR_PAYMENTS');
+					// Same bank account as the invoice, order and proposal branches
+					if ($paymentmethod == 'stancer') {
+						$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 					}
 
 					//Get bank account for a specific paymentmedthod
@@ -1409,19 +1082,10 @@ if ($ispaymentok) {
 		// Record payment for registration to an event for an attendee
 		$object = new Facture($db);
 		$result = $object->fetch($ref);
-		if ($result) {
+		if ($result > 0) {
 			$FinalPaymentAmt = $_SESSION["FinalPaymentAmt"];
 
 			$paymentTypeId = 0;
-			if ($paymentmethod == 'paybox') {
-				$paymentTypeId = getDolGlobalString('PAYBOX_PAYMENT_MODE_FOR_PAYMENTS');
-			}
-			if ($paymentmethod == 'paypal') {
-				$paymentTypeId = getDolGlobalString('PAYPAL_PAYMENT_MODE_FOR_PAYMENTS');
-			}
-			if ($paymentmethod == 'stripe') {
-				$paymentTypeId = getDolGlobalString('STRIPE_PAYMENT_MODE_FOR_PAYMENTS');
-			}
 			if (empty($paymentTypeId)) {
 				$paymentType = $_SESSION["paymentType"] ?? '';
 				if (empty($paymentType)) {
@@ -1478,12 +1142,9 @@ if ($ispaymentok) {
 
 					if (!$error && !empty($conf->banque->enabled)) {
 						$bankaccountid = 0;
-						if ($paymentmethod == 'paybox') {
-							$bankaccountid = getDolGlobalInt('PAYBOX_BANK_ACCOUNT_FOR_PAYMENTS');
-						} elseif ($paymentmethod == 'paypal') {
-							$bankaccountid = getDolGlobalInt('PAYPAL_BANK_ACCOUNT_FOR_PAYMENTS');
-						} elseif ($paymentmethod == 'stripe') {
-							$bankaccountid = getDolGlobalInt('STRIPE_BANK_ACCOUNT_FOR_PAYMENTS');
+						// Same bank account as the invoice, order and proposal branches
+						if ($paymentmethod == 'stancer') {
+							$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 						}
 
 						if ($bankaccountid > 0) {
@@ -1601,19 +1262,10 @@ if ($ispaymentok) {
 		// Record payment for booth or conference
 		$object = new Facture($db);
 		$result = $object->fetch($ref);
-		if ($result) {
+		if ($result > 0) {
 			$FinalPaymentAmt = $_SESSION["FinalPaymentAmt"];
 
 			$paymentTypeId = 0;
-			if ($paymentmethod == 'paybox') {
-				$paymentTypeId = getDolGlobalString('PAYBOX_PAYMENT_MODE_FOR_PAYMENTS');
-			}
-			if ($paymentmethod == 'paypal') {
-				$paymentTypeId = getDolGlobalString('PAYPAL_PAYMENT_MODE_FOR_PAYMENTS');
-			}
-			if ($paymentmethod == 'stripe') {
-				$paymentTypeId = getDolGlobalString('STRIPE_PAYMENT_MODE_FOR_PAYMENTS');
-			}
 			if (empty($paymentTypeId)) {
 				$paymentType = $_SESSION["paymentType"] ?? '';
 				if (empty($paymentType)) {
@@ -1670,12 +1322,9 @@ if ($ispaymentok) {
 
 					if (!$error && !empty($conf->banque->enabled)) {
 						$bankaccountid = 0;
-						if ($paymentmethod == 'paybox') {
-							$bankaccountid = getDolGlobalInt('PAYBOX_BANK_ACCOUNT_FOR_PAYMENTS');
-						} elseif ($paymentmethod == 'paypal') {
-							$bankaccountid = getDolGlobalInt('PAYPAL_BANK_ACCOUNT_FOR_PAYMENTS');
-						} elseif ($paymentmethod == 'stripe') {
-							$bankaccountid = getDolGlobalInt('STRIPE_BANK_ACCOUNT_FOR_PAYMENTS');
+						// Same bank account as the invoice, order and proposal branches
+						if ($paymentmethod == 'stancer') {
+							$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 						}
 
 						if ($bankaccountid > 0) {
@@ -1785,11 +1434,11 @@ if ($ispaymentok) {
 					}
 				}
 			} else {
-				$postactionmessages[] = 'Failed to get a valid value for "amount paid" (' . $FinalPaymentAmt . ') or "payment type" (' . $paymentType . ') to record the payment of invoice ' . $tmptag['ATT'] . '. May be payment was already recorded.';
+				$postactionmessages[] = 'Failed to get a valid value for "amount paid" (' . $FinalPaymentAmt . ') or "payment type" (' . $paymentType . ') to record the payment of invoice ' . $tmptag['BOO'] . '. May be payment was already recorded.';
 				$ispostactionok = -1;
 			}
 		} else {
-			$postactionmessages[] = 'Invoice paid ' . $tmptag['ATT'] . ' was not found';
+			$postactionmessages[] = 'Invoice paid ' . $tmptag['BOO'] . ' was not found';
 			$ispostactionok = -1;
 		}
 	} else {
@@ -1888,38 +1537,38 @@ if ($ispaymentok) {
 		if (array_key_exists('MEM', $tmptag)) {
 			$url = $urlwithroot . "/adherents/subscription.php?rowid=" . $tmptag['MEM'];
 			$content .= '<strong>' . $companylangs->trans("PaymentSubscription") . "</strong><br><br>\n";
-			$content .= $companylangs->trans("MemberId") . ': <strong>' . $tmptag['MEM'] . "</strong><br>\n";
+			$content .= $companylangs->trans("MemberId") . ': <strong>' . dol_escape_htmltag($tmptag['MEM']) . "</strong><br>\n";
 			if (!empty($thirdpartyName)) {
 				$content .= $companylangs->trans("Customer") . ' : <strong>' . dol_escape_htmltag($thirdpartyName) . "</strong><br>\n";
 			}
-			$content .= $companylangs->trans("Link") . ': <a href="' . $url . '">' . $url . '</a>' . "<br>\n";
+			$content .= $companylangs->trans("Link") . ': <a href="' . dol_escape_htmltag($url) . '">' . dol_escape_htmltag($url) . '</a>' . "<br>\n";
 		} elseif (array_key_exists('INV', $tmptag)) {
 			$url = $urlwithroot . "/compta/facture/card.php?id=" . $tmptag['INV'];
 			$invoiceRef = (is_object($object) && !empty($object->ref)) ? $object->ref : $tmptag['INV'];
 			$content .= '<strong>' . $companylangs->trans("Payment") . "</strong><br><br>\n";
-			$content .= $companylangs->trans("Invoice") . ' : <strong><a href="' . $url . '">' . dol_escape_htmltag($invoiceRef) . "</a></strong><br>\n";
+			$content .= $companylangs->trans("Invoice") . ' : <strong><a href="' . dol_escape_htmltag($url) . '">' . dol_escape_htmltag($invoiceRef) . "</a></strong><br>\n";
 			if (!empty($thirdpartyName)) {
 				$content .= $companylangs->trans("Customer") . ' : <strong>' . dol_escape_htmltag($thirdpartyName) . "</strong><br>\n";
 			}
-			$content .= $companylangs->trans("Amount") . ' : <strong>' . $FinalPaymentAmt . ' ' . $currencyCodeType . "</strong><br>\n";
+			$content .= $companylangs->trans("Amount") . ' : <strong>' . dol_escape_htmltag($FinalPaymentAmt) . ' ' . dol_escape_htmltag($currencyCodeType) . "</strong><br>\n";
 			$content .= $companylangs->trans("PaymentMode") . ' : <strong>Stancer (CB)</strong><br>' . "\n";
-			$content .= 'Transaction ID : <strong>' . $TRANSACTIONID . "</strong><br>\n";
+			$content .= 'Transaction ID : <strong>' . dol_escape_htmltag($TRANSACTIONID) . "</strong><br>\n";
 		} elseif (array_key_exists('ORD', $tmptag)) {
 			$url = $urlwithroot . "/commande/card.php?id=" . $tmptag['ORD'];
 			$orderRef = (is_object($object) && !empty($object->ref)) ? $object->ref : $tmptag['ORD'];
 			$content .= '<strong>' . $companylangs->trans("Payment") . "</strong><br><br>\n";
-			$content .= $companylangs->trans("Order") . ' : <strong><a href="' . $url . '">' . dol_escape_htmltag($orderRef) . "</a></strong><br>\n";
+			$content .= $companylangs->trans("Order") . ' : <strong><a href="' . dol_escape_htmltag($url) . '">' . dol_escape_htmltag($orderRef) . "</a></strong><br>\n";
 			if (!empty($thirdpartyName)) {
 				$content .= $companylangs->trans("Customer") . ' : <strong>' . dol_escape_htmltag($thirdpartyName) . "</strong><br>\n";
 			}
-			$content .= $companylangs->trans("Amount") . ' : <strong>' . $FinalPaymentAmt . ' ' . $currencyCodeType . "</strong><br>\n";
+			$content .= $companylangs->trans("Amount") . ' : <strong>' . dol_escape_htmltag($FinalPaymentAmt) . ' ' . dol_escape_htmltag($currencyCodeType) . "</strong><br>\n";
 			$content .= $companylangs->trans("PaymentMode") . ' : <strong>Stancer (CB)</strong><br>' . "\n";
-			$content .= 'Transaction ID : <strong>' . $TRANSACTIONID . "</strong><br>\n";
+			$content .= 'Transaction ID : <strong>' . dol_escape_htmltag($TRANSACTIONID) . "</strong><br>\n";
 		} else {
 			$content .= $companylangs->transnoentitiesnoconv("NewOnlinePaymentReceived") . "<br><br>\n";
-			$content .= $companylangs->trans("Amount") . ' : <strong>' . $FinalPaymentAmt . ' ' . $currencyCodeType . "</strong><br>\n";
+			$content .= $companylangs->trans("Amount") . ' : <strong>' . dol_escape_htmltag($FinalPaymentAmt) . ' ' . dol_escape_htmltag($currencyCodeType) . "</strong><br>\n";
 			$content .= $companylangs->trans("PaymentMode") . ' : <strong>Stancer (CB)</strong><br>' . "\n";
-			$content .= 'Transaction ID : <strong>' . $TRANSACTIONID . "</strong><br>\n";
+			$content .= 'Transaction ID : <strong>' . dol_escape_htmltag($TRANSACTIONID) . "</strong><br>\n";
 		}
 		// Post-action status
 		$content .= "<br>\n";
@@ -1934,7 +1583,7 @@ if ($ispaymentok) {
 		}
 		$content .= '<br>' . "\n";
 		foreach ($postactionmessages as $postactionmessage) {
-			$content .= ' * ' . $postactionmessage . '<br>' . "\n";
+			$content .= ' * ' . dol_escape_htmltag($postactionmessage) . '<br>' . "\n";
 		}
 		if ($ispostactionok < 0) {
 			$content .= $langs->transnoentities("ARollbackWasPerformedOnPostActions");
@@ -1944,20 +1593,20 @@ if ($ispaymentok) {
 		// Technical details
 		$content .= '<small style="color:#666;">';
 		$content .= '<u>' . $companylangs->transnoentitiesnoconv("TechnicalInformation") . ":</u><br>\n";
-		$content .= "IP : " . $ipaddress . "<br>\n";
-		$content .= "tag=" . $fulltag . "<br>\n";
+		$content .= "IP : " . dol_escape_htmltag($ipaddress) . "<br>\n";
+		$content .= "tag=" . dol_escape_htmltag($fulltag) . "<br>\n";
 
 		if (!empty($ErrorCode)) {
-			$content .= "ErrorCode = " . $ErrorCode . "<br>\n";
+			$content .= "ErrorCode = " . dol_escape_htmltag($ErrorCode) . "<br>\n";
 		}
 		if (!empty($ErrorShortMsg)) {
-			$content .= "ErrorShortMsg = " . $ErrorShortMsg . "<br>\n";
+			$content .= "ErrorShortMsg = " . dol_escape_htmltag($ErrorShortMsg) . "<br>\n";
 		}
 		if (!empty($ErrorLongMsg)) {
-			$content .= "ErrorLongMsg = " . $ErrorLongMsg . "<br>\n";
+			$content .= "ErrorLongMsg = " . dol_escape_htmltag($ErrorLongMsg) . "<br>\n";
 		}
 		if (!empty($ErrorSeverityCode)) {
-			$content .= "ErrorSeverityCode = " . $ErrorSeverityCode . "<br>\n";
+			$content .= "ErrorSeverityCode = " . dol_escape_htmltag($ErrorSeverityCode) . "<br>\n";
 		}
 		$content .= '</small>';
 
@@ -2012,14 +1661,6 @@ if ($ispaymentok) {
 	if (getDolGlobalString('PAYMENTONLINE_SENDEMAIL', '') != '') {
 		$sendemail = getDolGlobalString('PAYMENTONLINE_SENDEMAIL');
 	}
-	// TODO Remove local option to keep only the generic one ?
-	if ($paymentmethod == 'paypal' && getDolGlobalString('PAYPAL_PAYONLINE_SENDEMAIL', '') != '') {
-		$sendemail = getDolGlobalString('PAYPAL_PAYONLINE_SENDEMAIL');
-	} elseif ($paymentmethod == 'paybox' && getDolGlobalString('PAYBOX_PAYONLINE_SENDEMAIL', '') != '') {
-		$sendemail = getDolGlobalString('PAYBOX_PAYONLINE_SENDEMAIL');
-	} elseif ($paymentmethod == 'stripe' && getDolGlobalString('STRIPE_PAYONLINE_SENDEMAIL', '') != '') {
-		$sendemail = getDolGlobalString('STRIPE_PAYONLINE_SENDEMAIL');
-	}
 
 	// Send warning of error to administrator
 	if ($sendemail) {
@@ -2056,13 +1697,13 @@ if ($ispaymentok) {
 
 		$content .= "<br><br>\n";
 		$content .= '<u>' . $companylangs->transnoentitiesnoconv("TechnicalInformation") . ":</u><br>\n";
-		$content .= $companylangs->transnoentitiesnoconv("OnlinePaymentSystem") . ': <strong>' . $paymentmethod . "</strong><br>\n";
-		$content .= $companylangs->transnoentitiesnoconv("ReturnURLAfterPayment") . ': ' . $urlback . "<br>\n";
+		$content .= $companylangs->transnoentitiesnoconv("OnlinePaymentSystem") . ': <strong>' . dol_escape_htmltag($paymentmethod) . "</strong><br>\n";
+		$content .= $companylangs->transnoentitiesnoconv("ReturnURLAfterPayment") . ': ' . dol_escape_htmltag($urlback) . "<br>\n";
 		$content .= "<br>\n";
 		// The PayPal token and payer id this line used to carry were always empty:
 		// name the Stancer payment and the status it came back with instead, they are
 		// what the administrator needs to look the transaction up.
-		$content .= "tag=" . $fulltag . "<br>\npayment=" . $stancerPaymentId . "<br>\nstatus=" . $statusTXT . "<br>\npaymentType=" . $paymentType . "<br>\ncurrencycodeType=" . $currencyCodeType . "<br>\nipaddress=" . $ipaddress . "<br>\nFinalPaymentAmt=" . $FinalPaymentAmt . "<br>\n";
+		$content .= "tag=" . dol_escape_htmltag($fulltag) . "<br>\npayment=" . dol_escape_htmltag($stancerPaymentId) . "<br>\nstatus=" . dol_escape_htmltag($statusTXT) . "<br>\npaymentType=" . dol_escape_htmltag($paymentType) . "<br>\ncurrencycodeType=" . dol_escape_htmltag($currencyCodeType) . "<br>\nipaddress=" . dol_escape_htmltag($ipaddress) . "<br>\nFinalPaymentAmt=" . dol_escape_htmltag($FinalPaymentAmt) . "<br>\n";
 
 
 		$ishtml = 0;

@@ -145,6 +145,7 @@ Depuis cet onglet, vous pouvez :
 - Enregistrer une carte bancaire
 - Enregistrer un mandat SEPA
 - Supprimer un mandat SEPA
+- Synchroniser les mandats SEPA avec Stancer : le bouton **Synchroniser les mandats SEPA avec Stancer** complète un BIC manquant et vérifie chez Stancer chaque mandat du tiers. L'affichage de l'onglet ne modifie plus rien, cette vérification se fait uniquement par ce bouton, réservé aux utilisateurs ayant le droit d'écriture du module
 - Copier les liens publics pour les envoyer au client
 
 ![Onglet Stancer complet sur la fiche tiers avec les sections compte client, CB et SEPA](screenshots/tiers-onglet-stancer-complet.webp)

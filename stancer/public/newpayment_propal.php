@@ -106,12 +106,9 @@ $langs->loadLangs(array("main", "other", "dict", "bills", "companies", "errors")
 // No check on module enabled. Done later according to $validpaymentmethod
 
 $action = GETPOST('action', 'aZ09');
-$ref = $REF = GETPOST('ref', 'alpha');
-$TAG = GETPOST("tag", 'alpha');
-$FULLTAG = GETPOST("fulltag", 'alpha'); // fulltag is tag with more information
-$SECUREKEY = GETPOST("securekey"); // Secure key
+$ref = GETPOST('ref', 'alpha');
+$SECUREKEY = (string) GETPOST("securekey", 'alpha'); // Secure key
 
-$suffix = GETPOST("suffix", 'aZ09');
 $amount = (float) price2num(GETPOST("amount", 'alpha'));
 if (!GETPOST("currency", 'alpha')) {
 	$currency = $conf->currency;
@@ -121,7 +118,7 @@ if (!GETPOST("currency", 'alpha')) {
 $source = GETPOST("s", 'aZ09') ? GETPOST("s", 'aZ09') : GETPOST("source", 'aZ09');
 //$download = GETPOST('d', 'int') ?GETPOST('d', 'int') : GETPOST('download', 'int');
 $object = null;
-$numPaiement = $error = $partialPayment = 0;
+$numPaiement = $partialPayment = 0;
 //partialPayment set to 1 in case of for "30% on order" for example
 
 if (!$action) {
@@ -145,8 +142,8 @@ if ($source == 'propal') {
 	$propal = new Propal($db);
 	$result = $propal->fetch(0, $ref);
 	if (is_numeric($result) && $result <= 0) {
-		$mesg = $propal->error;
-		$error++;
+		dol_syslog("stancer newpayment_propal: proposal " . $ref . " not found (" . $result . "): " . $propal->error, LOG_ERR);
+		accessforbidden($langs->trans('ErrorRecordNotFound'), 0, 0, 1);
 	} else {
 		$result = $propal->fetch_thirdparty($propal->socid);
 	}
@@ -157,15 +154,15 @@ if ($source == 'propal') {
 	// sensitive action (payment/customer creation). Aligned EXACTLY with the link
 	// generation in stancerGetPropalPaymentUrl():
 	// dol_hash(PAYMENT_SECURITY_TOKEN + 'propalpayment' + id + ref).
-	if (!empty($conf->global->PAYMENT_SECURITY_TOKEN) && !empty($propal->id)) {
+	if (getDolGlobalString('PAYMENT_SECURITY_TOKEN') != '') {
 		$tokenisok = false;
 		if (!empty($conf->global->PAYMENT_SECURITY_TOKEN_UNIQUE)) {
 			$tokenisok = dol_verifyHash($conf->global->PAYMENT_SECURITY_TOKEN . 'propalpayment' . $propal->id . $propal->ref, $SECUREKEY, '2');
 		} else {
-			$tokenisok = ($conf->global->PAYMENT_SECURITY_TOKEN == $SECUREKEY);
+			$tokenisok = hash_equals(getDolGlobalString('PAYMENT_SECURITY_TOKEN'), $SECUREKEY);
 		}
 		if (!$tokenisok && empty($conf->global->PAYMENT_SECURITY_ACCEPT_ANY_TOKEN)) {
-			dol_syslog("stancer newpayment_propal: invalid securekey for propal ref=" . $REF, LOG_ERR);
+			dol_syslog("stancer newpayment_propal: invalid securekey for propal ref=" . $ref, LOG_ERR);
 			accessforbidden('Bad value for payment security key');
 		}
 	}
