@@ -41,24 +41,6 @@ class StancerApi
 	const API_URL_TEST = 'https://api.stancer.com/v2';
 
 	/**
-	 * @var StancerApi|null Singleton instance
-	 */
-	private static $instance = null;
-
-	/**
-	 * Get singleton instance
-	 *
-	 * @return StancerApi
-	 */
-	public static function getInstance()
-	{
-		if (self::$instance === null) {
-			self::$instance = new self();
-		}
-		return self::$instance;
-	}
-
-	/**
 	 * @var string API base URL
 	 */
 	private $apiUrl;
@@ -176,9 +158,11 @@ class StancerApi
 			$postorget = 'DELETE';
 		}
 
-		dol_syslog("StancerApi::request $method $endpoint", LOG_DEBUG);
+		// The query string may carry the customer email or mobile: log the path only
+		dol_syslog("StancerApi::request " . $method . " " . strtok($endpoint, '?'), LOG_DEBUG);
 
-		$response = getURLContent($url, $postorget, $param, 1, $headers, array('https'), 0);
+		// Peer verification forced: the core disables it when $dolibarr_main_prod is empty
+		$response = getURLContent($url, $postorget, $param, 1, $headers, array('https'), 0, 1);
 
 		$this->lastHttpCode = isset($response['http_code']) ? (int) $response['http_code'] : 0;
 		$this->lastResponse = $response;
@@ -224,8 +208,19 @@ class StancerApi
 				// Fallback: append raw body (truncated) when no known error key
 				$this->error .= ': ' . dol_trunc($content, 500, 'right', 'UTF-8', 1);
 			}
+			// The error type and message were logged above, $this->error may hold
+			// the raw body and is only shown to the user
 			$this->errors[] = $this->error;
-			dol_syslog("StancerApi::request HTTP error: " . $this->error, LOG_ERR);
+			return false;
+		}
+
+		if (!is_array($decoded)) {
+			if (trim((string) $content) === '' && ($this->lastHttpCode == 204 || $method === 'DELETE')) {
+				return array();
+			}
+			$this->error = 'HTTP ' . $this->lastHttpCode . ' response is not JSON';
+			$this->errors[] = $this->error;
+			dol_syslog("StancerApi::request " . $method . " " . strtok($endpoint, '?') . ": HTTP " . $this->lastHttpCode . " response is not JSON (" . strlen((string) $content) . " bytes)", LOG_ERR);
 			return false;
 		}
 
@@ -852,7 +847,7 @@ class StancerApi
 			'Accept: application/pdf',
 		);
 
-		$response = getURLContent($url, 'GET', '', 1, $headers, array('https'), 0);
+		$response = getURLContent($url, 'GET', '', 1, $headers, array('https'), 0, 1);
 
 		$this->lastHttpCode = isset($response['http_code']) ? (int) $response['http_code'] : 0;
 		$this->lastResponse = $response;

@@ -102,12 +102,9 @@ $langs->loadLangs(array("main", "other", "dict", "bills", "companies", "errors")
 // No check on module enabled. Done later according to $validpaymentmethod
 
 $action = GETPOST('action', 'aZ09');
-$ref = $REF = GETPOST('ref', 'alpha');
-$TAG = GETPOST("tag", 'alpha');
-$FULLTAG = GETPOST("fulltag", 'alpha'); // fulltag is tag with more information
-$SECUREKEY = GETPOST("securekey"); // Secure key
+$ref = GETPOST('ref', 'alpha');
+$SECUREKEY = (string) GETPOST("securekey", 'alpha'); // Secure key
 
-$suffix = GETPOST("suffix", 'aZ09');
 $amount = (float) price2num(GETPOST("amount", 'alpha'));
 if (!GETPOST("currency", 'alpha')) {
 	$currency = $conf->currency;
@@ -117,7 +114,7 @@ if (!GETPOST("currency", 'alpha')) {
 $source = GETPOST("s", 'aZ09') ?GETPOST("s", 'aZ09') : GETPOST("source", 'aZ09');
 //$download = GETPOST('d', 'int') ?GETPOST('d', 'int') : GETPOST('download', 'int');
 $object = null;
-$numPaiement = $error = $partialPayment = 0;
+$numPaiement = $partialPayment = 0;
 //partialPayment set to 1 in case of for "30% on order" for example
 
 if (!$action) {
@@ -141,16 +138,16 @@ if (!$action) {
 if (!empty($conf->global->PAYMENT_SECURITY_TOKEN)) {
 	$tokenisok = false;
 	if (!empty($conf->global->PAYMENT_SECURITY_TOKEN_UNIQUE)) {
-		if ($source && $REF) {
-			$tokenisok = dol_verifyHash($conf->global->PAYMENT_SECURITY_TOKEN . $source . $REF, $SECUREKEY, '2');
+		if ($source && $ref) {
+			$tokenisok = dol_verifyHash($conf->global->PAYMENT_SECURITY_TOKEN . $source . $ref, $SECUREKEY, '2');
 		} else {
 			$tokenisok = dol_verifyHash($conf->global->PAYMENT_SECURITY_TOKEN, $SECUREKEY, '2');
 		}
 	} else {
-		$tokenisok = ($conf->global->PAYMENT_SECURITY_TOKEN == $SECUREKEY);
+		$tokenisok = hash_equals(getDolGlobalString('PAYMENT_SECURITY_TOKEN'), $SECUREKEY);
 	}
 	if (!$tokenisok && empty($conf->global->PAYMENT_SECURITY_ACCEPT_ANY_TOKEN)) {
-		dol_syslog("stancer newpayment: invalid securekey for source=" . $source . " ref=" . $REF, LOG_ERR);
+		dol_syslog("stancer newpayment: invalid securekey for source=" . $source . " ref=" . $ref, LOG_ERR);
 		accessforbidden('Bad value for payment security key');
 	}
 }
@@ -161,9 +158,10 @@ if ($source == 'invoice') {
 
 	$invoice = new Facture($db);
 	$result = $invoice->fetch(0, $ref);
-	if (is_numeric($result) &&  $result <= 0) {
-		$mesg = $invoice->error;
-		$error++;
+	if (is_numeric($result) && $result <= 0) {
+		// Going on would compute amounts and start a payment on an empty object
+		dol_syslog("stancer newpayment: invoice " . $ref . " not found (" . $result . "): " . $invoice->error, LOG_ERR);
+		accessforbidden($langs->trans('ErrorRecordNotFound'), 0, 0, 1);
 	} else {
 		$result = $invoice->fetch_thirdparty($invoice->socid);
 	}
@@ -178,6 +176,8 @@ if ($source == 'invoice') {
 	// $object is a Facture here: total_ttc is always filled by fetch(), the former
 	// fallback on $object->amount was dead code (no such property on Facture).
 	$resteapayer = (float) price2num($object->total_ttc - $totalpaye - $totalcreditnotes - $totaldeposits, 'MT');
+	// The amount in the URL is chosen by the customer, an invoice is charged what is left to pay
+	$amount = $resteapayer;
 	if ($resteapayer != (float) price2num($object->total_ttc)) {
 		$list = $object->getListOfPayments();
 		$numPaiement = count($list);
@@ -188,9 +188,10 @@ if ($source == 'invoice') {
 
 	$order = new Commande($db);
 	$result = $order->fetch(0, $ref);
-	if (is_numeric($result) &&  $result <= 0) {
-		$mesg = $order->error;
-		$error++;
+	if (is_numeric($result) && $result <= 0) {
+		// Going on would compute amounts and start a payment on an empty object
+		dol_syslog("stancer newpayment: order " . $ref . " not found (" . $result . "): " . $order->error, LOG_ERR);
+		accessforbidden($langs->trans('ErrorRecordNotFound'), 0, 0, 1);
 	} else {
 		$result = $order->fetch_thirdparty((int) $order->socid);
 	}
@@ -217,8 +218,9 @@ if ($source == 'invoice') {
 	$propal = new Propal($db);
 	$result = $propal->fetch(0, $ref);
 	if (is_numeric($result) && $result <= 0) {
-		$mesg = $propal->error;
-		$error++;
+		// Going on would compute amounts and start a payment on an empty object
+		dol_syslog("stancer newpayment: propal " . $ref . " not found (" . $result . "): " . $propal->error, LOG_ERR);
+		accessforbidden($langs->trans('ErrorRecordNotFound'), 0, 0, 1);
 	} else {
 		$result = $propal->fetch_thirdparty($propal->socid);
 	}

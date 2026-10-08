@@ -121,11 +121,76 @@ class ActionsStancer
 	{
 		global $conf, $langs, $db;
 
+		// Confirmation of "allow payment without 3-D Secure", on an order or an
+		// invoice. It has to state who bears a fraudulent chargeback afterwards.
+		if ($action == 'stancerno3ds'
+			&& in_array($parameters['currentcontext'], array('ordercard', 'invoicecard'), true)
+			&& ($object instanceof Commande || $object instanceof Facture) && !empty($object->id)) {
+			$form = new Form($db);
+			$this->resprints = $form->formconfirm(
+				$_SERVER["PHP_SELF"] . '?id=' . ((int) $object->id),
+				$langs->trans('StancerNo3dsConfirmTitle'),
+				$langs->trans('StancerNo3dsConfirmText', $object->ref),
+				'confirm_stancerno3ds',
+				'',
+				'no',
+				1,
+				250,
+				600
+			);
+
+			return 0;
+		}
+
 		// print json_encode($object);exit;
 
 		// dol_syslog("stancer formConfirm param = " . json_encode($parameters));
 		// dol_syslog("stancer formConfirm object = " . json_encode($object));
 		// dol_syslog("stancer formConfirm action = " . json_encode($action));
+
+		// Confirmation of "send the payment link". Placed before the Facture guard
+		// below on purpose: the button also exists on an order card. Going through
+		// formconfirm() means the mail leaves on a POST carrying a CSRF token, never
+		// on a GET a link prefetch could fire.
+		if ($action == 'stancersendpaylink'
+			&& in_array($parameters['currentcontext'], array('ordercard', 'invoicecard'), true)
+			&& ($object instanceof Commande || $object instanceof Facture) && !empty($object->id)) {
+			dol_include_once('/stancer/lib/stancer_customer.lib.php');
+			$form = new Form($db);
+			$societe = new Societe($db);
+			$recipient = '';
+			$recipientFrom = '';
+			if (!empty($object->socid) && $societe->fetch((int) $object->socid) > 0) {
+				$payer = stancerResolvePayerContact($societe, $object);
+				$recipient = $payer['email'];
+				$recipientFrom = $payer['email_from'];
+			}
+
+			if ($recipient === '') {
+				$message = '<p>' . $langs->trans('StancerSendPayLinkNoRecipient') . '</p>';
+			} else {
+				$type = ($parameters['currentcontext'] == 'invoicecard') ? 'invoice' : 'order';
+				$urlPayment = getOnlinePaymentUrl(0, $type, (string) $object->ref);
+				$message = '<p>' . $langs->trans('StancerSendPayLinkConfirm', $recipient) . '</p>';
+				// Where the address comes from matters: the thirdparty and one of its
+				// contacts are not the same person, and the user is the one who knows.
+				$message .= '<p class="opacitymedium">' . $langs->trans('StancerSendPayLinkSource', $recipientFrom) . '</p>';
+				$message .= '<div><input type="text" class="quatrevingtpercentminusx" value="' . dol_escape_htmltag($urlPayment) . '"></div>';
+			}
+			$this->resprints = $form->formconfirm(
+				$_SERVER["PHP_SELF"] . '?id=' . ((int) $object->id),
+				$langs->trans('StancerSendPayLink'),
+				$message,
+				'confirm_stancersendpaylink',
+				'',
+				'no',
+				1,
+				300,
+				500
+			);
+
+			return 0;
+		}
 
 		// The three actions handled below are only ever triggered from the invoice
 		// card (buttons built by addMoreActionsButtons()), where the core always
@@ -261,8 +326,11 @@ class ActionsStancer
 					$messages = array();
 					//si plusieurs paiements sont liés création d'un tableau [date => valeur]
 					foreach ($resSP as $key => $val) {
-						$url = "https://manage.stancer.com/fr/details-de-paiement?id=" . $val->stancer_id;
-						$paymentLine = "<a href='" . $url . "'>" . Stancer_payments::$tab_status[$val->status] . "</a> (" . dol_print_date($val->date_bank) . ")";
+						// Every fragment coming from the API or the database is escaped as HTML,
+						// the assembled markup is then passed to javascript through json_encode()
+						$url = "https://manage.stancer.com/fr/details-de-paiement?id=" . urlencode((string) $val->stancer_id);
+						$statusLabel = isset(Stancer_payments::$tab_status[$val->status]) ? Stancer_payments::$tab_status[$val->status] : (string) $val->status;
+						$paymentLine = '<a href="' . dol_escape_htmltag($url) . '">' . dol_escape_htmltag($statusLabel) . "</a> (" . dol_print_date($val->date_bank) . ")";
 
 						// Check for dispute/rejection on this payment
 						$sqlDispute = "SELECT dispute_id, status, response, date_bank, tms FROM " . MAIN_DB_PREFIX . "stancer_stancer_disputes";
@@ -277,7 +345,7 @@ class ActionsStancer
 								if (!empty($objDispute->response)) {
 									$disputeInfo .= ' ' . $objDispute->response;
 								}
-								$paymentLine .= ", <b style='color:#cc0000;'>" . $disputeInfo . "</b> (" . dol_print_date($disputeDate) . ")";
+								$paymentLine .= ", <b style='color:#cc0000;'>" . dol_escape_htmltag($disputeInfo) . "</b> (" . dol_print_date($disputeDate) . ")";
 							}
 						}
 
@@ -292,7 +360,8 @@ class ActionsStancer
 					print '$( document ).ready(function() {';
 					print '$("span").each(function() {';
 					print 'var text = $(this).text();';
-					print 'text2 = text.replace("' . $search . '", "<span style=\"float:left; opacity: unset; text-align: justify;\">' . $replace . '</span>");';
+					$jsonFlags = JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT;
+					print 'text2 = text.replace(' . json_encode($search, $jsonFlags) . ', ' . json_encode('<span style="float:left; opacity: unset; text-align: justify;">' . $replace . '</span>', $jsonFlags) . ');';
 					print 'if(text != text2) {';
 					print '$(this).html(text2);';
 					print '}';
@@ -321,6 +390,17 @@ class ActionsStancer
 			print '  });' . "\n";
 			print '});' . "\n";
 			print "</script>\n";
+		}
+		// While card payments of this document go without 3-D Secure, say so on the
+		// card itself: a fraudulent chargeback would be borne by the merchant.
+		if (in_array($parameters['currentcontext'], array('ordercard', 'invoicecard'), true)
+			&& ($object instanceof Commande || $object instanceof Facture) && !empty($object->id)
+			&& !in_array($action, array('create', 'edit'), true)) {
+			dol_include_once('/stancer/lib/stancer_payment.lib.php');
+			if (stancerNo3dsCanBeChanged($object) && stancerNo3dsAllowed($object)) {
+				print '<tr><td>' . $langs->trans('StancerNo3dsFieldLabel') . '</td>';
+				print '<td>' . img_warning() . ' ' . $langs->trans('StancerNo3dsBanner') . '</td></tr>';
+			}
 		}
 		// elseif ($parameters['currentcontext'] == 'bankline') {
 		// 	print "<tr><td>Insertion hook</td></tr>";
@@ -452,6 +532,35 @@ class ActionsStancer
 	}
 
 	/**
+	 * Check that the current user may run an action that moves money (debit,
+	 * charge, refund, payment recording): Stancer write right and session token.
+	 * These actions are reached through links and ajax confirmations that the
+	 * core leaves unchecked, so the token is verified here.
+	 *
+	 * @param  User    $user    Current user
+	 * @param  string  $action  Action being run, for the log
+	 * @return bool             True when the action may run
+	 */
+	private function stancerMoneyActionAllowed($user, $action)
+	{
+		global $langs;
+
+		if (!$user->hasRight('stancer', 'write')) {
+			dol_syslog("stancer doActions: action " . $action . " refused, user " . $user->id . " lacks stancer write right", LOG_WARNING);
+			setEventMessages($langs->trans('NotEnoughPermissions'), null, 'errors');
+			return false;
+		}
+		$token = GETPOST('token', 'alpha');
+		if ($token === '' || $token !== currentToken()) {
+			dol_syslog("stancer doActions: action " . $action . " refused, missing or invalid token", LOG_WARNING);
+			setEventMessages($langs->trans('SecurityTokenHasExpiredSoActionHasBeenCanceledPleaseRetry'), null, 'warnings');
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
 	 * Overloading the doActions function : replacing the parent's function with the one below
 	 *
 	 * @param  array        $parameters  Hook metadatas (context, etc...)
@@ -466,13 +575,63 @@ class ActionsStancer
 
 		$error = 0; // Error counter
 
-		// DEBUG FORCE LOG
-		$this->stancerLog("doActions ENTRY: action=$action, currentcontext=" . ($parameters['currentcontext'] ?? 'NULL'), LOG_ERR);
+		// Allow, or withdraw, card payments without 3-D Secure on one order or
+		// invoice. The change moves the fraud liability to the merchant, so it needs
+		// the Stancer write permission and the session token. The token is checked
+		// here even though the core may already have: the ajax confirmation comes
+		// back as a GET, which the core leaves unchecked below
+		// MAIN_SECURITY_CSRF_WITH_TOKEN = 2.
+		if (in_array($action, array('confirm_stancerno3ds', 'unsetstancerno3ds'), true)
+			&& in_array($parameters['currentcontext'], array('ordercard', 'invoicecard'), true)
+			&& ($object instanceof Commande || $object instanceof Facture) && !empty($object->id)) {
+			dol_include_once('/stancer/lib/stancer_payment.lib.php');
+			$allow = ($action == 'confirm_stancerno3ds');
+			if (!$user->hasRight('stancer', 'write')) {
+				setEventMessages($langs->trans('NotEnoughPermissions'), null, 'errors');
+			} elseif (GETPOST('token', 'alpha') === '' || GETPOST('token', 'alpha') !== currentToken()) {
+				setEventMessages($langs->trans('SecurityTokenHasExpiredSoActionHasBeenCanceledPleaseRetry'), null, 'warnings');
+			} elseif ($allow && GETPOST('confirm', 'alpha') != 'yes') {
+				// "No" in the confirmation: nothing to do.
+			} elseif ($allow && !stancerNo3dsCanBeChanged($object)) {
+				// Nothing left to pay by card: there is no payment to relax 3-D Secure for.
+				setEventMessages($langs->trans('StancerNo3dsChangeFailed'), null, 'errors');
+			} elseif (stancerSetNo3ds($object, $user, $allow) > 0) {
+				setEventMessages($langs->trans($allow ? 'StancerNo3dsAllowed' : 'StancerNo3dsWithdrawn'), null, $allow ? 'warnings' : 'mesgs');
+				// Back to the card, so a reload never replays the change.
+				header('Location: ' . $_SERVER['PHP_SELF'] . '?id=' . ((int) $object->id));
+				exit;
+			} else {
+				setEventMessages($langs->trans('StancerNo3dsChangeFailed'), null, 'errors');
+			}
+			$action = '';
+
+			return 0;
+		}
+
+		$this->stancerLog("doActions ENTRY: action=$action, currentcontext=" . ($parameters['currentcontext'] ?? 'NULL'), LOG_DEBUG);
 
 		// DEBUG for stancerFindPaymentInvoice
 		if ($action == 'stancerFindPaymentInvoice') {
 			dol_syslog("stancer doActions: stancerFindPaymentInvoice action detected, currentcontext=" . ($parameters['currentcontext'] ?? 'NULL'), LOG_DEBUG);
 		}
+		// Confirmed "send the payment link". formconfirm() POSTs with a CSRF token,
+		// which the core has already checked by the time a hook runs.
+		if ($action == 'confirm_stancersendpaylink' && GETPOST('confirm', 'alpha') == 'yes'
+			&& in_array($parameters['currentcontext'], array('ordercard', 'invoicecard'), true)
+			&& is_object($object) && !empty($object->id)) {
+			dol_include_once('/stancer/lib/stancer_mail.lib.php');
+			$type = ($parameters['currentcontext'] == 'invoicecard') ? 'invoice' : 'order';
+			$sent = stancerSendPaymentLink($object, $type);
+			if (!empty($sent['ok'])) {
+				setEventMessages($langs->trans('StancerSendPayLinkSent', $sent['email']), null, 'mesgs');
+			} else {
+				setEventMessages($sent['error'], null, 'errors');
+			}
+			$action = '';
+
+			return 0;
+		}
+
 		if (in_array($parameters['currentcontext'], $this->array_of_handled_context)) {
 			// Skip if the object's bank account is not the one managed by Stancer
 			$stancerBankAccount = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS', '');
@@ -482,21 +641,21 @@ class ActionsStancer
 			}
 
 			stancerFakeStripeModuleEnable();
-			if ($action == "confirm_stancerSEPA") {
+			if ($action == "confirm_stancerSEPA" && $this->stancerMoneyActionAllowed($user, $action)) {
 				stancerSEPAstartPay($object, true, 0, 1);
 			}
 
-			if ($action == "stancerSEPA") {
+			if ($action == "stancerSEPA" && $this->stancerMoneyActionAllowed($user, $action)) {
 				stancerSEPAstartPay($object);
 			}
 
 			//force le paiement CB
-			if ($action == "confirm_stancertakecbpayment") {
+			if ($action == "confirm_stancertakecbpayment" && $this->stancerMoneyActionAllowed($user, $action)) {
 				stancerCBstartPay($object, true, 0, 1);
 			}
 
 			// Stancer refund for credit notes
-			if ($action == "confirm_stancerRefund" && $object instanceof Facture && $object->type == Facture::TYPE_CREDIT_NOTE) {
+			if ($action == "confirm_stancerRefund" && $object instanceof Facture && $object->type == Facture::TYPE_CREDIT_NOTE && $this->stancerMoneyActionAllowed($user, $action)) {
 				dol_syslog("stancer doActions confirm_stancerRefund for credit note id=" . $object->id);
 
 				// Find the original invoice
@@ -541,7 +700,9 @@ class ActionsStancer
 			if ($action == 'stancerFindPaymentInvoice') {
 				// stancerFindPaymentInvoiceAction() reads supplier invoice fields
 				// ($date, getSommePaiement()...), so only run it on a real one.
-				if ($object instanceof FactureFournisseur) {
+				if (!$this->stancerMoneyActionAllowed($user, $action)) {
+					$action = '';
+				} elseif ($object instanceof FactureFournisseur) {
 					dol_syslog("stancer doActions: calling stancerFindPaymentInvoiceAction", LOG_DEBUG);
 					$this->stancerFindPaymentInvoiceAction($object, $user, $error);
 					dol_syslog("stancer doActions: stancerFindPaymentInvoiceAction completed, error=$error", LOG_DEBUG);
@@ -557,11 +718,9 @@ class ActionsStancer
 		}
 
 		if (!$error) {
-			$this->results = array('myreturn' => 999);
-			$this->resprints = '<p>A text to show</p>';
 			return 0; // or return 1 to replace standard code
 		} else {
-			$this->errors[] = 'Error message';
+			$this->errors[] = $langs->trans('ErrorStancer');
 			return -1;
 		}
 	}
@@ -640,39 +799,32 @@ class ActionsStancer
 
 				//check if that customer exists on stancer and/or if prereq are ok (mail / phone)
 				// print "<p>Debug eric: " . json_encode($object) . "</p>";
+				// A Stancer customer needs an email or an international mobile. This
+				// check must be the very one stancerAddCustomerIfNeeded() will make,
+				// otherwise the button is hidden for a payment that would have gone
+				// through: it used to read the thirdparty alone, and the landline
+				// field alone, so a thirdparty whose contacts carried both an address
+				// and a mobile was turned away.
+				dol_include_once('/stancer/lib/stancer_customer.lib.php');
+				$payerIsReachable = false;
 				if ($object->element == 'member') {
-					$errorStancer = 0;
-					if (substr($object->phone, 0, 1) != '+') {
-						$errorStancer++;
-					}
-					if (strpos($object->email, '@') === false) {
-						$errorStancer++;
-					}
-					if ($errorStancer == 2) {
-						$error++;
-						print '<div class="warning"><span class="fa fa-warning"> </span> <span class="clear"> ' . $langs->trans("StancerCompanyMailOrPhoneNewPayment") . '</span></div>';
-					}
+					$memberCountry = empty($object->country_code) ? 'FR' : $object->country_code;
+					$payerIsReachable = (strpos((string) $object->email, '@') !== false)
+						|| (stancerNormalizePhone($object->phone, $memberCountry) !== '');
 				} else {
 					$societe = new Societe($this->db);
-					$socresult = $societe->fetch($object->socid);
-					if ($socresult) {
-						// print "<p>Debug eric: " . json_encode($societe) . "</p>";
-						$errorStancer = 0;
-						if (substr($societe->phone, 0, 1) != '+') {
-							$errorStancer++;
-						}
-						if (strpos($societe->email, '@') === false) {
-							$errorStancer++;
-						}
-						if ($errorStancer == 2) {
-							$error++;
-							print '<div class="warning"><span class="fa fa-warning"> </span> <span class="clear"> ' . $langs->trans("StancerCompanyMailOrPhoneNewPayment") . '</span></div>';
-						}
+					if ($societe->fetch($object->socid) > 0) {
+						$payer = stancerResolvePayerContact($societe, $object);
+						$payerIsReachable = ($payer['email'] !== '' || $payer['mobile'] !== '');
 					}
+				}
+				if (!$payerIsReachable) {
+					$error++;
+					print '<div class="warning"><span class="fa fa-warning"> </span> <span class="clear"> ' . $langs->trans("StancerCompanyMailOrPhoneNewPayment") . '</span></div>';
 				}
 
 				if (empty($error) && in_array($source, $listOfHandledSources)) {
-					$result =  '<br>';
+					$result = '';
 
 					//cond_reglement_code
 					//race condition for order with partial payment
@@ -689,7 +841,7 @@ class ActionsStancer
 						$btnLabel = $langs->trans("STANCER_PAY_BUTTON_MESSAGE");
 					}
 					//
-					$result .= '<div class="stancerbuttonpayment butAction" id="div_dopayment_stancer" style="margin-bottom: 1em;">';
+					$result .= '<div class="stancerbuttonpayment butAction" id="div_dopayment_stancer">';
 					$result .= '<span class="fa fa-credit-card"></span>';
 					$result .= '<input type="hidden" name="tag" value="' . $tag . '">';
 					$result .= '<input type="hidden" name="source" value="' . $source . '">';
@@ -703,7 +855,7 @@ class ActionsStancer
                                             $("#dopayment_stancer").click();
                                         });
                                         $("#dopayment_stancer").click(function(e) {
-											$("#dolpaymentform").attr("action", "' . DOL_MAIN_URL_ROOT . '/custom/stancer/public/newpayment.php");
+											$("#dolpaymentform").attr("action", "' . dol_buildpath('/stancer/public/newpayment.php', 3) . '");
                                             $("#div_dopayment_stancer").css( \'cursor\', \'wait\' );
 											$("#dolpaymentform").submit();
                                             e.stopPropagation();
@@ -720,7 +872,9 @@ class ActionsStancer
 					// other PSPs in the Dolibarr ecosystem also use print() for the same
 					// reason. With print(), execution order driven by hook priority
 					// dictates the visual button order on the page.
-					print $result;
+					// Frame the block so the customer sees this method comes from Stancer,
+					// and not from the other payment modules printed on the same page.
+					print stancerPaymentFrame($result);
 				}
 				dol_syslog("stancer HOOK RETURN 1 ...");
 				return 1;
@@ -730,7 +884,7 @@ class ActionsStancer
 			return 0; // Or return 1 to replace standard code.
 		}
 
-		$this->errors[] = 'Error message';
+		$this->errors[] = $langs->trans('ErrorStancer');
 		return -1;
 	}
 
@@ -887,7 +1041,7 @@ class ActionsStancer
 			return 0; // Or return 1 to replace standard code.
 		}
 
-		$this->errors[] = 'Error message';
+		$this->errors[] = $langs->trans('ErrorStancer');
 		return -1;
 	}
 
@@ -957,11 +1111,9 @@ class ActionsStancer
 		// }
 
 		if (!$error) {
-			$this->results = array('myreturn' => 999);
-			$this->resprints = 'A text to show';
 			return 0; // or return 1 to replace standard code
 		} else {
-			$this->errors[] = 'Error message';
+			$this->errors[] = $langs->trans('ErrorStancer');
 			return -1;
 		}
 	}
@@ -991,7 +1143,7 @@ class ActionsStancer
 		if (!$error) {
 			return 0; // or return 1 to replace standard code
 		} else {
-			$this->errors[] = 'Error message';
+			$this->errors[] = $langs->trans('ErrorStancer');
 			return -1;
 		}
 	}
@@ -1176,7 +1328,7 @@ class ActionsStancer
 			//add more border lines
 			$cb_complete = false;
 			if ($cb_complete) {
-				print "<a class='stancertakepayment' href='" . dol_buildpath("/stancer/stancer_thirdparty.php", 2) . "?socid=" . $object->id . "&action=stancertakepayment&companymodeid=" . $parameters['obj']->rowid . "'>" . $langs->trans("StancerPayBalanceCB") . "</a>";
+				print "<a class='stancertakepayment' href='" . dol_buildpath("/stancer/stancer_thirdparty.php", 2) . "?socid=" . $object->id . "&action=stancertakepayment&token=" . newToken() . "&companymodeid=" . ((int) $parameters['obj']->rowid) . "'>" . $langs->trans("StancerPayBalanceCB") . "</a>";
 			}
 			print '</td>';
 		}
@@ -1219,6 +1371,26 @@ class ActionsStancer
 			return 0;
 		}
 
+		// "Send the payment link": the payment page is a permanent link that
+		// recomputes what is left to pay and starts a fresh Stancer attempt on
+		// every click, so it can be sent again after a refusal. Only offered for
+		// the two objects the core knows an online payment page for.
+		if (getDolGlobalString('STANCER_ENABLE_CB') && in_array($currentcontext, array('ordercard', 'invoicecard'), true)) {
+			$stillOwesMoney = false;
+			if ($currentcontext == 'invoicecard' && $object instanceof Facture) {
+				// A paid invoice is closed (STATUS_CLOSED), so a validated one still owes money.
+				$stillOwesMoney = ($object->status == Facture::STATUS_VALIDATED);
+			} elseif ($currentcontext == 'ordercard' && $object instanceof Commande) {
+				// Order statuses: 0 draft, 1 validated, 2 in progress, 3 delivered, -1 cancelled.
+				$stillOwesMoney = ($object->status >= Commande::STATUS_VALIDATED);
+			}
+			if ($stillOwesMoney) {
+				print '<div class="inline-block divButAction"><a class="butAction" href="' . $_SERVER["PHP_SELF"]
+					. '?id=' . ((int) $object->id) . '&action=stancersendpaylink&token=' . newToken() . '">'
+					. $langs->trans('StancerSendPayLink') . '</a></div>';
+			}
+		}
+
 		// print json_encode($object);exit;
 		if ($currentcontext == 'invoicesuppliercard' && $object instanceof FactureFournisseur) {
 			// uniquement si fournisseur est stancer !
@@ -1228,7 +1400,7 @@ class ActionsStancer
 			// on Dolibarr 15 (still supported), $this->status appears in Dolibarr 16.
 			// @phan-suppress-next-line PhanDeprecatedProperty
 			if ($object->statut == FactureFournisseur::STATUS_VALIDATED && preg_match($search, $object->thirdparty->name)) {
-				print '<div class="inline-block divButAction"><a class="butAction" href="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '&action=stancerFindPaymentInvoice">' . $langs->trans('stancerFindPaymentInvoice') . '</a></div>';
+				print '<div class="inline-block divButAction"><a class="butAction" href="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '&action=stancerFindPaymentInvoice&token=' . newToken() . '">' . $langs->trans('stancerFindPaymentInvoice') . '</a></div>';
 			}
 		}
 
@@ -1285,7 +1457,7 @@ class ActionsStancer
 
 				if ($showSepaButton) {
 					if ($btnAction == "butAction") {
-						print '<div class="inline-block divButAction"><a class="' . $btnAction . '" href="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '&action=stancerSEPA">' . $langs->trans('StancerSEPAstart') . '</a></div>';
+						print '<div class="inline-block divButAction"><a class="' . $btnAction . '" href="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '&action=stancerSEPA&token=' . newToken() . '">' . $langs->trans('StancerSEPAstart') . '</a></div>';
 					} else {
 						print '<div class="inline-block divButAction"><a class="' . $btnAction . ' classfortooltip" href="#" title="' . $alreadyInProgressTitle . '">' . $langs->trans('StancerSEPAstart') . '</a></div>';
 					}
@@ -1358,6 +1530,24 @@ class ActionsStancer
 				}
 			}
 		}
+		// Card payments without 3-D Secure, allowed or withdrawn on this order or
+		// invoice only, while it can still be paid by card.
+		if (getDolGlobalString('STANCER_ENABLE_CB') && $user->hasRight('stancer', 'write')
+			&& in_array($currentcontext, array('ordercard', 'invoicecard'), true)
+			&& ($object instanceof Commande || $object instanceof Facture)) {
+			dol_include_once('/stancer/lib/stancer_payment.lib.php');
+			if (stancerNo3dsCanBeChanged($object)) {
+				$urlCard = $_SERVER["PHP_SELF"] . '?id=' . ((int) $object->id);
+				if (!stancerNo3dsIsInstalled($object)) {
+					print '<div class="inline-block divButAction"><a class="butActionRefused classfortooltip" href="#" title="' . dol_escape_htmltag($langs->trans('StancerNo3dsNeedsReactivation')) . '">' . $langs->trans('StancerNo3dsAllow') . '</a></div>';
+				} elseif (stancerNo3dsAllowed($object)) {
+					print '<div class="inline-block divButAction"><a class="butAction" href="' . $urlCard . '&action=unsetstancerno3ds&token=' . newToken() . '">' . $langs->trans('StancerNo3dsRevoke') . '</a></div>';
+				} else {
+					print '<div class="inline-block divButAction"><a class="butAction" href="' . $urlCard . '&action=stancerno3ds&token=' . newToken() . '">' . $langs->trans('StancerNo3dsAllow') . '</a></div>';
+				}
+			}
+		}
+
 		return 0;
 	}
 

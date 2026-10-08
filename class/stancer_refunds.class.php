@@ -65,7 +65,7 @@ class Stancer_refunds extends CommonObject
 	 * @var int  Does this object support multicompany module ?
 	 * 0=No test on entity, 1=Test with field entity, 'field@table'=Test with link by field@table
 	 */
-	public $ismultientitymanaged = 0;
+	public $ismultientitymanaged = 1;
 
 	/**
 	 * @var int  Does object support extrafields ? 0=No, 1=Yes
@@ -559,7 +559,7 @@ class Stancer_refunds extends CommonObject
 		 return -1;
 		 }*/
 
-		return $this->setStatusCommon($user, self::STATUS_DRAFT, $notrigger, 'STANCER_MYOBJECT_UNVALIDATE');
+		return $this->setStatusCommon($user, self::STATUS_DRAFT, $notrigger, 'STANCER_REFUNDS_UNVALIDATE');
 	}
 
 	/**
@@ -583,7 +583,7 @@ class Stancer_refunds extends CommonObject
 		 return -1;
 		 }*/
 
-		return $this->setStatusCommon($user, self::STATUS_CANCELED, $notrigger, 'STANCER_MYOBJECT_CANCEL');
+		return $this->setStatusCommon($user, self::STATUS_CANCELED, $notrigger, 'STANCER_REFUNDS_CANCEL');
 	}
 
 	/**
@@ -607,7 +607,7 @@ class Stancer_refunds extends CommonObject
 		 return -1;
 		 }*/
 
-		return $this->setStatusCommon($user, self::STATUS_VALIDATED, $notrigger, 'STANCER_MYOBJECT_REOPEN');
+		return $this->setStatusCommon($user, self::STATUS_VALIDATED, $notrigger, 'STANCER_REFUNDS_REOPEN');
 	}
 
 	/**
@@ -669,7 +669,8 @@ class Stancer_refunds extends CommonObject
 			$label = implode($this->getTooltipContentArray($params));
 		}
 
-		$url = dol_buildpath('/stancer/stancer_refunds_card.php', 1).'?id='.$this->id;
+		// No card page in the module: link to the list filtered on this record
+		$url = dol_buildpath('/stancer/stancer_refunds_list.php', 1).'?search_refund_id='.urlencode((string) $this->refund_id);
 
 		if ($option !== 'nolink') {
 			// Add param to save lastsearch_values or not
@@ -844,22 +845,28 @@ class Stancer_refunds extends CommonObject
 		// phpcs:enable
 		if (empty($this->labelStatus) || empty($this->labelStatusShort)) {
 			global $langs;
-			//$langs->load("stancer@stancer");
-			$this->labelStatus[self::STATUS_DRAFT] = $langs->transnoentitiesnoconv('Draft');
-			$this->labelStatus[self::STATUS_VALIDATED] = $langs->transnoentitiesnoconv('Enabled');
-			$this->labelStatus[self::STATUS_CANCELED] = $langs->transnoentitiesnoconv('Disabled');
-			$this->labelStatusShort[self::STATUS_DRAFT] = $langs->transnoentitiesnoconv('Draft');
-			$this->labelStatusShort[self::STATUS_VALIDATED] = $langs->transnoentitiesnoconv('Enabled');
-			$this->labelStatusShort[self::STATUS_CANCELED] = $langs->transnoentitiesnoconv('Disabled');
+			$langs->load("stancer@stancer");
+			// Every status fillDataFromApi() can store: 0 to_refund, 1 refund_sent,
+			// 2 refunded, 6 failed / not_honored, 9 payment_canceled
+			$labels = array(
+				0 => 'StancerRefundStatusToRefund',
+				1 => 'StancerRefundStatusSent',
+				2 => 'StancerRefundStatusRefunded',
+				6 => 'StancerRefundStatusFailed',
+				9 => 'StancerRefundStatusCanceled',
+			);
+			foreach ($labels as $code => $key) {
+				$this->labelStatus[$code] = $langs->transnoentitiesnoconv($key);
+				$this->labelStatusShort[$code] = $langs->transnoentitiesnoconv($key);
+			}
 		}
 
-		$statusType = 'status'.$status;
-		//if ($status == self::STATUS_VALIDATED) $statusType = 'status1';
-		if ($status == self::STATUS_CANCELED) {
-			$statusType = 'status6';
-		}
+		$statusTypes = array(0 => 'status0', 1 => 'status1', 2 => 'status4', 6 => 'status8', 9 => 'status6');
+		$statusType = isset($statusTypes[$status]) ? $statusTypes[$status] : 'status0';
+		$label = isset($this->labelStatus[$status]) ? $this->labelStatus[$status] : (string) $status;
+		$labelShort = isset($this->labelStatusShort[$status]) ? $this->labelStatusShort[$status] : (string) $status;
 
-		return dolGetStatus($this->labelStatus[$status], $this->labelStatusShort[$status], '', $statusType, $mode);
+		return dolGetStatus($label, $labelShort, '', $statusType, $mode);
 	}
 
 	/**
@@ -978,61 +985,6 @@ class Stancer_refunds extends CommonObject
 	}
 
 	/**
-	 *  Returns the reference to the following non used object depending on the active numbering module.
-	 *
-	 *  @return string      		Object free reference
-	 */
-	public function getNextNumRef()
-	{
-		global $langs, $conf;
-		$langs->load("stancer@stancer");
-
-		if (!getDolGlobalString('STANCER_MYOBJECT_ADDON')) {
-			$conf->global->STANCER_MYOBJECT_ADDON = 'mod_stancer_refunds_standard';
-		}
-
-		if (getDolGlobalString('STANCER_MYOBJECT_ADDON')) {
-			$mybool = false;
-
-			$file = getDolGlobalString('STANCER_MYOBJECT_ADDON').".php";
-			$classname = getDolGlobalString('STANCER_MYOBJECT_ADDON');
-
-			// Include file with class
-			$dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
-			foreach ($dirmodels as $reldir) {
-				$dir = dol_buildpath($reldir."core/modules/stancer/");
-
-				// Load file with numbering class (if found)
-				$mybool = ((bool) @include_once $dir.$file) || $mybool;
-			}
-
-			if (!$mybool) {
-				dol_print_error($this->db, "Failed to include file ".$file);
-				return '';
-			}
-
-			if (class_exists($classname)) {
-				$obj = new $classname();
-				$numref = $obj->getNextValue($this);
-
-				if ($numref != '' && $numref != '-1') {
-					return $numref;
-				} else {
-					$this->error = $obj->error;
-					//dol_print_error($this->db,get_class($this)."::getNextNumRef ".$obj->error);
-					return "";
-				}
-			} else {
-				print $langs->trans("Error")." ".$langs->trans("ClassNotFound").' '.$classname;
-				return "";
-			}
-		} else {
-			print $langs->trans("ErrorNumberingModuleNotSetup", $this->element);
-			return "";
-		}
-	}
-
-	/**
 	 *  Create a document onto disk according to template module.
 	 *
 	 *  @param	    string		$modele			Force template to use ('' to not force)
@@ -1057,8 +1009,8 @@ class Stancer_refunds extends CommonObject
 
 			if (!empty($this->model_pdf)) {
 				$modele = $this->model_pdf;
-			} elseif (getDolGlobalString('MYOBJECT_ADDON_PDF')) {
-				$modele = getDolGlobalString('MYOBJECT_ADDON_PDF');
+			} elseif (getDolGlobalString('STANCER_REFUNDS_ADDON_PDF')) {
+				$modele = getDolGlobalString('STANCER_REFUNDS_ADDON_PDF');
 			}
 		}
 
@@ -1069,36 +1021,6 @@ class Stancer_refunds extends CommonObject
 		}
 
 		return $result;
-	}
-
-	/**
-	 * Action executed by scheduler
-	 * CAN BE A CRON TASK. In such a case, parameters come from the schedule job setup field 'Parameters'
-	 * Use public function doScheduledJob($param1, $param2, ...) to get parameters
-	 *
-	 * @return	int			0 if OK, <>0 if KO (this function is used also by cron so only 0 is OK)
-	 */
-	public function doScheduledJob()
-	{
-		//global $conf, $langs;
-
-		//$conf->global->SYSLOG_FILE = 'DOL_DATA_ROOT/dolibarr_mydedicatedlofile.log';
-
-		$error = 0;
-		$this->output = '';
-		$this->error = '';
-
-		dol_syslog(__METHOD__, LOG_DEBUG);
-
-		$now = dol_now();
-
-		$this->db->begin();
-
-		// ...
-
-		$this->db->commit();
-
-		return $error;
 	}
 
 

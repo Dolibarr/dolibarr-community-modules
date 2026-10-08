@@ -1294,190 +1294,6 @@ class Stancer_payments extends CommonObject
 	}
 
 	/**
-	 * Action executed by scheduler
-	 * CAN BE A CRON TASK. In such a case, parameters come from the schedule job setup field 'Parameters'
-	 * Use public function doScheduledJob($param1, $param2, ...) to get parameters
-	 *
-	 * @return	int			0 if OK, <>0 if KO (this function is used also by cron so only 0 is OK)
-	 */
-	public function doScheduledJob()
-	{
-		global $conf, $langs;
-
-		//$conf->global->SYSLOG_FILE = 'DOL_DATA_ROOT/dolibarr_mydedicatedlofile.log';
-
-		$error = 0;
-		$this->output = '';
-		$this->error = '';
-
-		dol_syslog(__METHOD__, LOG_DEBUG);
-
-		$now = dol_now();
-
-		$this->db->begin();
-
-		// ...
-
-		$this->db->commit();
-
-		return $error;
-	}
-
-	/**
-	 * fill object data from Stancer Payment
-	 *
-	 * Takes an object of the Stancer PHP SDK (getUniqueId(), populate()->get()...).
-	 * The module dropped that SDK for its own StancerApi client, so nothing calls
-	 * this method any more: every remaining call site is commented out
-	 * (stancer_payouts_list.php, lib/stancer_dispute.lib.php). Kept for third party
-	 * code that would still pass an SDK object.
-	 *
-	 * @deprecated Use fillDataFromApi() instead
-	 * @param   mixed $payment Stancer Payment object (deprecated)
-	 *
-	 * @return  int ret code, <0 on error
-	 */
-	public function fillData($payment)
-	{
-		global $conf;
-		dol_syslog("Stancer_payments fillData");
-		$this->entity = $conf->entity;
-		$ret = 0;
-
-		dol_syslog("stancer fillData uuid tracking : this=" . $this->unique_id  . ", stancer=" . $payment->getUniqueId());
-		$uuid = $payment->getUniqueId();
-		if ($this->unique_id != $uuid) {
-			dol_syslog("stancer fillData uuid tracking mic mac, keep our uniqid", LOG_INFO);
-			$uuid = $this->unique_id;
-		}
-		if (empty($uuid)) {
-			dol_syslog("stancer fillData uuid stancer empty, keep using our");
-			$uuid = $this->unique_id;
-		}
-		if (empty($uuid)) {
-			dol_syslog("stancer fillData uuid stancer AND our are empty, return");
-			return -1;
-		}
-
-		//le client
-		$customer = null;
-		try {
-			$customer = $payment->getCustomer();
-		} catch (Exception $e) {
-			dol_syslog("stancer fillData ERROR catch " . $e->getMessage(), LOG_WARNING);
-			// $customer = null;
-			// return -1;
-		}
-
-		// Prefer the CUS=<id> embedded in the tag over the stancer_account mapping.
-		// See fillDataFromApi() for the full rationale.
-		$fk_soc = null;
-		$fk_soc_from_tag = stancerGetCustomerSocidFromTag($uuid);
-		if (!empty($fk_soc_from_tag)) {
-			$fk_soc = $fk_soc_from_tag;
-			dol_syslog("stancer fillData fk_soc=$fk_soc resolved from CUS= tag");
-		}
-
-		//TODO customer peut-être vide si c'est payé par TPE physique
-		if (null === $customer) {
-			//customer is null, use default TPE ?
-			if (empty($fk_soc)) {
-				$fk_soc = getDolGlobalString('STANCER_DEFAULT_CUSTOMER_IF_NULL');
-			}
-			$customer = "";
-			$email = "default.customer (TPE ?)";
-		} else {
-			//il faudrait aller récupérer le socid du client dans dolibarr
-			if (empty($fk_soc)) {
-				$companypaymentmode = new CompanyPaymentModeStancer($this->db);
-				$res = $companypaymentmode->fetch(0, '', 0, '', " AND label LIKE 'stancer-%' AND stancer_account = ".$customer);
-				if ($res > 0) {
-					$fk_soc = $companypaymentmode->fk_soc;
-					dol_syslog("stancer fillData fk_soc=$fk_soc resolved from companypaymentmode mapping (no CUS= tag)");
-				}
-			}
-			$email = $customer->getEmail() ?? '(no mail)';
-		}
-		dol_syslog("stancer fillData : customer is " . json_encode($customer) . " : $email", LOG_DEBUG);
-
-		$json = null;
-		//en attendant que fee soit proposé par un accesseur
-		try {
-			$json = $payment->populate()->get();
-		} catch (Exception $e) {
-			dol_syslog("stancer payment->populate catch " . $e->getMessage());
-		}
-
-		// dol_syslog("stancer fillData : json is " . json_encode($json), LOG_DEBUG);
-
-		//et a cause du throw plutôt que du return null de la lib stancer
-		$listOfPropToGet = [
-			'stancer_id' => 'Id',
-			'amount' => 'Amount',
-			'currency' => 'Currency',
-			'description' => 'Description',
-			'order_id' => 'OrderId',
-			'method' => 'Method',
-			'card' => 'Card',
-			'sepa' => 'Sepa',
-			'refunds' => 'Refunds',
-			'status' => 'Status',
-			'response' => 'Response',
-			'capture' => 'Capture',
-			'created' => 'Created',
-			'date_bank' => 'DateBank',
-			'return_url' => 'ReturnUrl'
-		];
-		// Collected values, fed to fillDataArray() below. Declared here because the
-		// loop only writes keys and the block after it reads $data['status'].
-		$data = array();
-		foreach ($listOfPropToGet as $key => $val) {
-			try {
-				$func = "get" . $val;
-				dol_syslog("stancer listOfPropToGet run $func ...");
-				$data[$key] = $payment->{$func};
-			} catch (Exception $e) {
-				dol_syslog("stancer listOfPropToGet $val catch " . $e->getMessage());
-				$data[$key] = null;
-				--$ret;
-			}
-		}
-
-		//try to get data from basic json ...
-		if (is_null($data['status']) && isset($json['status'])) {
-			$data['status']		= $json['status'];
-		}
-
-		// The fee is accounting data of its own: stancerCheckBankLines() books it as a
-		// separate negative bank line (stancerAddPaimentFeeOnBank(), lib/stancer_bank.lib.php).
-		// $json stays null when populate()->get() threw above, and the key can also be
-		// missing from a partial answer. Reading $json['fee'] then would be an undefined
-		// index, and skipping the assignment would keep whatever ->fee already held, so
-		// the caller could not tell a real zero fee from a missing one. Stop instead,
-		// with a log: nothing has been written to the object yet except ->entity.
-		if (!is_array($json) || !isset($json['fee'])) {
-			$idForLog = '';
-			if (isset($data['stancer_id']) && is_scalar($data['stancer_id'])) {
-				$idForLog = (string) $data['stancer_id'];
-			} elseif (!empty($this->stancer_id)) {
-				$idForLog = (string) $this->stancer_id;
-			}
-			dol_syslog("stancer fillData no fee in Stancer answer for payment " . $idForLog . " (unique_id=" . $uuid . ", answer type=" . gettype($json) . "), object left unchanged and not saved", LOG_ERR);
-			return -1;
-		}
-
-		$data['fee'] 		= $json['fee'];
-		$data['unique_id'] 	= $uuid;
-		$data['customer'] 	= $customer;
-		$data['live_mode'] 	= getDolGlobalString('STANCER_IS_PROD', '0');
-		$data['fk_soc'] 	= $fk_soc;
-		$this->fillDataArray($data);
-
-		dol_syslog("Stancer_payments fillData end, returns error = $ret");
-		return $ret;
-	}
-
-	/**
 	 * Copy an associative array of Stancer values into the object properties
 	 *
 	 * @param	array	$array				Key/value pairs coming from the Stancer API or from the local table
@@ -1690,7 +1506,7 @@ class Stancer_payments extends CommonObject
 		if (in_array($key, ['amount','fee'])) {
 			return price((float) $object / 100);
 		} elseif ($key == 'stancer_id') {
-			$linkExternal = "<a href='https://manage.stancer.com/fr/details-de-paiement?id=" . $object . "' target='_stancer'>" . img_picto($langs->trans('ShowInStancer'), 'globe') . " " . $object . "</a>";
+			$linkExternal = "<a href='https://manage.stancer.com/fr/details-de-paiement?id=" . urlencode((string) $object) . "' target='_stancer' rel='noopener noreferrer'>" . img_picto($langs->trans('ShowInStancer'), 'globe') . " " . dol_escape_htmltag((string) $object) . "</a>";
 			$linkRaw = '';
 			if (getDolGlobalString('STANCER_SHOW_RAW_API_PICTO', '0') == '1') {
 				$linkRaw = " <a href='#' class='stancer-raw-link' data-stancer-type='payment' data-stancer-id='" . dol_escape_htmltag($object) . "' title='" . dol_escape_htmltag($langs->trans('ShowRawApiResponse')) . "'>" . img_picto($langs->trans('ShowRawApiResponse'), 'search') . "</a>";
@@ -1758,7 +1574,7 @@ class Stancer_payments extends CommonObject
 					}
 				}
 			}
-			//return "<a href='https://manage.stancer.com/fr/details-de-paiement?id=" . $object . "' target='_stancer'>" . img_picto($langs->trans('ShowInStancer'), 'globe') . " " . $object . "</a>";
+			//return "<a href='https://manage.stancer.com/fr/details-de-paiement?id=" . urlencode((string) $object) . "' target='_stancer' rel='noopener noreferrer'>" . img_picto($langs->trans('ShowInStancer'), 'globe') . " " . dol_escape_htmltag((string) $object) . "</a>";
 		}
 
 		return parent::showOutputField($val, $key, $object, $moreparam, $keysuffix, $keyprefix, $showsize);
@@ -1862,6 +1678,29 @@ class Stancer_payments extends CommonObject
 			self::STATUS_DRAFT, // The bank authorized the payment but the transaction will only be processed when the capture will be set to true
 		];
 		return in_array($this->status, $listOfPaidStatus);
+	}
+
+	/**
+	 * Tell if the stored attempt failed for good, so a new one must be started.
+	 *
+	 * Stancer keeps a unique_id reserved for ever, even when the payment that
+	 * carried it was refused: asking again with the same one is answered
+	 * "HTTP 409 duplicate unique_id", the payment is never created and the
+	 * customer can never retry. Every final failure must therefore lead to a
+	 * fresh attempt id, which is what stancerNextFreeTag() builds.
+	 *
+	 * @return bool True when the attempt reached a final failure state.
+	 */
+	public function hasFinallyFailed()
+	{
+		$listOfFailedStatus = [
+			self::STATUS_ERROR,
+			self::STATUS_EXPIRED,
+			self::STATUS_FAILED,
+			self::STATUS_REFUSED,
+			self::STATUS_CANCELED,
+		];
+		return in_array($this->status, $listOfFailedStatus);
 	}
 }
 

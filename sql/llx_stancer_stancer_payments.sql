@@ -34,7 +34,7 @@ CREATE TABLE llx_stancer_stancer_payments(
 	response varchar(4), 
 	capture boolean, 
 	created datetime, 
-	date_bank timestamp, 
+	date_bank timestamp NULL DEFAULT NULL,
 	live_mode boolean, 
 	fk_soc integer, 
 	date_creation datetime NOT NULL, 

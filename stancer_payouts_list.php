@@ -271,6 +271,7 @@ if (getDolGlobalString('STANCER_IS_PROD', '0') == '0') {
 }
 
 if ($action == "refreshone") {
+	stancerCheckWriteActionAllowed($permissiontoadd, 'payouts_list refreshone');
 	$payoutIdToRefresh = GETPOST('payout_id', 'alphanohtml');
 	if (!preg_match('/^[A-Za-z0-9_\-]{1,64}$/', $payoutIdToRefresh)) {
 		dol_syslog("stancer refreshone invalid payout_id: " . $payoutIdToRefresh, LOG_WARNING);
@@ -292,6 +293,7 @@ if ($action == "refreshone") {
 }
 
 if ($action == "refreshall") {
+	stancerCheckWriteActionAllowed($permissiontoadd, 'payouts_list refreshall');
 	dol_syslog("stancer refreshall ...");
 	dol_include_once('/stancer/lib/stancer_bank.lib.php');
 	// Clean any orphan bank_url left over from previous mis-reconciliations
@@ -505,13 +507,7 @@ if (!$resql) {
 $num = $db->num_rows($resql);
 
 
-// Direct jump if only one record found
-if ($num == 1 && (getDolGlobalString('MAIN_SEARCH_DIRECT_OPEN_IF_ONLY_ONE', '') != '') && $search_all && !$page) {
-	$obj = $db->fetch_object($resql);
-	$id = $obj->rowid;
-	header("Location: ".dol_buildpath('/stancer/stancer_payouts_card.php', 1).'?id='.$id);
-	exit;
-}
+// No direct jump on a single result: the module has no payout card page
 
 
 // Output page
@@ -609,7 +605,6 @@ $newcardbutton .= dolGetButtonTitle($langs->trans('ViewKanban'), '', 'fa fa-th-l
 $newcardbutton .= dolGetButtonTitleSeparator();
 $newcardbutton .= dolGetButtonTitle($langs->trans('Refresh'), '', 'fa fa-refresh', $_SERVER["PHP_SELF"].'?action=refreshall&token='.newToken().preg_replace('/(&|\?)*action=[^&]+/', '', $param), '', 1, array('morecss'=>'reposition'));
 $newcardbutton .= dolGetButtonTitleSeparator();
-$newcardbutton .= dolGetButtonTitle($langs->trans('New'), '', 'fa fa-plus-circle', dol_buildpath('/stancer/stancer_payouts_card.php', 1).'?action=create&backtopage='.urlencode($_SERVER['PHP_SELF']), '', $permissiontoadd);
 
 print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, $massactionbutton, $num, $nbtotalofrecords, 'object_'.$object->picto, 0, $newcardbutton, '', $limit, 0, 0, 1);
 

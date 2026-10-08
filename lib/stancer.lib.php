@@ -115,8 +115,6 @@ dol_include_once('/stancer/class/stancer_api.class.php');
 // 	$stancer->setMode(Stancer\Config::TEST_MODE);
 // }
 
-// New API client - global instance
-$stancerApi = new StancerApi();
 
 //check stancer module version vs last init version in database
 dol_include_once('/stancer/core/modules/modStancer.class.php');
@@ -160,6 +158,156 @@ function stancer_get_private_key()
 	} else {
 		return getDolGlobalString('STANCER_TEST_PRIVATE_KEY', '');
 	}
+}
+
+/**
+ * Create the member extra fields of the association mode (STANCER_ASSO_ACTIVE).
+ * addExtraField() is re-entrant: an existing field is left as is.
+ *
+ * @param   DoliDB  $db  Database handler
+ * @return  int          Number of fields that could not be created
+ */
+function stancerEnsureMemberExtrafields($db)
+{
+	include_once DOL_DOCUMENT_ROOT . '/core/class/extrafields.class.php';
+	$extrafields = new ExtraFields($db);
+	// $size, $list and $help are declared as string by ExtraFields::addExtraField().
+	// '32' is the column length, '0' hides the field from lists, '' means no tooltip.
+	$fields = array(
+		array('stancer_sepa_ref', 'StancerSEPAstart', 1, 0),
+		array('stancer_cb_ref', 'StancerCardStart', 2, 0),
+		array('stancer_account', 'StancerAccount', 3, 1),
+	);
+	$failed = 0;
+	foreach ($fields as $field) {
+		$res = $extrafields->addExtraField($field[0], $field[1], 'varchar', $field[2], '32', 'adherent', $field[3], 0, '', '', 1, '', '0', '', '', '', 'stancer@stancer', '$conf->stancer->enabled');
+		if ($res < 0) {
+			$failed++;
+			dol_syslog("stancerEnsureMemberExtrafields: cannot create member extra field " . $field[0] . ": " . $extrafields->error, LOG_ERR);
+		}
+	}
+
+	return $failed;
+}
+
+/**
+ * Date of the most recent event of a list returned by ActionComm::getActions(),
+ * whatever the sort order of that list.
+ *
+ * @param   array|int  $actions  Events, or a negative error code
+ * @return  int                  Timestamp, 0 when there is none
+ */
+function stancerMostRecentActionDate($actions)
+{
+	$latest = 0;
+	if (is_array($actions)) {
+		foreach ($actions as $action) {
+			if (is_object($action) && !empty($action->datep) && (int) $action->datep > $latest) {
+				$latest = (int) $action->datep;
+			}
+		}
+	}
+
+	return $latest;
+}
+
+/**
+ * Mandate reference (RUM) of the Stancer SEPA mandate of a thirdparty, default mandate first.
+ *
+ * @param   int     $socid  Thirdparty id
+ * @return  string          RUM, empty string when the thirdparty has no Stancer mandate
+ */
+function stancerGetSepaRum($socid)
+{
+	global $db;
+
+	$sql = "SELECT rum FROM " . MAIN_DB_PREFIX . "societe_rib";
+	$sql .= " WHERE fk_soc = " . ((int) $socid) . " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND rum <> ''";
+	$sql .= " ORDER BY default_rib DESC, rowid DESC";
+	$resql = $db->query($sql . $db->plimit(1));
+	if (!$resql) {
+		dol_syslog("stancerGetSepaRum: " . $db->lasterror(), LOG_ERR);
+		return '';
+	}
+	$obj = $db->fetch_object($resql);
+
+	return $obj ? (string) $obj->rum : '';
+}
+
+/**
+ * Stop the page unless the user may run a write action reached by a link:
+ * Stancer write right and session token. Refresh actions create bank lines,
+ * reopen invoices and send emails, so a forged GET must not trigger them.
+ *
+ * @param   int|bool  $permissiontoadd  Write permission computed by the page
+ * @param   string    $context          Page and action, for the log
+ * @return  void
+ */
+function stancerCheckWriteActionAllowed($permissiontoadd, $context)
+{
+	global $user;
+
+	if (!$permissiontoadd) {
+		dol_syslog("stancer " . $context . ": denied for user " . (int) $user->id . " without write permission", LOG_WARNING);
+		accessforbidden();
+	}
+	if (GETPOST('token', 'alpha') === '' || GETPOST('token', 'alpha') !== currentToken()) {
+		dol_syslog("stancer " . $context . ": denied, missing or invalid token for user " . (int) $user->id, LOG_WARNING);
+		accessforbidden('Invalid CSRF token');
+	}
+}
+
+/**
+ * Move the Stancer bank entries left on a 471 suspense account to a fee account.
+ *
+ * The predicate sits directly in the WHERE clause: MySQL refuses a subquery
+ * reading the table being updated (error 1093).
+ *
+ * @param   string  $accountNumber  Accounting account to assign (627xxx)
+ * @return  int                     Number of entries updated, -1 on error
+ */
+function stancerBookkeepingFixFeeAccount($accountNumber)
+{
+	global $db;
+
+	$sql = "UPDATE " . MAIN_DB_PREFIX . "accounting_bookkeeping SET numero_compte = '" . $db->escape($accountNumber) . "'";
+	$sql .= " WHERE numero_compte LIKE '471%' AND doc_type = 'bank'";
+	$sql .= " AND (doc_ref LIKE '%Stancer%' OR label_operation LIKE '%Stancer%')";
+	$sql .= " AND entity IN (" . getEntity('accountancy') . ")";
+	$resql = $db->query($sql);
+	if (!$resql) {
+		dol_syslog("stancerBookkeepingFixFeeAccount: " . $db->lasterror(), LOG_ERR);
+		return -1;
+	}
+
+	return (int) $db->affected_rows($resql);
+}
+
+/**
+ * Resolve a log file name received by admin/logs.php into a readable path.
+ *
+ * Only the base name is kept, it must end with ".log", and the resolved file
+ * must sit directly in the data root: anything else (conf.php through "..",
+ * a symlink pointing elsewhere) is refused.
+ *
+ * @param   string  $name  File name received from the request
+ * @return  string         Real path of the log file, empty string when refused
+ */
+function stancerResolveLogFile($name)
+{
+	$base = basename((string) $name);
+	if ($base === '' || substr($base, -4) !== '.log') {
+		dol_syslog("stancerResolveLogFile: refused name " . $base, LOG_WARNING);
+		return '';
+	}
+	$root = realpath(DOL_DATA_ROOT);
+	$path = realpath(DOL_DATA_ROOT . '/' . $base);
+	if ($root === false || $path === false || dirname($path) !== $root || !is_file($path)) {
+		dol_syslog("stancerResolveLogFile: " . $base . " is not a log file of the data root", LOG_WARNING);
+		return '';
+	}
+
+	return $path;
 }
 
 /**
@@ -243,6 +391,41 @@ function stancerAdminPrepareHead()
 	complete_head_from_modules($conf, $langs, null, $head, $h, 'stancer@stancer', 'remove');
 
 	return $head;
+}
+
+/**
+ * Return the Stancer logo, sized for an inline use (button, frame legend...).
+ *
+ * @param  int    $height Height in pixels
+ * @return string         HTML of the logo
+ */
+function stancerBrandLogo($height = 16)
+{
+	$height = max(8, (int) $height);
+
+	return '<img src="' . dol_buildpath('/stancer/img/object_stancer.png', 1) . '" alt="Stancer" height="' . $height . '" width="' . $height . '" style="vertical-align: middle;">';
+}
+
+/**
+ * Wrap the Stancer payment button in a bordered block so the customer sees at a glance
+ * that this payment method belongs to Stancer, and not to another payment module of the page.
+ *
+ * @param  string $content Inner HTML (button, hidden inputs, scripts)
+ * @return string          HTML of the framed block
+ */
+function stancerPaymentFrame($content)
+{
+	global $langs;
+
+	$out = '<fieldset style="border: 1px solid rgba(128, 128, 128, 0.4); border-radius: 8px; padding: 8px 16px 16px; margin: 1em 0; min-width: 0;">';
+	$out .= '<legend style="padding: 0 8px; font-weight: bold; white-space: nowrap;">';
+	$out .= stancerBrandLogo(16);
+	$out .= '<span style="vertical-align: middle; margin-left: 8px;">' . $langs->trans('StancerPaymentFrameTitle') . '</span>';
+	$out .= '</legend>';
+	$out .= $content;
+	$out .= '</fieldset>';
+
+	return $out;
 }
 
 
