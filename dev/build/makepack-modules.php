@@ -476,7 +476,7 @@ function checkAndCompleteChangelog($mod, $version, $project, $repo)
 	$newEntry = $header . "\n\n";
 	if (!empty($prTitles)) {
 		foreach ($prTitles as $title) {
-			$newEntry .= $title . "\n";
+			$newEntry .= '- ' . $title . "\n";
 		}
 	} else {
 		$newEntry .= "No merged pull requests found since previous version.\n";
@@ -624,6 +624,7 @@ function buildModulePackages($action, $modulename)
 					$returnCode = 0;
 					$repo = $directoryToSearch . DIRECTORY_SEPARATOR . $project;
 					$command = sprintf('git -C %s tag %s 2>&1', escapeshellarg($repo), escapeshellarg($tag));
+					$command .= "; git tag push origin ".escapeshellarg($tag);
 					$lastmessagetoshow .= "YOU MUST COMMIT ALL FILES (INCLUDING THE ZIP) AND CREATE A TAG WITH COMMAND:\n";
 					$lastmessagetoshow .= $command."\n";
 					/*exec(
@@ -1272,7 +1273,7 @@ if ($argv[1] == 'pushdolistore') {
 			exit(1);
 		}
 	} else {
-		print "API key found in environment variable DOLISTORE_API_KEY.\n";
+		print "API key found in environment variable DOLISTORE_API_KEY: ".substr($apikey, 0, 4)."*****...\n";
 	}
 
 	// Get the Dolistore API URL from environment variable DOLISTORE_API_URL, or ask the user if not set
@@ -1284,7 +1285,7 @@ if ($argv[1] == 'pushdolistore') {
 			$dolistoreApiUrl = 'https://www.dolistore.com/api/index.php';
 		}
 	} else {
-		print "Dolistore API URL found in environment variable DOLISTORE_API_URL.\n";
+		print "Dolistore API URL found in environment variable DOLISTORE_API_URL: ".$dolistoreApiUrl."\n";
 	}
 
 	// Build the list of modules to push
@@ -1305,6 +1306,17 @@ if ($argv[1] == 'pushdolistore') {
 		print "Found " . count($moduletopush) . " module(s) to push: " . implode(', ', $moduletopush) . "\n";
 	} else {
 		$moduletopush = array(strtolower($argv[2]));
+		print "Module to push: " . strtolower($argv[2]);
+		//print filesize($directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . "module_" . strtolower($argv[2]) . ".zip")."ko";
+		print "\n";
+	}
+
+	print "\n";
+	print "Please type enter to confirm to push zip file on Dolistore (CTR+C to cancel): ";
+	$confirmkey = trim(fgets(STDIN));
+	if (empty($confirmkey)) {
+		print "Operation canceled.\n";
+		exit(1);
 	}
 
 	// Push each module to the Dolistore

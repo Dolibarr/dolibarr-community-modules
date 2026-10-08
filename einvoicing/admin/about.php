@@ -60,12 +60,6 @@ if (!$res && file_exists("../../../../../main.inc.php")) {
 if (!$res) {
 	die("Include of main fails");
 }
-
-// Libraries
-require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
-require_once DOL_DOCUMENT_ROOT.'/core/lib/functions2.lib.php';
-require_once '../lib/einvoicing.lib.php';
-
 /**
  * @var Conf $conf
  * @var DoliDB $db
@@ -73,6 +67,12 @@ require_once '../lib/einvoicing.lib.php';
  * @var Translate $langs
  * @var User $user
  */
+
+// Libraries
+require_once DOL_DOCUMENT_ROOT.'/core/lib/admin.lib.php';
+require_once DOL_DOCUMENT_ROOT.'/core/lib/functions2.lib.php';
+require_once __DIR__.'/../lib/einvoicing.lib.php';
+
 
 // Translations
 $langs->loadLangs(array("errors", "admin", "einvoicing@einvoicing"));

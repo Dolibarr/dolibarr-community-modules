@@ -608,7 +608,8 @@ class ActionsStancer
 			return 0;
 		}
 
-		$this->stancerLog("doActions ENTRY: action=$action, currentcontext=" . ($parameters['currentcontext'] ?? 'NULL'), LOG_DEBUG);
+		// DEBUG FORCE LOG
+		$this->stancerLog("doActions ENTRY: action=$action, currentcontext=" . ($parameters['currentcontext'] ?? 'NULL'), LOG_ERR);
 
 		// DEBUG for stancerFindPaymentInvoice
 		if ($action == 'stancerFindPaymentInvoice') {

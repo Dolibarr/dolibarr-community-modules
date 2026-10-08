@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2025-2026       Laurent Destailleur         <eldy@users.sourceforge.net>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  * Copyright (C) 2025-2026       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
@@ -191,22 +192,12 @@ trait CommonProtocol
 	/**
 	 * Map type of invoices dolibarr <-> facturx
 	 *
-	 * @param 	CommonInvoice	$object 	The invoice object
+	 * @param 	Facture|FactureFournisseur	$object 	The invoice object
 	 * @return  string|null 				code of invoice type
 	 */
 	private function _getTypeOfInvoice($object)
 	{
-		$map = [
-			CommonInvoice::TYPE_STANDARD        => '380',
-			CommonInvoice::TYPE_REPLACEMENT     => '384',
-			CommonInvoice::TYPE_CREDIT_NOTE     => '381',
-			CommonInvoice::TYPE_DEPOSIT         => '386',
-			CommonInvoice::TYPE_SITUATION       => '380',				// Process situation invoice as common invoice
-		];
-
-		// TODO Manage the credit note of a deposit invoice ?
-
-		return $map[$object->type] ?? null;
+		return einvoicingDocumentTypeCode($object, $this->db);
 	}
 
 
@@ -220,6 +211,17 @@ trait CommonProtocol
 	 */
 	private function getIEC6523Code($country_code, $global = 0)
 	{
+		// EINVOICING_PARTY_IDENTIFIER_SCHEME decides the scheme of the party identifier (BT-29, BT-46)
+		// alone. It must not reach $global == 2, the electronic address (BT-34, BT-49), where 0225 is
+		// the right answer and BR-CL-25 accepts nothing outside the CEF EAS list.
+		if ($global == 1) {
+			$configured = trim(getDolGlobalString('EINVOICING_PARTY_IDENTIFIER_SCHEME'));
+			// 'none' rather than an empty string: an empty option is an option nobody set, which
+			// keeps the historical scheme of the country.
+			if ($configured !== '') {
+				return ($configured === 'none') ? '' : $configured;
+			}
+		}
 		$retour = "";
 		switch ($country_code) {
 			case 'BE':
@@ -243,6 +245,24 @@ trait CommonProtocol
 				$retour = "0060";	// DUNS
 		}
 		return $retour;
+	}
+
+	/**
+	 * Value of the party identifier (BT-29, BT-46), which follows the scheme the setup asks for.
+	 *
+	 * Every entry of the list but the SIRET is declared with the professional identifier idprof()
+	 * answers for the country of the party, which is what the module has always written.
+	 *
+	 * @param	Societe	$thirdparty		Party the identifier belongs to
+	 * @return	string					Identifier, empty when that party has nothing under that scheme
+	 */
+	private function getPartyIdentifierValue($thirdparty)
+	{
+		if (getDolGlobalString('EINVOICING_PARTY_IDENTIFIER_SCHEME') === '0009') {
+			return removeAllSpaces($thirdparty->idprof2);
+		}
+
+		return idprof($thirdparty);
 	}
 
 	/**
@@ -338,7 +358,7 @@ trait CommonProtocol
 	{
 		global $conf, $langs, $mysoc;
 
-		dol_mkdir($conf->einvoicing->dir_temp);
+		dol_mkdir($conf->einvoicing->dir_temp, einvoicingDataRoot($conf->einvoicing->dir_temp));
 
 		$outputlangs = $langs;		// TODO Use the target language
 
@@ -482,7 +502,7 @@ trait CommonProtocol
 		// Note: the carrier of the specimen is the one the setup of the instance produces, untouched.
 		// A Factur-X specimen is only a conformant PDF/A-3 when PDF_USE_A is set to PDF/A-3b in
 		// "Home - Setup - PDF", which is exactly what the specimen is there to show.
-		$tmpinvoice->generateDocument($tmpinvoice->model_pdf, $outputlangs);
+		$tmpinvoice->generateDocument((string) $tmpinvoice->model_pdf, $outputlangs);
 
 		// For invoice with ->specimen=1, the file is SPECIMEN.pdf so we rename it into ref
 		$dir = $conf->invoice->multidir_output[$conf->entity];
@@ -522,15 +542,167 @@ trait CommonProtocol
 
 
 	/**
+	 * Merge the legal organization identifier of the seller (BT-30) into its global identifiers.
+	 *
+	 * The legal id (e.g. SIREN) is often carried only in the SpecifiedLegalOrganization
+	 * (sellerLegalOrgId/Scheme) and left out of sellerGlobalIds, so every reader of the global ids
+	 * has to bring it back in before looking at them.
+	 *
+	 * @param	array<string,mixed>		$sellerInfo		Seller block of the parsed header, completed in place
+	 * @return	void
+	 */
+	private function _mergeSellerLegalOrgIntoGlobalIds(&$sellerInfo)
+	{
+		if (!empty($sellerInfo['sellerLegalOrgId']) && !empty($sellerInfo['sellerLegalOrgScheme'])) {
+			if (empty($sellerInfo['sellerGlobalIds']) || !is_array($sellerInfo['sellerGlobalIds'])) {
+				$sellerInfo['sellerGlobalIds'] = array();
+			}
+			if (empty($sellerInfo['sellerGlobalIds'][$sellerInfo['sellerLegalOrgScheme']])) {
+				$sellerInfo['sellerGlobalIds'][$sellerInfo['sellerLegalOrgScheme']] = $sellerInfo['sellerLegalOrgId'];
+			}
+		}
+	}
+
+	/**
+	 * Search the Dolibarr thirdparty a received document was issued by, on its structured identifiers only.
+	 *
+	 * Read only: nothing is created, nothing is updated. These are steps 1 and 2 of
+	 * _syncOrCreateThirdpartyFromEInvoiceSeller(), which calls it, so a screen that has to name the
+	 * vendor of a flow (see einvoicing/product_mapping.php) answers it the way the import does and
+	 * not with a lookup of its own that would drift from it.
+	 *
+	 * A name is not an identity (BT-27 and BT-28 are descriptive), so it is not a criteria here: the
+	 * fuzzy match on it stays step 3 of the import, behind its hidden option.
+	 *
+	 * @param	array<string,mixed>		$sellerInfo		Seller block of the parsed header
+	 * @return	array{res:int, message:string, candidates:int[]}		'res' > 0 = id of the thirdparty, 0 = none found, -2 = several carry that VAT number ('candidates' then holds the first two)
+	 */
+	public function findThirdpartyFromEInvoiceSeller($sellerInfo)
+	{
+		global $db;
+		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php'; // @phpstan-ignore requireOnce.fileNotFound
+
+		$thirdparty = new Societe($db);
+		$sellerCountryCode = $sellerInfo['sellercountry'] ?? '';
+
+		$this->_mergeSellerLegalOrgIntoGlobalIds($sellerInfo);
+
+		// Step 1: Try to find thirdparty by global IDs
+		if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
+			foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
+				if (!empty($globalId)) {
+					// Map scheme to idprof field (0002 = SIREN)
+					// TODO Use function idprof() ?
+					$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
+					if (!empty($idprofField)) {
+						$result = 0;
+						// Fetch thirdparty by corresponding idprof field
+						if ($idprofField === 'idprof1') { // SIREN
+							$result = $thirdparty->fetch(0, '', '', '', $globalId);
+						}
+						if ($idprofField === 'idprof2') { // SIRET
+							$result = $thirdparty->fetch(0, '', '', '', '', $globalId);
+						}
+						if ($idprofField === 'idprof3') {
+							$result = $thirdparty->fetch(0, '', '', '', '', '', $globalId);
+						}
+						if ($idprofField === 'idprof4') {
+							$result = $thirdparty->fetch(0, '', '', '', '', '', '', $globalId);
+						}
+						if ($idprofField === 'idprof5') {
+							$result = $thirdparty->fetch(0, '', '', '', '', '', '', '', $globalId);
+						}
+						if ($idprofField === 'idprof6') {
+							$result = $thirdparty->fetch(0, '', '', '', '', '', '', '', '', $globalId);
+						}
+
+						if ($result > 0) {
+							dol_syslog(__METHOD__ . ' Found thirdparty by ' . $idScheme . ': ' . $thirdparty->id);
+							return array('res' => (int) $thirdparty->id, 'message' => 'Thirdparty found by ' . $idScheme, 'candidates' => array());
+						}
+					}
+				}
+			}
+		}
+
+		// Step 2: Try to find using VAT number if not found by global IDs
+		if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
+			$sql = "SELECT rowid, siret FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape(removeAllSpaces($sellerInfo['sellerTaxRegistations']['VA'])) . "' AND entity IN (". getEntity('societe').")";
+			$resql = $db->query($sql);
+			if ($resql) {
+				if ($db->num_rows($resql) > 1) {
+					// Several thirdparties can legitimately share one VAT number: in France it is
+					// derived from the SIREN alone (FR + 2 check digits + SIREN), so different
+					// établissements (same SIREN, different SIRET) of one legal entity collide here.
+					// Try the SIRET carried by the document to pick the right établissement before
+					// treating this as an unresolved data-quality duplicate.
+					$candidates = array();
+					while ($obj = $db->fetch_object($resql)) {
+						$candidates[] = $obj;
+					}
+
+					$sellerSiret = $this->_extractSellerSiret($sellerInfo, $sellerCountryCode);
+					$matchedCandidate = null;
+					$severalCandidatesMatchSiret = false;
+					if ($sellerSiret !== '') {
+						foreach ($candidates as $candidate) {
+							if (!empty($candidate->siret) && removeAllSpaces($candidate->siret) === $sellerSiret) {
+								if ($matchedCandidate !== null) {
+									$severalCandidatesMatchSiret = true;
+									break;
+								}
+								$matchedCandidate = $candidate;
+							}
+						}
+					}
+
+					if ($matchedCandidate !== null && !$severalCandidatesMatchSiret) {
+						if ($thirdparty->fetch($matchedCandidate->rowid) > 0) {
+							dol_syslog(__METHOD__ . ' VAT number ' . $sellerInfo['sellerTaxRegistations']['VA'] . ' shared by ' . count($candidates) . ' thirdparties, disambiguated by SIRET ' . $sellerSiret . ': ' . $thirdparty->id);
+							return array('res' => (int) $thirdparty->id, 'message' => 'Thirdparty found by VAT number and SIRET', 'candidates' => array());
+						}
+					} elseif ($sellerSiret !== '' && !$severalCandidatesMatchSiret) {
+						// The document's SIRET matches none of the établissements sharing this VAT
+						// number: most likely a new établissement of the same entity. Do not block
+						// the import on it, let step 3/4 of the import handle it (name match or creation).
+						dol_syslog(__METHOD__ . ' VAT number ' . $sellerInfo['sellerTaxRegistations']['VA'] . ' shared by ' . count($candidates) . ' thirdparties, none matches document SIRET ' . $sellerSiret . '; not treated as a blocking duplicate', LOG_WARNING);
+						return array('res' => 0, 'message' => 'Several thirdparties carry the VAT number of the seller, none its SIRET', 'candidates' => array());
+					} else {
+						// No SIRET on the document to disambiguate with, or several candidates share
+						// the same SIRET: genuine ambiguity, cannot safely resolve it.
+						dol_syslog(__METHOD__ . ' Error: Multiple thirdparties found for VAT number: ' . $sellerInfo['sellerTaxRegistations']['VA'], LOG_ERR);
+						return array('res' => -2, 'message' => 'Several thirdparties carry the VAT number of the seller', 'candidates' => array((int) $candidates[0]->rowid, (int) $candidates[1]->rowid));
+					}
+				} elseif ($db->num_rows($resql) === 1) {
+					$obj = $db->fetch_object($resql);
+					$result = $thirdparty->fetch($obj->rowid);
+					if ($result > 0) {
+						dol_syslog(__METHOD__ . ' Found thirdparty by VAT number: ' . $thirdparty->id);
+						return array('res' => (int) $thirdparty->id, 'message' => 'Thirdparty found by VAT number', 'candidates' => array());
+					}
+				}
+			}
+		}
+
+		return array('res' => 0, 'message' => 'No thirdparty found for the identifiers of the seller', 'candidates' => array());
+	}
+
+	/**
 	 * Synchronize or create a Dolibarr thirdparty based on E-invoice seller information.
 	 *
 	 * @param array     $sellerInfo 	Array containing seller information extracted from E-invoice
 	 * @param string    $priority 		Fill priority ('dolibarr' or 'pdp'). If both data are available, which one to prefer
 	 * @param string    $flowId 		Flow identifier source of the thirdparty.
-	 * @return array{res:int, message:string, actioncode:string|null, actionurl:string|null, action:string|null}   Returns array with 'res' (ID of the synchronized or created/updated thirdparty, -1 on error) with a 'message' and an optional 'actioncode', 'actionurl', and 'action'.
+	 * @return array{res:int, message:string, actioncode?:string, actionurl?:string, action?:string, actiondata?:array<string,mixed>}   Returns array with 'res' (ID of the synchronized or created/updated thirdparty, -1 on error) with a 'message' and an optional 'actioncode', 'actionurl', 'action', and 'actiondata'.
 	 */
 	private function _syncOrCreateThirdpartyFromEInvoiceSeller($sellerInfo, $priority = 'dolibarr', $flowId = '')
 	{
+		// EN 16931 bounds none of these texts, llx_societe does: a longer one was refused and stopped the import.
+		foreach (array('sellername' => 128, 'sellercity' => 50) as $key => $max) {
+			if (isset($sellerInfo[$key])) {
+				$sellerInfo[$key] = dol_substr((string) $sellerInfo[$key], 0, $max);
+			}
+		}
 		/**
 		 * Scenario to find or create a thirdparty based on E-invoice seller information:
 		 *
@@ -568,82 +740,38 @@ trait CommonProtocol
 		// The legal id (e.g. SIREN) is often carried only in the SpecifiedLegalOrganization
 		// (sellerLegalOrgId/Scheme) and left out of sellerGlobalIds. Merge it in so the lookup,
 		// update and creation steps below all populate the matching idprof field (e.g. idprof1).
-		if (!empty($sellerInfo['sellerLegalOrgId']) && !empty($sellerInfo['sellerLegalOrgScheme'])) {
-			if (empty($sellerInfo['sellerGlobalIds']) || !is_array($sellerInfo['sellerGlobalIds'])) {
-				$sellerInfo['sellerGlobalIds'] = array();
-			}
-			if (empty($sellerInfo['sellerGlobalIds'][$sellerInfo['sellerLegalOrgScheme']])) {
-				$sellerInfo['sellerGlobalIds'][$sellerInfo['sellerLegalOrgScheme']] = $sellerInfo['sellerLegalOrgId'];
-			}
-		}
+		$this->_mergeSellerLegalOrgIntoGlobalIds($sellerInfo);
 
-		// Step 1: Try to find thirdparty by global IDs
-		if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
-			foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
-				if (!empty($globalId)) {
-					// Map scheme to idprof field (0002 = SIREN)
-					// TODO Use function idprof() ?
-					$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
-					if (!empty($idprofField)) {
-						$result = 0;
-						// Fetch thirdparty by corresponding idprof field
-						if ($idprofField === 'idprof1') { // SIREN
-							$result = $thirdparty->fetch(0, '', '', '', $globalId);
-						}
-						if ($idprofField === 'idprof2') { // SIRET
-							$result = $thirdparty->fetch(0, '', '', '', '', $globalId);
-						}
-						if ($idprofField === 'idprof3') {
-							$result = $thirdparty->fetch(0, '', '', '', '', '', $globalId);
-						}
-						if ($idprofField === 'idprof4') {
-							$result = $thirdparty->fetch(0, '', '', '', '', '', '', $globalId);
-						}
-						if ($idprofField === 'idprof5') {
-							$result = $thirdparty->fetch(0, '', '', '', '', '', '', '', $globalId);
-						}
-						if ($idprofField === 'idprof6') {
-							$result = $thirdparty->fetch(0, '', '', '', '', '', '', '', '', $globalId);
-						}
+		// Steps 1 and 2: find the thirdparty on its structured identifiers (global IDs, then VAT number)
+		$found = $this->findThirdpartyFromEInvoiceSeller($sellerInfo);
+		if ($found['res'] > 0) {
+			$thirdpartyId = $found['res'];
+			$matchedByStructuredIdentifier = true;
+			// The steps below read the record they are about to update (name mismatch, existing fields),
+			// so load it here: the search only answers with an id.
+			$thirdparty->fetch($thirdpartyId);
+		} elseif ($found['res'] == -2) {
+			// Several thirdparties carry that VAT number: nothing can be decided here, and binding the
+			// document to whichever came first would file it on the wrong vendor.
+			$vatnumber = (string) ($sellerInfo['sellerTaxRegistations']['VA'] ?? '');
 
-						if ($result > 0) {
-							$thirdpartyId = $thirdparty->id;
-							$matchedByStructuredIdentifier = true;
-							dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Found thirdparty by ' . $idScheme . ': ' . $thirdpartyId);
-							break;
-						}
-					}
-				}
-			}
-		}
-		// Step 2: Try to find using VAT number if not found by global IDs
-		if ($thirdpartyId < 0) {
-			if (!empty($sellerInfo['sellerTaxRegistations']['VA'])) {
-				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE REPLACE(tva_intra, ' ', '') = '" . $db->escape(removeAllSpaces($sellerInfo['sellerTaxRegistations']['VA'])) . "' AND entity IN (". getEntity('societe').")";
-				$resql = $db->query($sql);
-				if ($resql) {
-					if ($db->num_rows($resql) > 1) {
-						dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error: Multiple thirdparties found for VAT number: ' . $sellerInfo['sellerTaxRegistations']['VA'], LOG_ERR);
-						$obj1 = $db->fetch_object($resql);
-						$obj2 = $db->fetch_object($resql);
-						return array(
-							'res' => -1,
-							'message' => 'Multiple thirdparties found for VAT number: ' . $sellerInfo['sellerTaxRegistations']['VA'],
-							'actioncode' => 'DUPLICATE_THIRDPARTIES',
-							'action' => 'Merge the 2 thirdparties',
-							'actiondata' => array('thirdpartyid1' => $obj1->rowid, 'thirdpartyid2' => $obj2->rowid)
-						);
-					} elseif ($db->num_rows($resql) === 1) {
-						$obj = $db->fetch_object($resql);
-						$result = $thirdparty->fetch($obj->rowid);
-						if ($result > 0) {
-							$thirdpartyId = $thirdparty->id;
-							$matchedByStructuredIdentifier = true;
-							dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Found thirdparty by VAT number: ' . $thirdpartyId);
-						}
-					}
-				}
-			}
+			// Create URL to prefill thirdparty creation form
+			$createUrl = DOL_URL_ROOT . '/societe/list.php?type=f&search_vat='.urlencode($vatnumber);
+			$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
+
+			$action = $langs->trans('CheckSuppliersWithDuplicateCode', $vatnumber);
+			$action .= '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+			$action .= '<i class="fas fa-plus-circle"></i> ';
+			$action .= $langs->trans('CheckSuppliers');
+			$action .= '</a>';
+
+			return array(
+				'res' => -1,
+				'message' => $langs->trans("SuppliersWithDuplicateVATCode", $vatnumber),	// Can be a technical message. The business one is defined into the syncFlows() of the provider.
+				'actioncode' => 'THIRDPARTY_DUPLICATE_VAT',
+				'action' => $action,
+				'actiondata' => array('thirdpartyid1' => ($found['candidates'][0] ?? 0), 'thirdpartyid2' => ($found['candidates'][1] ?? 0), 'vatnumber' => $vatnumber)
+			);
 		}
 
 		// Step 3: If not found, try to find by findNearest function. A name is not an identity: BT-27 and
@@ -735,15 +863,25 @@ trait CommonProtocol
 			}
 		}
 
+		// A phone number written in a document is free text (BT-42 is a Text, and so is the fax of the
+		// EXTENDED profile), and vendors do write things like "09 77 40 50 60 (service gratuit + prix
+		// appel)" in it. Keep the number and leave the sentence out, so the column can hold it. See #943.
+		$sellerPhone = $this->_extractPhoneNumberFromDocument($sellerInfo['sellercontactphoneno'] ?? '');
+		$sellerFax = $this->_extractPhoneNumberFromDocument($sellerInfo['sellercontactfaxno'] ?? '');
+		// A number cut short is a wrong number: one longer than the column (20 up to Dolibarr 21) once the
+		// core has removed its spaces and dots is not saved.
+		$phoneMax = (int) DOL_VERSION >= 22 ? 30 : 20;
+		$sellerPhone = dol_strlen(preg_replace('/[\s.]/', '', $sellerPhone)) > $phoneMax ? '' : $sellerPhone;
+		$sellerFax = dol_strlen(preg_replace('/[\s.]/', '', $sellerFax)) > $phoneMax ? '' : $sellerFax;
+
 		// Step 4: Create or update thirdparty
 
 		//$thirdpartyId = -2; // For testing
 		if ($thirdpartyId > 0) {
-			dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Updating existing thirdparty: ' . $thirdpartyId);
-			// TODO: MAYBE we should call PDP to retrieve more information
+			dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Updating existing thirdparty (client status'.(getDolGlobalString('EINVOICING_THIRDPARTIES_COMPLETE_INFO') ? ' + other info' : '').'): ' . $thirdpartyId);
 
 			$thirdparty = new Societe($db);
-			$thirdparty->fetch($thirdpartyId);
+			$this->_fetchThirdpartyForImportUpdate($thirdparty, $thirdpartyId);
 
 			// Update thirdparty information based on priority
 			if (getDolGlobalInt('EINVOICING_THIRDPARTIES_COMPLETE_INFO')) {
@@ -758,15 +896,19 @@ trait CommonProtocol
 					}
 					$thirdparty->zip = $sellerInfo['sellerpostcode'] ?? $thirdparty->zip;
 					$thirdparty->town = $sellerInfo['sellercity'] ?? $thirdparty->town;
-					$thirdparty->country_code = $sellerInfo['sellercountry'] ?? $thirdparty->country_code;
+					$this->_setThirdpartyCountryFromCode($thirdparty, $sellerInfo['sellercountry'] ?? '');
 					$thirdparty->email = $sellerInfo['sellercontactemailaddr'] ?? $thirdparty->email;
-					$thirdparty->phone = $sellerInfo['sellercontactphoneno'] ?? $thirdparty->phone;
-					$thirdparty->fax = $sellerInfo['sellercontactfaxno'] ?? $thirdparty->fax;
+					if ($sellerPhone !== '') {
+						$thirdparty->phone = $sellerPhone;
+					}
+					if ($sellerFax !== '') {
+						$thirdparty->fax = $sellerFax;
+					}
 					// Set identification numbers
 					if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 						foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
 							if (!empty($globalId)) {
-								$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+								$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
 								if (!empty($idprofField)) {
 									$thirdparty->$idprofField = removeAllSpaces($globalId);
 								}
@@ -791,6 +933,7 @@ trait CommonProtocol
 						if (!empty($sellerInfo['sellerlinethree'])) {
 							$thirdparty->address .= "\n" . $sellerInfo['sellerlinethree'];
 						}
+						$thirdparty->address = dol_substr($thirdparty->address, 0, 255);
 					}
 					if (empty($thirdparty->zip) && !empty($sellerInfo['sellerpostcode'])) {
 						$thirdparty->zip = $sellerInfo['sellerpostcode'];
@@ -798,23 +941,23 @@ trait CommonProtocol
 					if (empty($thirdparty->town) && !empty($sellerInfo['sellercity'])) {
 						$thirdparty->town = $sellerInfo['sellercity'];
 					}
-					if (empty($thirdparty->country_code) && !empty($sellerInfo['sellercountry'])) {
-						$thirdparty->country_code = $sellerInfo['sellercountry'];
+					if (empty($thirdparty->country_id) && !empty($sellerInfo['sellercountry'])) {
+						$this->_setThirdpartyCountryFromCode($thirdparty, $sellerInfo['sellercountry']);
 					}
 					if (empty($thirdparty->email) && !empty($sellerInfo['sellercontactemailaddr'])) {
 						$thirdparty->email = $sellerInfo['sellercontactemailaddr'];
 					}
-					if (empty($thirdparty->phone) && !empty($sellerInfo['sellercontactphoneno'])) {
-						$thirdparty->phone = $sellerInfo['sellercontactphoneno'];
+					if (empty($thirdparty->phone) && $sellerPhone !== '') {
+						$thirdparty->phone = $sellerPhone;
 					}
-					if (empty($thirdparty->fax) && !empty($sellerInfo['sellercontactfaxno'])) {
-						$thirdparty->fax = $sellerInfo['sellercontactfaxno'];
+					if (empty($thirdparty->fax) && $sellerFax !== '') {
+						$thirdparty->fax = $sellerFax;
 					}
 					// Set identification numbers if empty
 					if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 						foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
 							if (!empty($globalId)) {
-								$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+								$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
 								if (!empty($idprofField) && empty($thirdparty->$idprofField)) {
 									$thirdparty->$idprofField = removeAllSpaces($globalId);
 								}
@@ -827,50 +970,97 @@ trait CommonProtocol
 					}
 				}
 			}
-			// Flag the thirdparty as a vendor if it is not one yet
-			// (ex: a prospect or customer receiving its first supplier invoice).
-			if (!$thirdparty->fournisseur) {
-				$thirdparty->fournisseur = 1;
-			}
-
-			// A thirdparty code may be mandatory (MAIN_COMPANY_CODE_ALWAYS_REQUIRED, or a numbering
-			// module refusing an empty code): verify() then refuses every update of a thirdparty saved
-			// without one, and the whole synchronization stops on it. Ask for a generated code when the
-			// numbering module allows it. The allowmod flags are required twice over: update() checks
-			// them before writing the code columns, and it is also how the thirdparty card saves a code.
 			$allowmodcodeclient = 0;
 			$allowmodcodefournisseur = 0;
-			if (empty($thirdparty->code_fournisseur) && $thirdparty->codefournisseur_modifiable()) {
-				$thirdparty->code_fournisseur = 'auto';
-				$allowmodcodefournisseur = 1;
+			$tosave = $this->_prepareThirdpartyForImportUpdate($thirdparty, $allowmodcodeclient, $allowmodcodefournisseur);
+			// The vendor is identified and the import has nothing to write on it: saving it anyway would only
+			// let a setup rule it does not meet (mandatory professional id, code mask...) refuse the document.
+			if (!$tosave && !getDolGlobalInt('EINVOICING_THIRDPARTIES_COMPLETE_INFO')) {
+				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Nothing to update on thirdparty: ' . $thirdpartyId);
+				return array(
+					'res' => $thirdpartyId,
+					'message' => 'Thirdparty ' . $thirdparty->name . ' found, nothing to update.' . ($nameMismatchWarning !== '' ? ' - ' . $nameMismatchWarning : '')
+				);
 			}
-			if (!empty($thirdparty->client) && empty($thirdparty->code_client) && $thirdparty->codeclient_modifiable()) {
-				$thirdparty->code_client = 'auto';
-				$allowmodcodeclient = 1;
-			}
-
-			// This function never sets an extrafield on a thirdparty, so it must not rewrite them, and it has
-			// to say so explicitly: from Dolibarr 20 on, fetch() pre-fills array_options with a null entry for
-			// every declared extrafield, and update() hands that array to insertExtraFields(), which refuses
-			// the WHOLE update as soon as one of those fields is mandatory and empty. Emptied, array_options
-			// makes insertExtraFields() return 0 without touching the stored row.
-			$thirdparty->array_options = array();
 
 			$result = $thirdparty->update(0, $user, 1, $allowmodcodeclient, $allowmodcodefournisseur);
+
+			// update() answers -3 to every refusal of verify() (code out of the numbering mask, mandatory or
+			// duplicate professional id...): only the error it recorded tells a supplier code used twice.
+			$duplicateSupplierCode = ($result == -3 && in_array('ErrorSupplierCodeAlreadyUsed', $thirdparty->errors));
+
+			// Copying into the thirdparty what the document says is a convenience (option
+			// EINVOICING_THIRDPARTIES_COMPLETE_INFO), and the vendor is already identified at this point:
+			// a value it refuses - a phone number carrying a sentence, a name longer than the column, a
+			// trigger of another module - must not cost the invoice. Save the thirdparty again without
+			// that completion: the document is then imported, and the caller is told what was left out.
+			// The duplicate supplier code is not about the completion and keeps its own answer below.
+			$completionWarning = '';
+			if ($result < 0 && !$duplicateSupplierCode && getDolGlobalInt('EINVOICING_THIRDPARTIES_COMPLETE_INFO')) {
+				$completionError = implode(', ', array_filter(array_merge(array($thirdparty->error), $thirdparty->errors)));
+
+				$plainthirdparty = new Societe($db);
+				if ($this->_fetchThirdpartyForImportUpdate($plainthirdparty, $thirdpartyId) > 0) {
+					$allowmodcodeclient = 0;
+					$allowmodcodefournisseur = 0;
+					$this->_prepareThirdpartyForImportUpdate($plainthirdparty, $allowmodcodeclient, $allowmodcodefournisseur);
+
+					$resultwithoutcompletion = $plainthirdparty->update(0, $user, 1, $allowmodcodeclient, $allowmodcodefournisseur);
+					if ($resultwithoutcompletion > 0) {
+						$thirdparty = $plainthirdparty;
+						$result = $resultwithoutcompletion;
+
+						$completionWarning = $langs->trans('EInvoiceThirdpartyNotCompletedWarning', '{s1}', $completionError);
+						$completionWarning = str_replace('{s1}', $thirdparty->getNomUrl(0, '', 0, 1), $completionWarning);
+
+						dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Thirdparty ' . $thirdpartyId . ' kept as it is, its completion from the document was refused: ' . $completionError, LOG_WARNING);
+						dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller ' . $completionWarning, LOG_WARNING, 0, '_einvoicing');
+
+						setEventMessages($completionWarning, null, 'warnings', '', 1);
+					}
+				}
+			}
+
 			if ($result < 0) {
 				$this->error = $thirdparty->error;
 				$this->errors = $thirdparty->errors;
 
-				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error updating thirdparty: ' . implode(',', array_merge(array($thirdparty->error), $thirdparty->errors)), LOG_ERR);
-				return array(
-					'res' => -1,
-					'message' => 'Thirdparty update error: ' . dol_escape_htmltag(implode(',', array_merge(array($thirdparty->error), $thirdparty->errors))).'.'
-				);
+				if ($duplicateSupplierCode) {
+					// Case of duplicate supplier code, need to change one.
+					dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error updating thirdparty: There is 2+ suppliers with the same supplier code. You msut fix one', LOG_DEBUG);
+
+					// Create URL to prefill thirdparty creation form
+					$createUrl = DOL_URL_ROOT . '/societe/list.php?type=f&search_supplier_code='.urlencode($thirdparty->code_fournisseur);
+					$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
+
+					$action = $langs->trans('CheckSuppliersWithDuplicateCode', $thirdparty->code_fournisseur);
+					$action .= '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+					$action .= '<i class="fas fa-plus-circle"></i> ';
+					$action .= $langs->trans('CheckSuppliers');
+					$action .= '</a>';
+
+					return array(
+						'res' => -1,
+						'message' => $langs->trans("SuppliersWithDuplicateCode", $thirdparty->code_fournisseur),	// Can be a technical message. The business one is defined into the syncFlows() of the provider.
+						'actioncode' => 'THIRDPARTY_DUPLICATE_SUPPLIER_CODE',
+						'actionurl' => $createUrl,
+						'action' => $action,
+						'actiondata' => array('suppliercode' => $thirdparty->code_fournisseur)
+					);
+				} else {
+					// Name the thirdparty: the user has to open it to fix what the core refuses.
+					$updateError = implode(', ', array_unique(array_filter(array_merge(array($thirdparty->error), $thirdparty->errors))));
+					dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Error updating thirdparty ' . $thirdpartyId . ': ' . $updateError, LOG_ERR);
+					return array(
+						'res' => -1,
+						'message' => 'Thirdparty update error on ' . dol_escape_htmltag($thirdparty->name) . ' (id ' . ((int) $thirdpartyId) . '): ' . dol_escape_htmltag($updateError) . '.'
+					);
+				}
 			} else {
 				dol_syslog(get_class($this) . '::_syncOrCreateThirdpartyFromEInvoiceSeller Updated thirdparty: ' . $thirdpartyId);
 				return array(
 					'res' => $thirdpartyId,
-					'message' => 'Thirdparty ' . $thirdparty->name . ' updated successfully.' . ($nameMismatchWarning !== '' ? ' - ' . $nameMismatchWarning : '')
+					'message' => 'Thirdparty ' . $thirdparty->name . ' updated successfully.' . ($nameMismatchWarning !== '' ? ' - ' . $nameMismatchWarning : '') . ($completionWarning !== '' ? ' - ' . $completionWarning : '')
 				);
 			}
 		}
@@ -889,18 +1079,19 @@ trait CommonProtocol
 			if (!empty($sellerInfo['sellerlinethree'])) {
 				$thirdparty->address .= "\n" . $sellerInfo['sellerlinethree'];
 			}
+			$thirdparty->address = dol_substr($thirdparty->address, 0, 255);
 			$thirdparty->zip = $sellerInfo['sellerpostcode'] ?? '';
 			$thirdparty->town = $sellerInfo['sellercity'] ?? '';
-			$thirdparty->country_code = $sellerInfo['sellercountry'] ?? '';
+			$this->_setThirdpartyCountryFromCode($thirdparty, $sellerInfo['sellercountry'] ?? '');
 			$thirdparty->email = $sellerInfo['sellercontactemailaddr'] ?? '';
-			$thirdparty->phone = $sellerInfo['sellercontactphoneno'] ?? '';
-			$thirdparty->fax = $sellerInfo['sellercontactfaxno'] ?? '';
+			$thirdparty->phone = $sellerPhone;
+			$thirdparty->fax = $sellerFax;
 
 			// Set identification numbers
 			if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 				foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
 					if (!empty($globalId)) {
-						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
 						if (!empty($idprofField)) {
 							$thirdparty->$idprofField = removeAllSpaces($globalId);
 						}
@@ -962,7 +1153,7 @@ trait CommonProtocol
 			if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 				foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
 					if (!empty($globalId)) {
-						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
 						if (!empty($idprofField)) {
 							$createParams[$idprofField] = $globalId;
 						}
@@ -979,7 +1170,7 @@ trait CommonProtocol
 				$createParams['town'] = $sellertown;
 			}
 			if (!empty($sellercountrycode)) {
-				$countryid = dol_getIdFromCode($this->db, $sellercountrycode, 'c_country');
+				$countryid = dol_getIdFromCode($this->db, $sellercountrycode, 'c_country', 'code', 'rowid');
 				if ($countryid > 0) {
 					$createParams['country_id'] = $countryid;
 				}
@@ -989,6 +1180,15 @@ trait CommonProtocol
 			// Create URL to prefill thirdparty creation form
 			$createUrl = DOL_URL_ROOT . '/societe/card.php?action=create&type=f';
 			if (!empty($createParams)) {
+				// The Dolibarr GET firewall (analyseVarsForSqlAndScriptsInjection) rejects " < > in any URL
+				// parameter, so a seller name/address carrying them would 403 before the prefilled creation
+				// form even opens. Use the core helper (replaces " with ' and removes < >, identical from
+				// v18 to v25) to drop them from the prefill - a convenience the operator reviews and edits.
+				foreach ($createParams as $cpKey => $cpVal) {
+					if (is_string($cpVal)) {
+						$createParams[$cpKey] = dol_string_nospecial($cpVal, "'", array('"'), array('<', '>'));
+					}
+				}
 				$createUrl .= '&' . http_build_query($createParams);
 			}
 			$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
@@ -1016,7 +1216,7 @@ trait CommonProtocol
 			if (!empty($sellerInfo['sellerGlobalIds']) && is_array($sellerInfo['sellerGlobalIds'])) {
 				foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
 					if (!empty($globalId)) {
-						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode);
+						$idprofField = $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId);
 						if (!empty($idprofField)) {
 							$errorDetails[$idprofField] = $langs->trans($idprofField).': ' . $globalId;
 							$actiondata[$idprofField] = $globalId;
@@ -1030,10 +1230,33 @@ trait CommonProtocol
 			$message = $langs->trans("FailedToFindSupplier"). ' ' . $detailsStr . ". \n";
 			$message .= $langs->trans("AutoCreateThirdPartyOffCreateItManually");
 
-			$action = $langs->trans('CreateSupplierManually');
-			$action .= '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">';
+			// Creating the thirdparty needs the right on it. Without that right the button stays where it is,
+			// greyed and titled: a button that disappears reads as "create it, but how?", a greyed one names
+			// the permission to ask for.
+			$action = '<div class="marginbottomonly opacitymedium">'.$langs->trans('CreateSupplierManually');
+			$action .= ' '.$langs->trans('OrAssignProfessionalIdToExistingSupplier').'</div>';
+
+			$action .= $user->hasRight('societe', 'creer')
+				? '<a class="butAction small smallpaddingimp nomarginleft" href="' . dol_escape_htmltag($createUrl) . '" target="_blank">'
+				: '<a class="butActionRefused classfortooltip small smallpaddingimp" href="#" title="' . dol_escape_htmltag($langs->trans("NotEnoughPermissions")) . '">';
 			$action .= '<i class="fas fa-plus-circle"></i> ';
 			$action .= $langs->trans('CreateSupplier');
+			$action .= '</a>';
+
+			// The seller may already exist as a thirdparty under another identity: the professional
+			// identifier of the document can be set on it by hand, and the suppliers list is where to look for it.
+			$searchUrl = DOL_URL_ROOT . '/societe/list.php?type=f';
+			$searchUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
+
+			$action .= ' ';
+
+			// Reading the list needs the right on it, and the same reasoning as for the creation
+			// button above applies: a greyed button names the permission to ask for.
+			$action .= $user->hasRight('societe', 'lire')
+				? '<a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($searchUrl) . '" target="_blank">'
+				: '<a class="butActionRefused classfortooltip small smallpaddingimp" href="#" title="' . dol_escape_htmltag($langs->trans("NotEnoughPermissions")) . '">';
+			$action .= '<i class="fas fa-search"></i> ';
+			$action .= $langs->trans('SearchAmongSuppliers');
 			$action .= '</a>';
 
 			return array(
@@ -1048,6 +1271,133 @@ trait CommonProtocol
 	}
 
 	/**
+	 * Set the country of a thirdparty from the country code carried by a received document.
+	 *
+	 * The stored country is fk_pays, which the core writes from country_id: up to Dolibarr 19,
+	 * Societe::update() never derives it from country_code, so a thirdparty created by the import
+	 * silently ended up with no country at all (issue #1037). An unknown code is left out.
+	 *
+	 * @param	Societe		$thirdparty		Thirdparty to set the country on
+	 * @param	string		$countrycode	Country code read in the document (BT-40, BT-55...)
+	 * @return	void
+	 */
+	private function _setThirdpartyCountryFromCode($thirdparty, $countrycode)
+	{
+		$countrycode = trim((string) $countrycode);
+		if ($countrycode === '') {
+			return;
+		}
+
+		$countryid = dol_getIdFromCode($this->db, $countrycode, 'c_country', 'code', 'rowid');
+		if ($countryid > 0) {
+			$thirdparty->country_id = $countryid;
+			$thirdparty->country_code = $countrycode;
+		} else {
+			dol_syslog(get_class($this) . '::_setThirdpartyCountryFromCode Unknown country code in document: ' . $countrycode, LOG_WARNING);
+		}
+	}
+
+	/**
+	 * Load a thirdparty found in Dolibarr for the update done when a document is imported.
+	 *
+	 * @param	Societe	$thirdparty		Thirdparty to load
+	 * @param	int		$thirdpartyId	Id of the thirdparty
+	 * @return	int						Result of Societe::fetch()
+	 */
+	private function _fetchThirdpartyForImportUpdate($thirdparty, $thirdpartyId)
+	{
+		$result = $thirdparty->fetch($thirdpartyId);
+		// Societe::update() accepts a code out of the current numbering mask only when oldcopy holds it
+		// unchanged. A plain clone: dol_clone() of Dolibarr 24 drops the null properties update() reads.
+		$thirdparty->oldcopy = clone $thirdparty;
+
+		return $result;
+	}
+
+	/**
+	 * Prepare a thirdparty found in Dolibarr for the update done when a document is imported.
+	 *
+	 * A thirdparty code may be mandatory (MAIN_COMPANY_CODE_ALWAYS_REQUIRED, or a numbering module
+	 * refusing an empty code): verify() then refuses every update of a thirdparty saved without one,
+	 * and the whole synchronization stops on it. Ask for a generated code when the numbering module
+	 * allows it. The allowmod flags are required twice over: update() checks them before writing the
+	 * code columns, and it is also how the thirdparty card saves a code.
+	 *
+	 * @param	Societe	$thirdparty					Thirdparty to save, already loaded
+	 * @param	int		$allowmodcodeclient			Set to 1 when a customer code has to be generated
+	 * @param	int		$allowmodcodefournisseur	Set to 1 when a vendor code has to be generated
+	 * @return	int									1 if there is something to save on the thirdparty, 0 if not
+	 */
+	private function _prepareThirdpartyForImportUpdate($thirdparty, &$allowmodcodeclient, &$allowmodcodefournisseur)
+	{
+		$tosave = 0;
+
+		// Flag the thirdparty as a vendor if it is not one yet
+		// (ex: a prospect or customer receiving its first supplier invoice).
+		if (!$thirdparty->fournisseur) {
+			$thirdparty->fournisseur = 1;
+			$tosave = 1;
+		}
+
+		if (empty($thirdparty->code_fournisseur) && $thirdparty->codefournisseur_modifiable()) {
+			$thirdparty->code_fournisseur = 'auto';
+			$allowmodcodefournisseur = 1;
+			$tosave = 1;
+		}
+		if (!empty($thirdparty->client) && empty($thirdparty->code_client) && $thirdparty->codeclient_modifiable()) {
+			$thirdparty->code_client = 'auto';
+			$allowmodcodeclient = 1;
+			$tosave = 1;
+		}
+
+		// This function never sets an extrafield on a thirdparty, so it must not rewrite them, and it has
+		// to say so explicitly: from Dolibarr 20 on, fetch() pre-fills array_options with a null entry for
+		// every declared extrafield, and update() hands that array to insertExtraFields(), which refuses
+		// the WHOLE update as soon as one of those fields is mandatory and empty. Emptied, array_options
+		// makes insertExtraFields() return 0 without touching the stored row.
+		$thirdparty->array_options = array();
+
+		return $tosave;
+	}
+
+	/**
+	 * Extract the phone number out of what a received document carries as a phone or fax number.
+	 *
+	 * The telephone number of the seller contact (BT-42) is a Text, and so is the fax number the
+	 * EXTENDED profile adds next to it (BT-X-107, outside EN 16931): vendors do add a sentence to them
+	 * ("09 77 40 50 60 (service gratuit + prix appel)"), which no longer fits the phone column of a
+	 * thirdparty. A value that is already made of number characters only is returned untouched,
+	 * whatever its local formatting; anything else is reduced to the first group of at least 6 digits
+	 * it holds, and an empty string is returned when it holds none.
+	 *
+	 * @param	string	$value	Phone or fax number as written in the document
+	 * @return	string			Phone number to save, or an empty string when there is none to save
+	 */
+	private function _extractPhoneNumberFromDocument($value)
+	{
+		$value = trim((string) $value);
+		if ($value === '') {
+			return '';
+		}
+
+		// Already a number: keep what the vendor wrote, separators included.
+		if (preg_match('/^[+(]?[0-9][0-9 .\/()+-]*$/', $value)) {
+			return $value;
+		}
+
+		if (preg_match_all('/[+]?[0-9][0-9 .\/()-]*/', $value, $matches)) {
+			foreach ($matches[0] as $candidate) {
+				$candidate = trim($candidate, " .-/()");
+				if (strlen(preg_replace('/[^0-9]/', '', $candidate)) >= 6) {
+					return $candidate;
+				}
+			}
+		}
+
+		return '';
+	}
+
+	/**
 	 * Search an existing Dolibarr product matching an e-invoice line. Read only: nothing is created.
 	 *
 	 * Note: this is the matching part (steps 1 to 4 + default routing) of _findOrCreateProductFromEinvoiceLine().
@@ -1055,7 +1405,7 @@ trait CommonProtocol
 	 * flow, if the line is already resolved or not, without importing anything.
 	 *
 	 * @param 	array 	$lineData 	Array containing invoice line data extracted from XML
-	 * @return 	array{res:int, message:string, matchtype?:string}   'res' = ID of the product found, 0 if no product found. 'matchtype' tells how it was resolved ('defaultrouting' when the line fell back on the default product of the vendor).
+	 * @return 	array{res:int, message:string, matchtype?:string, routingtype?:string, actioncode?:string, action?:string, actionurl?:string, actiondata?:array<string,mixed>, allactiondata?:array<string,array<string,mixed>>}   'res' = ID of the product found, 0 if no product found, -1 when a mixed invoice needs a default the setup does not choose. 'matchtype' tells how it was resolved ('defaultrouting' when the line fell back on a default of the vendor, 'routingtype' then says which one).
 	 */
 	public function findProductFromEinvoiceLine($lineData)
 	{
@@ -1064,20 +1414,31 @@ trait CommonProtocol
 		$einvoicing = new EInvoicing($db);
 
 		// Search in product supplier prices table using prodsellerid (the ref of product of the vendor)
-		$sql = "SELECT p.rowid ";
-		$sql .= " FROM " . MAIN_DB_PREFIX . "product as p ";
-		$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp ON pfp.fk_product = p.rowid ";
-		$sql .= " WHERE (pfp.ref_fourn = '" . $db->escape($lineData['prodsellerid'] ?? '') . "' ";
-		$sql .= " OR pfp.ref_fourn = '" . $db->escape($lineData['prodname'] ?? '') . "') ";
-		$sql .= " AND pfp.fk_soc = " . intval($lineData['supplierId'] ?? 0) . " ";
-		$sql .= " AND p.entity IN (" . getEntity('product') . ")";
-		$sql .= " LIMIT 1";
-		$resql = $db->query($sql);
-		if ($resql && $db->num_rows($resql) > 0) {
-			$obj = $db->fetch_object($resql);
-			dol_syslog(__METHOD__ . ' Found product by prodsellerid or prodname as ref_fourn: ' . $obj->rowid);
-			return array('res' => $obj->rowid, 'message' => 'Product found by prodsellerid');
-			// No match found, continue to next step
+		// An absent reference is not a search key: looked up as it stands it matches any vendor price
+		// row whose ref_fourn is empty, and binds the line to a product that has nothing to do with it.
+		$sellerref = trim((string) ($lineData['prodsellerid'] ?? ''));
+		$searchname = trim((string) ($lineData['prodname'] ?? ''));
+		if ($sellerref !== '' || $searchname !== '') {
+			$sql = "SELECT p.rowid ";
+			$sql .= " FROM " . MAIN_DB_PREFIX . "product as p ";
+			$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp ON pfp.fk_product = p.rowid ";
+			if ($sellerref !== '' && $searchname !== '') {
+				$sql .= " WHERE (pfp.ref_fourn = '" . $db->escape($sellerref) . "' OR pfp.ref_fourn = '" . $db->escape($searchname) . "') ";
+			} elseif ($sellerref !== '') {
+				$sql .= " WHERE pfp.ref_fourn = '" . $db->escape($sellerref) . "' ";
+			} else {
+				$sql .= " WHERE pfp.ref_fourn = '" . $db->escape($searchname) . "' ";
+			}
+			$sql .= " AND pfp.fk_soc = " . intval($lineData['supplierId'] ?? 0) . " ";
+			$sql .= " AND p.entity IN (" . getEntity('product') . ")";
+			$sql .= " LIMIT 1";
+			$resql = $db->query($sql);
+			if ($resql && $db->num_rows($resql) > 0) {
+				$obj = $db->fetch_object($resql);
+				dol_syslog(__METHOD__ . ' Found product by prodsellerid or prodname as ref_fourn: ' . $obj->rowid);
+				return array('res' => $obj->rowid, 'message' => 'Product found by prodsellerid');
+				// No match found, continue to next step
+			}
 		}
 
 		// Fall back on the canonical form of the reference, for the vendors that do not write it
@@ -1106,7 +1467,8 @@ trait CommonProtocol
 		// TODO
 
 		// if Buyer Reference (prodbuyerid) is available search prodbuyerid = internal product reference
-		if (!empty($lineData['prodbuyerid'])) {
+		// A reference is a string, so its emptiness is tested on the string: empty() also answers true on '0'.
+		if (trim((string) ($lineData['prodbuyerid'] ?? '')) !== '') {
 			$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
 			$sql .= " WHERE ref = '" . $db->escape($lineData['prodbuyerid']) . "' OR rowid = '" . $db->escape($lineData['prodbuyerid']) . "' ";
 			$sql .= " AND entity IN (" . getEntity('product') . ")";
@@ -1120,14 +1482,14 @@ trait CommonProtocol
 		}
 
 		// Check with EI- prefix for product imported using prodsellerid as internal reference with EI- prefix
-		if (!empty($lineData['prodsellerid']) && $lineData['prodsellerid'] !== "") {
+		if (trim((string) ($lineData['prodsellerid'] ?? '')) !== '') {
 			// The reference is sanitized when the product is created (see
 			// _findOrCreateProductFromEinvoiceLine), so the lookup has to apply the same transform.
 			// A vendor reference holding a character forbidden in a file name is stored as
 			// 'EI-A1234_10_42' but was looked up as 'EI-A1234|10|42', so the module could never
 			// find back a product it had created itself.
 			$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
-			$sql .= " WHERE ref = 'EI-" . $db->escape(dol_sanitizeFileName($lineData['prodsellerid'])) . "'";
+			$sql .= " WHERE ref = '" . $db->escape(dol_substr('EI-' . dol_sanitizeFileName($lineData['prodsellerid']), 0, 128)) . "'";
 			$sql .= " AND entity IN (" . getEntity('product') . ")";
 			$sql .= " LIMIT 1";
 			$resql = $db->query($sql);
@@ -1140,7 +1502,7 @@ trait CommonProtocol
 
 		// Text Search using prodname
 		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
-		$sql .= " WHERE label = '" . $db->escape($lineData['prodname'] ?? '') . "'";
+		$sql .= " WHERE label = '" . $db->escape(trim(dol_substr((string) ($lineData['prodname'] ?? ''), 0, 255))) . "'";
 		$sql .= " AND entity IN (" . getEntity('product') . ")";
 		$resql = $db->query($sql);
 		if ($resql) {
@@ -1151,42 +1513,114 @@ trait CommonProtocol
 			}
 		}
 
-		// If not found, we check by using the default product ID on thirdpary level
-		$resFetchP = $einvoicing->fetchDefaultRouting($lineData['supplierId'] ?? 0, 'product');
-		if (!empty($resFetchP) && $resFetchP != '-1') {
-			$product_id = (string) $resFetchP;		// Can be 'idprod_123' (product id) or '456' (supplier ref id)
-			if (preg_match('/^idprod_/', $product_id)) {
-				$productId = str_replace('idprod_', '', $product_id);
-				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
-				$sql .= " WHERE rowid = '" . (int) $productId . "'";
-				$sql .= " AND entity IN (" . getEntity('product') . ")";
-				$sql .= " LIMIT 1";
-				$resql = $db->query($sql);
-				if ($resql && $db->num_rows($resql) > 0) {
-					$obj = $db->fetch_object($resql);
-					dol_syslog(__METHOD__ . ' Default routing product found for supplier=' . $lineData['supplierId'] . ' product=' . $obj->rowid);
-					return array('res' => $obj->rowid, 'message' => 'Line product not found, but a default routing product ID was found for this supplier', 'matchtype' => 'defaultrouting');
-				}
-			} else {
-				// We search in product supplier prices table.
-				$sql = "SELECT pfp.fk_product";
-				$sql .= " FROM " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp";
-				$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product as p";
-				$sql .= " ON p.rowid = pfp.fk_product";
-				$sql .= " WHERE pfp.rowid = " . ((int) $product_id);
-				$sql .= " AND pfp.fk_soc = " . ((int) $lineData['supplierId']);
-				$sql .= " AND p.entity IN (" . getEntity('product') . ")";
-				$sql .= " LIMIT 1";
-				$resql = $db->query($sql);
-				if ($resql && $db->num_rows($resql) > 0) {
-					$obj = $db->fetch_object($resql);
-					dol_syslog(__METHOD__ . ' Default routing product found for supplier=' . $lineData['supplierId'] . ' product=' . $obj->fk_product);
-					return array('res' => $obj->fk_product, 'message' => 'Line product not found, but a default routing product was found for this supplier', 'matchtype' => 'defaultrouting');
+		// If not found, fall back on the default of the vendor: the default product, or the default service
+		// when the billing framework of the document (BT-23) says it bills services.
+		$supplierId = (int) ($lineData['supplierId'] ?? 0);
+		$routingtype = self::defaultRoutingTypeForFramework($lineData['businessProcessId'] ?? '');
+		if ($routingtype === '') {
+			// A mixed invoice (M) does not say which of the two defaults its lines are: the setup has to.
+			if ($supplierId > 0 && ($this->resolveDefaultRouting($einvoicing, $supplierId, 'product') > 0 || $this->resolveDefaultRouting($einvoicing, $supplierId, 'service') > 0)) {
+				return self::mixedFrameworkUnsetError($supplierId);
+			}
+		} else {
+			// The other default stays a fallback, so a vendor that has only one default keeps using it.
+			foreach (array($routingtype, ($routingtype == 'service' ? 'product' : 'service')) as $type) {
+				$productId = $this->resolveDefaultRouting($einvoicing, $supplierId, $type);
+				if ($productId > 0) {
+					dol_syslog(__METHOD__ . ' Default routing ' . $type . ' found for supplier=' . $supplierId . ' product=' . $productId);
+					return array('res' => $productId, 'message' => 'Line product not found, but a default ' . $type . ' was found for this supplier', 'matchtype' => 'defaultrouting', 'routingtype' => $type);
 				}
 			}
 		}
 
 		return array('res' => 0, 'message' => 'No product found for this e-invoice line');
+	}
+
+	/**
+	 * Which default of the vendor a line falls back on, from the billing framework of the document (BT-23).
+	 * Its first letter is B (goods), S (services) or M (both): EINVOICING_DEFAULT_ROUTING_MIXED decides for M.
+	 *
+	 * @param 	string 	$framework 	BT-23 of the document, empty when absent
+	 * @return 	string 				'product', 'service', or '' for a mixed framework the setup does not decide
+	 */
+	public static function defaultRoutingTypeForFramework($framework)
+	{
+		$letter = strtoupper(substr(trim((string) $framework), 0, 1));
+		if ($letter === 'S') {
+			return 'service';
+		}
+		if ($letter === 'M') {
+			$mixed = getDolGlobalString('EINVOICING_DEFAULT_ROUTING_MIXED');
+			return in_array($mixed, array('product', 'service'), true) ? $mixed : '';
+		}
+
+		return 'product';
+	}
+
+	/**
+	 * Product a default routing of the vendor points at.
+	 *
+	 * @param 	EInvoicing 				$einvoicing 	EInvoicing handler
+	 * @param 	int 					$supplierId 	Vendor id
+	 * @param 	'product'|'service' 	$type 			Which default
+	 * @return 	int 									Product id, 0 when the vendor has no such default or it points at nothing
+	 */
+	private function resolveDefaultRouting($einvoicing, $supplierId, $type)
+	{
+		global $db;
+
+		$value = (string) $einvoicing->fetchDefaultRouting($supplierId, $type);		// 'idprod_123' (product id) or '456' (supplier price id)
+		if ($supplierId <= 0 || $value === '' || $value === '0' || $value === '-1') {
+			return 0;
+		}
+		if (preg_match('/^idprod_([0-9]+)$/', $value, $reg)) {
+			$sql = "SELECT rowid AS fk_product FROM " . MAIN_DB_PREFIX . "product";
+			$sql .= " WHERE rowid = " . ((int) $reg[1]);
+			$sql .= " AND entity IN (" . getEntity('product') . ")";
+		} else {
+			$sql = "SELECT pfp.fk_product";
+			$sql .= " FROM " . MAIN_DB_PREFIX . "product_fournisseur_price as pfp";
+			$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "product as p ON p.rowid = pfp.fk_product";
+			$sql .= " WHERE pfp.rowid = " . ((int) $value);
+			$sql .= " AND pfp.fk_soc = " . ((int) $supplierId);
+			$sql .= " AND p.entity IN (" . getEntity('product') . ")";
+		}
+		$sql .= " LIMIT 1";
+		$resql = $db->query($sql);
+		if ($resql && ($obj = $db->fetch_object($resql))) {
+			return (int) $obj->fk_product;
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Error of a mixed invoice (BT-23 in M) whose line needs a default while the setup says none applies.
+	 *
+	 * @param 	int 	$supplierId 	Vendor id
+	 * @return 	array{res:int, message:string, businessmessage:string, actioncode:string, action:string, actionurl:string, actiondata:array<string,mixed>, allactiondata:array<string,array<string,mixed>>}
+	 */
+	private static function mixedFrameworkUnsetError($supplierId)
+	{
+		global $langs, $user;
+
+		$langs->load("einvoicing@einvoicing");
+		$setupUrl = dol_buildpath('/einvoicing/admin/setup_options.php', 1) . '#EINVOICING_DEFAULT_ROUTING_MIXED';
+		$action = $user->admin
+			? '<a class="button small smallpaddingimp" style="display:inline-block;width:auto;" href="' . dol_escape_htmltag($setupUrl) . '" target="_blank">'
+			: '<a class="button disabled classfortooltip small smallpaddingimp" style="display:inline-block;width:auto;" href="#" title="' . dol_escape_htmltag($langs->trans("NotEnoughPermissions")) . '">';
+		$action .= '<i class="fas fa-cog"></i> ' . $langs->trans('SetDefaultRoutingMixed') . '</a>';
+
+		return array(
+			'res' => -1,
+			'message' => $langs->transnoentitiesnoconv('ErrorDefaultRoutingMixedUnset'),
+			'businessmessage' => $langs->trans('ErrorDefaultRoutingMixedUnset'),
+			'actioncode' => 'DEFAULT_ROUTING_MIXED_UNSET',
+			'action' => $action,
+			'actionurl' => $setupUrl,
+			'actiondata' => array('socid' => (int) $supplierId),
+			'allactiondata' => array('setdefaultroutingmixed' => array('label' => $langs->trans('SetDefaultRoutingMixed'), 'url' => $setupUrl, 'actiondata' => array('socid' => (int) $supplierId))),
+		);
 	}
 
 	/**
@@ -1217,9 +1651,9 @@ trait CommonProtocol
 
 		$einvoicing = new EInvoicing($db);
 
-		// Steps 1 to 4: try to find an existing product
+		// Steps 1 to 4: try to find an existing product. A negative answer is an error the user has to solve.
 		$resFind = $this->findProductFromEinvoiceLine($lineData);
-		if ($resFind['res'] > 0) {
+		if ($resFind['res'] != 0) {
 			return $resFind;
 		}
 
@@ -1228,10 +1662,14 @@ trait CommonProtocol
 			// Auto-create product
 			$product = new Product($db);
 			$product->type 		= $this->_detectProductTypeFromEinvoiceLine($lineData);
-			$product->ref 		= 'EI-' . dol_sanitizeFileName(!empty($lineData['prodsellerid'] && $lineData['prodsellerid'] !== "") ? $lineData['prodsellerid'] : uniqid());
-			$product->ref_ext 	= trim($lineData['prodsellerid'] ?? '');
+			// The && was inside the empty(), which warns on an absent key instead of being protected by it.
+			$sellerref = trim((string) ($lineData['prodsellerid'] ?? ''));
+			$product->ref 		= dol_substr('EI-' . dol_sanitizeFileName($sellerref !== '' ? $sellerref : uniqid()), 0, 128);
+			$product->ref_ext 	= $sellerref;
+			// BT-153 has no maximum length (EN 16931, BR-FR) and product.label holds 255 characters: a longer
+			// name was refused by the database and stopped the whole synchronization. The line keeps it whole.
 			$product->label 	= !empty($lineData['prodname'])
-				? $lineData['prodname']
+				? trim(dol_substr($lineData['prodname'], 0, 255))
 				: 'Imported product from supplier invoice (Ref: ' . $lineData['parentDocumentNo'] . ')';
 			$product->description = trim($lineData['proddesc'] ?? '');
 			$product->tva_tx 	= (float) ($lineData['rateApplicablePercent'] ?? 0);
@@ -1301,10 +1739,10 @@ trait CommonProtocol
 			$createParams = [];
 			$allactiondata = [];
 
-			if (!empty($prodRef)) {
+			if ($prodRef !== '') {
 				$errorDetails[] = 'Ref: '.$prodRef;
 
-				$createParams['ref'] = 'EI-' . dol_sanitizeFileName(!empty($lineData['prodsellerid'] && $lineData['prodsellerid'] !== "") ? $lineData['prodsellerid'] : uniqid());
+				$createParams['ref'] = 'EI-' . dol_sanitizeFileName($prodSupplierRef !== '' ? $prodSupplierRef : uniqid());
 
 				$createParams['ref_ext'] = $prodRef;
 			}
@@ -1312,7 +1750,7 @@ trait CommonProtocol
 				$errorDetails[] = 'Vendor id: ' . $vendorId;
 				$createParams['socid'] = $vendorId;							// TODO Dolibarr must be able to handle this parameter
 			}
-			if (!empty($prodSupplierRef)) {
+			if ($prodSupplierRef !== '') {
 				$errorDetails[] = 'Supplier ref: ' . $prodSupplierRef;
 				$createParams['supplierref'] = $prodSupplierRef;			// TODO Dolibarr must be able to handle this parameter
 			}
@@ -1343,6 +1781,15 @@ trait CommonProtocol
 			// Create URL to prefill product creation form
 			$createUrl = DOL_URL_ROOT . '/product/card.php?action=create';
 			if (!empty($createParams)) {
+				// The Dolibarr GET firewall (analyseVarsForSqlAndScriptsInjection) rejects " < > in any URL
+				// parameter, so a line label/description carrying them would 403 before the prefilled creation
+				// form even opens. Use the core helper (replaces " with ' and removes < >, identical from
+				// v18 to v25) to drop them from the prefill - a convenience the operator reviews and edits.
+				foreach ($createParams as $cpKey => $cpVal) {
+					if (is_string($cpVal)) {
+						$createParams[$cpKey] = dol_string_nospecial($cpVal, "'", array('"'), array('<', '>'));
+					}
+				}
 				$createUrl .= '&' . http_build_query($createParams);
 			}
 			$createUrl .= '&backtopage=' . urlencode(dol_buildpath('/einvoicing/document_list.php', 1));
@@ -1383,9 +1830,14 @@ trait CommonProtocol
 			}
 
 			// Third choice: set a default product on the vendor thirdparty (used for future imports when no product is found)
+			// The field lives on the thirdparty card, so this one takes the right to edit it. Greyed without it,
+			// like the button above. "disabled" and not "buttonRefused": the eldy theme dropped the rule for
+			// that class in Dolibarr 24, which would leave the button looking enabled there.
 			if (!empty($vendorId)) {
 				$thirdpartyUrl = dol_buildpath('/societe/card.php', 1) . '?socid=' . ((int) $vendorId) . '&action=edit&highlight=routing_product_id#treinvoicing';
-				$action .= '<a class="button small smallpaddingimp" style="' . $btnStyle . '" href="' . dol_escape_htmltag($thirdpartyUrl) . '" target="_blank">';
+				$action .= $user->hasRight('societe', 'creer')
+					? '<a class="button small smallpaddingimp" style="' . $btnStyle . '" href="' . dol_escape_htmltag($thirdpartyUrl) . '" target="_blank">'
+					: '<a class="button disabled classfortooltip small smallpaddingimp" style="' . $btnStyle . '" href="#" title="' . dol_escape_htmltag($langs->trans("NotEnoughPermissions")) . '">';
 				$action .= '<i class="fas fa-star"></i> ';
 				$action .= $langs->trans('SetDefaultProductForThirdparty');
 				$action .= '</a>';
@@ -1408,17 +1860,60 @@ trait CommonProtocol
 
 
 	/**
+	 * Extract a SIRET from the seller's global identifiers (sellerGlobalIds / sellerLegalOrgId), the
+	 * only identifier precise enough to tell apart two établissements of one French entity that share
+	 * a single VAT number (the number is derived from the SIREN alone, not the SIRET).
+	 *
+	 * @param	array<string,mixed>	$sellerInfo	Seller information extracted from the e-invoice
+	 * @param	string	$sellerCountryCode	Country code of the seller
+	 * @return	string						Cleaned SIRET (no spaces), '' when the document carries none
+	 */
+	private function _extractSellerSiret($sellerInfo, $sellerCountryCode)
+	{
+		if (empty($sellerInfo['sellerGlobalIds']) || !is_array($sellerInfo['sellerGlobalIds'])) {
+			return '';
+		}
+
+		foreach ($sellerInfo['sellerGlobalIds'] as $idScheme => $globalId) {
+			if (!empty($globalId) && $this->_mapGlobalIdSchemeToIdprof($idScheme, $sellerCountryCode, $globalId) === 'idprof2') {
+				return removeAllSpaces($globalId);
+			}
+		}
+
+		return '';
+	}
+
+
+	/**
 	 * Map global ID scheme to Dolibarr idprof field
+	 *
+	 * 0002 and 0009 name the register they come from, 0225 does not: it is the French e-invoicing
+	 * ADDRESS scheme, whose value is a SIREN, a SIRET, or either of them suffixed with a routing code
+	 * (rules G1.83, G1.93 and G1.115 of the French specification). Its shape is therefore what decides
+	 * where it is stored, and a suffixed one is stored nowhere: it identifies a mailbox, not a company.
+	 * 0231 (the SIREN of a VAT group) and 0088 (a GLN) are left out on purpose - neither is the
+	 * registration identifier of the party the document names.
 	 *
 	 * @param 	string 	$scheme 		Global ID scheme code
 	 * @param	string	$countrycode	Country code
-	 * @return 	string 					Corresponding idprof field name
+	 * @param	string	$value			Identifier carried under that scheme, read when the scheme alone does not decide
+	 * @return 	string 					Corresponding idprof field name, empty when the identifier is not one
 	 */
-	private function _mapGlobalIdSchemeToIdprof($scheme, $countrycode = '')
+	private function _mapGlobalIdSchemeToIdprof($scheme, $countrycode = '', $value = '')
 	{
+		if ($scheme === '0225') {
+			$digits = preg_replace('/\D/', '', (string) $value);
+			if ($digits !== (string) $value) {
+				return '';
+			}
+			if (dol_strlen($digits) == 9) {
+				return 'idprof1';	// SIREN
+			}
+			return (dol_strlen($digits) == 14) ? 'idprof2' : '';	// SIRET
+		}
+
 		$map = [
 			'0002' => 'idprof1',	// SIREN
-			'0225' => 'idprof1',	// SIREN
 			'0009' => 'idprof2',	// SIRET
 		];
 
@@ -1619,6 +2114,31 @@ trait CommonProtocol
 	}
 
 	/**
+	 * Tell the EN 16931 VAT category a VAT exemption reason code (BT-121) imposes.
+	 *
+	 * The code list annotates some of its entries with the category they go with - "Only use with VAT
+	 * category code O" for VATEX-EU-O - so the dictionary entry the seller fills already carries the
+	 * qualification, and nothing else has to be asked of them.
+	 *
+	 * Only "Not subject to VAT" is mapped here. The three other bound codes (AE, G, IC) describe
+	 * situations the country tests above already decide, and reading them from the dictionary as well
+	 * would let a mis-filled entry contradict the seller and buyer countries.
+	 *
+	 * @param 	string 	$vatex 	VAT exemption reason code, uppercased
+	 * @return 	string 			Category code the list imposes, or '' when it imposes none
+	 */
+	protected function vatCategoryForExemptionCode($vatex)
+	{
+		// Dolibarr 24 is where llx_c_tva.einvoice_vatex appears, and it is the only place a seller can
+		// state the code without a hidden constant. Below that the category keeps its previous value.
+		if ((float) DOL_VERSION < 24.0) {
+			return '';
+		}
+
+		return strtoupper((string) $vatex) === 'VATEX-EU-O' ? 'O' : '';
+	}
+
+	/**
 	 * Get the category of the VAT rate and the VATEX code and reason.
 	 *
 	 * @param 	CommonInvoiceLine		$line			Invoice line
@@ -1777,11 +2297,11 @@ trait CommonProtocol
 				// registration identifier (BT-32), the buyer with its VAT identifier (BT-48) or its legal
 				// registration identifier (BT-47). Reporting it here names the record to complete; left to the
 				// Schematron it comes back from the platform as a rejected document.
-				$buyerThirdparty = empty($buyer->thirdparty) ? null : $buyer->thirdparty;
+				$buyerThirdparty = empty($buyer->thirdparty) ? null : $buyer->thirdparty;	// @phpstan-ignore empty.property (Dolibarr 18 documents $thirdparty as always set, it stays empty until fetch_thirdparty())
 				if (empty($seller->tva_intra) && empty($seller->idprof1)) {
 					throw new Exception('BADVATNUMBER[BR-AE-02]: The VAT number or the professional id of the seller '.$seller->name.' is mandatory when a line is invoiced under the reverse charge (VAT category AE).');
 				}
-				if ($buyerThirdparty !== null && empty($buyerThirdparty->tva_intra) && empty($buyerThirdparty->idprof1)) {
+				if ($buyerThirdparty !== null && empty($buyerThirdparty->tva_intra) && empty(idprof($buyerThirdparty))) {
 					throw new Exception('BADVATNUMBER[BR-AE-03]: The VAT number or the legal registration id of the customer '.$buyerThirdparty->name.' is mandatory when a line is invoiced under the reverse charge (VAT category AE).');
 				}
 			}
@@ -1820,7 +2340,7 @@ trait CommonProtocol
 				$langs->load("compta");
 				$urltovatdic = DOL_URL_ROOT.'/admin/dict.php?id=10';
 				$errormsg = $langs->trans("UnknownVATEX1", $id, '0', $vat_src_code);
-				$errormsg .= '<br>'.$langs->trans("UnknownVATEX2b", '0', ($vat_src_code ? $vat_src_code : "''"), $urltovatdic, $langs->trans("VATExemptionCode"));
+				$errormsg .= '<br>'.$langs->trans("UnknownVATEX2b", '0', ($vat_src_code ? $vat_src_code : "''"), $urltovatdic, $langs->trans("EInvVATExemptionCode"));
 
 				throw new Exception('MISSINGSETUP: '.$errormsg);
 			}
@@ -1889,8 +2409,8 @@ trait CommonProtocol
 					if ((float) DOL_VERSION < 24.0) {
 						// We must use the reason found in the constant MAIN_VAT_EXEMPTION_CODE_FOR_0.00_XXXX
 						// List of VATEX: https://docs.peppol.eu/poacc/billing/3.0/codelist/vatex/
-						// TVA non applicable: article 261-4 CGI (comme médecin) VATEX-FR-CGI261-4, vente objet art
-						// VATEX-FR-I, vente objet antiquité VATEX-FR-J, vente agence voyage VATEX-EU-D,
+						// TVA non applicable: article 261-4 CGI (comme médecin) VATEX-FR-CGI261-4, vente art VATEX-FR-I,
+						// vente antiquité VATEX-FR-J, vente agence voyage VATEX-EU-D,
 						// debours (VAT paid by customer) VATEX-EU-79-C
 						$vatex = '';
 
@@ -1963,13 +2483,20 @@ trait CommonProtocol
 							$langs->load("compta");
 							$urltovatdic = DOL_URL_ROOT.'/admin/dict.php?id=10';
 							$errormsg = $langs->trans("UnknownVATEX1", $id, '0', $vat_src_code);
-							$errormsg .= '<br>'.$langs->trans("UnknownVATEX2b", '0', ($vat_src_code ? $vat_src_code : "''"), $urltovatdic, $langs->trans("VATExemptionCode"));
+							$errormsg .= '<br>'.$langs->trans("UnknownVATEX2b", '0', ($vat_src_code ? $vat_src_code : "''"), $urltovatdic, $langs->trans("EInvVATExemptionCode"));
 							//$errormsg .= ' '.$langs->trans("ClickHere", $constantforvatex);		// Go on dictionary page
 
 							throw new Exception('MISSINGSETUP: '.$errormsg);
 						} else {
 							$exemptionReasonCode = $vatex;
 							$exemptionReason = '';
+							// The dictionary entry can say the operation is outside the scope of VAT rather than
+							// exempt from it (CGI art. 258 for a supply of goods located abroad, for instance).
+							// "E" would announce a taxable operation that a rule exempts, which is another claim.
+							$imposedCategory = $this->vatCategoryForExemptionCode($vatex);
+							if ($imposedCategory !== '') {
+								$categoryVAT = $imposedCategory;
+							}
 						}
 					}
 				}
@@ -2205,10 +2732,42 @@ trait CommonProtocol
 
 		$orderId = (int) $db->fetch_object($resql)->rowid;
 
+		// A draft imported again is already linked to the order: a second link breaks the unique key of
+		// element_element, and on PostgreSQL the transaction of the whole import with it.
+		$sqlLinked = "SELECT rowid FROM " . MAIN_DB_PREFIX . "element_element";
+		$sqlLinked .= " WHERE fk_source = " . ((int) $orderId) . " AND sourcetype = 'order_supplier'";
+		$sqlLinked .= " AND fk_target = " . ((int) $supplierInvoice->id) . " AND targettype = '" . $db->escape($supplierInvoice->element) . "'";
+		$resqlLinked = $db->query($sqlLinked);
+		if ($resqlLinked && $db->num_rows($resqlLinked) > 0) {
+			return '';
+		}
+
 		$res = $supplierInvoice->add_object_linked('order_supplier', $orderId);
 		if ($res > 0) {
 			$msg = $langs->trans('EInvoiceSupplierInvoiceLinkedToOrder', $orderReference);
 			dol_syslog(get_class($this) . '::_linkSupplierInvoiceToPurchaseOrder ' . $msg, LOG_DEBUG);
+
+			// Propagate extrafields from the purchase order to the supplier invoice.
+			// Only empty fields on the invoice are filled: values already set by the import are kept.
+			// insertExtraFields() silently ignores keys that are not defined for facture_fourn.
+			$order = new CommandeFournisseur($db);
+			if ($order->fetch($orderId) > 0) {
+				$order->fetch_optionals();
+				if (!empty($order->array_options)) {
+					$supplierInvoice->fetch_optionals();
+					$changed = false;
+					foreach ($order->array_options as $key => $value) {
+						if (isset($value) && $value !== '' && (!isset($supplierInvoice->array_options[$key]) || $supplierInvoice->array_options[$key] === '')) {
+							$supplierInvoice->array_options[$key] = $value;
+							$changed = true;
+						}
+					}
+					if ($changed) {
+						$supplierInvoice->insertExtraFields();
+					}
+				}
+			}
+
 			return $msg;
 		}
 
@@ -2224,12 +2783,24 @@ trait CommonProtocol
 	private static $UNTDID4461_TO_DOLIBARR_PAIEMENT_CODE = [
 		'10' => 'LIQ',	// Cash
 		'20' => 'CHQ',	// Check
+		'21' => 'CHQ',	// Banker's draft
+		'22' => 'CHQ',	// Certified banker's draft
 		'23' => 'TRA',	// Banque check
+		'24' => 'TRA',	// Bill of exchange awaiting acceptance
+		'25' => 'CHQ',	// Certified cheque
+		'26' => 'CHQ',	// Local cheque
 		'30' => 'VIR',	// Bank transfer
+		'31' => 'VIR',	// Debit transfer, a transfer within a giro system network
+		'42' => 'VIR',	// Payment to bank account
 		'45' => 'TIP',	// Referenced home-banking credit transfer
+		'48' => 'CB',	// Bank card, the generic code most senders use rather than 54
+		'49' => 'PRE',	// Direct debit, the generic code most senders use rather than 59
 		'54' => 'CB',	// Credit card
+		'55' => 'CB',	// Debit card, the dictionary of Dolibarr has one code for both cards
+		'58' => 'VIR',	// SEPA credit transfer, which BR-49/BR-50 put on a par with 30
 		'59' => 'PRE',	// SEPA direct debit
 		'68' => 'VAD',	// Online payment
+		'70' => 'LCR',	// Bill drawn by the creditor on the debtor, the French LCR
 		'1' => 'FAC',	// local payment method | not defined
 	];
 

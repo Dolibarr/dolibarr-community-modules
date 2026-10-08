@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2026 Pierre Grasswill
+ * Copyright (C) 2026      MB Informatique      <info@mb-informatique.fr>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -38,6 +39,7 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 
 require_once $dolibarrHtdocs . '/master.inc.php';
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
+require_once __DIR__ . '/../../class/utils/EmbeddedXmlReader.class.php';
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 
 /**
@@ -131,6 +133,32 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 		$this->assertCount(1, $lines);
 		$this->assertEmpty($lines[0]['linestatusreasoncode'], 'no BT-X-8 in the document, none in the line');
 		$this->assertTrue($this->isDetail($lines[0]), 'a line without a subtype is a regular item');
+	}
+
+	/**
+	 * Factur-X reads line references through EmbeddedXmlReader. The qualifier must survive that path so
+	 * an invoiced object identifier such as a phone number is not mistaken for an invoice reference.
+	 *
+	 * @return	void
+	 */
+	public function testFacturXReaderKeepsTheLineReferenceQualifier()
+	{
+		$xml = $this->documentWithLine('
+      <ram:AssociatedDocumentLineDocument><ram:LineID>000001</ram:LineID></ram:AssociatedDocumentLineDocument>
+      <ram:SpecifiedLineTradeSettlement>
+        <ram:AdditionalReferencedDocument>
+          <ram:IssuerAssignedID>0600000000</ram:IssuerAssignedID>
+          <ram:TypeCode>130</ram:TypeCode>
+          <ram:ReferenceTypeCode>AWV</ram:ReferenceTypeCode>
+        </ram:AdditionalReferencedDocument>
+      </ram:SpecifiedLineTradeSettlement>');
+
+		$documents = (new EmbeddedXmlReader($xml))->getLineAdditionalReferencedDocuments('000001');
+
+		$this->assertCount(1, $documents);
+		$this->assertSame('0600000000', $documents[0]['IssuerAssignedID']);
+		$this->assertSame('130', $documents[0]['typeCode']);
+		$this->assertSame('AWV', $documents[0]['referenceTypeCode']);
 	}
 
 	/**
@@ -302,6 +330,8 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 
 	/**
 	 * A line at zero on both sides - a free sample, a heading - is not an anomaly and must stay silent.
+	 * BT-131 absent, not stated as 0.0: an explicit zero is a real amount (a line whose net price a
+	 * charge absorbs entirely), not the "nothing announced" this test is about.
 	 *
 	 * @return	void
 	 */
@@ -311,7 +341,7 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 
 		$protocol = new CIIProtocol($db);
 
-		$parsedLine = array('lineid' => '002', 'lineTotalAmount' => 0.0, 'linestatusreasoncode' => '');
+		$parsedLine = array('lineid' => '002', 'linestatusreasoncode' => '');
 		$amounts = $this->callResolveLineAmounts($protocol, $parsedLine, 0.0, 0.0);
 
 		$this->assertSame(0.0, $amounts['qty']);
@@ -483,6 +513,7 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 
 	/**
 	 * A free line - zero on both sides - is not an anomaly and must stay silent, credit or not.
+	 * BT-131 absent, not stated as 0.0: see testAZeroLineIsNotReported().
 	 *
 	 * @return	void
 	 */
@@ -492,7 +523,7 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 
 		$protocol = new CIIProtocol($db);
 
-		$parsedLine = array('lineid' => '22', 'lineTotalAmount' => 0.0, 'linestatusreasoncode' => '');
+		$parsedLine = array('lineid' => '22', 'linestatusreasoncode' => '');
 		$amounts = $this->callResolveLineAmounts($protocol, $parsedLine, 1.0, 0.0);
 
 		$this->assertSame(1.0, $amounts['qty'], 'nothing to repair, the document announces nothing');
@@ -521,20 +552,21 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 	 * Call CIIProtocol::resolveLineAmounts() through reflection, the same way LineWithoutQuantityTest
 	 * does: it is what tells whether the line the import is about to write rebuilds BT-131.
 	 *
-	 * @param	array	$parsedLine		One line as parseInvoiceLines() returns it
-	 * @param	float	$qty			Quantity read from the document
-	 * @param	float	$subprice		Unit price resolved by the caller
-	 * @param	float	$remisePercent	Discount percent resolved by the caller
+	 * @param	array	$parsedLine			One line as parseInvoiceLines() returns it
+	 * @param	float	$qty				Quantity read from the document
+	 * @param	float	$subprice			Unit price resolved by the caller
+	 * @param	float	$remisePercent		Discount percent resolved by the caller
+	 * @param	bool	$mergeLineCharges	True when the line's charges are folded into its description (issue #969)
 	 * @return	array{qty:float,subprice:float,remise_percent:float,warning:string}	What the import would store
 	 */
-	private function amounts(array $parsedLine, $qty, $subprice, $remisePercent = 0.0)
+	private function amounts(array $parsedLine, $qty, $subprice, $remisePercent = 0.0, $mergeLineCharges = false)
 	{
 		global $db;
 
 		$method = new ReflectionMethod(CIIProtocol::class, 'resolveLineAmounts');
 		$method->setAccessible(true);
 
-		return $method->invoke(new CIIProtocol($db), $parsedLine, $qty, $subprice, $remisePercent);
+		return $method->invoke(new CIIProtocol($db), $parsedLine, $qty, $subprice, $remisePercent, $mergeLineCharges);
 	}
 
 	/**
@@ -747,6 +779,33 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 	}
 
 	/**
+	 * A line whose net price is entirely made of its own charge - a flat fee billed with no separate
+	 * priced item, the shape of a real FedEx invoice line ("Frais de dossier", net price 15, one charge
+	 * of 15, BT-131 announcing 15). $announced (BT-131 less the charge) is 0.0, exactly like a line that
+	 * announces nothing at all - but BT-131 is present here, so the base line has to be corrected to 0.0
+	 * rather than left at its naive (quantity, unit price): buildLineChargeLines() adds the charge as its
+	 * own line right after, and the two together must total 15, not 30.
+	 *
+	 * @return	void
+	 */
+	public function testAChargeThatIsTheWholeOfTheLineIsNotCountedTwice()
+	{
+		$parsedLine = array(
+			'lineid' => '7',
+			'lineTotalAmount' => 15.0,
+			'lineAllowances' => array(
+				array('indicator' => 'true', 'actualAmount' => 15.0, 'reason' => 'Frais de dossier'),
+			),
+		);
+
+		$amounts = $this->amounts($parsedLine, 1.0, 15.0);
+
+		$this->assertSame(1.0, $amounts['qty']);
+		$this->assertSame(0.0, $amounts['subprice'], 'the base line carries nothing, the charge line carries the 15');
+		$this->assertNotSame('', $amounts['warning'], 'the correction is reported like any other');
+	}
+
+	/**
 	 * A line announcing nothing has no amount to be imported at: BT-131 is what a line is worth, and an
 	 * absent one is not a figure to rewrite a price against. It keeps what its own price rebuilds.
 	 *
@@ -754,7 +813,7 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 	 */
 	public function testALineAnnouncingNothingKeepsWhatItsPriceRebuilds()
 	{
-		$amounts = $this->amounts(array('lineid' => '5', 'lineTotalAmount' => 0.0), 2.0, 40.0);
+		$amounts = $this->amounts(array('lineid' => '5'), 2.0, 40.0);
 
 		$this->assertSame(40.0, $amounts['subprice'], 'nothing is rewritten against an absent BT-131');
 		$this->assertStringContainsString('carries the rebuilt amount', $amounts['warning']);
@@ -952,8 +1011,8 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 	}
 
 	/**
-	 * A document that does state BT-137 is resolved exactly as before: the whole existing corpus of
-	 * received documents goes through this branch and must not move.
+	 * A document stating a BT-137 that is the gross of its line is resolved exactly as before: the whole
+	 * existing corpus of received documents states it that way and must not move.
 	 *
 	 * @return	void
 	 */
@@ -968,9 +1027,121 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 
 		$discount = $this->call('resolveLineDiscountPercent', array($lines[0]['lineAllowances'], $lines[0]['lineTotalAmount']));
 
-		$this->assertEqualsWithDelta(500.25, $discount['base'], 0.001, 'the base of the document is the one used');
+		$this->assertEqualsWithDelta(500.25, $discount['base'], 0.001, 'the gross of the line, which is what BT-137 states here');
 		$this->assertEqualsWithDelta(10.001, $discount['percent'], 0.0001);
 		$this->assertEqualsWithDelta(450.22, $this->importedLine($lines[0])['rebuilt'], 0.011, 'and the line still totals BT-131');
+	}
+
+	/**
+	 * A BT-137 stated per unit while BT-136 is the allowance of the whole line (reported in #1011): the
+	 * percentage is taken against the gross of the line, so the unit price of the document survives.
+	 *
+	 * @return	void
+	 */
+	public function testABaseStatedPerUnitIsNotTheBaseOfTheDiscount()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		// Quantity 2 at 19.85, an allowance of 17.08 for the two units and a BT-137 of 19.85, which is
+		// the base of a single one. BT-131 = 39.70 - 17.08 = 22.62.
+		$lines = $protocol->parseInvoiceLines($this->discountedLine(2.0, 19.85, 17.08, 22.62, 19.85));
+		$this->assertEqualsWithDelta(19.85, $lines[0]['lineAllowances'][0]['basisAmount'], 0.001, 'BT-137 is read, and it covers one unit');
+
+		$discount = $this->call('resolveLineDiscountPercent', array($lines[0]['lineAllowances'], $lines[0]['lineTotalAmount']));
+
+		$this->assertEqualsWithDelta(39.70, $discount['base'], 0.001, 'the gross of the line, not the base of one unit');
+		$this->assertEqualsWithDelta(43.0227, $discount['percent'], 0.0001);
+		$this->assertEqualsWithDelta(86.0453, round((17.08 / 19.85) * 100, 4), 0.0001, 'what the base of one unit computed');
+
+		$imported = $this->importedLine($lines[0]);
+
+		$this->assertEqualsWithDelta(2.0, $imported['qty'], 0.001, 'the quantity of the document is kept');
+		$this->assertEqualsWithDelta(19.85, $imported['subprice'], 0.001, 'and so is its unit price');
+		$this->assertEqualsWithDelta(22.62, $imported['rebuilt'], 0.011, 'the line totals BT-131');
+		$this->assertSame('', $imported['warning'], 'with nothing left to repair or report');
+	}
+
+	/**
+	 * The same base stated per unit, over a quantity large enough for the percentage it used to give to
+	 * pass 100: the line was then rebuilt upside down and imported as a single unit, losing both the
+	 * quantity and the unit price of the document.
+	 *
+	 * @return	void
+	 */
+	public function testABaseStatedPerUnitNoLongerCostsTheLineItsQuantity()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		// Quantity 5 at 100.00, an allowance of 150.00 over the line and a BT-137 of 100.00: 150 percent
+		// of a single unit. BT-131 = 500.00 - 150.00 = 350.00.
+		$lines = $protocol->parseInvoiceLines($this->discountedLine(5.0, 100.00, 150.00, 350.00, 100.00));
+
+		$discount = $this->call('resolveLineDiscountPercent', array($lines[0]['lineAllowances'], $lines[0]['lineTotalAmount']));
+
+		$this->assertEqualsWithDelta(30.0, $discount['percent'], 0.0001);
+		$this->assertEqualsWithDelta(150.0, round((150.00 / 100.00) * 100, 4), 0.0001, 'the base of one unit stated more than the whole line');
+
+		$imported = $this->importedLine($lines[0]);
+
+		$this->assertEqualsWithDelta(5.0, $imported['qty'], 0.001, 'the five units of the document are still five');
+		$this->assertEqualsWithDelta(100.00, $imported['subprice'], 0.001);
+		$this->assertEqualsWithDelta(350.00, $imported['rebuilt'], 0.011, 'the line totals BT-131, as it did before');
+		$this->assertSame('', $imported['warning']);
+	}
+
+	/**
+	 * A BT-137 covering part of the line - an allowance granted on some of the units only - is a base
+	 * Dolibarr cannot apply a percentage to either: remise_percent takes the whole line.
+	 *
+	 * @return	void
+	 */
+	public function testABaseCoveringPartOfTheLineIsNotTheBaseOfTheDiscount()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		// Quantity 10 at 10.00, an allowance of 5.00 granted on two units only, so BT-137 = 20.00 and
+		// BT-131 = 100.00 - 5.00 = 95.00.
+		$lines = $protocol->parseInvoiceLines($this->discountedLine(10.0, 10.00, 5.00, 95.00, 20.00));
+
+		$discount = $this->call('resolveLineDiscountPercent', array($lines[0]['lineAllowances'], $lines[0]['lineTotalAmount']));
+
+		$this->assertEqualsWithDelta(100.00, $discount['base'], 0.001, 'the gross of the line, not the two units the allowance names');
+		$this->assertEqualsWithDelta(5.0, $discount['percent'], 0.0001);
+		$this->assertEqualsWithDelta(25.0, round((5.00 / 20.00) * 100, 4), 0.0001, 'what the partial base computed');
+
+		$imported = $this->importedLine($lines[0]);
+
+		$this->assertEqualsWithDelta(10.00, $imported['subprice'], 0.001, 'the unit price of the document is kept');
+		$this->assertEqualsWithDelta(95.00, $imported['rebuilt'], 0.011);
+		$this->assertSame('', $imported['warning']);
+	}
+
+	/**
+	 * Two allowances stating two bases: only the first was ever read, so the second was taken against a
+	 * base that was never its own. The gross of the line is the one base the two share.
+	 *
+	 * @return	void
+	 */
+	public function testTwoAllowancesWithTwoBasesShareTheGrossOfTheLine()
+	{
+		$lineAllowances = array(
+			array('indicator' => 'false', 'basisAmount' => 60.00, 'actualAmount' => 6.00, 'reason' => 'Commercial discount'),
+			array('indicator' => 'false', 'basisAmount' => 40.00, 'actualAmount' => 4.00, 'reason' => 'Volume rebate'),
+		);
+
+		$discount = $this->call('resolveLineDiscountPercent', array($lineAllowances, 90.00));
+
+		$this->assertNotFalse($discount);
+		$this->assertEqualsWithDelta(10.00, $discount['discountAmount'], 0.001, 'the two allowances are summed');
+		$this->assertEqualsWithDelta(100.00, $discount['base'], 0.001, 'against the gross of the line');
+		$this->assertEqualsWithDelta(10.0, $discount['percent'], 0.0001);
+		$this->assertEqualsWithDelta(16.6667, round((10.00 / 60.00) * 100, 4), 0.0001, 'what the base of the first allowance computed');
 	}
 
 	/**
@@ -1331,6 +1502,157 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 			array('lineid' => '1', 'rateApplicablePercent' => 20.0, 'lineAllowances' => $chargeOnly),
 		)));
 	}
+
+	/**
+	 * EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION (issue #969): with charges folded into the line's
+	 * own description, resolveLineAmounts() must total the line at the full BT-131, not BT-131 less the
+	 * charges - there being no charge line left to carry that difference. Same FedEx figures as
+	 * testAChargeThatIsTheWholeOfTheLineIsNotCountedTwice() (net price 15, one charge of 15, BT-131
+	 * announcing 15), but this time the line itself must be worth the full 15, not 0.
+	 *
+	 * @return	void
+	 */
+	public function testMergedChargesKeepTheFullAmountOnTheLine()
+	{
+		$parsedLine = array(
+			'lineid' => '7',
+			'lineTotalAmount' => 15.0,
+			'lineAllowances' => array(
+				array('indicator' => 'true', 'actualAmount' => 15.0, 'reason' => 'Frais de dossier'),
+			),
+		);
+
+		$amounts = $this->amounts($parsedLine, 1.0, 15.0, 0.0, true);
+
+		$this->assertSame(1.0, $amounts['qty']);
+		$this->assertSame(15.0, $amounts['subprice'], 'the line carries the whole amount, the charge is only described');
+		$this->assertSame('', $amounts['warning'], 'quantity and price already rebuild the full BT-131, nothing to correct');
+	}
+
+	/**
+	 * Without merging, the same figures still behave exactly as testAChargeThatIsTheWholeOfTheLineIsNotCountedTwice():
+	 * the new $mergeLineCharges parameter defaults to false and changes nothing for every caller that
+	 * does not know about it.
+	 *
+	 * @return	void
+	 */
+	public function testUnmergedChargesDefaultBehaviourIsUnchanged()
+	{
+		$parsedLine = array(
+			'lineid' => '7',
+			'lineTotalAmount' => 15.0,
+			'lineAllowances' => array(
+				array('indicator' => 'true', 'actualAmount' => 15.0, 'reason' => 'Frais de dossier'),
+			),
+		);
+
+		$amounts = $this->amounts($parsedLine, 1.0, 15.0);
+
+		$this->assertSame(0.0, $amounts['subprice'], 'the base line still carries nothing by default, the charge leaves on its own line');
+	}
+
+	/**
+	 * buildLineChargesDescription() describes each charge of the line (BG-28) the way
+	 * EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION folds it into the product line: plain text by
+	 * default, the reason kept, the amount signed positive - matching the wording the issuer's own
+	 * reconstructed document already uses (e.g. "Charge: Handling : +7.00").
+	 *
+	 * @return	void
+	 */
+	public function testChargesDescriptionListsEachChargeWithItsSignedAmount()
+	{
+		global $conf;
+
+		$saved = $conf->global->FCKEDITOR_ENABLE_DETAILS ?? null;
+		$conf->global->FCKEDITOR_ENABLE_DETAILS = 0;
+		try {
+			$description = $this->call('buildLineChargesDescription', array(
+				array('lineid' => '6', 'lineAllowances' => $this->allowanceAndCharge()),
+			));
+		} finally {
+			if ($saved === null) {
+				unset($conf->global->FCKEDITOR_ENABLE_DETAILS);
+			} else {
+				$conf->global->FCKEDITOR_ENABLE_DETAILS = $saved;
+			}
+		}
+
+		$this->assertStringContainsString('Handling', $description, 'the reason of the charge is kept');
+		$this->assertStringContainsString('+7.00', $description, 'the amount is signed positive');
+		$this->assertStringNotContainsString('50.03', $description, 'the allowance is not a charge: it stays out of the description');
+		$this->assertStringNotContainsString('EInvoicing', $description, 'the language file is loaded, so no raw translation key survives');
+		$this->assertStringNotContainsString('<b>', $description, 'plain text when the WYSIWYG line editor is off');
+	}
+
+	/**
+	 * A line with no charge (no allowance at all, an allowance only, or a charge worth zero) describes
+	 * nothing: this is the control that EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION changes nothing
+	 * on a line it has nothing to fold.
+	 *
+	 * @return	void
+	 */
+	public function testChargesDescriptionIsEmptyWithoutAnyCharge()
+	{
+		$this->assertSame('', $this->call('buildLineChargesDescription', array(array('lineid' => '1'))));
+		$this->assertSame('', $this->call('buildLineChargesDescription', array(array('lineid' => '1', 'lineAllowances' => array()))));
+		$this->assertSame('', $this->call('buildLineChargesDescription', array(array('lineid' => '1', 'lineAllowances' => array(
+			array('indicator' => 'false', 'actualAmount' => 10.0),
+		)))));
+		$this->assertSame('', $this->call('buildLineChargesDescription', array(array('lineid' => '1', 'lineAllowances' => array(
+			array('indicator' => 'true', 'actualAmount' => 0.0, 'reason' => 'Nothing'),
+		)))));
+	}
+
+	/**
+	 * Several charges on one line each get their own entry, in the order of the document - the
+	 * description equivalent of testSeveralChargesOnOneLine().
+	 *
+	 * @return	void
+	 */
+	public function testChargesDescriptionListsSeveralChargesInOrder()
+	{
+		$description = $this->call('buildLineChargesDescription', array(array('lineid' => '3', 'lineAllowances' => array(
+			array('indicator' => 'true', 'actualAmount' => 7.00, 'reason' => 'Handling'),
+			array('indicator' => 'true', 'actualAmount' => 2.50, 'reason' => 'Packaging'),
+		))));
+
+		$handlingPos = strpos($description, 'Handling');
+		$packagingPos = strpos($description, 'Packaging');
+		$this->assertNotFalse($handlingPos);
+		$this->assertNotFalse($packagingPos);
+		$this->assertLessThan($packagingPos, $handlingPos, 'Handling comes first, in the order of the document');
+	}
+
+	/**
+	 * The label of the charge is wrapped in bold when the WYSIWYG line editor is active
+	 * (FCKEDITOR_ENABLE_DETAILS), matching how the issuer's own reconstructed PDF shows it.
+	 *
+	 * @return	void
+	 */
+	public function testChargesDescriptionLabelIsBoldWithTheWysiwygEditor()
+	{
+		global $conf;
+
+		$saved = $conf->global->FCKEDITOR_ENABLE_DETAILS ?? null;
+		$conf->global->FCKEDITOR_ENABLE_DETAILS = 1;
+		try {
+			$description = $this->call('buildLineChargesDescription', array(
+				array('lineid' => '1', 'lineAllowances' => array(
+					array('indicator' => 'true', 'actualAmount' => 7.00, 'reason' => 'Handling'),
+				)),
+			));
+		} finally {
+			if ($saved === null) {
+				unset($conf->global->FCKEDITOR_ENABLE_DETAILS);
+			} else {
+				$conf->global->FCKEDITOR_ENABLE_DETAILS = $saved;
+			}
+		}
+
+		$this->assertStringContainsString('<b>', $description, 'the label is bold when the WYSIWYG editor is active');
+		$this->assertStringContainsString('Handling', $description);
+	}
+
 	/**
 	 * Call CIIProtocol::buildHeaderChargeLines() through reflection: the whole decision, no database
 	 * access and no side effect.

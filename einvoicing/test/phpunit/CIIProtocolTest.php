@@ -26,6 +26,14 @@
  *                  must keep one side alone and refuse a period that ends before it starts.
  *                  Import (issue #853): a date of the document must be stored as the day it states,
  *                  whatever the timezone of the server that reads it.
+ *                  Product reference: an absent one must not be used as a search key, and "0" is a
+ *                  reference like any other, in both directions.
+ *                  Import (issue #1050): a line with no product falls back on the default product or the
+ *                  default service of the vendor, as the billing framework of the document (BT-23) says.
+ *                  Import (issue #1031): the payment method of the document (BT-81) must reach the
+ *                  supplier invoice for every code the dictionary of Dolibarr can answer.
+ *                  Import made again (issue #1022): the draft is rebuilt in place, what the user added
+ *                  to it stays, and the discounts of the previous import do not stay behind as credit.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -44,8 +52,26 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 }
 
 require_once $dolibarrHtdocs . '/master.inc.php';
+dol_include_once('einvoicing/class/providers/AbstractPDPProvider.class.php');
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
+dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
+require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+require_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
+require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
+require_once DOL_DOCUMENT_ROOT . '/ecm/class/ecmfiles.class.php';
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
+
+if (empty($user->id)) {
+	print "Load permissions for admin user nb 1\n";
+	$user->fetch(1);
+	// User::loadRights() only exists from Dolibarr 19 on, older versions name it getrights()
+	if (method_exists($user, 'loadRights')) {
+		$user->loadRights();
+	} else {
+		$user->getrights();
+	}
+}
 
 /**
  * Class for PHPUnit tests
@@ -58,6 +84,15 @@ class CIIProtocolTest extends CommonClassTest
 {
 	/** @var string	PHP default timezone saved at setUp() */
 	private $savtz;
+
+	/** @var int[] Supplier invoices created by a test, deleted at tearDown() */
+	private $createdInvoiceIds = array();
+
+	/** @var int[] Third parties created by a test, deleted at tearDown() */
+	private $createdThirdpartyIds = array();
+
+	/** @var array<string,mixed> Constants a test changed, put back at tearDown() (null: was not set) */
+	private $savedConstants = array();
 
 	/**
 	 * Call the private CIIProtocol::buildLineItem() through reflection: pure line-level XML
@@ -449,7 +484,34 @@ class CIIProtocolTest extends CommonClassTest
 	 */
 	protected function tearDown(): void
 	{
+		global $conf, $db, $user;
+
 		date_default_timezone_set($this->savtz);
+		AbstractProtocol::$rebuildSupplierInvoiceId = 0;
+
+		foreach ($this->savedConstants as $name => $value) {
+			if ($value === null) {
+				unset($conf->global->$name);
+			} else {
+				$conf->global->$name = $value;
+			}
+		}
+		$this->savedConstants = array();
+
+		foreach ($this->createdInvoiceIds as $id) {
+			$invoice = new FactureFournisseur($db);
+			if ($invoice->fetch($id) > 0) {
+				$invoice->delete($user);
+			}
+		}
+		$this->createdInvoiceIds = array();
+		foreach ($this->createdThirdpartyIds as $id) {
+			$thirdparty = new Societe($db);
+			if ($thirdparty->fetch($id) > 0) {
+				$thirdparty->delete($id, $user);
+			}
+		}
+		$this->createdThirdpartyIds = array();
 
 		parent::tearDown();
 	}
@@ -508,6 +570,80 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
+	 * The payment method of a received document (BT-81, UNTDID 4461) reaches fk_mode_reglement of the
+	 * supplier invoice, for every code of the table that the dictionary of Dolibarr can answer. The
+	 * SEPA credit transfer (58) is the code issue #1031 was opened on: EN 16931 puts it on a par with
+	 * the plain credit transfer (30) in BR-49/BR-50, and senders use one or the other.
+	 *
+	 * @return void
+	 */
+	public function testThePaymentMeansCodeReachesTheInvoice()
+	{
+		global $db;
+
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+
+		$protocol = new CIIProtocol($db);
+		$payment = new ReflectionMethod(CIIProtocol::class, '_applyPaymentInfoToSupplierInvoice');
+		$payment->setAccessible(true);
+
+		$expected = array(
+			'10' => 'LIQ',
+			'20' => 'CHQ',
+			'21' => 'CHQ',
+			'22' => 'CHQ',
+			'25' => 'CHQ',
+			'26' => 'CHQ',
+			'30' => 'VIR',
+			'31' => 'VIR',
+			'42' => 'VIR',
+			'48' => 'CB',
+			'49' => 'PRE',
+			'54' => 'CB',
+			'55' => 'CB',
+			'58' => 'VIR',
+			'59' => 'PRE',
+		);
+
+		foreach ($expected as $untdidCode => $dolibarrCode) {
+			// Only the entries the dictionary of this instance serves: the module reads it with the
+			// filter of the core on active entries, and a deactivated one is left empty by design.
+			$paymentModeId = (int) dol_getIdFromCode($db, $dolibarrCode, 'c_paiement', 'code', 'id', 1, " AND active = 1");
+			if ($paymentModeId <= 0) {
+				continue;
+			}
+
+			$supplierInvoice = new FactureFournisseur($db);
+			$payment->invoke($protocol, $supplierInvoice, array('paymentMeansCode' => $untdidCode));
+
+			$this->assertSame($paymentModeId, (int) $supplierInvoice->mode_reglement_id, 'UNTDID 4461 code ' . $untdidCode . ' must be imported as ' . $dolibarrCode);
+		}
+	}
+
+	/**
+	 * A code of the list with no counterpart in the dictionary of Dolibarr (97, clearing between
+	 * partners) leaves the payment method empty instead of picking a wrong one, and says so.
+	 *
+	 * @return void
+	 */
+	public function testAnUnmappedPaymentMeansCodeLeavesTheMethodEmpty()
+	{
+		global $db;
+
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+
+		$protocol = new CIIProtocol($db);
+		$payment = new ReflectionMethod(CIIProtocol::class, '_applyPaymentInfoToSupplierInvoice');
+		$payment->setAccessible(true);
+
+		$supplierInvoice = new FactureFournisseur($db);
+		$res = $payment->invoke($protocol, $supplierInvoice, array('paymentMeansCode' => '97'));
+
+		$this->assertEmpty($supplierInvoice->mode_reglement_id, 'an unmapped code must not set a payment method');
+		$this->assertStringContainsString('97', $res['message'], 'the code left out must be named in the message');
+	}
+
+	/**
 	 * What the second argument buys, on the timezone the defect was reported from: left out,
 	 * dol_stringtotime() answers midnight UTC, which idate() writes as the day before.
 	 *
@@ -546,5 +682,657 @@ class CIIProtocolTest extends CommonClassTest
 			$this->assertSame('2026-09-01 00:00:00', dol_print_date($period['start'], '%Y-%m-%d %H:%M:%S', 'tzserver'), 'wrong start in ' . $tz);
 			$this->assertSame('2026-09-30 00:00:00', dol_print_date($period['end'], '%Y-%m-%d %H:%M:%S', 'tzserver'), 'wrong end in ' . $tz);
 		}
+	}
+
+	/**
+	 * A vendor identified by its SIREN, as the automatic creation of the import leaves it.
+	 *
+	 * @param	string	$siren	SIREN identifying the vendor
+	 * @return	int				Id of the created thirdparty
+	 */
+	private function createSellerVendor($siren)
+	{
+		global $db, $user;
+
+		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
+		require_once DOL_DOCUMENT_ROOT . '/core/lib/company.lib.php';	// Societe::create() of Dolibarr 21 calls getCountry() without loading it
+
+		$thirdparty = new Societe($db);
+		$thirdparty->name = 'Vendor of the seller lookup test';
+		$thirdparty->country_code = 'FR';
+		$thirdparty->idprof1 = $siren;
+		$thirdparty->fournisseur = 1;
+		$thirdparty->code_fournisseur = 'auto';
+
+		$id = $thirdparty->create($user);
+		$this->assertGreaterThan(0, $id, 'Could not create the vendor of the test: ' . $thirdparty->error . ' ' . implode(', ', $thirdparty->errors));
+
+		return $id;
+	}
+
+	/**
+	 * Seller block of a received document, reduced to what the vendor lookup reads.
+	 *
+	 * @param	string	$siren	SIREN carried by the document
+	 * @return	array			Seller information, as the protocols parse it
+	 */
+	private function sellerInfo($siren)
+	{
+		return array(
+			'sellername' => 'Vendor of the seller lookup test',
+			'sellerlineone' => '1 rue du Test',
+			'sellerpostcode' => '86000',
+			'sellercity' => 'Poitiers',
+			'sellercountry' => 'FR',
+			'sellerGlobalIds' => array('0002' => $siren),
+		);
+	}
+
+	/**
+	 * The vendor lookup the import runs before anything else, called on its own. product_mapping.php
+	 * names the vendor of a flow with it, so its answer has to stay the answer of the import.
+	 *
+	 * @param	array	$sellerInfo	Seller information
+	 * @return	array				Answer of findThirdpartyFromEInvoiceSeller()
+	 */
+	private function lookupSeller($sellerInfo)
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		return $protocol->findThirdpartyFromEInvoiceSeller($sellerInfo);
+	}
+
+	/**
+	 * Number of thirdparties carrying a SIREN, to tell a lookup that found nothing from one that
+	 * created what it was looking for. The column of idprof1 is named after what it holds in France.
+	 *
+	 * @param	string	$siren	SIREN to count
+	 * @return	int				Number of rows
+	 */
+	private function nbThirdpartiesWithSiren($siren)
+	{
+		global $db;
+
+		$sql = "SELECT COUNT(*) as nb FROM " . MAIN_DB_PREFIX . "societe WHERE siren = '" . $db->escape($siren) . "'";
+		$resql = $db->query($sql);
+		$this->assertNotFalse($resql, 'Could not count the thirdparties: ' . $db->lasterror());
+		$obj = $db->fetch_object($resql);
+
+		return (int) $obj->nb;
+	}
+
+	/**
+	 * The lookup answers the vendor the SIREN of the document identifies.
+	 *
+	 * @return void
+	 */
+	public function testSellerLookupFindsTheVendorByItsLegalIdentifier()
+	{
+		$siren = '000000015';
+		$socid = $this->createSellerVendor($siren);
+
+		$res = $this->lookupSeller($this->sellerInfo($siren));
+
+		$this->assertEquals($socid, $res['res'], 'The lookup did not find the vendor by its SIREN: ' . $res['message']);
+	}
+
+	/**
+	 * An unknown seller is answered with 0, and nothing is created: the lookup is read only, where the
+	 * synchronization around it creates the vendor when the option says so.
+	 *
+	 * @return void
+	 */
+	public function testSellerLookupCreatesNothingWhenTheSellerIsUnknown()
+	{
+		global $conf;
+
+		// On, so a lookup that would go on creating like the synchronization does would be caught here.
+		$saved = $conf->global->EINVOICING_THIRDPARTIES_AUTO_GENERATION ?? null;
+		$conf->global->EINVOICING_THIRDPARTIES_AUTO_GENERATION = 1;
+
+		try {
+			$siren = '000000016';
+			$this->assertEquals(0, $this->nbThirdpartiesWithSiren($siren), 'The SIREN of the test is already used');
+
+			$res = $this->lookupSeller($this->sellerInfo($siren));
+
+			$this->assertEquals(0, $res['res'], 'The lookup answered a thirdparty for a SIREN nobody carries');
+			$this->assertEquals(0, $this->nbThirdpartiesWithSiren($siren), 'The lookup created the vendor it was only asked about');
+		} finally {
+			if ($saved === null) {
+				unset($conf->global->EINVOICING_THIRDPARTIES_AUTO_GENERATION);
+			} else {
+				$conf->global->EINVOICING_THIRDPARTIES_AUTO_GENERATION = $saved;
+			}
+		}
+	}
+
+	/**
+	 * A name is not an identity (BT-27 and BT-28 are descriptive): a document carrying no structured
+	 * identifier is not attached to the vendor that merely bears the same name (issue #739).
+	 *
+	 * @return void
+	 */
+	public function testSellerLookupDoesNotMatchOnTheNameAlone()
+	{
+		$siren = '000000017';
+		$this->createSellerVendor($siren);
+
+		$sellerInfo = $this->sellerInfo($siren);
+		unset($sellerInfo['sellerGlobalIds']);
+
+		$res = $this->lookupSeller($sellerInfo);
+
+		$this->assertEquals(0, $res['res'], 'The lookup attached the document to a vendor on its name alone');
+	}
+
+	/**
+	 * Real aggregated invoice line, as a payroll provider sends it: one line standing for the whole
+	 * invoice, with no vendor reference, no buyer reference and no GTIN, and a label far longer than
+	 * the 128 characters of product_fournisseur_price.ref_fourn. Anonymized sample of a document
+	 * received in production. It lives outside test/samples, which holds the documents the module emits
+	 * and the CI validates: this one is a received document, and it breaks BR-53 as its sender sent it.
+	 *
+	 * @return void
+	 */
+	public function testAnAggregatedLineCarriesNoProductIdentifierAtAll()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+		$xml = file_get_contents(__DIR__ . '/fixtures/received/aggregated_line_without_product_ref.xml');
+		$this->assertNotFalse($xml, 'sample file not readable');
+
+		$lines = $protocol->parseInvoiceLines($xml);
+
+		$this->assertCount(1, $lines, 'the sample is a single aggregated line');
+		$this->assertSame('', trim((string) ($lines[0]['prodsellerid'] ?? '')), 'no BT-155 expected');
+		$this->assertSame('', trim((string) ($lines[0]['prodbuyerid'] ?? '')), 'no BT-156 expected');
+		$this->assertSame('', trim((string) ($lines[0]['prodglobalid'] ?? '')), 'no BT-157 expected');
+		$this->assertGreaterThan(128, strlen((string) $lines[0]['prodname']), 'the label cannot be used as a ref_fourn');
+	}
+
+	/**
+	 * A line carrying no vendor reference must not be bound to a product. Looked up as it stands, an
+	 * absent reference matches any vendor price row whose ref_fourn is empty, and the line silently
+	 * takes a product it has nothing to do with.
+	 *
+	 * @return void
+	 */
+	public function testAnAbsentVendorReferenceDoesNotMatchAnEmptyVendorPrice()
+	{
+		global $conf, $db;
+
+		$socid = $this->vendorWithoutAnyPrice();
+
+		// Written in SQL on purpose: Product::create() refuses for reasons that depend on the setup of
+		// the instance (reference module, accountancy defaults), and the fixture only needs a row to
+		// join on. The class-wide transaction of CommonClassTest rolls both inserts back.
+		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "product (entity, datec, ref, label, fk_product_type, tosell, tobuy, tva_tx)";
+		$sql .= " VALUES (" . ((int) $conf->entity) . ", '" . $db->idate(dol_now()) . "'";
+		$sql .= ", 'EITEST-" . $db->escape(uniqid()) . "', 'Bench product reachable only through an empty vendor reference', 1, 0, 1, 20)";
+		$this->assertNotFalse($db->query($sql), 'could not create the bench product: ' . $db->lasterror());
+		$productid = (int) $db->last_insert_id(MAIN_DB_PREFIX . 'product');
+		$this->assertGreaterThan(0, $productid, 'the bench product got no id');
+
+		$sql = "INSERT INTO " . MAIN_DB_PREFIX . "product_fournisseur_price";
+		$sql .= " (entity, datec, fk_product, fk_soc, ref_fourn, price, quantity, unitprice, tva_tx)";
+		$sql .= " VALUES (" . ((int) $conf->entity) . ", '" . $db->idate(dol_now()) . "'";
+		$sql .= ", " . ((int) $productid) . ", " . ((int) $socid) . ", '', 10, 1, 10, 20)";
+		$this->assertNotFalse($db->query($sql), 'could not create the vendor price with an empty reference: ' . $db->lasterror());
+
+		$protocol = new CIIProtocol($db);
+		$found = $protocol->findProductFromEinvoiceLine(array(
+			'prodsellerid' => '',
+			'prodname' => 'A label that matches no product at all ' . uniqid(),
+			'supplierId' => $socid,
+		));
+
+		$this->assertSame(0, (int) $found['res'], 'an absent vendor reference must not resolve to a product');
+	}
+
+	/**
+	 * EN 16931 bounds none of the texts of a document, the columns they are written to are bounded: a
+	 * longer seller name, town, phone, item name (BT-153, 272 characters on a real aggregated line) or
+	 * vendor reference (BT-155) was refused by the database and stopped the whole synchronization. The
+	 * document imports, and imported again it finds the same third party and product.
+	 *
+	 * @return void
+	 */
+	public function testADocumentWithTextsLongerThanTheColumnsIsImported()
+	{
+		global $conf, $db, $user;
+
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+		// The invoice is written with the user as its author: this file loads none at the top.
+		if (empty($user->id)) {
+			$user->fetch(1);
+		}
+
+		$R = 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100';
+		$doc = new DOMDocument();
+		$doc->load(__DIR__ . '/fixtures/received_documents/cii_rounding_amount.xml');
+		$xp = new DOMXPath($doc);
+		$xp->registerNamespace('ram', $R);
+		$siren = (string) random_int(100000000, 999999999);
+		$seller = $xp->query('//ram:SellerTradeParty')->item(0);
+		$xp->query('ram:GlobalID', $seller)->item(0)->nodeValue = $siren . '00017';
+		$xp->query('ram:SpecifiedLegalOrganization/ram:ID', $seller)->item(0)->nodeValue = $siren;
+		$xp->query('ram:SpecifiedTaxRegistration/ram:ID', $seller)->item(0)->nodeValue = 'FR00' . $siren;
+		$xp->query('ram:Name', $seller)->item(0)->nodeValue = 'LONG ' . $siren . ' ' . str_repeat('Société à responsabilité limitée ', 5);
+		$xp->query('ram:PostalTradeAddress/ram:CityName', $seller)->item(0)->nodeValue = str_repeat('Saint-Rémy-', 6);
+		$contact = $doc->createElementNS($R, 'DefinedTradeContact');
+		$phone = $doc->createElementNS($R, 'TelephoneUniversalCommunication');
+		$phone->appendChild($doc->createElementNS($R, 'CompleteNumber', '+33 1 23 45 67 89 / +33 6 12 34 56 78'));
+		$contact->appendChild($phone);
+		$seller->insertBefore($contact, $xp->query('ram:PostalTradeAddress', $seller)->item(0));
+		$product = $xp->query('//ram:SpecifiedTradeProduct')->item(0);
+		$product->insertBefore($doc->createElementNS($R, 'SellerAssignedID', 'REF-' . $siren . '-' . str_repeat('0123456789', 15)), $product->firstChild);
+		$xp->query('ram:Name', $product)->item(0)->nodeValue = 'ITEM ' . $siren . ' ' . str_repeat('désignation longue ', 16);
+		$docid = $xp->query('//*[local-name()="ExchangedDocument"]/*[local-name()="ID"]')->item(0);
+
+		$saved = array();
+		foreach (array('EINVOICING_THIRDPARTIES_AUTO_GENERATION' => 1, 'EINVOICING_PRODUCTS_AUTO_GENERATION' => 1, 'EINVOICING_IMPORT_AS_FREE_LINES' => 0) as $name => $value) {
+			$saved[$name] = getDolGlobalString($name);
+			$conf->global->$name = $value;
+		}
+		$found = array();
+		foreach (array(1, 2) as $run) {
+			$docid->nodeValue = 'LONG-' . $siren . '-' . $run;
+			$res = (new CIIProtocol($db))->createSupplierInvoiceFromSource($doc->saveXML(), null, 'test-long-' . $siren . '-' . $run);
+			$invoice = new FactureFournisseur($db);
+			if (($res['res'] ?? 0) > 0 && $invoice->fetch((int) $res['res']) > 0) {
+				$found[$run] = $invoice->socid . '/' . $invoice->lines[0]->fk_product;
+			}
+			$this->assertArrayHasKey($run, $found, 'import ' . $run . ': ' . strip_tags((string) ($res['message'] ?? '')));
+		}
+		foreach ($saved as $name => $value) {
+			$conf->global->$name = $value;
+		}
+
+		$this->assertSame($found[1], $found[2], 'imported again, the document finds the same third party and product');
+		$line = $invoice->lines[0];
+		$this->assertSame(128, dol_strlen((string) $line->ref_supplier), 'BT-155 is cut to the 128 characters of its columns');
+		$item = new Product($db);
+		$item->fetch((int) $line->fk_product);
+		$this->assertSame(trim(dol_substr($xp->query('ram:Name', $product)->item(0)->nodeValue, 0, 255)), $item->label, 'BT-153 is cut to the 255 characters of the product label');
+		$this->assertStringContainsString(trim($xp->query('ram:Name', $product)->item(0)->nodeValue), (string) $line->description, 'the line keeps the whole item name');
+	}
+
+	/**
+	 * "0" is a valid vendor reference: emptiness has to be tested on the string, because empty()
+	 * answers true on it and drops BT-155 from the generated line.
+	 *
+	 * @return void
+	 */
+	public function testAVendorReferenceEqualToZeroIsStillWritten()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+		$doc = new DOMDocument('1.0', 'UTF-8');
+
+		$line = $this->baseLineData();
+		$line['prodsellerid'] = '0';
+		$node = $this->callBuildLineItem($protocol, $doc, $line);
+		$ids = $node->getElementsByTagName('ram:SellerAssignedID');
+		$this->assertSame(1, $ids->length, 'a vendor reference of "0" must be written');
+		$this->assertSame('0', $ids->item(0)->nodeValue);
+
+		$line['prodsellerid'] = '';
+		$node = $this->callBuildLineItem($protocol, $doc, $this->baseLineData());
+		$this->assertSame(0, $node->getElementsByTagName('ram:SellerAssignedID')->length, 'no reference, no BT-155');
+	}
+
+	/**
+	 * A vendor id carrying no vendor price at all, so the fixture is the only row the lookup can see.
+	 * A unique key allows a single price with an empty ref_fourn per vendor, so an existing vendor
+	 * cannot be reused; product_fournisseur_price.fk_soc has no foreign key, so no third party is
+	 * needed to hold the row either.
+	 *
+	 * @return int	Vendor id free of any vendor price
+	 */
+	private function vendorWithoutAnyPrice()
+	{
+		global $db;
+
+		$resql = $db->query("SELECT COALESCE(MAX(fk_soc), 0) + 1 as freesoc FROM " . MAIN_DB_PREFIX . "product_fournisseur_price");
+		$this->assertNotFalse($resql, 'could not read the vendor prices: ' . $db->lasterror());
+		$obj = $db->fetch_object($resql);
+
+		return (int) $obj->freesoc;
+	}
+
+	/**
+	 * A vendor with a default product and, when asked, a default service, each pointing at a product
+	 * created for the test. Returns the ids so a test can tell which default a line fell back on.
+	 *
+	 * @param	bool	$withProduct	Give the vendor a default product
+	 * @param	bool	$withService	Give the vendor a default service
+	 * @return	array{socid:int, product:int, service:int}
+	 */
+	private function vendorWithDefaults($withProduct, $withService)
+	{
+		global $conf, $db;
+
+		// A vendor id free of any price and of any routing, so two vendors of the same test never share one
+		$sql = "SELECT GREATEST((SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "product_fournisseur_price),";
+		$sql .= " (SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "einvoicing_routing)) + 1 as freesoc";
+		$resql = $db->query($sql);
+		$this->assertNotFalse($resql, 'could not find a free vendor id: ' . $db->lasterror());
+		$socid = (int) $db->fetch_object($resql)->freesoc;
+		$ids = array('socid' => $socid, 'product' => 0, 'service' => 0);
+		$einvoicing = new EInvoicing($db);
+		foreach (array('product' => $withProduct, 'service' => $withService) as $type => $wanted) {
+			$sql = "INSERT INTO " . MAIN_DB_PREFIX . "product (entity, datec, ref, label, fk_product_type, tosell, tobuy, tva_tx)";
+			$sql .= " VALUES (" . ((int) $conf->entity) . ", '" . $db->idate(dol_now()) . "'";
+			$sql .= ", 'EI1050-" . $db->escape(uniqid()) . "', 'Default " . $type . " of the bench vendor', " . ($type == 'service' ? 1 : 0) . ", 0, 1, 20)";
+			$this->assertNotFalse($db->query($sql), 'could not create the bench ' . $type . ': ' . $db->lasterror());
+			$ids[$type] = (int) $db->last_insert_id(MAIN_DB_PREFIX . 'product');
+			if ($wanted) {
+				$this->assertGreaterThan(0, $einvoicing->addRouting($socid, 'idprod_' . $ids[$type], '', $type), 'could not set the default ' . $type . ': ' . $einvoicing->error);
+			}
+		}
+
+		return $ids;
+	}
+
+	/**
+	 * Match a line that no product answers, on a document carrying the given billing framework.
+	 *
+	 * @param	int		$socid		Vendor id
+	 * @param	string	$framework	BT-23 of the document
+	 * @param	string	$mixed		EINVOICING_DEFAULT_ROUTING_MIXED for the call
+	 * @return	array<string,mixed>	Answer of findProductFromEinvoiceLine()
+	 */
+	private function matchUnknownLine($socid, $framework, $mixed = '')
+	{
+		global $conf, $db;
+
+		$saved = $conf->global->EINVOICING_DEFAULT_ROUTING_MIXED ?? null;
+		$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = $mixed;
+		try {
+			$protocol = new CIIProtocol($db);
+			return $protocol->findProductFromEinvoiceLine(array(
+				'prodsellerid' => 'NO-SUCH-REF-' . uniqid(),
+				'prodname' => 'A label that matches no product at all ' . uniqid(),
+				'supplierId' => $socid,
+				'businessProcessId' => $framework,
+			));
+		} finally {
+			if ($saved === null) {
+				unset($conf->global->EINVOICING_DEFAULT_ROUTING_MIXED);
+			} else {
+				$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = $saved;
+			}
+		}
+	}
+
+	/**
+	 * The first letter of BT-23 picks the default: B and an absent framework the product, S the service,
+	 * M whatever the setup says, and nothing while it says nothing.
+	 *
+	 * @return void
+	 */
+	public function testBillingFrameworkPicksTheDefaultOfTheVendor()
+	{
+		global $conf;
+
+		$saved = $conf->global->EINVOICING_DEFAULT_ROUTING_MIXED ?? null;
+		try {
+			$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = '';
+			$this->assertSame('product', CIIProtocol::defaultRoutingTypeForFramework('B1'));
+			$this->assertSame('product', CIIProtocol::defaultRoutingTypeForFramework(''));
+			$this->assertSame('service', CIIProtocol::defaultRoutingTypeForFramework('S4'));
+			$this->assertSame('service', CIIProtocol::defaultRoutingTypeForFramework(' s1'));
+			$this->assertSame('', CIIProtocol::defaultRoutingTypeForFramework('M1'));
+			$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = 'service';
+			$this->assertSame('service', CIIProtocol::defaultRoutingTypeForFramework('M2'));
+			$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = 'product';
+			$this->assertSame('product', CIIProtocol::defaultRoutingTypeForFramework('M1'));
+			$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = 'garbage';
+			$this->assertSame('', CIIProtocol::defaultRoutingTypeForFramework('M1'));
+		} finally {
+			if ($saved === null) {
+				unset($conf->global->EINVOICING_DEFAULT_ROUTING_MIXED);
+			} else {
+				$conf->global->EINVOICING_DEFAULT_ROUTING_MIXED = $saved;
+			}
+		}
+	}
+
+	/**
+	 * A goods invoice (B) and one with no framework fall back on the default product, a services
+	 * invoice (S) on the default service.
+	 *
+	 * @return void
+	 */
+	public function testALineFallsBackOnTheDefaultTheFrameworkNames()
+	{
+		$ids = $this->vendorWithDefaults(true, true);
+
+		$found = $this->matchUnknownLine($ids['socid'], 'B1');
+		$this->assertSame($ids['product'], (int) $found['res'], 'B1 must use the default product');
+		$this->assertSame('defaultrouting', $found['matchtype'] ?? '');
+		$this->assertSame('product', $found['routingtype'] ?? '');
+
+		$this->assertSame($ids['product'], (int) $this->matchUnknownLine($ids['socid'], '')['res'], 'no BT-23 must use the default product');
+
+		$found = $this->matchUnknownLine($ids['socid'], 'S1');
+		$this->assertSame($ids['service'], (int) $found['res'], 'S1 must use the default service');
+		$this->assertSame('service', $found['routingtype'] ?? '');
+	}
+
+	/**
+	 * A vendor with a single default keeps using it whatever the framework says, as before the default
+	 * service existed.
+	 *
+	 * @return void
+	 */
+	public function testAVendorWithOneDefaultKeepsUsingIt()
+	{
+		$onlyproduct = $this->vendorWithDefaults(true, false);
+		$this->assertSame($onlyproduct['product'], (int) $this->matchUnknownLine($onlyproduct['socid'], 'S1')['res'], 'S1 must fall back on the default product when there is no default service');
+
+		$onlyservice = $this->vendorWithDefaults(false, true);
+		$this->assertSame($onlyservice['service'], (int) $this->matchUnknownLine($onlyservice['socid'], 'B1')['res'], 'B1 must fall back on the default service when there is no default product');
+	}
+
+	/**
+	 * A mixed invoice (M) uses the default the setup chooses, and stops with an error the user can act
+	 * on while the setup chooses none.
+	 *
+	 * @return void
+	 */
+	public function testAMixedInvoiceNeedsTheSetupToChoose()
+	{
+		$ids = $this->vendorWithDefaults(true, true);
+
+		$found = $this->matchUnknownLine($ids['socid'], 'M1', '');
+		$this->assertSame(-1, (int) $found['res'], 'M1 with no choice in the setup must stop');
+		$this->assertSame('DEFAULT_ROUTING_MIXED_UNSET', $found['actioncode'] ?? '');
+		$this->assertStringContainsString('setup_options.php', (string) ($found['actionurl'] ?? ''));
+
+		$this->assertSame($ids['service'], (int) $this->matchUnknownLine($ids['socid'], 'M1', 'service')['res'], 'M1 must use the default service when the setup says so');
+		$this->assertSame($ids['product'], (int) $this->matchUnknownLine($ids['socid'], 'M2', 'product')['res'], 'M2 must use the default product when the setup says so');
+	}
+
+	/**
+	 * A mixed invoice from a vendor with no default at all has nothing to choose between: the line is
+	 * simply not found, as any other line, and no setup error is raised.
+	 *
+	 * @return void
+	 */
+	public function testAMixedInvoiceFromAVendorWithoutDefaultIsNotASetupError()
+	{
+		$ids = $this->vendorWithDefaults(false, false);
+
+		$found = $this->matchUnknownLine($ids['socid'], 'M1', '');
+		$this->assertSame(0, (int) $found['res']);
+		$this->assertArrayNotHasKey('actioncode', $found);
+	}
+
+	/**
+	 * The bill of exchange awaiting acceptance, and the generic bank card and direct debit codes, reach a
+	 * Dolibarr payment mode on import. 48 and 49 are what many senders write, rather than the credit card (54)
+	 * and SEPA direct debit (59) variants the table already knew.
+	 *
+	 * @return void
+	 */
+	public function testGenericPaymentMeansCodesAreMapped()
+	{
+		$map = new ReflectionProperty(CIIProtocol::class, 'UNTDID4461_TO_DOLIBARR_PAIEMENT_CODE');
+		$map->setAccessible(true);
+		$codes = $map->getValue();
+
+		$this->assertSame('TRA', $codes['24'] ?? null, 'bill of exchange awaiting acceptance');
+		$this->assertSame('CB', $codes['48'] ?? null, 'bank card');
+		$this->assertSame('PRE', $codes['49'] ?? null, 'direct debit');
+	}
+
+	/**
+	 * The seller of the received fixture, as an instance receiving that document already holds it.
+	 * Another test importing the same fixture may have left it: it is then reused, since a second
+	 * third party with the same VAT number would make the import refuse the document.
+	 *
+	 * @return	int		Id of the third party
+	 */
+	private function createFixtureSeller()
+	{
+		global $db, $user;
+
+		$resql = $db->query("SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE tva_intra = 'FR34999888779' AND entity IN (" . getEntity('societe') . ")");
+		if ($resql && $db->num_rows($resql) == 1) {
+			return (int) $db->fetch_object($resql)->rowid;
+		}
+
+		$supplier = new Societe($db);
+		$supplier->name = 'EINVOICING REBUILD SELLER';
+		$supplier->fournisseur = 1;
+		$supplier->code_fournisseur = 'auto';
+		$supplier->address = '1 rue du Test';
+		$supplier->zip = '75001';
+		$supplier->town = 'Paris';
+		$supplier->country_id = 1;
+		$supplier->country_code = 'FR';
+		$supplier->accountancy_code_buy = '401EINV1022';
+		$supplier->idprof1 = '999888779';
+		$supplier->idprof2 = '99988877900017';
+		$supplier->tva_intra = 'FR34999888779';
+		$id = $supplier->create($user);
+		$this->assertGreaterThan(0, $id, 'the seller third party is created: ' . $supplier->error . ' ' . implode(', ', (array) $supplier->errors));
+		$this->createdThirdpartyIds[] = (int) $id;
+
+		return (int) $id;
+	}
+
+	/**
+	 * A discount of the vendor, consumed by a line of the invoice the way the import consumes one.
+	 *
+	 * @param	FactureFournisseur	$invoice	Draft consuming it
+	 * @return	int							Id of the discount
+	 */
+	private function consumeADiscount(FactureFournisseur $invoice)
+	{
+		global $db, $user;
+
+		$discount = new DiscountAbsolute($db);
+		// fk_soc up to Dolibarr 19, socid from 20 on (see CIIProtocol::createHeaderDiscounts())
+		$discount->fk_soc = $invoice->socid;
+		$discount->socid = $invoice->socid;
+		$discount->amount_ht = 1;
+		$discount->amount_tva = 0.2;
+		$discount->amount_ttc = 1.2;
+		$discount->total_ht = 1;
+		$discount->total_tva = 0.2;
+		$discount->total_ttc = 1.2;
+		$discount->tva_tx = 20;
+		$discount->fk_user = $user->id;
+		$discount->description = 'PHPUNIT 1022';
+		$discount->discount_type = 1;
+		$id = $discount->create($user);
+		$this->assertGreaterThan(0, $id, (string) $discount->error);
+		$this->assertGreaterThan(0, $invoice->insert_discount($id), (string) $invoice->error);
+
+		return (int) $id;
+	}
+
+	/**
+	 * An import made again into its draft rebuilds it in place: same invoice, same reference, lines and
+	 * imported files replaced rather than added. What the user added - a file, a note - stays; the
+	 * discount of the previous import is deleted, any other consumed discount is freed.
+	 *
+	 * @return void
+	 */
+	public function testAnImportMadeAgainRebuildsTheDraftInPlace()
+	{
+		global $conf, $db, $user;
+
+		// Whether the import creates a product for a line is another subject: the lines of the fixture
+		// are imported as free ones, which every instance can do.
+		foreach (array('EINVOICING_IMPORT_AS_FREE_LINES', 'EINVOICING_PRODUCTS_AUTO_GENERATION') as $name) {
+			$this->savedConstants[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
+		}
+		$conf->global->EINVOICING_IMPORT_AS_FREE_LINES = 1;
+		$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 0;
+
+		$socid = $this->createFixtureSeller();
+		$xml = str_replace('EINV994-0001', 'EINV1022-' . strtoupper(bin2hex(random_bytes(4))), (string) file_get_contents(__DIR__ . '/fixtures/received_documents/cii_rounding_amount.xml'));
+
+		$protocol = new CIIProtocol($db);
+		$first = $protocol->createSupplierInvoiceFromSource($xml, null, 'test1022');
+		$id = (int) ($first['res'] ?? 0);
+		$this->assertGreaterThan(0, $id, 'first import: ' . strip_tags((string) ($first['message'] ?? '')));
+		$this->createdInvoiceIds[] = $id;
+
+		$invoice = new FactureFournisseur($db);
+		$invoice->fetch($id);
+		$this->assertSame($socid, (int) $invoice->socid);
+		$ref = $invoice->ref;
+		$dir = $conf->fournisseur->facture->dir_output . '/' . get_exdir($invoice->id, 2, 0, 0, $invoice, 'invoice_supplier') . dol_sanitizeFileName($ref);
+		$relativedir = preg_replace('/^' . preg_quote(DOL_DATA_ROOT . '/', '/') . '/', '', $dir);
+		$importedFiles = array_column(dol_dir_list($dir, 'files'), 'name');
+		$this->assertNotEmpty($importedFiles, 'the import attached the document');
+
+		// What the user adds to the draft
+		dol_mkdir($dir);
+		file_put_contents($dir . '/delivery_note.pdf', 'by hand');
+		$this->assertGreaterThan(0, addFileIntoDatabaseIndex($dir, 'delivery_note.pdf', 'delivery_note.pdf', 'uploaded', 0, $invoice));
+		$invoice->update_note('written by the user', '_private');
+		$importDiscount = $this->consumeADiscount($invoice);
+		$otherDiscount = $this->consumeADiscount($invoice);
+		$einvoicing = new EInvoicing($db);
+		$einvoicing->insertOrUpdateExtraField($id, $invoice->element, EInvoicing::EXTRAFIELD_IMPORTED_DISCOUNTS, (string) $importDiscount);
+
+		AbstractProtocol::$rebuildSupplierInvoiceId = $id;
+		$again = $protocol->createSupplierInvoiceFromSource($xml, null, 'test1022');
+		AbstractProtocol::$rebuildSupplierInvoiceId = 0;
+
+		$this->assertSame($id, (int) ($again['res'] ?? 0), 'the same invoice: ' . strip_tags((string) ($again['message'] ?? '')));
+		$rebuilt = new FactureFournisseur($db);
+		$rebuilt->fetch($id);
+		$rebuilt->fetch_lines();
+		$this->assertSame($ref, $rebuilt->ref, 'the reference is kept');
+		$this->assertCount(2, $rebuilt->lines, 'the billed line and the rounding, not added to the previous ones');
+		$this->assertEquals(25.47, (float) $rebuilt->total_ttc);
+		$this->assertSame('written by the user', (string) $rebuilt->note_private);
+
+		$files = array_column(dol_dir_list($dir, 'files'), 'name');
+		sort($files);
+		$expected = array_merge($importedFiles, array('delivery_note.pdf'));
+		sort($expected);
+		$this->assertSame($expected, $files, 'the file attached by hand stays, the imported ones are written again');
+		$ecmfile = new EcmFiles($db);
+		$this->assertGreaterThan(0, $ecmfile->fetch(0, '', $relativedir . '/delivery_note.pdf'), 'with its entry of the index');
+
+		$discount = new DiscountAbsolute($db);
+		$this->assertLessThanOrEqual(0, $discount->fetch($importDiscount), 'the discount of the previous import is gone');
+		$discount = new DiscountAbsolute($db);
+		$this->assertGreaterThan(0, $discount->fetch($otherDiscount), 'any other discount is kept');
+		$this->assertEmpty($discount->fk_invoice_supplier_line, 'and freed');
+
+		$this->assertSame($id, SupplierInvoiceHelper::findIdByRef($rebuilt->ref_supplier, $socid), 'and no second invoice carries the document');
 	}
 }

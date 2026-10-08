@@ -211,7 +211,33 @@ function thirdpartyidprof($object)
 {
 	$object->fetch_thirdparty();
 	$thirdparty = $object->thirdparty;
-	return $thirdparty ? idprof($object->thirdparty) : '';
+	return $thirdparty ? idprof($thirdparty) : '';
+}
+
+/**
+ * Escape a value for a text node or an attribute of a generated XML document.
+ *
+ * Two ways a text value breaks the document, neither of which htmlspecialchars() handles alone:
+ * an invalid UTF-8 sequence, which it answers with an EMPTY STRING below PHP 8.1 where ENT_SUBSTITUTE
+ * is not a default (one latin-1 byte in a company name, and BR-06 refuses the empty element), and a
+ * control character forbidden by XML 1.0 (a vertical tab pasted from a PDF), which it copies through
+ * and which leaves a file no parser reads - the platform answers HTTP 400 on it.
+ *
+ * @param  mixed	$value	Value to escape. null is accepted and gives ''.
+ * @return string			Value escaped for DOMDocument::createElement() and setAttribute()
+ */
+function einvoicingXmlText($value)
+{
+	$value = (string) $value;
+
+	// Tab, LF and CR are the three control characters XML 1.0 allows. No /u here: the pattern is
+	// byte based on purpose, so it also holds on the invalid UTF-8 the escape below repairs.
+	$stripped = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F]/', '', $value);
+	if ($stripped !== null) {
+		$value = $stripped;
+	}
+
+	return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
 /**
@@ -437,6 +463,23 @@ function getMultidirOutputCompat($object, $module = '', $forobject = 0, $mode = 
 }
 
 
+/**
+ * Return the root directory dol_mkdir() may start from to create $dir.
+ *
+ * Without this second argument dol_mkdir() rebuilds the path from '/' and calls mkdir() on every
+ * ancestor, which an open_basedir setup refuses and logs (issue #1012). An empty string is returned
+ * for a directory that is not below the data root, because MAIN_TEMP_DIR may move the temporary
+ * files anywhere: dol_mkdir() would then build a path under DOL_DATA_ROOT instead of the one asked.
+ *
+ * @param	string	$dir	Directory to be created
+ * @return	string			DOL_DATA_ROOT when $dir is below it, an empty string otherwise
+ */
+function einvoicingDataRoot($dir)
+{
+	return (strpos($dir, DOL_DATA_ROOT.'/') === 0 ? DOL_DATA_ROOT : '');
+}
+
+
 
 
 if (!function_exists('einvoicingDolGetButtonActionDropdown')) {
@@ -448,7 +491,9 @@ if (!function_exists('einvoicingDolGetButtonActionDropdown')) {
 	 *
 	 *  @param	string	$label			Dropdown toggle visible label
 	 *  @param	array	$urlButtons		List of sub-buttons, same format as the native $url array
-	 *                                  (each entry: 'lang', 'enabled', 'perm', 'label', 'url')
+	 *                                  (each entry: 'lang', 'enabled', 'perm', 'label', 'url', or
+	 *                                  'divider' => 1 for a separator line printed before the next
+	 *                                  entry shown)
 	 *  @param	array	$params			Extra params (only 'backtopage' is honored, like the core function)
 	 *  @return	string					Dropdown HTML
 	 *  @since	Dolibarr V18
@@ -460,10 +505,21 @@ if (!function_exists('einvoicingDolGetButtonActionDropdown')) {
 		$out = '<div id="einvoicing_button_dropdown" class="dropdown inline-block dropdown-holder">';
 		$out .= '<a style="margin-right: auto;" class="dropdown-toggle butAction" data-toggle="dropdown">' . $label . '</a>';
 		$out .= '<div class="dropdown-content">';
+		$dividerpending = false;
 		foreach ($urlButtons as $subbutton) {
+			if (!empty($subbutton['divider'])) {
+				// A separator line, printed only when an entry is shown after it: on this core a disabled
+				// entry is dropped by the test below, so the line would otherwise close the list.
+				$dividerpending = true;
+				continue;
+			}
 			if (!empty($subbutton['enabled']) && !empty($subbutton['perm'])) {
 				if (!empty($subbutton['lang'])) {
 					$langs->load($subbutton['lang']);
+				}
+				if ($dividerpending) {
+					$out .= '-----';
+					$dividerpending = false;
 				}
 				$out .= dolGetButtonAction('', $langs->trans($subbutton['label']), 'default', DOL_URL_ROOT . $subbutton['url'] . (empty($params['backtopage']) ? '' : '&amp;backtopage=' . urlencode($params['backtopage'])), '', 1);
 			}
@@ -473,6 +529,18 @@ if (!function_exists('einvoicingDolGetButtonActionDropdown')) {
 
 		return $out;
 	}
+}
+
+/**
+ * Url for the 'url' key of a dropdown entry, which Dolibarr 18 and 19 prefix with DOL_URL_ROOT.
+ *
+ * @param	string	$url			Url as dol_buildpath() returns it with type 1
+ * @param	string	$dolurlroot		Value of DOL_URL_ROOT
+ * @return	string					Url without DOL_URL_ROOT
+ */
+function einvoicingDropdownEntryUrl($url, $dolurlroot = DOL_URL_ROOT)
+{
+	return (string) preg_replace('/^' . preg_quote($dolurlroot, '/') . '/', '', $url);
 }
 
 
@@ -699,7 +767,7 @@ function einvoicingIsSendDisabled()
  *
  * @return bool
  */
-function einvoicingIsReceiveDisabled()
+function einvoicingReceptionDisabled()
 {
 	return (bool) getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') || (bool) getDolGlobalString('EINVOICING_ONLY_GENERATE');
 }
@@ -973,21 +1041,39 @@ function einvoicingModuleCommit()
  */
 function einvoicingCheckoutCommit($repodir)
 {
+	// The directory above the module is outside open_basedir on an instance set up as the
+	// documentation recommends: asking PHP for it at all is what issue #1012 is about, so it is not
+	// asked. The accesses below stay silenced for what open_basedir does not cover, a checkout the
+	// web server may not read, which this already answers '' to.
+	$basedir = (string) ini_get('open_basedir');
+	if ($basedir !== '') {
+		$reachable = false;
+		foreach (explode(PATH_SEPARATOR, $basedir) as $allowed) {
+			$allowed = rtrim(trim($allowed), '/');
+			if ($allowed !== '' && strpos($repodir.'/', $allowed.'/') === 0) {
+				$reachable = true;
+				break;
+			}
+		}
+		if (!$reachable) {
+			return '';
+		}
+	}
+
 	$gitdir = $repodir.'/.git';
 
-	// A linked worktree and a submodule replace .git with a file naming the real directory
 	$reg = array();
-	if (is_file($gitdir) && preg_match('/^gitdir:\s*(\S.*)$/m', (string) file_get_contents($gitdir), $reg)) {
+	if (@is_file($gitdir) && preg_match('/^gitdir:\s*(\S.*)$/m', (string) @file_get_contents($gitdir), $reg)) {
 		$gitdir = trim($reg[1]);
 		if (strpos($gitdir, '/') !== 0) {
 			$gitdir = $repodir.'/'.$gitdir;
 		}
 	}
-	if (!is_dir($gitdir) || !is_readable($gitdir.'/HEAD')) {
+	if (!@is_dir($gitdir) || !@is_readable($gitdir.'/HEAD')) {
 		return '';
 	}
 
-	$head = trim((string) file_get_contents($gitdir.'/HEAD'));
+	$head = trim((string) @file_get_contents($gitdir.'/HEAD'));
 	if (preg_match('/^[0-9a-f]{40,}$/', $head)) {
 		return substr($head, 0, 7);		// detached HEAD carries the commit itself
 	}
@@ -998,17 +1084,17 @@ function einvoicingCheckoutCommit($repodir)
 
 	// A linked worktree has a HEAD of its own but shares the refs of the main repository
 	$refdir = $gitdir;
-	if (is_readable($gitdir.'/commondir')) {
-		$commondir = trim((string) file_get_contents($gitdir.'/commondir'));
+	if (@is_readable($gitdir.'/commondir')) {
+		$commondir = trim((string) @file_get_contents($gitdir.'/commondir'));
 		$refdir = (strpos($commondir, '/') === 0 ? $commondir : $gitdir.'/'.$commondir);
 	}
 
 	$commit = '';
-	if (is_readable($refdir.'/'.$ref)) {
-		$commit = trim((string) file_get_contents($refdir.'/'.$ref));
-	} elseif (is_readable($refdir.'/packed-refs')) {
+	if (@is_readable($refdir.'/'.$ref)) {
+		$commit = trim((string) @file_get_contents($refdir.'/'.$ref));
+	} elseif (@is_readable($refdir.'/packed-refs')) {
 		// git packs refs away instead of keeping one file each: "<commit> <refname>" per line
-		$packed = (string) file_get_contents($refdir.'/packed-refs');
+		$packed = (string) @file_get_contents($refdir.'/packed-refs');
 		if (preg_match('/^([0-9a-f]{40,})\s+'.preg_quote($ref, '/').'$/m', $packed, $reg)) {
 			$commit = $reg[1];
 		}
@@ -1055,6 +1141,14 @@ function einvoicingIsAllowedRedirectUrl($url)
 	if (!preg_match('#^https?://#i', $url)) {
 		return false;
 	}
+	// A browser treats a backslash in the authority as a slash, and strips control/space characters,
+	// while parse_url() does not. That gap lets "https://evil.com\@allowed.com" pass the host check
+	// below (parse_url sees allowed.com) while the browser navigates to evil.com, redirecting the user
+	// and the OAuth tokens to an attacker domain. No legitimate https redirect URL carries such a
+	// character, so reject the URL outright rather than try to normalize it.
+	if (preg_match('#[\\\\\x00-\x20\x7f]#', $url)) {
+		return false;
+	}
 
 	$host = parse_url($url, PHP_URL_HOST);
 	if (!is_string($host) || $host === '') {
@@ -1090,18 +1184,11 @@ function einvoicingIsAllowedRedirectUrl($url)
 /**
  * The four sentinels Dolibarr stores in the description of a discount, and the text each stands for.
  *
- * A discount built from another piece - a credit note applied, a deposit deducted, an excess payment
- * carried over - carries no text of its own: the core writes one of four sentinels in the description
- * of the discount, insert_discount() copies it into the description of the line, and pdf_getlinedesc()
- * resolves it against the piece it comes from at print time. Nothing resolves it for an e-invoice, so
- * the customer used to read '(CREDIT_NOTE)' in the item name of the line (BT-153) or in the reason of
- * a document level allowance (BT-97).
- *
- * The test is the one the core makes: the description equals a sentinel exactly, and the line is
- * actually a discount line. Matching the text alone is wrong in both directions - a description edited
- * by hand is missed, and a service line quoting the string is caught - and the four sentinels are not
- * even spelled alike: '(CREDIT_NOTE)' holds an underscore where '(EXCESS PAID)' and
- * '(EXCESS RECEIVED)' hold a space.
+ * A discount built from another piece carries no text of its own: the core writes one of these four in
+ * the description and pdf_getlinedesc() resolves it at print time, which nothing does for an e-invoice.
+ * The test is the one the core makes - the description equals a sentinel exactly and the line is a
+ * discount line - because matching the text alone misses a description edited by hand and catches a
+ * service line quoting the string.
  *
  * @return	array<string,string>	Sentinel of the core => translation key of the text it stands for
  */
@@ -1177,17 +1264,11 @@ function einvoicingDiscountLabel($discount, $description, $outputlangs, $related
 /**
  * Text a discount line of the invoice stands for, '' when the line carries no discount at all.
  *
- * einvoicingDiscountLabel() decides on the description alone, which is what a document level
- * allowance needs: there, the caller has already established that a discount is behind the amount.
- * A line of the invoice has not, and the description alone cannot tell - a line of work can be named
- * '(DEPOSIT)' and carry nothing, and it was then renamed 'Down payment deducted' on its way out,
- * under the wording meant for a discount whose source piece cannot be read, which is a different
- * situation entirely.
- *
- * The test of the core is in two halves, the description AND the discount the line points at
- * (pdf_getlinedesc(): $desc == '(DEPOSIT)' && $object->lines[$i]->fk_remise_except). This is where
- * the second half is made, so that the two call sites read the line the same way: the one writing
- * BT-97 already stands inside a test on fk_remise_except, the one writing BT-153 does not.
+ * einvoicingDiscountLabel() decides on the description alone, which a document level allowance can
+ * afford: its caller has already established a discount is behind the amount. A line has not, and a
+ * line of work named '(DEPOSIT)' carrying nothing was renamed on its way out. The test of the core is
+ * in two halves (pdf_getlinedesc(): $desc == '(DEPOSIT)' && ...->fk_remise_except); the second half is
+ * made here so both call sites read the line the same way.
  *
  * @param	?object				$line				Line of the invoice being written
  * @param	?DiscountAbsolute	$discount			Discount the line was built from, already fetched
@@ -1234,4 +1315,80 @@ function einvoicingDiscountRelatedInvoiceRef($discount, $db)
 	}
 
 	return (string) $correctedInvoice->ref;
+}
+
+/**
+ * Document type code (BT-3, UNTDID 1001) of an invoice, as the French list of BR-FR-04 names it.
+ *
+ * A credit note whose source is a deposit invoice is an "avoir d'acompte" (503), not a 381. The same code
+ * goes into BT-3, into the type of a document that references it (BT-25) and into its lifecycle (MDT-91).
+ *
+ * @param	Facture|FactureFournisseur	$invoice	Customer or supplier invoice
+ * @param	DoliDB			$db			Database handler
+ * @return	?string						Type code, null for a type the French list has no code for
+ */
+function einvoicingDocumentTypeCode($invoice, $db)
+{
+	$codes = array(
+		CommonInvoice::TYPE_STANDARD => '380',
+		CommonInvoice::TYPE_REPLACEMENT => '384',
+		CommonInvoice::TYPE_CREDIT_NOTE => '381',
+		CommonInvoice::TYPE_DEPOSIT => '386',
+		CommonInvoice::TYPE_SITUATION => '380',		// A situation invoice is transmitted as a commercial invoice
+	);
+	$type = (int) $invoice->type;
+	if (!isset($codes[$type])) {
+		return null;
+	}
+
+	if ($type == CommonInvoice::TYPE_CREDIT_NOTE && (int) $invoice->fk_facture_source > 0) {
+		// The source is of the class of the credit note, whose file is therefore already loaded
+		$source = ($invoice instanceof FactureFournisseur) ? new FactureFournisseur($db) : new Facture($db);
+		if ($source->fetch((int) $invoice->fk_facture_source) > 0 && (int) $source->type == CommonInvoice::TYPE_DEPOSIT) {
+			return '503';
+		}
+	}
+
+	return $codes[$type];
+}
+
+/**
+ * Preview picto for a diagnostic file of the module temp directory, opened in the dialog of the core.
+ *
+ * Those slots belong to no invoice, so no document list of the core shows them and none of them gets the
+ * picto a file of an invoice card gets. A PDF goes to the preview of the core; an XML, which
+ * dolIsAllowedForPreview() excludes on purpose, goes to the read-only viewer of the module.
+ *
+ * @param	string	$fileName	File name in the module temp directory
+ * @return	string				The <a> of the picto, empty string when the browser gets no preview
+ */
+function einvoicingDiagnosticPreviewLink($fileName)
+{
+	global $conf, $langs;
+
+	// Same condition as FormFile::showPreview(): below it lib_foot.js.php binds no click on the class
+	if ($conf->browser->layout == 'phone' || empty($conf->use_javascript_ajax)) {
+		return '';
+	}
+
+	if (preg_match('/\.xml$/i', $fileName)) {
+		$url = dol_buildpath('/einvoicing/xmlpreview.php', 1).'?source=diag&file='.urlencode($fileName).'&mode=raw';
+		$mime = 'text/html';
+	} else {
+		$urladvancedpreview = getAdvancedPreviewUrl('einvoicing', 'temp/'.$fileName, 1);
+		if (!is_array($urladvancedpreview) || empty($urladvancedpreview['url'])) {
+			return '';
+		}
+		$url = $urladvancedpreview['url'];
+		$mime = $urladvancedpreview['mime'];
+	}
+
+	$title = $langs->trans("Preview").' - '.$fileName;
+
+	$out = '<a class="pictopreview documentpreview" href="'.$url.'" mime="'.$mime.'"';
+	$out .= ' data-title="'.dol_escape_htmltag($title).'" target="_blank" rel="noopener noreferrer"';
+	$out .= ' title="'.dol_escape_htmltag($title).'">';
+	$out .= '<span class="fas fa-search-plus pictofixedwidth" style="color: #808080;"></span></a>';
+
+	return $out;
 }

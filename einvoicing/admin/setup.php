@@ -71,10 +71,10 @@ if (!$res) {
 // Libraries
 require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formsetup.class.php';
-require_once '../lib/einvoicing.lib.php';
-require_once "../class/providers/PDPProviderManager.class.php";
-require_once "../class/protocols/ProtocolManager.class.php";
-require_once "../class/einvoicing.class.php";
+require_once __DIR__.'/../lib/einvoicing.lib.php';
+require_once __DIR__.'/../class/providers/PDPProviderManager.class.php';
+require_once __DIR__.'/../class/protocols/ProtocolManager.class.php';
+require_once __DIR__.'/../class/einvoicing.class.php';
 
 
 // Translations
@@ -170,6 +170,7 @@ if (GETPOST('code') && GETPOST('state') && $provider instanceof AbstractPDPProvi
 		setEventMessages($langs->trans('EINVOICING_SUPERPDP_OAUTH_STATE_MISMATCH'), null, 'errors');
 	} else {
 		unset($_SESSION['einvoicing_superpdp_oauth_state']);
+		// @phan-suppress-next-line PhanUndeclaredMethod  Guarded by the method_exists() above: only a provider using an authorization code flow declares it.
 		$token = $provider->exchangeAuthorizationCode(GETPOST('code'));
 		if ($token) {
 			setEventMessages("Token generated successfully", null, 'mesgs');
@@ -193,7 +194,7 @@ $item->defaultFieldValue = getDolGlobalString('EINVOICING_PDP');
 $item->helpText = $langs->transnoentities('EINVOICING_PDP_HELP');
 $item->helpText .= '<br>'.$langs->transnoentities('EINVOICING_PDP_HELP2');
 $item->helpText .= '<br>'.$langs->transnoentities('EINVOICING_PDP_HELP3');
-$item->cssClass = 'minwidth500';
+$item->cssClass = 'maxwidth500';
 //var_dump($item);exit;
 
 // Real/test mode has no meaning for the TESTPDP stub, which never talks to any platform.

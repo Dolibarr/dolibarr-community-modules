@@ -23,7 +23,9 @@
  * \brief   CDAR (Cross Domain Acknowledgement and Response) Handler
  */
 
-dol_include_once('einvoicing/lib/einvoicing.lib.php');
+require_once __DIR__ . '/../../lib/einvoicing.lib.php';	// removeAllSpaces(), used to normalize an electronic address
+require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';	// @phpstan-ignore requireOnce.fileNotFound (PHPStan takes DOL_DOCUMENT_ROOT from install/inc.php of the core, where it is '..')
+
 
 /**
  * CdarHandler
@@ -50,6 +52,9 @@ class CdarHandler
 	const ACK_ACKNOWLEDGEMENT = '305';
 	const ACK_REJECTION = '304';
 	const ACK_ACCEPTANCE = '302';
+
+	// Length MDT-4 (the id of the message) is given in the PPF profile of XP Z12-012
+	const ID_MAX_LENGTH = 50;
 
 	// Document Type Codes
 	const DOC_INVOICE = '380';
@@ -195,7 +200,7 @@ class CdarHandler
 	/**
 	 * generate
 	 *
-	 * Values coming from the data are escaped with htmlspecialchars() before they reach
+	 * Values coming from the data are escaped with einvoicingXmlText() before they reach
 	 * DOMDocument::createElement(), which parses its second argument: an ampersand in a free text
 	 * (a rejection reason, a party name) would otherwise produce an empty element and lose the
 	 * information - same defect as issue #695 on the invoice side.
@@ -264,7 +269,7 @@ class CdarHandler
 	 * @param Facture|FactureFournisseur    $object       Invoice object (CustomerInvoice or SupplierInvoice)
 	 * @param int                           $statusCode     Status code to send
 	 * @param string                        $reasonCode Reason code to send (optional)
-	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>}  $paymentData  Cashed amount (TTC, in the company currency) for status 212, with an optional ready-made breakdown by VAT rate
+	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>,reason?:string}  $paymentData  Amount (TTC, in the company currency) moved for status 212, negative on a refund, with an optional ready-made breakdown by VAT rate and the reason of the cancellation (MDT-126)
 	 *
 	 * @return  array{res:int<-1,1>, message:string, file?:string}   Returns array with 'res' (1 on success, -1 on failure) with a 'message' and 'file' with the path.
 	 */
@@ -280,12 +285,28 @@ class CdarHandler
 		* - Payment transmitted (212) - optional but recommended
 		*/
 
-		// Id format: {SupplierRef}_{StatusCode}_{CreationDate}#{DocType}_{CreationDate} as defined in documentation
-		// TODO: map DOC_INVOICE with $object type
+		// MDT-91 is the BT-3 of the document the status is about: a cash-out is reported on the credit
+		// note the money was refunded on, which the platform holds as a 381, not as a 380.
+		$referencedDocTypeCode = ($statusCode == CdarHandler::PROC_PAID)
+			? $this->getReferencedDocumentTypeCode($object)
+			: CdarHandler::DOC_INVOICE;	// TODO: map DOC_INVOICE with $object type on the supplier invoice statuses too
+
+		// Id format {StatusCode}_{CreationDate}#{DocType}_{CreationDate}_{SupplierRef}: same parts as the
+		// documentation, the reference last. MDT-4 names THIS message - a lifecycle message about another
+		// one designates it by that id - and the PPF profile caps the field at 50 characters, so the only
+		// part of variable length is the one the cap eats into, and the document carries the reference
+		// whole in MDT-87 anyway.
 		// 'tzserver' and not the 'auto' default: 'auto' resolves to $conf->tzuserinputkey, which the
 		// MAIN_TZUSERINPUTKEY constant can switch to 'tzuserrel', and the id would then follow the
 		// timezone of whoever triggers the send instead of the server one.
-		$ID = ($statusCode == 212 ? $object->ref : $object->ref_supplier) . '_' . $statusCode . '_' . dol_print_date((int) $object->date_creation, '%Y%m%d%H%M%S', 'tzserver') . '#' . CdarHandler::DOC_INVOICE . '_' . dol_print_date((int) $object->date_creation, '%Y%m%d', 'tzserver');
+		$issueDateTime = CdarHandler::getCurrentDateTime();
+		// Dated by the moment of the message, milliseconds included: two statuses recorded on the same
+		// invoice within the same second - a bank import, a mass payment - would otherwise share the id.
+		$now = microtime(true);
+		$messageStamp = $issueDateTime . sprintf('%03d', (int) (($now - floor($now)) * 1000));
+		$reference = (string) ($statusCode == CdarHandler::PROC_PAID ? $object->ref : $object->ref_supplier);
+		$ID = $statusCode . '_' . $messageStamp . '#' . $referencedDocTypeCode . '_' . dol_print_date((int) $object->date_creation, '%Y%m%d', 'tzserver') . '_' . $reference;
+		$ID = dol_trunc($ID, CdarHandler::ID_MAX_LENGTH, 'right', 'UTF-8', 1);
 
 		// We use same as ID for Name as its not required to be different
 		$Name = $ID;
@@ -328,7 +349,7 @@ class CdarHandler
 
 		/**
 		 * MDT-88
-		 * TODO: the lifecycle statuses with no reference example still fall back on "in process":
+		 * Note: the lifecycle statuses with no reference example still fall back on "in process":
 		 * 39 (on hold) = Suspendue
 		 * 37 (Complete) = Complétée
 		 * 50 (Rejected / Refused) = Refusée (by C4)
@@ -429,6 +450,12 @@ class CdarHandler
 				return array('res' => -1, 'message' => 'Cannot compute the cashed amount (MEN) per VAT rate for invoice ' . $object->ref);
 			}
 			$SpecifiedDocumentStatus['SpecifiedDocumentCharacteristic'] = $cashedAmounts;
+
+			// Rule P1.17: a cash-out states why the cash-in is being cancelled, in the note (MDT-126).
+			if ((float) $cashedAmounts[0]['ValueAmount'] < 0) {
+				$reason = isset($paymentData['reason']) ? trim((string) $paymentData['reason']) : '';
+				$SpecifiedDocumentStatus['IncludedNoteContent'] = ($reason !== '') ? $reason : 'Refund of ' . $object->ref;
+			}
 		} elseif ($statusCode == CdarHandler::PROC_PAYMENT_TRANSMITTED) {
 			// "Paiement transmis" tells the vendor what was paid and when (MDG-43 block MDT-207 = MPA).
 			// No rule makes it mandatory, so a status with no known amount is still sent, just bare.
@@ -482,7 +509,7 @@ class CdarHandler
 			'ExchangedDocument' => [
 				'ID' => $ID,
 				'Name' => $Name,
-				'IssueDateTime' => CdarHandler::getCurrentDateTime(),
+				'IssueDateTime' => $issueDateTime,
 
 				'SenderTradeParty' => [
 					'RoleCode' => CdarHandler::ROLE_WK
@@ -496,12 +523,12 @@ class CdarHandler
 			'AcknowledgementDocument' => [
 				'MultipleReferencesIndicator' => false,
 				'TypeCode' => '23',
-				'IssueDateTime' => CdarHandler::getCurrentDateTime(),
+				'IssueDateTime' => $issueDateTime,
 
 				'ReferenceReferencedDocument' => [
 					'IssuerAssignedID' => $IssuerAssignedID,
 					'StatusCode' => $StatusCodeCdar,
-					'TypeCode' => CdarHandler::DOC_INVOICE, // TODO: map DOC_INVOICE with $object type
+					'TypeCode' => $referencedDocTypeCode,
 					// MDT-97, mandatory in the CTC-FR profile: it says what the lifecycle message is about
 					'ReferenceTypeCode' => CdarHandler::REFERENCE_TYPE_EINVOICE,
 					// Every XP Z12-012 reference example dates the referenced invoice with a plain date
@@ -522,7 +549,7 @@ class CdarHandler
 
 		$tempDir = $conf->einvoicing->dir_temp;
 		if (!dol_is_dir($tempDir)) {
-			dol_mkdir($tempDir);
+			dol_mkdir($tempDir, einvoicingDataRoot($tempDir));
 			if (!dol_is_dir($tempDir)) {
 				return array('res' => -1, 'message' => 'The temporary directory of the module cannot be created: ' . $tempDir);
 			}
@@ -668,14 +695,27 @@ class CdarHandler
 	}
 
 	/**
+	 * Document type code (MDT-91, the BT-3 of the document the status is about) of one of our own invoices.
+	 *
+	 * @param  Facture|FactureFournisseur $object Invoice, credit note or deposit the status is about
+	 * @return string                             Document type code, 380 for a commercial invoice
+	 */
+	private function getReferencedDocumentTypeCode($object)
+	{
+		// The code the invoice itself was sent with, 503 included for a credit note of a deposit
+		return einvoicingDocumentTypeCode($object, $this->db) ?? CdarHandler::DOC_INVOICE;
+	}
+
+	/**
 	 * Build the MDG-43 "cashed amount" (MEN) blocks of a status 212 (Encaissee) CDAR.
 	 *
 	 * One block per VAT rate, holding the TTC amount (MDT-215) and the rate itself (MDT-224). Dolibarr only
 	 * records a payment as a single TTC amount, so it is spread over the VAT rates proportionally to their
 	 * TTC weight; rounding differences go to the largest block, so the blocks always sum up to the amount.
+	 * A refund is a cash-out: it is reported the same way, with negative amounts (rule P1.15).
 	 *
 	 * @param  Facture|FactureFournisseur $object       Invoice the payment belongs to
-	 * @param  array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>}  $paymentData  Cashed amount (TTC, company currency) and/or a ready-made breakdown. Defaults to the sum of the payments of the invoice.
+	 * @param  array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>,reason?:string}  $paymentData  Amount (TTC, company currency) moved, negative on a refund, and/or a ready-made breakdown. Defaults to the sum of the payments of the invoice.
 	 * @return array<array{TypeCode:string,ValueAmount:string,CurrencyID:string,ValuePercent:string}>  MEN blocks, empty if they cannot be computed
 	 */
 	public function getCashedAmountCharacteristics($object, $paymentData = array())
@@ -691,7 +731,7 @@ class CdarHandler
 			if (empty($cashedAmount) && method_exists($object, 'getSommePaiement')) {
 				$cashedAmount = (float) $object->getSommePaiement();
 			}
-			if ($cashedAmount <= 0) {
+			if (empty($cashedAmount)) {
 				dol_syslog(__METHOD__ . ' No cashed amount found for invoice id=' . $object->id, LOG_WARNING, 0, '_einvoicing');
 				return array();
 			}
@@ -700,19 +740,20 @@ class CdarHandler
 				$object->fetch_lines();
 			}
 
-			// TTC weight of each VAT rate of the invoice
+			// TTC weight of each VAT rate, on absolute values: a credit note holds its lines negative
+			// while the amount refunded carries the direction of the money on its own (rule P1.15).
 			$totalPerRate = array();
 			foreach ($object->lines as $line) {
 				$rate = (string) price2num($line->tva_tx, 'MU');
 				if (!isset($totalPerRate[$rate])) {
 					$totalPerRate[$rate] = 0.0;
 				}
-				$totalPerRate[$rate] += (float) $line->total_ttc;
+				$totalPerRate[$rate] += abs((float) $line->total_ttc);
 			}
 
 			$totalTtc = array_sum($totalPerRate);
-			if ($totalTtc <= 0) {
-				dol_syslog(__METHOD__ . ' Cannot split the cashed amount, invoice id=' . $object->id . ' has no positive TTC total', LOG_WARNING, 0, '_einvoicing');
+			if (empty($totalTtc)) {
+				dol_syslog(__METHOD__ . ' Cannot split the cashed amount, invoice id=' . $object->id . ' has no TTC total', LOG_WARNING, 0, '_einvoicing');
 				return array();
 			}
 
@@ -723,7 +764,7 @@ class CdarHandler
 				$amount = (float) price2num($amountTtc * $ratio, 'MT');
 				$rounded += $amount;
 				$breakdown[$rate] = array('vatrate' => (float) $rate, 'amount' => $amount);
-				if (is_null($biggest) || $amount > $breakdown[$biggest]['amount']) {
+				if (is_null($biggest) || abs($amount) > abs($breakdown[$biggest]['amount'])) {
 					$biggest = $rate;
 				}
 			}
@@ -911,7 +952,7 @@ class CdarHandler
 		$context->appendChild($process);
 
 		$guideline = $dom->createElement('ram:GuidelineSpecifiedDocumentContextParameter');
-		$guideline->appendChild($dom->createElement('ram:ID', htmlspecialchars((string) $guidelineID)));
+		$guideline->appendChild($dom->createElement('ram:ID', einvoicingXmlText((string) $guidelineID)));
 		$context->appendChild($guideline);
 		$root->appendChild($context);
 	}
@@ -929,7 +970,7 @@ class CdarHandler
 	private function addDateTimeElement($dom, $parent, $elementName, $value, $format)
 	{
 		$element = $dom->createElement($elementName);
-		$dateTimeStr = $dom->createElement('udt:DateTimeString', htmlspecialchars((string) $value));
+		$dateTimeStr = $dom->createElement('udt:DateTimeString', einvoicingXmlText((string) $value));
 		$dateTimeStr->setAttribute('format', $format);
 		$element->appendChild($dateTimeStr);
 		$parent->appendChild($element);
@@ -949,18 +990,18 @@ class CdarHandler
 		$party = $dom->createElement($elementName);
 
 		if (isset($data['GlobalID'])) {
-			$globalID = $dom->createElement('ram:GlobalID', htmlspecialchars((string) $data['GlobalID']));
+			$globalID = $dom->createElement('ram:GlobalID', einvoicingXmlText((string) $data['GlobalID']));
 			if (!empty($data['SchemeID'])) {
 				$globalID->setAttribute('schemeID', $data['SchemeID']);
 			}
 			$party->appendChild($globalID);
 		}
 
-		$party->appendChild($dom->createElement('ram:RoleCode', htmlspecialchars((string) $data['RoleCode'])));
+		$party->appendChild($dom->createElement('ram:RoleCode', einvoicingXmlText((string) $data['RoleCode'])));
 
 		if (isset($data['URIID'])) {
 			$uriComm = $dom->createElement('ram:URIUniversalCommunication');
-			$uriID = $dom->createElement('ram:URIID', htmlspecialchars((string) $data['URIID']));
+			$uriID = $dom->createElement('ram:URIID', einvoicingXmlText((string) $data['URIID']));
 			$uriID->setAttribute('schemeID', $data['URISchemeID']);
 			$uriComm->appendChild($uriID);
 			$party->appendChild($uriComm);
@@ -975,7 +1016,7 @@ class CdarHandler
 	 * parseExchangedDocument
 	 *
 	 * @param  SimpleXmlElement $xml xml
-	 * @return array<string,string|array<string,string>>
+	 * @return array<string,string|array<string,string>|array<int,array<string,string>>>
 	 */
 	private function parseExchangedDocument($xml)
 	{
@@ -995,8 +1036,69 @@ class CdarHandler
 				'RoleCode' => $this->getXpathValue($xml, '//rsm:ExchangedDocument/ram:RecipientTradeParty/ram:RoleCode'),
 				'URIID' => $this->getXpathValue($xml, '//rsm:ExchangedDocument/ram:RecipientTradeParty/ram:URIUniversalCommunication/ram:URIID'),
 				'URISchemeID' => $this->getXpathAttribute($xml, '//rsm:ExchangedDocument/ram:RecipientTradeParty/ram:URIUniversalCommunication/ram:URIID', 'schemeID')
-			]
+			],
+			// The key above keeps the FIRST recipient, which is all the callers reading it need. A
+			// lifecycle message may address several, and which ones is what tells a rejection posted
+			// at emission from one posted at reception (issue #973), so keep the whole list too.
+			'RecipientTradeParties' => $this->parseRecipientTradeParties($xml)
 		];
+	}
+
+	/**
+	 * Every ExchangedDocument/RecipientTradeParty of a CDAR, in document order.
+	 *
+	 * XP Z12-012 annex A, sheet "Acteurs CDV", gives a status one recipient per audience: a rejection
+	 * posted at emission is addressed to the seller alone, one posted at reception to the seller AND
+	 * the buyer. Nothing else in a 213 says which platform posted it - issuer and sender are both the
+	 * generic "WK" with an empty identifier on the documents seen so far.
+	 *
+	 * @param  SimpleXMLElement $xml	CDAR with the namespaces registered
+	 * @return array<int,array{GlobalID:string,SchemeID:string,RoleCode:string,Name:string}>
+	 */
+	private function parseRecipientTradeParties($xml)
+	{
+		$parties = array();
+
+		$nodes = $this->registerNamespaces($xml)->xpath('//rsm:ExchangedDocument/ram:RecipientTradeParty');
+		if (empty($nodes)) {
+			return $parties;
+		}
+
+		foreach ($nodes as $node) {
+			$parties[] = array(
+				'GlobalID' => $this->getXpathValue($node, 'ram:GlobalID'),
+				'SchemeID' => $this->getXpathAttribute($node, 'ram:GlobalID', 'schemeID'),
+				'RoleCode' => $this->getXpathValue($node, 'ram:RoleCode'),
+				'Name' => $this->getXpathValue($node, 'ram:Name')
+			);
+		}
+
+		return $parties;
+	}
+
+	/**
+	 * The RoleCodes of the recipients above, comma separated, as stored on a lifecycle message
+	 * (llx_einvoicing_lifecycle_msg.lc_recipient_roles): "SE", "SE,BY"...
+	 *
+	 * @param  array<string,mixed> $cdarDocument	Result of readFromString()
+	 * @return string								Empty when the CDAR names no recipient
+	 */
+	public static function recipientRoles($cdarDocument)
+	{
+		$parties = $cdarDocument['ExchangedDocument']['RecipientTradeParties'] ?? array();
+		if (!is_array($parties)) {
+			return '';
+		}
+
+		$roles = array();
+		foreach ($parties as $party) {
+			$role = trim((string) ($party['RoleCode'] ?? ''));
+			if ($role !== '' && !in_array($role, $roles, true)) {
+				$roles[] = $role;
+			}
+		}
+
+		return implode(',', $roles);
 	}
 
 	/**
@@ -1073,9 +1175,66 @@ class CdarHandler
 				$result['StatusIncludedNoteContents'] = $allContents;               // array of all notes
 				$result['StatusIncludedNoteContent'] = implode("\n", $allContents); // backward-compatible string
 			}
+
+			// MDG-43 blocks: what the status is about in figures - the amount cashed in (MEN) of a 212,
+			// the amount paid (MPA) of a 211, what is left to pay (RAP), ...
+			$characteristics = array();
+			foreach ($statusNodes as $statusNode) {
+				foreach ($this->registerNamespaces($statusNode)->xpath('ram:SpecifiedDocumentCharacteristic') as $node) {
+					$block = array(
+						'TypeCode' => $this->getXpathValue($node, 'ram:TypeCode'),
+						'ValueAmount' => $this->getXpathValue($node, 'ram:ValueAmount'),
+						'CurrencyID' => $this->getXpathAttribute($node, 'ram:ValueAmount', 'currencyID'),
+						'ValuePercent' => $this->getXpathValue($node, 'ram:ValuePercent'),
+						'ValueDateTime' => $this->getXpathValue($node, 'ram:ValueDateTime/qdt:DateTimeString')
+					);
+					if ($block['TypeCode'] !== '' || $block['ValueAmount'] !== '') {
+						$characteristics[] = $block;
+					}
+				}
+			}
+			if (!empty($characteristics)) {
+				$result['StatusCharacteristics'] = $characteristics;
+			}
 		}
 
 		return $result;
+	}
+
+	/**
+	 * Describe the MDG-43 blocks of a received status in one line, for the status comment and the log.
+	 *
+	 * @param  array<array{TypeCode?:string,ValueAmount?:string,CurrencyID?:string,ValuePercent?:string,ValueDateTime?:string}> $characteristics Blocks as parsed from the CDAR
+	 * @param  Translate $langs Translate object
+	 * @return string           One line, empty when no block carries an amount
+	 */
+	public static function describeStatusCharacteristics($characteristics, $langs)
+	{
+		$parts = array();
+
+		foreach ($characteristics as $block) {
+			if (!isset($block['ValueAmount']) || $block['ValueAmount'] === '') {
+				continue;	// A block with no amount says nothing a reader can use
+			}
+
+			// A cash-in and a cash-out are both a 212, told apart by the sign alone (rule P1.15): say
+			// which one this is rather than leave "Cashed in -240.00" on the screen.
+			$code = isset($block['TypeCode']) ? (string) $block['TypeCode'] : '';
+			$key = 'EInvCdarAmount' . $code . ($code === 'MEN' && (float) $block['ValueAmount'] < 0 ? 'Negative' : '');
+			$label = ($code !== '' && $langs->trans($key) !== $key) ? $langs->trans($key) : $code;
+
+			$one = price((float) $block['ValueAmount'], 0, $langs, 1, -1, -1, !empty($block['CurrencyID']) ? $block['CurrencyID'] : '');
+			if (isset($block['ValuePercent']) && $block['ValuePercent'] !== '') {
+				$one .= ' (' . vatrate((string) $block['ValuePercent'], true) . ')';
+			}
+			if (!empty($block['ValueDateTime'])) {
+				$one .= ' ' . dol_print_date(dol_stringtotime($block['ValueDateTime']), 'day');
+			}
+
+			$parts[] = ($label !== '' ? $label . ' ' : '') . $one;
+		}
+
+		return implode(', ', $parts);
 	}
 
 	// ==================== GENERATION ====================
@@ -1091,8 +1250,8 @@ class CdarHandler
 	private function addExchangedDocument($dom, $root, $doc)
 	{
 		$exchanged = $dom->createElement('rsm:ExchangedDocument');
-		$exchanged->appendChild($dom->createElement('ram:ID', htmlspecialchars((string) $doc['ID'])));
-		$exchanged->appendChild($dom->createElement('ram:Name', htmlspecialchars((string) $doc['Name'])));
+		$exchanged->appendChild($dom->createElement('ram:ID', einvoicingXmlText((string) $doc['ID'])));
+		$exchanged->appendChild($dom->createElement('ram:Name', einvoicingXmlText((string) $doc['Name'])));
 
 		$this->addDateTimeElement($dom, $exchanged, 'ram:IssueDateTime', $doc['IssueDateTime'], self::FORMAT_DATETIME);
 
@@ -1120,7 +1279,7 @@ class CdarHandler
 		$multipleRef->appendChild($indicator);
 		$ack->appendChild($multipleRef);
 
-		$ack->appendChild($dom->createElement('ram:TypeCode', htmlspecialchars((string) $doc['TypeCode'])));
+		$ack->appendChild($dom->createElement('ram:TypeCode', einvoicingXmlText((string) $doc['TypeCode'])));
 		$this->addDateTimeElement($dom, $ack, 'ram:IssueDateTime', $doc['IssueDateTime'], self::FORMAT_DATETIME);
 		$this->addReferencedDocument($dom, $ack, $doc['ReferenceReferencedDocument']);
 
@@ -1138,24 +1297,24 @@ class CdarHandler
 	private function addReferencedDocument($dom, $parent, $doc)
 	{
 		$ref = $dom->createElement('ram:ReferenceReferencedDocument');
-		$ref->appendChild($dom->createElement('ram:IssuerAssignedID', htmlspecialchars((string) $doc['IssuerAssignedID'])));
-		$ref->appendChild($dom->createElement('ram:StatusCode', htmlspecialchars((string) $doc['StatusCode'])));
-		$ref->appendChild($dom->createElement('ram:TypeCode', htmlspecialchars((string) $doc['TypeCode'])));
+		$ref->appendChild($dom->createElement('ram:IssuerAssignedID', einvoicingXmlText((string) $doc['IssuerAssignedID'])));
+		$ref->appendChild($dom->createElement('ram:StatusCode', einvoicingXmlText((string) $doc['StatusCode'])));
+		$ref->appendChild($dom->createElement('ram:TypeCode', einvoicingXmlText((string) $doc['TypeCode'])));
 
 		// MDT-97. Its place in the CDAR XSD sequence (ReferencedDocumentType) is after ReceiptDateTime /
 		// AttachmentBinaryObject and before FormattedIssueDateTime - the order the platforms use too.
 		if (!empty($doc['ReferenceTypeCode'])) {
-			$ref->appendChild($dom->createElement('ram:ReferenceTypeCode', htmlspecialchars((string) $doc['ReferenceTypeCode'])));
+			$ref->appendChild($dom->createElement('ram:ReferenceTypeCode', einvoicingXmlText((string) $doc['ReferenceTypeCode'])));
 		}
 
 		$formattedDateTime = $dom->createElement('ram:FormattedIssueDateTime');
-		$dateTimeStr = $dom->createElement('qdt:DateTimeString', htmlspecialchars((string) $doc['FormattedIssueDateTime']));
+		$dateTimeStr = $dom->createElement('qdt:DateTimeString', einvoicingXmlText((string) $doc['FormattedIssueDateTime']));
 		$dateTimeStr->setAttribute('format', self::FORMAT_DATE);
 		$formattedDateTime->appendChild($dateTimeStr);
 		$ref->appendChild($formattedDateTime);
 
-		$ref->appendChild($dom->createElement('ram:ProcessConditionCode', htmlspecialchars((string) $doc['ProcessConditionCode'])));
-		$ref->appendChild($dom->createElement('ram:ProcessCondition', htmlspecialchars((string) $doc['ProcessCondition'])));
+		$ref->appendChild($dom->createElement('ram:ProcessConditionCode', einvoicingXmlText((string) $doc['ProcessConditionCode'])));
+		$ref->appendChild($dom->createElement('ram:ProcessCondition', einvoicingXmlText((string) $doc['ProcessCondition'])));
 
 		$this->addTradeParty($dom, $ref, 'ram:IssuerTradeParty', $doc['IssuerTradeParty']);
 		$parent->appendChild($ref);
@@ -1165,13 +1324,13 @@ class CdarHandler
 
 			if (!empty($doc['SpecifiedDocumentStatus']['ReasonCode'])) {
 				$status->appendChild(
-					$dom->createElement('ram:ReasonCode', htmlspecialchars((string) $doc['SpecifiedDocumentStatus']['ReasonCode']))
+					$dom->createElement('ram:ReasonCode', einvoicingXmlText((string) $doc['SpecifiedDocumentStatus']['ReasonCode']))
 				);
 			}
 
 			if (!empty($doc['SpecifiedDocumentStatus']['Reason'])) {
 				$status->appendChild(
-					$dom->createElement('ram:Reason', htmlspecialchars((string) $doc['SpecifiedDocumentStatus']['Reason']))
+					$dom->createElement('ram:Reason', einvoicingXmlText((string) $doc['SpecifiedDocumentStatus']['Reason']))
 				);
 			}
 
@@ -1184,15 +1343,23 @@ class CdarHandler
 				);
 			}
 
+			// MDT-126. Its place in the D22B DocumentStatusType sequence is after SequenceNumeric and
+			// before the MDG-43 blocks.
+			if (!empty($doc['SpecifiedDocumentStatus']['IncludedNoteContent'])) {
+				$note = $dom->createElement('ram:IncludedNote');
+				$note->appendChild($dom->createElement('ram:Content', einvoicingXmlText((string) $doc['SpecifiedDocumentStatus']['IncludedNoteContent'])));
+				$status->appendChild($note);
+			}
+
 			// MDG-43 blocks (cashed amount per VAT rate for status 212). Element order follows the D22B
 			// DocumentCharacteristicType sequence: TypeCode, then ValueAmount, then ValuePercent.
 			if (!empty($doc['SpecifiedDocumentStatus']['SpecifiedDocumentCharacteristic'])) {
 				foreach ($doc['SpecifiedDocumentStatus']['SpecifiedDocumentCharacteristic'] as $characteristic) {
 					$characteristicElement = $dom->createElement('ram:SpecifiedDocumentCharacteristic');
-					$characteristicElement->appendChild($dom->createElement('ram:TypeCode', htmlspecialchars((string) $characteristic['TypeCode'])));
+					$characteristicElement->appendChild($dom->createElement('ram:TypeCode', einvoicingXmlText((string) $characteristic['TypeCode'])));
 
 					if (isset($characteristic['ValueAmount'])) {
-						$amountElement = $dom->createElement('ram:ValueAmount', htmlspecialchars((string) $characteristic['ValueAmount']));
+						$amountElement = $dom->createElement('ram:ValueAmount', einvoicingXmlText((string) $characteristic['ValueAmount']));
 						if (!empty($characteristic['CurrencyID'])) {
 							$amountElement->setAttribute('currencyID', $characteristic['CurrencyID']);
 						}
@@ -1204,7 +1371,7 @@ class CdarHandler
 					}
 
 					if (isset($characteristic['ValuePercent'])) {
-						$characteristicElement->appendChild($dom->createElement('ram:ValuePercent', htmlspecialchars((string) $characteristic['ValuePercent'])));
+						$characteristicElement->appendChild($dom->createElement('ram:ValuePercent', einvoicingXmlText((string) $characteristic['ValuePercent'])));
 					}
 
 					$status->appendChild($characteristicElement);

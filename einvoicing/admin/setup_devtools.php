@@ -72,10 +72,10 @@ if (!$res) {
 // Libraries
 require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
 require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
-require_once '../lib/einvoicing.lib.php';
-require_once "../class/providers/PDPProviderManager.class.php";
-require_once "../class/protocols/ProtocolManager.class.php";
-require_once "../class/einvoicing.class.php";
+require_once __DIR__.'/../lib/einvoicing.lib.php';
+require_once __DIR__.'/../class/providers/PDPProviderManager.class.php';
+require_once __DIR__.'/../class/protocols/ProtocolManager.class.php';
+require_once __DIR__.'/../class/einvoicing.class.php';
 
 if (!class_exists('FormSetup')) {
 	require_once DOL_DOCUMENT_ROOT.'/core/class/html.formsetup.class.php';
@@ -275,7 +275,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 			$buyerId = $tmpthirdparty->id;
 			if (!$buyerId) {
 				$langs->load("errors");
-				setEventMessages($langs->trans("ErrorThirdPartyNotFound"), null, 'warnings');
+				setEventMessages($langs->trans("EInvErrorThirdPartyNotFound"), null, 'warnings');
 			}
 		}
 	}
@@ -288,7 +288,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 			$sellerId = $tmpthirdparty->id;
 			if (!$sellerId) {
 				$langs->load("errors");
-				setEventMessages($langs->trans("ErrorThirdPartyNotFound"), null, 'warnings');
+				setEventMessages($langs->trans("EInvErrorThirdPartyNotFound"), null, 'warnings');
 			}
 		}
 	}
@@ -331,7 +331,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 	print '<br>';
 
 	// Invoice type
-	print '<span class="width150 inline-block">'.$langs->trans("InvoiceType").'</span> ';
+	print '<span class="width150 inline-block">'.$langs->trans("EInvInvoiceType").'</span> ';
 	if ((float) DOL_VERSION >= 24.0) {
 		$typeofinvoice = array(
 			Facture::TYPE_STANDARD => array('label' => $langs->trans('InvoiceStandard')),
@@ -431,7 +431,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 			// so that list is what separates a customer of yours from anyone else on the internet. While
 			// it is empty every destination is accepted, which is the warning pdpShowWarning() prints
 			// above; a future version will refuse the redirect instead of accepting everything.
-			print '- on THIS instance, the variable EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN to the comma separated list of the domains of your customer instances, for example <input type="text" class="width300" id="idproxydomains" value="domainofmycustomers.com,anotherdomain.com" spellcheck="false">: ';
+			print '- on THIS instance, the variable EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN to the comma separated list of the domains of your customer instances <input type="text" class="width300" id="idproxydomains" placeholder="domainofmycustomers.com,anotherdomain.com" spellcheck="false">: ';
 			print (getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN') ? '<span class="ok">'.img_picto('', 'tick').' '.dolPrintHTML(getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN')).'</span>' : '<span class="error">'.img_warning().' KO, not set: every redirect destination is accepted</span>').'<br>';
 			print ajax_autoselect("idproxydomains");
 			print '</div>';

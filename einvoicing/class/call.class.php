@@ -26,6 +26,9 @@
 
 // Put here all includes required by your class file
 require_once DOL_DOCUMENT_ROOT.'/core/class/commonobject.class.php';
+// getNomUrl() calls dolPrintHTMLForAttribute(), added to the core in Dolibarr 19: the backport is loaded here
+// because a caller outside this module has no reason to know this class needs it.
+require_once __DIR__ . '/../compat/functions.lib.php';
 //require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 //require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 
@@ -305,9 +308,13 @@ class Call extends CommonObject
 		//foreach($this->lines as $line)
 		//	$line->fetch_optionals();
 
-		// Reset some properties
+		// Reset some properties. unset() rather than an empty value is what the core does in its own
+		// createFromClone(): createCommon() below builds the INSERT from the properties that are set.
+		// @phan-suppress-next-line PhanTypeObjectUnsetDeclaredProperty
 		unset($object->id);
+		// @phan-suppress-next-line PhanTypeObjectUnsetDeclaredProperty
 		unset($object->fk_user_creat);
+		// @phan-suppress-next-line PhanTypeObjectUnsetDeclaredProperty
 		unset($object->import_key);
 
 		// Clear fields
@@ -357,7 +364,7 @@ class Call extends CommonObject
 
 		if (!$error) {
 			// copy external contacts if same company  @phan-suppress-next-line PhanUndeclaredProperty
-			if (!empty($object->socid) && ((property_exists($this, 'fk_soc') && ($this->fk_soc == $object->socid)) || (property_exists($this, 'socid') && ($this->socid == $object->socid)))) {	// @phpstan-ignore-line
+			if (!empty($object->socid) && ((property_exists($this, 'fk_soc') && ($this->fk_soc == $object->socid)) || (property_exists($this, 'socid') && ($this->socid == $object->socid)))) {	// @phpstan-ignore-line @phan-suppress-current-line PhanUndeclaredProperty
 				if ($this->copy_linked_contact($object, 'external') < 0) {
 					$error++;
 				}
@@ -559,12 +566,9 @@ class Call extends CommonObject
 
 		$this->db->begin();
 
-		// Define new ref
-		if (preg_match('/^[\(]?PROV/i', $this->ref) || empty($this->ref)) { // empty should not happened, but when it occurs, the test save life
-			$num = $this->getNextNumRef();
-		} else {
-			$num = (string) $this->ref;
-		}
+		// The object has no ref column and the module ships no numbering model: fetchCommon() fills
+		// $this->ref with the row id, and the reference the user sees is call_id.
+		$num = (string) $this->ref;
 		$this->newref = $num;
 
 		if (!empty($num)) {
@@ -957,10 +961,10 @@ class Call extends CommonObject
 			global $langs;
 			//$langs->load("einvoicing@einvoicing");
 			$this->labelStatus[self::STATUS_FAILED] = $langs->transnoentitiesnoconv('Failed');
-			$this->labelStatus[self::STATUS_SUCCESS] = $langs->transnoentitiesnoconv('Success');
+			$this->labelStatus[self::STATUS_SUCCESS] = $langs->transnoentitiesnoconv('EInvSuccess');
 			$this->labelStatus[self::STATUS_CANCELED] = $langs->transnoentitiesnoconv('Disabled');
 			$this->labelStatusShort[self::STATUS_FAILED] = $langs->transnoentitiesnoconv('Failed');
-			$this->labelStatusShort[self::STATUS_SUCCESS] = $langs->transnoentitiesnoconv('Success');
+			$this->labelStatusShort[self::STATUS_SUCCESS] = $langs->transnoentitiesnoconv('EInvSuccess');
 			$this->labelStatusShort[self::STATUS_CANCELED] = $langs->transnoentitiesnoconv('Disabled');
 		}
 
@@ -1077,62 +1081,6 @@ class Call extends CommonObject
 	}
 
 	/**
-	 *  Returns the reference to the following non used object depending on the active numbering module.
-	 *
-	 *  @return	string      		Object free reference
-	 */
-	public function getNextNumRef()
-	{
-		global $langs, $conf;
-		$langs->load("einvoicing@einvoicing");
-
-		if (!getDolGlobalString('EINVOICING_MYOBJECT_ADDON')) {
-			$conf->global->EINVOICING_MYOBJECT_ADDON = 'mod_call_standard';
-		}
-
-		if (getDolGlobalString('EINVOICING_MYOBJECT_ADDON')) {
-			$mybool = false;
-
-			$file = getDolGlobalString('EINVOICING_MYOBJECT_ADDON').".php";
-			$classname = getDolGlobalString('EINVOICING_MYOBJECT_ADDON');
-
-			// Include file with class
-			$dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
-			foreach ($dirmodels as $reldir) {
-				$dir = dol_buildpath($reldir."core/modules/einvoicing/");
-
-				// Load file with numbering class (if found)
-				$mybool = $mybool || @include_once $dir.$file;
-			}
-
-			if (!$mybool) {
-				dol_print_error(null, "Failed to include file ".$file);
-				return '';
-			}
-
-			if (class_exists($classname)) {
-				$obj = new $classname();
-				'@phan-var-force ModeleNumRefCall $obj';
-				$numref = $obj->getNextValue($this);
-
-				if ($numref != '' && $numref != '-1') {
-					return $numref;
-				} else {
-					$this->error = $obj->error;
-					//dol_print_error($this->db,get_class($this)."::getNextNumRef ".$obj->error);
-					return "";
-				}
-			} else {
-				print $langs->trans("Error")." ".$langs->trans("ClassNotFound").' '.$classname;
-				return "";
-			}
-		} else {
-			print $langs->trans("ErrorNumberingModuleNotSetup", $this->element);
-			return "";
-		}
-	}
-
-	/**
 	 *  Create a document onto disk according to template module.
 	 *
 	 *  @param	string		$modele			Force template to use ('' to not force)
@@ -1187,38 +1135,6 @@ class Call extends CommonObject
 	}
 
 	/**
-	 * Action executed by scheduler
-	 * CAN BE A CRON TASK. In such a case, parameters come from the schedule job setup field 'Parameters'
-	 * Use public function doScheduledJob($param1, $param2, ...) to get parameters
-	 *
-	 * @return	int			0 if OK, <>0 if KO (this function is used also by cron so only 0 is OK)
-	 */
-	public function doScheduledJob()
-	{
-		//global $conf, $langs;
-
-		//$conf->global->SYSLOG_FILE = 'DOL_DATA_ROOT/dolibarr_mydedicatedlogfile.log';
-
-		$error = 0;
-		$this->output = '';
-		$this->error = '';
-
-		dol_syslog(__METHOD__." start", LOG_INFO);
-
-		$now = dol_now();
-
-		$this->db->begin();
-
-		// ...
-
-		$this->db->commit();
-
-		dol_syslog(__METHOD__." end", LOG_INFO);
-
-		return $error;
-	}
-
-	/**
 	 *  Returns the reference to the following non used object with 'call' prefix.
 	 *
 	 *  Must be called inside a transaction opened on $this->db, and the record must be inserted
@@ -1233,11 +1149,25 @@ class Call extends CommonObject
 
 		// Read on the connection this record will be written on ($dbhistory), not on the global $db: a
 		// snapshot read from another transaction returns a stale number and the insert dies on
-		// uk_einvoicing_call_callid. FOR UPDATE makes it a locking read and holds the range until insert.
+		// uk_einvoicing_call_callid. The read must therefore be a locking one, held until the insert.
+		$ispgsql = ($this->db->type == 'pgsql');
+
+		if ($ispgsql) {
+			// PostgreSQL refuses FOR UPDATE on an aggregate (SQLSTATE 0A000), so serialize the readers
+			// with an advisory lock instead. It is held until the transaction ends, like FOR UPDATE.
+			if (!$this->db->query("SELECT pg_advisory_xact_lock(1)")) {
+				return null;
+			}
+		}
+
+		// AS SIGNED, not AS INTEGER: MySQL rejects the latter (ERROR 1064) where MariaDB accepts it, and the
+		// pgsql driver of the core already rewrites " as signed)" into " as integer)" (DoliDBPgsql::convertSQLFromMysql()).
 		$sql = "SELECT MAX(CAST(SUBSTRING(call_id, ".(strlen($prefix) + 1).") AS SIGNED)) AS maxref";
 		$sql .= " FROM ".$this->db->prefix().$this->table_element;
 		$sql .= " WHERE call_id LIKE '".$this->db->escape($prefix)."%'";
-		$sql .= " FOR UPDATE";
+		if (!$ispgsql) {
+			$sql .= " FOR UPDATE";
+		}
 
 		$resql = $this->db->query($sql);
 		if (!$resql) {

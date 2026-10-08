@@ -149,8 +149,8 @@ class modHelloAsso extends DolibarrModules
 		$this->langfiles = array("helloasso@helloasso");
 
 		// Prerequisites
-		$this->phpmin = array(7, 1); // Minimum version of PHP required by module
-		$this->phpmax = array(8, 4); // Maximum version of PHP required by module
+		$this->phpmin = array(7, 1); 	// Minimum version of PHP required by module
+		$this->phpmax = array(); 		// Maximum version of PHP required by module
 		$this->need_dolibarr_version = array(21, 0, -4); // Minimum version of Dolibarr required by module
 		$this->need_javascript_ajax = 0;
 

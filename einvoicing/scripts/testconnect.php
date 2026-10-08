@@ -33,6 +33,16 @@ if (PHP_SAPI !== 'cli') {
 
 // Load Dolibarr environment
 $res = 0;
+// This module is deployed by symlinking the repository into htdocs/custom/einvoicing. PHP resolves
+// the symlink, so every path derived below lands in the repository instead of in the instance and
+// the include fails. DOLIBARR_HTDOCS lets the developer point explicitly at the instance to run
+// against, exactly like scripts/regenerate_einvoicing_fixtures.php already does.
+$dolibarrHtdocs = rtrim((string) getenv('DOLIBARR_HTDOCS'), '/');
+if (!$res && $dolibarrHtdocs && file_exists($dolibarrHtdocs.'/master.inc.php')) {
+	$_SERVER['DOCUMENT_ROOT'] = $dolibarrHtdocs;
+	chdir($dolibarrHtdocs);
+	$res = @include $dolibarrHtdocs.'/master.inc.php';
+}
 // Try main.inc.php into web root known defined into CONTEXT_DOCUMENT_ROOT (not always defined)
 if (!$res && !empty($_SERVER["CONTEXT_DOCUMENT_ROOT"])) {
 	$res = @include $_SERVER["CONTEXT_DOCUMENT_ROOT"]."/master.inc.php";
@@ -66,7 +76,7 @@ if (!$res && file_exists("../../../../master.inc.php")) {
 	$res = @include "../../../../master.inc.php";
 }
 if (!$res) {
-	die("Include of master fails");
+	die("Include of master fails. When the module is deployed as a symlink into htdocs/custom/einvoicing, set DOLIBARR_HTDOCS to the htdocs directory of the Dolibarr instance to run against.\n");
 }
 /**
  * The main.inc.php has been included so the following variable are now defined:

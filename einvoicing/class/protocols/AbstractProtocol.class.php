@@ -45,8 +45,17 @@ abstract class AbstractProtocol
 	/** @var array Non-blocking warning messages */
 	public $warnings = [];
 
+	/**
+	 * @var int Draft supplier invoice the next import rebuilds instead of creating one, 0 for none.
+	 *          Set by Document::reimport() around the synchronization of the flow, reset right after.
+	 */
+	public static $rebuildSupplierInvoiceId = 0;
+
 	/** @const string Invoice file extension (without the dot, example 'xml') */
 	const INVOICE_FILE_EXTENSION = ''; // Must be overridden by subclasses
+
+	/** @const string What replaces an attachment binary in a stored XML, when the file is kept elsewhere */
+	const ATTACHMENT_REMOVED_NOTE = '[Removed to get a smaller XML]';
 
 	/** @const string Generated invoice XML file name*/
 	const GENERATED_INVOICE_XML_FILE_NAME = ''; // Must be overridden by subclasses
@@ -79,6 +88,19 @@ abstract class AbstractProtocol
 	abstract public function generateXML($invoice, $outputlangs = null);
 
 	/**
+	 * Generate the e-invoice file of a given invoice, and return where it was written.
+	 *
+	 * The entry point of a protocol: the hooks and the sample generation of CommonProtocol call it on
+	 * whatever protocol the user selected, so every protocol has to answer to it.
+	 *
+	 * @param	int|Facture		$invoice_id		Invoice id, or invoice object, to process
+	 * @param	?Translate		$outputlangs	Output language
+	 * @param	string			$sourceFilePath	Source document the file is built from, when the format needs one
+	 * @return	-1|string						-1 if ko, path of the generated file if ok
+	 */
+	abstract public function generateInvoice($invoice_id, $outputlangs = null, $sourceFilePath = '');
+
+	/**
 	 * Create a supplier invoice in Dolibarr from Factur-X content.
 	 *
 	 * This function parses the provided Factur-X XML content
@@ -87,7 +109,7 @@ abstract class AbstractProtocol
 	 * @param  string 			$file                       		Source string file. We use this file to get data of supplier invoice.
 	 * @param  string|null 		$readableViewFile        			Readable view file (PDP Generated readable PDF).e only store it if available.
 	 * @param  string 			$flowId                       		Flow identifier source of the invoice.
-	 * @return array{res:int, message:string, action:string|null}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message' and an optional 'action'.
+	 * @return array{res:int, message:string, action:string|null, created?:int}   Returns array with 'res' (1 on success, 0 already exists, -1 on failure) with a 'message', an optional 'action', and 'created' set to 1 only when this call is what imported the invoice.
 	 */
 	abstract public function createSupplierInvoiceFromSource($file, $readableViewFile = null, $flowId = '');
 
@@ -152,9 +174,10 @@ abstract class AbstractProtocol
 	/**
 	 * Remove attachment nodes to get a smaller XML
 	 * @param string $xmlData The XML data to process
+	 * @param string $note    What is written in place of the binary, told to whoever reads the XML later
 	 * @return string Cleaned XML
 	 */
-	abstract public static function removeAttachmentFromXml(string $xmlData): string;
+	abstract public static function removeAttachmentFromXml(string $xmlData, string $note = self::ATTACHMENT_REMOVED_NOTE): string;
 
 	/**
 	 * Check if the generated e-invoice file exceeds the configured size limit.

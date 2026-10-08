@@ -126,6 +126,8 @@ if (!$permissiontoread) {
 	accessforbidden();
 }
 
+$hookmanager->initHooks(array($contextpage));
+
 
 /*
  * Actions
@@ -140,6 +142,12 @@ if (GETPOST('button_removefilter_x', 'alpha') || GETPOST('button_removefilter.x'
 if ($cancel) {
 	$action = 'view';
 	$rowid = 0;
+	$massaction = '';
+}
+
+// Keep the mass action only when it was sent by the confirm button of the mass action combo
+if (!GETPOST('confirmmassaction', 'alpha')) {
+	$massaction = '';
 }
 
 // Reassign a vendor reference to another product, and/or rename the reference
@@ -194,8 +202,8 @@ if ($action == 'confirm_delete' && $confirm == 'yes' && $permissiontoadd && $row
 	$rowid = 0;
 }
 
-// Delete the selected mappings
-if ($massaction == 'massdelete' && $confirm == 'yes' && $permissiontoadd && is_array($toselect) && count($toselect) > 0) {
+// Delete the selected mappings (massaction = 'delete' for a direct delete, or action/confirm = 'delete'/'yes' after the confirmation dialog of massactions_pre.tpl.php)
+if (($massaction == 'delete' || ($action == 'delete' && $confirm == 'yes')) && $permissiontoadd && is_array($toselect) && count($toselect) > 0) {
 	$nbdeleted = 0;
 	foreach ($toselect as $torowid) {
 		$pfp = new ProductFournisseur($db);
@@ -211,6 +219,7 @@ if ($massaction == 'massdelete' && $confirm == 'yes' && $permissiontoadd && is_a
 	if ($nbdeleted > 0) {
 		setEventMessages($langs->trans("NbOfVendorRefMappingsDeleted", $nbdeleted), null, 'mesgs');
 	}
+	$action = 'view';
 	$massaction = '';
 	$toselect = array();
 }
@@ -277,6 +286,16 @@ if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP") && $conf->entity
 	exit;
 }
 
+// List of mass actions available
+$arrayofmassactions = array();
+if ($permissiontoadd && $action != 'editmapping') {
+	$arrayofmassactions['predelete'] = img_picto('', 'delete', 'class="pictofixedwidth"').$langs->trans("Delete");
+}
+if (GETPOSTINT('nomassaction') || in_array($massaction, array('predelete'))) {
+	$arrayofmassactions = array();
+}
+$massactionbutton = $form->selectMassAction('', $arrayofmassactions);
+
 $param = '';
 if ($limit > 0 && $limit != $conf->liste_limit) {
 	$param .= '&limit='.((int) $limit);
@@ -296,26 +315,9 @@ if (getDolGlobalString('EINVOICING_SHOW_MAPPING_TOOL_ON_VENDOR_PRICE_LIST')) {	/
 	$newcardbutton = dolGetButtonTitle($langs->trans("MapEInvoiceProducts"), '', 'fa fa-link', dol_buildpath('/einvoicing/product_mapping.php', 1), '', ($permissiontoadd ? 1 : 0));
 }
 
-// Confirmations are printed before the search form: a form cannot be nested into another one
+// Confirmation of a single deletion, printed before the search form: a form cannot be nested into another one
 if ($action == 'delete' && $permissiontoadd && $rowid > 0) {
 	print $form->formconfirm($_SERVER["PHP_SELF"].'?rowid='.((int) $rowid).$param, $langs->trans("DeleteVendorRefMapping"), $langs->trans("ConfirmDeleteVendorRefMapping"), 'confirm_delete', '', 0, 1);
-}
-if ($massaction == 'massdelete' && $permissiontoadd && count($toselect) > 0) {
-	// Same as formconfirm, but it has to carry the ids selected into the list
-	print '<form method="POST" action="'.$_SERVER["PHP_SELF"].$param.'">';
-	print '<input type="hidden" name="token" value="'.newToken().'">';
-	print '<input type="hidden" name="massaction" value="massdelete">';
-	print '<input type="hidden" name="confirm" value="yes">';
-	foreach ($toselect as $selected) {
-		print '<input type="hidden" name="toselect[]" value="'.((int) $selected).'">';
-	}
-	print '<div class="warning">';
-	print $langs->trans("ConfirmDeleteSelectedVendorRefMappings", count($toselect)).'<br>';
-	print '<input type="submit" class="button small" value="'.$langs->trans("Yes").'">';
-	print ' <a class="button button-cancel small" href="'.$_SERVER["PHP_SELF"].'?'.ltrim($param, '&').'">'.$langs->trans("No").'</a>';
-	print '</div>';
-	print '</form>';
-	print '<br>';
 }
 
 print '<form method="POST" id="searchFormList" action="'.$_SERVER["PHP_SELF"].'">';
@@ -324,7 +326,11 @@ print '<input type="hidden" name="contextpage" value="'.dol_escape_htmltag($cont
 print '<input type="hidden" name="sortfield" value="'.dol_escape_htmltag($sortfield).'">';
 print '<input type="hidden" name="sortorder" value="'.dol_escape_htmltag($sortorder).'">';
 
-print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, '', $num, $nbtotalofrecords, 'einvoicing.png@einvoicing', 0, $newcardbutton, '', $limit);
+print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, $massactionbutton, $num, $nbtotalofrecords, 'einvoicing.png@einvoicing', 0, $newcardbutton, '', $limit);
+
+// Add code for pre mass action (confirmation or email presend form)
+$objecttmp = new ProductFournisseur($db);
+include DOL_DOCUMENT_ROOT.'/core/tpl/massactions_pre.tpl.php';	// @phpstan-ignore include.fileNotFound (PHPStan takes DOL_DOCUMENT_ROOT from install/inc.php of the core, where it is '..')
 
 print '<div class="info"><span class="">'.$langs->trans("MappedVendorRefsDesc");
 print ' '.$langs->trans("MapEInvoiceProductsDesc2");
@@ -333,6 +339,9 @@ print '.</span></div>';
 
 
 print '<br>';
+
+// Checkbox to check/uncheck all the lines at once, as on the lists built by modulebuilder
+$selectedfields = (count($arrayofmassactions) ? $form->showCheckAddButtons('checkforselect', 1) : '');
 
 print '<div class="div-table-responsive">';
 print '<table class="tagtable nobottomiftotal liste">';
@@ -371,7 +380,7 @@ print '</tr>';
 // Title line
 print '<tr class="liste_titre">';
 if ($leftcolumn) {
-	print_liste_field_titre('', $_SERVER["PHP_SELF"], "", '', '', '', $sortfield, $sortorder, 'center maxwidthsearch ');
+	print_liste_field_titre($selectedfields, $_SERVER["PHP_SELF"], "", '', '', '', $sortfield, $sortorder, 'center maxwidthsearch ');
 }
 print_liste_field_titre("Supplier", $_SERVER["PHP_SELF"], "s.nom", "", $param, "", $sortfield, $sortorder);
 print_liste_field_titre("VendorProductRef", $_SERVER["PHP_SELF"], "pfp.ref_fourn", "", $param, "", $sortfield, $sortorder, '', 'VendorProductRefColumnHelp');
@@ -381,7 +390,7 @@ print_liste_field_titre("BuyingPrice", $_SERVER["PHP_SELF"], "pfp.price", "", $p
 print_liste_field_titre("DateCreation", $_SERVER["PHP_SELF"], "pfp.datec", "", $param, "", $sortfield, $sortorder, 'center ');
 print_liste_field_titre("DateModification", $_SERVER["PHP_SELF"], "pfp.tms", "", $param, "", $sortfield, $sortorder, 'center ');
 if (!$leftcolumn) {
-	print_liste_field_titre('', $_SERVER["PHP_SELF"], "", '', '', '', $sortfield, $sortorder, 'center maxwidthsearch ');
+	print_liste_field_titre($selectedfields, $_SERVER["PHP_SELF"], "", '', '', '', $sortfield, $sortorder, 'center maxwidthsearch ');
 }
 print_liste_field_titre('', $_SERVER["PHP_SELF"], "", '', '', '', $sortfield, $sortorder, 'center maxwidthsearch ');
 print '</tr>';
@@ -542,12 +551,6 @@ if ($num == 0) {
 
 print '</table>';
 print '</div>';
-
-if ($permissiontoadd && $num > 0 && $action != 'editmapping') {
-	print '<div class="right paddingtop">';
-	print '<button type="submit" class="button small" name="massaction" value="massdelete">'.$langs->trans("DeleteSelectedVendorRefMappings").'</button>';
-	print '</div>';
-}
 
 print '</form>';
 

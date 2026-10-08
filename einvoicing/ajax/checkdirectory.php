@@ -225,9 +225,10 @@ if ($invoice->id <= 0) {
 // Authorize the fetched invoice with the standard invoice/third-party access rules: the e-invoicing
 // read right alone must not expose an invoice (and its recipient data) the user cannot otherwise read.
 restrictedArea($user, 'facture', $invoice->id, '', '', 'fk_soc', 'rowid');
+dol_include_once('einvoicing/lib/einvoicing.lib.php');
 
 $invoice->fetch_thirdparty();
-$siren = is_object($invoice->thirdparty) ? preg_replace('/[^0-9]/', '', (string) $invoice->thirdparty->idprof1) : '';
+$siren = is_object($invoice->thirdparty) ? preg_replace('/[^0-9]/', '', (string) idprof($invoice->thirdparty)) : '';
 if ($siren === '') {
 	print json_encode(array(
 		'status' => 'error',
@@ -238,7 +239,6 @@ if ($siren === '') {
 	exit;
 }
 
-require_once "../lib/einvoicing.lib.php";
 if (einvoicingIsSendDisabled()) {
 	// Generation-only mode (or the sync toggle): nothing is ever sent, so there is no recipient to reach.
 	print json_encode(array('status' => 'unsupported', 'html' => einvoicing_directory_html(array('status' => 'unsupported'), $siren)));
