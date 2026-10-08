@@ -79,8 +79,10 @@ class modStancer extends DolibarrModules
 		$this->editor_url = 'https://cap-rel.fr';
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '2.0.23';
-		// Url to the file with your last numberversion of this module
+		$this->version = '2.0.24';
+		// Url to the file with your last numberversion of this module.
+		// The four parameters are required (~/docs/MODULE.md point 13): m the module,
+		// v its installed version, d the Dolibarr version of the instance
 		$this->url_last_version = "https://cap-rel.fr/dolibarr/ver.php?m=" . $this->rights_class . "&v=" . $this->version . "&d=" . DOL_VERSION;
 
 		// Key used in llx_const table to save module status enabled/disabled (where STANCER is value of property name of module in uppercase)
@@ -640,6 +642,18 @@ class modStancer extends DolibarrModules
 		//$result4=$extrafields->addExtraField('stancer_myattr4', "New Attr 4 label", 'select',  1,  3, 'thirdparty',   0, 1, '', array('options'=>array('code1'=>'Val1','code2'=>'Val2','code3'=>'Val3')), 1,'', 0, 0, '', '', 'stancer@stancer', '$conf->stancer->enabled');
 		//$result5=$extrafields->addExtraField('stancer_myattr5', "New Attr 5 label", 'text',    1, 10, 'user',         0, 0, '', '', 1, '', 0, 0, '', '', 'stancer@stancer', '$conf->stancer->enabled');
 
+		// Card payments without 3-D Secure are allowed per order or invoice, never
+		// globally (see stancerNo3dsAllowed()). The flag is hidden on the card: it is
+		// only set through the confirmed action, which records who did it.
+		include_once DOL_DOCUMENT_ROOT . '/core/class/extrafields.class.php';
+		$extrafields = new ExtraFields($this->db);
+		foreach (array('commande', 'facture') as $elementtype) {
+			$resExtra = $extrafields->addExtraField('stancer_cb_no3ds', 'StancerNo3dsFieldLabel', 'boolean', 1000, '', $elementtype, 0, 0, '', '', 0, '', '0', '', '', '', 'stancer@stancer', 'isModEnabled("stancer")');
+			if ($resExtra < 0) {
+				dol_syslog("stancer init: could not create the stancer_cb_no3ds extrafield on " . $elementtype . ": " . $extrafields->error, LOG_ERR);
+			}
+		}
+
 		$sql = array();
 
 		//Creation d'un compte bancaire STANCER
@@ -690,7 +704,15 @@ class modStancer extends DolibarrModules
 			$bank->date_solde	   = dol_now();
 			$bank->entity		   = $conf->entity;
 			$res = $bank->create($user);
-			dol_syslog("stancer init : bank account STANCER does not exist, try to create it, return code is $res");
+			if ($res > 0) {
+				dol_syslog("stancer init : bank account STANCER created, id " . $res);
+			} else {
+				// Not fatal for the activation: the account can be created by hand and
+				// selected in the setup, but the administrator has to know
+				$this->error = 'Stancer bank account not created: ' . $bank->error;
+				dol_syslog("stancer init : " . $this->error, LOG_ERR);
+				setEventMessages($this->error, null, 'warnings');
+			}
 		}
 
 		// Document templates
@@ -738,14 +760,31 @@ class modStancer extends DolibarrModules
 		// The memcached PHP extension is optional and absent from the static
 		// analysis environment, hence the class_exists() guard and the
 		// suppressions: the class is only touched when it really exists.
-		if (class_exists('Memcached')) {
+		// Only the server Dolibarr itself caches into is flushed (~/docs/MEMCACHED.md),
+		// never a local memcached shared with other applications.
+		// $conf->memcached->enabled rather than isModEnabled(), absent before Dolibarr 16
+		if (!empty($conf->memcached->enabled) && class_exists('Memcached')) {
 			// @phan-suppress-next-line PhanUndeclaredClassMethod
 			$m = new Memcached();
+			$tmparray = explode(':', getDolGlobalString('MEMCACHED_SERVER'));
 			// @phan-suppress-next-line PhanUndeclaredClassMethod
-			$m->addServer('localhost', 11211);
-			/* invalidate every entry within 10 seconds */
-			// @phan-suppress-next-line PhanUndeclaredClassMethod
-			$m->flush(1);
+			$result = $m->addServer($tmparray[0], !empty($tmparray[1]) ? $tmparray[1] : 11211);
+			if ($result) {
+				/* invalidate every entry within 1 second */
+				// @phan-suppress-next-line PhanUndeclaredClassMethod
+				$m->flush(1);
+			} else {
+				dol_syslog("stancer init: cannot reach memcached server " . getDolGlobalString('MEMCACHED_SERVER') . ", cache not flushed", LOG_WARNING);
+			}
+		}
+
+		// Defaults written at activation rather than on a display of the setup pages
+		if (getDolGlobalString('STANCER_EMAIL_INFO_SEPA', '') == '' && !empty($mysoc->email)) {
+			dolibarr_set_const($this->db, 'STANCER_EMAIL_INFO_SEPA', $mysoc->email, 'chaine', 0, '', $conf->entity);
+		}
+		if (getDolGlobalString('STANCER_ASSO_ACTIVE', '') != '') {
+			dol_include_once('/stancer/lib/stancer.lib.php');
+			stancerEnsureMemberExtrafields($this->db);
 		}
 
 		if (getDolGlobalString('PAYMENT_SECURITY_TOKEN', '') == '') {
@@ -760,8 +799,8 @@ class modStancer extends DolibarrModules
 		$fixon = explode('.', '2.0.11');
 		if (versioncompare($installedVersion, $fixon) < 0) {
 			dol_syslog('stancer init: applying migrations for versions < 2.0.11', LOG_NOTICE);
-			// Aucun fix concret a appliquer aujourd'hui : ce bloc sert d'amorce
-			// pour les migrations futures (voir MODULE.md point 15).
+			// No concrete fix to apply today: this block is the starting point
+			// for future migrations (see MODULE.md point 15).
 		}
 
 		// Re-runnable data fix: tag legacy Stancer payments that were recorded with
@@ -785,6 +824,13 @@ class modStancer extends DolibarrModules
 			dol_syslog("stancer init: tagged " . (int) $nbTagged . " legacy untagged Stancer payment(s) with ext_payment_site='stancer'", LOG_NOTICE);
 		} else {
 			dol_syslog("stancer init: failed to tag legacy Stancer payments: " . $this->db->lasterror(), LOG_ERR);
+		}
+
+		// Re-runnable data fix: early versions stored SEPA mandates with type 'sepa'
+		// instead of the core 'ban'. Idempotent, a second run matches nothing.
+		$resBan = $this->db->query("UPDATE " . MAIN_DB_PREFIX . "societe_rib SET type = 'ban' WHERE type = 'sepa'");
+		if (!$resBan) {
+			dol_syslog("stancer init: failed to convert legacy 'sepa' payment modes: " . $this->db->lasterror(), LOG_ERR);
 		}
 
 		dolibarr_set_const($this->db, 'STANCER_MODULE_VERSION', $this->version, 'chaine', 0, 'Active module version', $conf->entity);

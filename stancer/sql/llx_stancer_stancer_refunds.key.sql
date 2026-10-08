@@ -20,10 +20,11 @@ ALTER TABLE llx_stancer_stancer_refunds ADD INDEX idx_stancer_stancer_refunds_re
 ALTER TABLE llx_stancer_stancer_refunds ADD INDEX idx_stancer_stancer_refunds_payment_id (payment_id);
 ALTER TABLE llx_stancer_stancer_refunds ADD INDEX idx_stancer_stancer_refunds_status (status);
 ALTER TABLE llx_stancer_stancer_refunds ADD INDEX idx_stancer_stancer_refunds_fk_soc (fk_soc);
-ALTER TABLE llx_stancer_stancer_refunds ADD CONSTRAINT llx_stancer_stancer_refunds_fk_user_creat FOREIGN KEY (fk_user_creat) REFERENCES llx_user(rowid);
+ALTER TABLE llx_stancer_stancer_refunds ADD CONSTRAINT llx_stancer_stancer_refunds_fk_user_creat FOREIGN KEY (fk_user_creat) REFERENCES llx_user(rowid) ON DELETE SET NULL;
 -- END MODULEBUILDER INDEXES
 
 --ALTER TABLE llx_stancer_stancer_refunds ADD UNIQUE INDEX uk_stancer_stancer_refunds_fieldxy(fieldx, fieldy);
 
 --ALTER TABLE llx_stancer_stancer_refunds ADD CONSTRAINT llx_stancer_stancer_refunds_fk_field FOREIGN KEY (fk_field) REFERENCES llx_stancer_myotherobject(rowid);
 
+ALTER TABLE llx_stancer_stancer_refunds ADD UNIQUE INDEX uk_stancer_stancer_refunds_refund_id (entity, refund_id);

@@ -1,147 +1,74 @@
 # STANCER FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-Module Dolibarr pour l'integration de la plateforme de paiement [Stancer](https://stancer.com/fr/paiement-en-ligne?mtm_campaign=Dolibarr&mtm_source=Dolibarr).
+## Features
 
-## Description
+Collect card payments and SEPA direct debits straight from Dolibarr, with the
+French payment platform [Stancer](https://www.stancer.com/).
 
-Ce module permet d'accepter des paiements par **carte bancaire** et **prelevement SEPA** directement depuis Dolibarr, en utilisant l'infrastructure de paiement Stancer.
+- **Card payment**: online payment link sent to the customer from an invoice,
+  an order or a proposal, secure payment page (3-D Secure), deposit on orders
+  and proposals, invoice classified as paid once the payment is confirmed
+- **SEPA direct debit**: public page where the customer enters the IBAN, SEPA
+  mandate PDF created automatically, optional electronic signature with
+  UptoSign, automatic collection of due invoices
+- **SEPA rejections**: customer and administrator notified, rejection fee
+  invoice created automatically if you wish
+- **Follow-up**: dashboard, lists of payments, payouts, refunds and disputes,
+  Stancer tab on every thirdparty card
+- **Synchronisation** with Stancer, on demand or by a scheduled job
+- **Emails** of confirmation, error and reminder after a refused payment
+- **Accounting**: Stancer fees booked on the bank account, payouts reconciled,
+  accounting gaps detected
+- **Associations**: online payment of membership fees and donations
+- **Multi-company**, test mode and production mode
 
-## Fonctionnalites
+Other external modules are available on [Dolistore.com](https://www.dolistore.com/index.php?controller=search&orderby=position&orderway=desc&tag=&website=marketplace&search_query=cap-rel&submit_search=).
 
-### Moyens de paiement
+## Requirements
 
-- **Carte bancaire** (Visa, Mastercard, CB) avec support 3D Secure
-- **Prelevement SEPA** avec gestion des mandats
+- Dolibarr 15.0 or above
+- PHP 7.4 or above
+- The Banks and cash and Direct debit modules enabled
+- A Stancer account and its API keys
 
-### Gestion des transactions
+## Documentation
 
-- Suivi des paiements (statuts : autorise, capture, refuse, etc.)
-- Gestion des remboursements
-- Suivi des reversements (virements de Stancer vers votre compte bancaire)
-- Synchronisation automatique avec l'API Stancer
+User documentation: [doc.cap-rel.fr/stancer](https://doc.cap-rel.fr/stancer/)
 
-### Integrations Dolibarr
+## Translations
 
-- Factures clients
-- Commandes
-- Dons
-- Adhesions et cotisations (associations)
-- Rapprochement comptable
+Translations can be completed manually by editing files into directories *langs*.
 
-### Pages publiques
-
-- Formulaire de paiement CB pour les clients
-- Formulaire de saisie IBAN pour les prelevements SEPA
-- Pages de retour apres paiement
-
-### Administration
-
-- Configuration des cles API (mode test et production)
-- Parametrage CB et SEPA separement
-- Templates d'emails personnalisables
-- Logs des transactions
-- Support multi-societe
-
-## Pre-requis
-
-| Logiciel | Version minimum |
-|----------|-----------------|
-| PHP | 7.4 |
-| Dolibarr | 15.0 |
-
-### Modules Dolibarr requis
-
-- Prelevements (modPrelevement)
-- Banques et caisses (modBanque)
+<!--
 
 ## Installation
 
-1. Telecharger le module depuis [Dolistore](https://www.dolistore.com)
-2. Extraire l'archive dans le dossier `htdocs/custom/` de Dolibarr
-3. Activer le module dans **Accueil > Configuration > Modules**
-4. Configurer les cles API dans **Configuration > Modules > Stancer**
+### From the ZIP file and GUI interface
 
-## Configuration
+Go into menu ```Home - Setup - Modules - Deploy external module``` and upload the zip file.
 
-### Cles API Stancer
+### <a name="final_steps"></a>Final steps
 
-1. Creer un compte sur [Stancer](https://stancer.com/fr/paiement-en-ligne?mtm_campaign=Dolibarr&mtm_source=Dolibarr)
-2. Recuperer vos cles API (publique et privee) depuis le dashboard Stancer
-3. Renseigner les cles dans la configuration du module
-4. Utiliser le mode test pour valider l'integration avant passage en production
+From your browser:
 
-### Parametrage des paiements
+  - Log into Dolibarr as a super-administrator
+  - Go to "Setup" -> "Modules"
+  - You should now be able to find and enable the module
 
-- **Carte bancaire** : activer/desactiver, seuil de montant, 3D Secure
-- **SEPA** : delai de prelevement, gestion des mandats
-- **Emails** : personnalisation des notifications
-
-## Utilisation
-
-### Paiement par carte bancaire
-
-1. Ouvrir une facture client
-2. Cliquer sur le bouton "Payer avec Stancer"
-3. Le client est redirige vers la page de paiement securisee
-4. Apres paiement, retour automatique et mise a jour du statut
-
-### Paiement par SEPA
-
-1. Enregistrer l'IBAN du client (formulaire public ou saisie manuelle)
-2. Creer le mandat SEPA
-3. Lancer le prelevement depuis la facture
-4. Suivi du statut dans la liste des paiements
-
-### Synchronisation
-
-Une tache planifiee (cron) synchronise automatiquement :
-- Les statuts des paiements
-- Les reversements recus
-- Les remboursements
-
-## Structure du module
-
-```
-stancer/
-├── admin/           # Pages d'administration
-├── class/           # Classes PHP principales
-├── core/            # Triggers et modules specifiques
-├── langs/           # Fichiers de traduction
-├── lib/             # Bibliotheque de fonctions
-├── public/          # Pages publiques (paiement, IBAN)
-├── sql/             # Scripts SQL d'installation
-└── vendor/          # Dependances (SDK Stancer)
-```
-
-## API Stancer
-
-Le module utilise l'API Stancer v2. Documentation : https://docs.stancer.com/api/
-
-### Ressources utilisees
-
-| Endpoint | Usage |
-|----------|-------|
-| `/customers/` | Gestion des clients |
-| `/cards/` | Cartes bancaires |
-| `/sepa/` | Comptes SEPA |
-| `/mandates/` | Mandats de prelevement |
-| `/checkout/` | Paiements |
+-->
 
 ## Support
 
-- Documentation Stancer : https://docs.stancer.com
-- Modules Dolibarr : https://www.dolistore.com
+Every help, support or maintenance request goes through:
 
-## Licence
+[https://cap-rel.fr/sav-module-dolibarr/](https://cap-rel.fr/sav-module-dolibarr/)
 
-### Code source
+## Licenses
 
-GPLv3 ou (a votre choix) toute version ulterieure. Voir le fichier COPYING.
+### Main code
+
+GPLv3 or (at your option) any later version. See file COPYING for more information.
 
 ### Documentation
 
-Textes et documentation sous licence GFDL.
-
-## Auteur
-
-[CAP-REL](https://cap-rel.fr) et la communauté Dolibarr
+All texts and readmes are licensed under GFDL.

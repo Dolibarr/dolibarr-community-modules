@@ -45,6 +45,64 @@ function stancerResolveReturnPaymentId($localPayment, $sessionPaymentId = '')
 }
 
 /**
+ * Tag the return page must process.
+ *
+ * The return URL is in the hands of the customer: its "tag" only serves to find
+ * the local row, and any "fulltag" it carries is ignored. The object to record
+ * the payment on is always derived from the tag stored on the local row, which
+ * was written server side when the payment started.
+ *
+ * @param   Stancer_payments|null  $localPayment  Local row loaded from the return tag or the session
+ * @param   array                  $args          Decoded return URL arguments, only used for the log
+ * @return  string                                Tag of the local row, empty string when there is none
+ */
+function stancerResolveReturnTag($localPayment, $args)
+{
+	if (is_object($localPayment) && !empty($localPayment->id) && !empty($localPayment->unique_id)) {
+		return (string) $localPayment->unique_id;
+	}
+	dol_syslog("stancer return: no local payment row carrying a tag, url tag " . (is_array($args) && isset($args['tag']) ? $args['tag'] : '') . " is not trusted", LOG_WARNING);
+
+	return '';
+}
+
+/**
+ * Check that the object named by a return tag really is the one the payment
+ * was issued for: same thirdparty as the local row, and same reference when the
+ * row recorded one. Without this, a customer holding a captured payment could
+ * replay it on the order or the proposal of another customer.
+ *
+ * @param   CommonObject           $object        Invoice, order or proposal about to be processed
+ * @param   Stancer_payments|null  $localPayment  Local row of the payment
+ * @return  bool                                  True when the object belongs to the payment
+ */
+function stancerReturnObjectMatchesPayment($object, $localPayment)
+{
+	// Signature stays generic, the return page only hands invoices, orders and proposals
+	'@phan-var Facture|Commande|Propal $object';
+	if (!is_object($object) || !is_object($localPayment)) {
+		dol_syslog("stancer return: object or local payment missing, refused", LOG_ERR);
+		return false;
+	}
+	$paymentSoc = (int) $localPayment->fk_soc;
+	$objectSoc = (int) ($object->socid ?? 0);
+	if ($paymentSoc <= 0 || $objectSoc !== $paymentSoc) {
+		dol_syslog("stancer return: " . get_class($object) . " " . ($object->ref ?? '') . " belongs to thirdparty " . $objectSoc . " but payment " . $localPayment->stancer_id . " to " . $paymentSoc . ", refused", LOG_ERR);
+		return false;
+	}
+	// The order_id is the reference of the object at payment start; a draft
+	// reference "(PROV..)" is renamed on validation and cannot be compared.
+	$orderId = trim((string) $localPayment->order_id);
+	$ref = trim((string) ($object->ref ?? ''));
+	if ($orderId !== '' && $ref !== '' && strpos($orderId, '(PROV') !== 0 && $orderId !== $ref) {
+		dol_syslog("stancer return: payment " . $localPayment->stancer_id . " was issued for " . $orderId . ", not for " . $ref . ", refused", LOG_ERR);
+		return false;
+	}
+
+	return true;
+}
+
+/**
  * Resolve the currency code of a payment coming back from Stancer.
  *
  * Same session-less scenario as stancerResolveReturnPaymentId(): an empty
@@ -153,7 +211,7 @@ function stancerCommonFilterBeforePay($object)
 	// print json_encode($object); exit;
 	if (!in_array($object->element, $listofHandledElements)) {
 		dol_syslog("stancerCommonFilterBeforePay object is not an invoice or an order (element != facture | commande), current type of object is " . $object->element, LOG_DEBUG);
-		$message = $langs->trans("Payment object is not an invoice or an order");
+		$message = $langs->trans('StancerErrObjectNotInvoiceOrOrder');
 		setEventMessages($langs->trans("ErrorStancer") . " (8) " . $message, [], 'errors');
 		return -1;
 	}
@@ -162,7 +220,7 @@ function stancerCommonFilterBeforePay($object)
 		if ($object->paye != '0') {
 			// @phan-suppress-next-line PhanDeprecatedProperty  same reason as above, kept for the log line
 			dol_syslog("stancerCommonFilterBeforePay invoice status paye is not 0, paye=" . $object->paye, LOG_DEBUG);
-			$message = $langs->trans("Payment object is already paid");
+			$message = $langs->trans('StancerErrObjectAlreadyPaid');
 			setEventMessages($langs->trans("ErrorStancer") . " (9) " . $message, [], 'errors');
 			return -2;
 		}
@@ -185,7 +243,7 @@ function stancerCommonFilterBeforePay($object)
 	} elseif ($object->element == 'commande') {
 		if ($object->status != Commande::STATUS_VALIDATED) {
 			dol_syslog("stancerCommonFilterBeforePay order status not validated : " . $object->status, LOG_DEBUG);
-			$message = $langs->trans("Payment order is not validated / ready for pay");
+			$message = $langs->trans('StancerErrOrderNotValidated');
 			setEventMessages($langs->trans("ErrorStancer") . " (10) " . $message, [], 'errors');
 			return -4;
 		}
@@ -198,6 +256,124 @@ function stancerCommonFilterBeforePay($object)
 	}
 
 	return 0;
+}
+
+/**
+ * Tell if an order or an invoice can still be paid by card, so its 3-D Secure setting still matters.
+ *
+ * @param  CommonObject $object Document.
+ * @return bool                 True for a validated unpaid invoice or a validated order.
+ */
+function stancerNo3dsCanBeChanged($object)
+{
+	if ($object instanceof Facture) {
+		// A paid invoice is closed, so a validated one still owes money.
+		return $object->status == Facture::STATUS_VALIDATED;
+	}
+	if ($object instanceof Commande) {
+		// Order statuses: 0 draft, 1 validated, 2 in progress, 3 delivered, -1 cancelled.
+		return $object->status >= Commande::STATUS_VALIDATED;
+	}
+
+	return false;
+}
+
+/**
+ * Tell if card payments of this document may be sent without 3-D Secure.
+ *
+ * 3-D Secure is always requested, unless a user with the Stancer write
+ * permission allowed otherwise on this very order or invoice, after a customer
+ * whose card cannot authenticate called in. The permission is the hidden
+ * stancer_cb_no3ds extrafield of that document; it is never global, so a
+ * fraudulent chargeback can only ever concern a document someone chose.
+ *
+ * @param  CommonObject $object Document being paid.
+ * @return bool                 True when 3-D Secure must not be requested.
+ */
+function stancerNo3dsAllowed($object)
+{
+	if (!($object instanceof Commande) && !($object instanceof Facture)) {
+		return false;
+	}
+	if (!isset($object->array_options['options_stancer_cb_no3ds']) && !empty($object->id)) {
+		$object->fetch_optionals();
+	}
+
+	return !empty($object->array_options['options_stancer_cb_no3ds']);
+}
+
+/**
+ * Tell if the stancer_cb_no3ds extrafield exists for this kind of document.
+ *
+ * It is created when the module is enabled: after an update made by copying
+ * the files, it is missing until the module is disabled and enabled again.
+ *
+ * @param  CommonObject $object Order or invoice.
+ * @return bool                 True when the extrafield is defined.
+ */
+function stancerNo3dsIsInstalled($object)
+{
+	global $db;
+
+	require_once DOL_DOCUMENT_ROOT . '/core/class/extrafields.class.php';
+	$extrafields = new ExtraFields($db);
+	$extrafields->fetch_name_optionals_label($object->table_element);
+
+	return !empty($extrafields->attributes[$object->table_element]['label']['stancer_cb_no3ds']);
+}
+
+/**
+ * Allow or withdraw card payments without 3-D Secure on one order or invoice, and record who did it.
+ *
+ * The change moves the liability for a fraudulent chargeback, so it is never
+ * saved without its trace: the flag and the event of the document are written
+ * in the same transaction.
+ *
+ * @param  Commande|Facture $object Order or invoice.
+ * @param  User             $user   User making the change.
+ * @param  bool             $allow  True to allow, false to require 3-D Secure again.
+ * @return int                      1 on success, -1 on error (nothing changed).
+ */
+function stancerSetNo3ds($object, $user, $allow)
+{
+	global $db, $langs;
+
+	require_once DOL_DOCUMENT_ROOT . '/comm/action/class/actioncomm.class.php';
+
+	$db->begin();
+
+	$object->array_options['options_stancer_cb_no3ds'] = $allow ? 1 : 0;
+	if ($object->updateExtraField('stancer_cb_no3ds') < 0) {
+		dol_syslog("stancer could not change the 3DS setting of " . $object->ref . ": " . $object->error, LOG_ERR);
+		$db->rollback();
+		return -1;
+	}
+
+	$event = new ActionComm($db);
+	$event->type_code = 'AC_OTH_AUTO';
+	$event->code = $allow ? 'AC_STANCER_NO3DS_ON' : 'AC_STANCER_NO3DS_OFF';
+	$event->label = $langs->transnoentities($allow ? 'StancerNo3dsEventOn' : 'StancerNo3dsEventOff', $object->ref);
+	$event->datep = dol_now();
+	$event->datef = $event->datep;
+	$event->percentage = -1;
+	$event->socid = (int) $object->socid;
+	$event->authorid = $user->id;
+	$event->userownerid = $user->id;
+	$event->elementid = (int) $object->id;
+	// @phan-suppress-next-line PhanDeprecatedProperty  Dolibarr 15..18 only read fk_element in ActionComm::create()
+	$event->fk_element = (int) $object->id;
+	$event->elementtype = ($object instanceof Facture) ? 'invoice' : 'order';
+	$event->fulldayevent = 0;
+	if ($event->create($user) <= 0) {
+		dol_syslog("stancer could not record the 3DS change of " . $object->ref . ", nothing changed: " . $event->error, LOG_ERR);
+		$db->rollback();
+		return -1;
+	}
+
+	$db->commit();
+	dol_syslog("stancer payment without 3DS " . ($allow ? "allowed" : "withdrawn") . " on " . $object->ref . " by " . $user->login, LOG_WARNING);
+
+	return 1;
 }
 
 /**
@@ -232,44 +408,13 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 		return $res;
 	}
 	// if ($object->mode_reglement_code != 'CB') {
-	// 	$message = $langs->trans("Payment mode is not CB");
+	// 	$message = $langs->trans('StancerErrPaymentModeNotCard');
 	// 	setEventMessages($langs->trans("ErrorStancer"), $message, 'errors');
 	// 	dol_syslog("stancerCardstartPayWithRedirect payment mode is not set to CB", LOG_DEBUG);
 	// 	return -4;
 	// }
 
-	if (!empty($forceAmount)) {
-		dol_syslog("stancerCardstartPayWithRedirect : use $forceAmount");
-		$amountToPay = StancerApi::toCents($forceAmount);
-	} else {
-		//facture peut avoir été partiellement payée
-		if ($object->element == "facture") {
-			$totalpaid = $object->getSommePaiement();
-			$totalcreditnotes = $object->getSumCreditNotesUsed();
-			$totaldeposits = $object->getSumDepositsUsed();
-			$amountToPay = StancerApi::toCents(price2num($object->total_ttc - $totalpaid - $totalcreditnotes - $totaldeposits, 'MT'));
-			dol_syslog("stancerCardstartPayWithRedirect : object is invoice, amount = $amountToPay");
-		} else {
-			$amountToPay = StancerApi::toCents(price2num($object->total_ttc ?? $object->amount, 'MT'));
-			//race condition for order
-			if (
-				$object->element == "commande"
-				&& getDolGlobalString('STANCER_CB_ORDER_PARTIAL_PAY') != ''
-				&& isset($object->deposit_percent) && $object->deposit_percent > 0 && $object->deposit_percent < 100
-			) {
-				$amountToPay = StancerApi::toCents((float) price2num($object->total_ttc ?? $object->amount, 'MT') * ((float) $object->deposit_percent / 100));
-				dol_syslog("stancerCardstartPayWithRedirect : partial Amount $amountToPay");
-			}
-		}
-	}
-
-	if (empty($amountToPay)) {
-		dol_syslog("stancerCardstartPayWithRedirect : amount is empty, use post data");
-		$postAmount = GETPOST('amount', 'int');
-		if (!empty($postAmount)) {
-			$amountToPay = StancerApi::toCents($postAmount);
-		}
-	}
+	$amountToPay = stancerResolveAmountToPay($object, $forceAmount);
 
 	if (empty($amountToPay) || $amountToPay < 50) {
 		// print "<p>Amount to pay error : $amountToPay</p>";
@@ -294,7 +439,7 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 		dol_syslog("stancer pay : tag comes from GETPOST : $tag");
 	}
 
-	$source = (empty($parameters['source']) ? GETPOST("source", 'alpha') : $parameters['s']);
+	$source = (empty($parameters['source']) ? GETPOST("source", 'alpha') : $parameters['source']);
 	if (empty($source) && $object->element == "facture") {
 		$source = 'invoice';
 	} elseif (empty($source) && $object->element == "propal") {
@@ -305,12 +450,7 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 
 	$public_key = stancer_get_public_key();
 
-	$args = base64_encode('tag=' . $tag . '&source=' . $source . '&ref=' . $object->ref . '&securekey=' . $securekey);
-	if (defined('DOLENTITY')) {
-		$args .= '&e=' . DOLENTITY;
-	}
-
-	$urlretour = DOL_MAIN_URL_ROOT . '/custom/stancer/public/paymentback.php?s=' . $args;
+	$urlretour = stancerBuildReturnUrl($tag, $source, $object->ref, $securekey);
 
 	// Get customer data for email (used later for notifications)
 	$customerData = $stancerApi->getCustomer($customerID);
@@ -343,6 +483,14 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 				$mustNewUUID = true;
 				dol_syslog("stancer   Stancer previous card " . json_encode($sp->card) . " so try to reset card ...");
 			}
+		} elseif ($sp->hasFinallyFailed()) {
+			// Stancer reserves a unique_id for ever, even when the payment it carried
+			// was refused: reusing it is answered "409 duplicate unique_id", the new
+			// payment is never created and the customer is stuck for good on this
+			// object. A final failure must start a brand new attempt.
+			dol_syslog("stancer previous attempt ($tag) ended in status " . $sp->status . ", starting a new attempt with a fresh unique_id", LOG_NOTICE);
+			$mustCreate = true;
+			$mustNewUUID = true;
 		} else {
 			$paymentData = $stancerApi->getPayment($sp->stancer_id);
 			if (empty($sp->card)) {
@@ -358,8 +506,13 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 	if ($mustCreate || $paymentData == null) {
 		dol_syslog("stancer   Stancer must create");
 		if ($mustNewUUID) {
-			dol_syslog("stancer   Stancer must add uniq tag");
-			$tag .= ".UNIQ=" . substr($sp->getNextNumRef(), -2);
+			$tag = stancerNextFreeTag($tag, $db);
+			dol_syslog("stancer   Stancer new attempt tag is $tag");
+			// The return URL was built above with the previous tag, and paymentback.php
+			// finds the attempt by that tag: left as is, it would load the refused
+			// attempt, ask Stancer about the refused payment, and report a failure to a
+			// customer whose new payment went through - without recording it.
+			$urlretour = stancerBuildReturnUrl($tag, $source, $object->ref, $securekey);
 		}
 
 		// Build payment data for API
@@ -370,8 +523,19 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 			'order_id' => $object->ref,
 			'unique_id' => $tag,
 			'description' => substr(stancerChangeLabel($object), -64), // max size is 64
-			'auth' => true // Enable 3DS
 		);
+
+		// Strong authentication is requested for every card payment, except on an
+		// order or an invoice where a user explicitly allowed payment without it
+		// (see stancerNo3dsAllowed()). Some cards, corporate ones especially, cannot
+		// authenticate at all: they come back as auth.status "unavailable", refused
+		// before the bank is even asked. Without 3DS the request reaches the bank,
+		// but a fraudulent chargeback is then borne by the merchant.
+		if (!stancerNo3dsAllowed($object)) {
+			$paymentApiData['auth'] = true; // Enable 3DS
+		} else {
+			dol_syslog("stancer 3DS not requested for " . $object->ref . ": payment without 3DS allowed on this document", LOG_WARNING);
+		}
 
 		if (strpos($urlretour, 'https://') === 0) {
 			$paymentApiData['return_url'] = $urlretour;
@@ -418,7 +582,7 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 		// "full payment" here, not "unknown".
 		$sp->partial_payment = stancerIsDepositPayment($object);
 		$res = $sp->create($user, true);
-		if ($res) {
+		if ($res > 0) {
 			// Redirect to Stancer payment page
 			$url = "https://payment.stancer.com/" . $public_key . "/" . $paymentId . "?lang=fr";
 			dol_syslog("stancer card Stancer_payments ok, prepare redirect to $url", LOG_DEBUG);
@@ -448,7 +612,7 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 			if ($forceJsRedirect || headers_sent()) {
 				dol_syslog("stancer card Stancer_payments ok redirect will be javascript", LOG_DEBUG);
 				print '<script type="text/javascript" language="javascript">' . "\n";
-				print "window.location = '" . $url . "'\n";
+				print "window.location = '" . dol_escape_js($url) . "';\n";
 				print "</script>\n";
 			} else {
 				dol_syslog("stancer card Stancer_payments ok redirect with header location to $url", LOG_DEBUG);
@@ -456,18 +620,86 @@ function stancerCardstartPayWithRedirect($object, $parameters, $forceAmount = nu
 				exit;
 			}
 		} else {
-			dol_syslog("stancer card Stancer_payments error", LOG_ERR);
+			dol_syslog("stancer card: local Stancer_payments row not created (" . $res . "): " . $sp->error . ", payment " . $paymentId . " is left to the refresh", LOG_ERR);
 		}
 	} else {
 		dol_syslog("stancer pay error : " . $stancerApi->error, LOG_ERR);
-		$message = "Please try with an other payment provider like Stripe";
-		setEventMessages($langs->trans("ErrorStancer") . " " . $message, [], 'errors');
+		setEventMessages($langs->trans("ErrorStancerPaymentNotStarted"), [], 'errors');
 
-		$urlPayment = getOnlinePaymentUrl(0, $object->element, (string) $object->ref);
+		// getOnlinePaymentUrl() expects a payment type ('order', 'invoice', 'member',
+		// 'membersubscription', 'contractline', 'free'), never a Dolibarr element name
+		// ('commande', 'facture'). Feeding it the element returned an empty string, and
+		// the empty "Location:" header that followed showed the customer a blank page.
+		$urlPayment = getOnlinePaymentUrl(0, stancerOnlinePaymentType($object), (string) $object->ref);
+		if (empty($urlPayment)) {
+			// No payment page to go back to (a proposal, for instance): say what
+			// happened here rather than redirecting the customer to nowhere.
+			stancerPrintPaymentError($object, (string) $stancerApi->error);
+			exit;
+		}
 		header("Location: " . $urlPayment);
 		exit;
 	}
 	return $error;
+}
+
+/**
+ * Translate a Dolibarr element name into the payment type getOnlinePaymentUrl() knows.
+ *
+ * The core function only answers for 'order', 'invoice', 'member',
+ * 'membersubscription', 'contractline' and 'free'. Anything else (a proposal,
+ * for instance) has no online payment page, and the caller must handle the
+ * empty answer instead of redirecting to it.
+ *
+ * @param  Object $object Paid object.
+ * @return string         Payment type, or an empty string when there is none.
+ */
+function stancerOnlinePaymentType($object)
+{
+	$map = array(
+		'commande' => 'order',
+		'order' => 'order',
+		'facture' => 'invoice',
+		'invoice' => 'invoice',
+		'adherent' => 'member',
+		'member' => 'member',
+		'subscription' => 'membersubscription',
+		'contratdet' => 'contractline',
+		'contractline' => 'contractline',
+	);
+	$element = isset($object->element) ? (string) $object->element : '';
+
+	return isset($map[$element]) ? $map[$element] : '';
+}
+
+/**
+ * Tell the customer that the payment could not be started, on screen.
+ *
+ * Used when there is no online payment page to send them back to. The point is
+ * that they read what happened and how to reach us, instead of a blank page.
+ *
+ * @param  Object $object   Object the customer tried to pay.
+ * @param  string $apiError Raw Stancer error, for the log only.
+ * @return void
+ */
+function stancerPrintPaymentError($object, $apiError = '')
+{
+	global $langs, $mysoc;
+
+	dol_syslog("stancer payment could not be started for " . (isset($object->ref) ? $object->ref : '?') . " : " . $apiError, LOG_ERR);
+
+	print '<p>' . $langs->trans("ErrorStancerPaymentNotStarted") . '</p>';
+	if (!empty($object->ref)) {
+		print '<p>' . $langs->trans("Ref") . ' : <strong>' . dol_escape_htmltag($object->ref) . '</strong></p>';
+	}
+	print '<p>' . $langs->trans("ErrorStancerPleaseContactBy") . '</p><ul>';
+	if (!empty($mysoc->phone)) {
+		print '<li>' . $langs->trans("ErrorStancerPleaseContactByPhone", $mysoc->phone) . '</li>';
+	}
+	if (!empty($mysoc->email)) {
+		print '<li>' . $langs->trans("ErrorStancerPleaseContactByMail", $mysoc->email) . '</li>';
+	}
+	print '</ul>';
 }
 
 /**
@@ -499,7 +731,7 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 
 	if ($force == 0) {
 		if ($object->mode_reglement_code != 'PRE') {
-			$message = $langs->trans("Payment mode is not SEPA");
+			$message = $langs->trans('StancerErrPaymentModeNotSepa');
 			if ($userMessage) {
 				setEventMessages($langs->trans("ErrorStancer") . " (13) " . $message, [], 'errors');
 			}
@@ -519,8 +751,12 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 	}
 
 	//limite hard de stancer = 50cents
-	if ($amountToPay <= 50) {
-		dol_syslog("stancer SEPA error amount less than minimal 50cents", LOG_ERR);
+	if ($amountToPay < 50) {
+		dol_syslog("stancerSEPAstartPay error: amount " . $amountToPay . " cents is under the 50 cents Stancer minimum for " . $object->ref, LOG_ERR);
+		if ($userMessage) {
+			setEventMessages($langs->trans("StancerAmountUnderMinimum"), [], 'errors');
+		}
+		return -10;
 	}
 
 	//Gestion de la limite du montant maximum
@@ -590,7 +826,7 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
 	if ($companypaymentmodeid == 0) {
 		//recherche si on a un moyen de paiement sepa pour cette societe chez stancer
-		$customsql = " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND fk_soc = '" . $db->escape($socid) . "' AND stancer_object_ref <> '' ORDER BY default_rib DESC";
+		$customsql = " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND fk_soc = " . ((int) $socid) . " AND stancer_object_ref <> '' ORDER BY default_rib DESC";
 		dol_syslog("stancer pay by SEPA : fetch payment mode with custom sql", LOG_DEBUG);
 		$res = $companypaymentmode->fetch(0, '', 0, '', $customsql);
 	} else {
@@ -610,8 +846,7 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 		return -8;
 	}
 
-	dol_syslog("stancer pay by SEPA : " . json_encode($object), LOG_DEBUG);
-	dol_syslog("stancer pay by SEPA companypaymentmode : " . json_encode($companypaymentmode), LOG_DEBUG);
+	dol_syslog("stancer pay by SEPA : object id=" . $object->id . ", companypaymentmode id=" . $companypaymentmode->id, LOG_DEBUG);
 	dol_syslog("stancer pay by SEPA ref " . $object->ref, LOG_INFO);
 
 	//warning si on fait 3 paiements de 50€ pour une facture le TAG sera identique et stancer refusera les paiements
@@ -701,8 +936,8 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 		];
 		$sp->fillDataArray($data);
 		$res = $sp->create($user, true);
-		if ($res) {
-			$message = $langs->trans("Nice, Stancer SEPA payment is engaged !");
+		if ($res > 0) {
+			$message = $langs->trans('StancerSepaPaymentEngaged');
 			$returnCode = 0;
 
 			$stc = new Stancer($db);
@@ -724,7 +959,8 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 				stancerSendInvoiceMailModele(getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_SEPA_MAILTYPE', ''), $object, 'BILL_SEPASTART_SENTBYMAIL');
 			}
 		} else {
-			$message = $langs->trans("Error on Stancer SEPA!");
+			dol_syslog("stancerSEPAstartPay: local Stancer_payments row not created (" . $res . "): " . $sp->error, LOG_ERR);
+			$message = $langs->trans('StancerErrSepa');
 
 			$stc = new Stancer($db);
 			$stc->createEvent($object, "stancer_sepa_start", $langs->trans("StancerPaySEPA"), $message);
@@ -739,7 +975,7 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 		}
 	} else {
 		dol_syslog("stancer pay SEPA error: " . $stancerApi->error, LOG_ERR);
-		$message = $langs->trans("Error on Stancer SEPA payment request: " . $stancerApi->error);
+		$message = $langs->trans('StancerErrSepaRequest', $stancerApi->error);
 
 		$stc = new Stancer($db);
 		$stc->createEvent($object, "stancer_sepa_start", $langs->trans("StancerPaySEPA"), $message);
@@ -1028,7 +1264,7 @@ function stancerSEPAstartPayGrouped(array $invoices, $companypaymentmodeid, $use
 		dol_syslog("stancerSEPAstartPayGrouped createPayment failed: " . $stancerApi->error, LOG_ERR);
 		// Log per-invoice event for traceability
 		$stc = new Stancer($db);
-		$msg = $langs->trans("Error on Stancer SEPA payment request: " . $stancerApi->error);
+		$msg = $langs->trans('StancerErrSepaRequest', $stancerApi->error);
 		foreach ($invoices as $inv) {
 			$stc->createEvent($inv, "stancer_sepa_start", $langs->trans("StancerPaySEPA"), $msg . ' (grouped ' . count($invoices) . ' invoices)');
 		}
@@ -1070,7 +1306,7 @@ function stancerSEPAstartPayGrouped(array $invoices, $companypaymentmodeid, $use
 	$bankaccountId = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 	$paymentmethodId = dol_getIdFromCode($db, 'PRE', 'c_paiement', 'code', 'id', 1);
 	$stc = new Stancer($db);
-	$eventMsg = $langs->trans("Stancer SEPA grouped payment engaged") . ' (' . count($invoices) . ' invoices, total=' . ($totalCents / 100) . ' ' . $currency . ', paymentId=' . $paymentId . ')';
+	$eventMsg = $langs->trans('StancerSepaGroupedPaymentEngaged') . ' (' . count($invoices) . ' invoices, total=' . ($totalCents / 100) . ' ' . $currency . ', paymentId=' . $paymentId . ')';
 	foreach ($invoices as $inv) {
 		$inv->setPaymentMethods($paymentmethodId);
 		$inv->setBankAccount($bankaccountId);
@@ -1122,7 +1358,7 @@ function stancerCBstartPay($object, $userMessage = true, $companypaymentmodeid =
 
 	if ($force == 0) {
 		if ($object->mode_reglement_code != 'CB') {
-			$message = $langs->trans("Payment mode is not CB");
+			$message = $langs->trans('StancerErrPaymentModeNotCard');
 			if ($userMessage) {
 				setEventMessages($langs->trans("ErrorStancer") . " (18) " . $message, [],  'errors');
 			}
@@ -1152,7 +1388,7 @@ function stancerCBstartPay($object, $userMessage = true, $companypaymentmodeid =
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
 	if ($companypaymentmodeid == 0) {
 		//recherche si on a un moyen de paiement sepa pour cette societe chez stancer
-		$customsql = " AND type = 'card' AND label LIKE 'stancer-card%' AND fk_soc = '" . $db->escape($socid) . "' AND stancer_object_ref <> '' ORDER BY default_rib DESC";
+		$customsql = " AND type = 'card' AND label LIKE 'stancer-card%' AND fk_soc = " . ((int) $socid) . " AND stancer_object_ref <> '' ORDER BY default_rib DESC";
 		$res = $companypaymentmode->fetch(0, '', 0, '', $customsql);
 	} else {
 		$res = $companypaymentmode->fetch($companypaymentmodeid);
@@ -1167,8 +1403,7 @@ function stancerCBstartPay($object, $userMessage = true, $companypaymentmodeid =
 		return -7;
 	}
 
-	dol_syslog("stancerCBstartPay pay by CB : " . json_encode($object), LOG_DEBUG);
-	// dol_syslog("stancerCBstartPay pay by CB companypaymentmode : " . json_encode($companypaymentmode), LOG_DEBUG);
+	dol_syslog("stancerCBstartPay pay by CB : object id=" . $object->id . ", ref=" . $object->ref, LOG_DEBUG);
 	// dol_syslog("stancerCBstartPay pay by CB ref " . $object->ref, LOG_INFO);
 
 	//warning si on fait 3 paiements de 50€ pour une facture le TAG sera identique et stancer refusera les paiements
@@ -1181,7 +1416,7 @@ function stancerCBstartPay($object, $userMessage = true, $companypaymentmodeid =
 
 	$sp = new Stancer_payments($db);
 	//Vérification que nous n'avons pas déjà un CB en cours ....
-	$resSP = $sp->fetchAll('ASC', '', 0, 0, array('customsql' => "live_mode = '" . getDolGlobalString('STANCER_IS_PROD') . "' AND (unique_id LIKE '%INV=" . $db->escape($object->id) . "' OR unique_id LIKE '%INV=" . $db->escape($object->id) . ".%')"));
+	$resSP = $sp->fetchAll('ASC', '', 0, 0, array('customsql' => "live_mode = '" . getDolGlobalString('STANCER_IS_PROD') . "' AND (unique_id LIKE '%INV=" . ((int) $object->id) . "' OR unique_id LIKE '%INV=" . ((int) $object->id) . ".%')"));
 	// print json_encode($object->ref) . " == " . json_encode($resSP);exit;
 	if (!empty($resSP)) {
 		$lastTry = 0;
@@ -1308,8 +1543,8 @@ function stancerCBstartPay($object, $userMessage = true, $companypaymentmodeid =
 		];
 		$sp->fillDataArray($data);
 		$res = $sp->create($user, true);
-		if ($res) {
-			$message = $langs->trans("Nice, Stancer CB payment is engaged !");
+		if ($res > 0) {
+			$message = $langs->trans('StancerCardPaymentEngaged');
 
 			$stc = new Stancer($db);
 			$stc->createEvent($object, "stancer_cb_start", $langs->trans("StancerPayCB"), $langs->trans("StancerPayAmountStarted", $amountToPay));
@@ -1334,11 +1569,11 @@ function stancerCBstartPay($object, $userMessage = true, $companypaymentmodeid =
 				stancerSendInvoiceMailModele(getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_CB_MAILTYPE', ''), $object, 'BILL_CBSTART_SENTBYMAIL');
 			}
 		} else {
-			$message = $langs->trans("Error on Stancer CB!");
+			$message = $langs->trans('StancerErrCard');
 			if ($userMessage) {
 				setEventMessages($langs->trans("ErrorStancer") . " (21) " . $message, [],  'errors');
 			}
-			dol_syslog("stancerCBstartPay pay CB error save (1)" . json_encode($res), LOG_DEBUG);
+			dol_syslog("stancerCBstartPay: local Stancer_payments row not created (" . $res . "): " . $sp->error, LOG_ERR);
 			if ($userMessage != true && getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_ERROR')) {
 				dol_syslog("stancerCBstartPay pay CB error send mail error", LOG_DEBUG);
 				stancerSendInvoiceMailModele(getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_ERROR', ''), $object, 'BILL_CBERROR_SENTBYMAIL', 1);
@@ -1349,7 +1584,7 @@ function stancerCBstartPay($object, $userMessage = true, $companypaymentmodeid =
 		dol_syslog("stancerCBstartPay pay CB error(1)" . json_encode($e->getMessage()), LOG_DEBUG);
 		// TODO gerer ce cas particulier:
 		// Payment already exists, duplicate unique_id (paym_xxxx)
-		$message = $langs->trans("Error on Stancer CB payment request :" . $e->getMessage());
+		$message = $langs->trans('StancerErrCardRequest', $e->getMessage());
 		$stc = new Stancer($db);
 		$stc->createEvent($object, "stancer_cb_start", $langs->trans("StancerPayCB"), $message);
 
@@ -1520,7 +1755,8 @@ function stancerMakeTAG($object, $addUnique = false)
 	// disabled, too many risks of double pay invoice
 	if ($addUnique) {
 		dol_syslog("stancerMakeTAG : add uniq to tag");
-		$tag = stancerCleanUpDuplicate($tag . '.UNIQ=' . rand(10, 99));
+		// First UNIQ suffix not stored yet, the tag stays within its 36 characters
+		$tag = stancerNextFreeTag(stancerCleanUpDuplicate($tag), $db);
 	} else {
 		$tag = stancerCleanUpDuplicate($tag);
 	}
@@ -1532,6 +1768,78 @@ function stancerMakeTAG($object, $addUnique = false)
 		dol_syslog("stancerMakeTAG error : TAG generator is to long (36 chars max) return tag cut to 36 char !", LOG_ERR);
 		return substr($tag, 0, 36);
 	}
+}
+
+
+/**
+ * Amount to charge for an object, in cents.
+ *
+ * The amount of an invoice, an order or a proposal is always computed here from
+ * the object: the amount received by the public payment page is in the hands of
+ * the customer and is only honoured for objects without a total of their own.
+ *
+ * @param   object      $object       Object to pay (Facture, Commande, Propal, Don, Adherent...)
+ * @param   float|null  $forceAmount  Amount requested by the caller
+ * @return  int                       Amount in cents
+ */
+function stancerResolveAmountToPay($object, $forceAmount = null)
+{
+	$element = isset($object->element) ? $object->element : '';
+	if ($element == "facture") {
+		// The invoice may have been partially paid already
+		$totalpaid = $object->getSommePaiement();
+		$totalcreditnotes = $object->getSumCreditNotesUsed();
+		$totaldeposits = $object->getSumDepositsUsed();
+		$amountToPay = StancerApi::toCents(price2num($object->total_ttc - $totalpaid - $totalcreditnotes - $totaldeposits, 'MT'));
+	} elseif ($element == "commande" || $element == "propal") {
+		$amountToPay = StancerApi::toCents(price2num($object->total_ttc, 'MT'));
+		if (
+			$element == "commande"
+			&& getDolGlobalString('STANCER_CB_ORDER_PARTIAL_PAY') != ''
+			&& isset($object->deposit_percent) && $object->deposit_percent > 0 && $object->deposit_percent < 100
+		) {
+			$amountToPay = StancerApi::toCents((float) price2num($object->total_ttc, 'MT') * ((float) $object->deposit_percent / 100));
+			dol_syslog("stancerResolveAmountToPay : partial amount $amountToPay");
+		}
+		if (
+			$element == "propal"
+			&& getDolGlobalString('STANCER_CB_PROPAL_PARTIAL_PAY') != ''
+			&& isset($object->deposit_percent) && $object->deposit_percent > 0 && $object->deposit_percent < 100
+		) {
+			$amountToPay = StancerApi::toCents((float) price2num($object->total_ttc, 'MT') * ((float) $object->deposit_percent / 100));
+			dol_syslog("stancerResolveAmountToPay : proposal deposit $amountToPay");
+		}
+	} elseif (!empty($forceAmount)) {
+		return StancerApi::toCents($forceAmount);
+	} else {
+		return StancerApi::toCents(price2num($object->total_ttc ?? ($object->amount ?? 0), 'MT'));
+	}
+
+	if (!empty($forceAmount) && StancerApi::toCents($forceAmount) != $amountToPay) {
+		dol_syslog("stancerResolveAmountToPay : requested amount " . $forceAmount . " ignored for " . $element . " " . ($object->ref ?? '') . ", charging " . $amountToPay . " cents", LOG_WARNING);
+	}
+
+	return $amountToPay;
+}
+
+/**
+ * Tell whether the payments, credit notes and deposits cover the whole invoice.
+ *
+ * @param   Facture  $invoice  Invoice, freshly fetched
+ * @return  bool               True when nothing is left to pay
+ */
+function stancerInvoiceIsFullyPaid($invoice)
+{
+	$paid = (float) $invoice->getSommePaiement();
+	$credit = (float) $invoice->getSumCreditNotesUsed();
+	$deposit = (float) $invoice->getSumDepositsUsed();
+	$remaining = (float) price2num($invoice->total_ttc - $paid - $credit - $deposit, 'MT');
+	if ($remaining > 0.005) {
+		dol_syslog("stancerInvoiceIsFullyPaid : invoice " . $invoice->ref . " still has " . $remaining . " to pay", LOG_INFO);
+		return false;
+	}
+
+	return true;
 }
 
 
@@ -1553,7 +1861,6 @@ function stancerGetPropalPaymentUrl($object)
 	}
 
 	$url = dol_buildpath("/stancer/public/newpayment_propal.php", 2);
-	// $url = DOL_MAIN_URL_ROOT . '/custom/stancer/public/newpayment.php';
 	$url .= '?source=propal';
 	$url .= '&ref=' . urlencode((string) $object->ref);
 	if (!empty($securekey)) {
@@ -1601,7 +1908,10 @@ function stancerCheckIfPaymentInProgress($object)
 	// the cron picks up the other invoices of the group as still unpaid and
 	// re-triggers a payment -> double billing (the incident on 13/05 + 14/05).
 	$sanitizedObjId = (int) $object->id;
-	$sanitizedObjRef = $db->escape($object->ref);
+	// Containment on purpose: this guard against double payments must also catch
+	// legacy order_id formats and truncated grouped references, so an over-match
+	// (a payment wrongly seen in progress) is the safe side. Wildcards are escaped.
+	$sanitizedObjRef = $db->escape($db->escapeforlike($object->ref));
 	$customSql = "live_mode = '" . getDolGlobalString('STANCER_IS_PROD') . "'";
 	$customSql .= " AND (";
 	$customSql .= "unique_id LIKE '%INV=" . $sanitizedObjId . "'";
@@ -1614,7 +1924,7 @@ function stancerCheckIfPaymentInProgress($object)
 	$customSql .= ")";
 	$resSP = $sp->fetchAll('ASC', '', 0, 0, array('customsql' => $customSql));
 	if (is_array($resSP) && count($resSP) > 0) {
-		$stancerApi = StancerApi::getInstance();
+		$stancerApi = new StancerApi();
 		//dans cette liste il faut vérifier s'il y en a un qui est de type payé/paiement en cours
 		foreach ($resSP as $key => $val) {
 			$paymentData = $stancerApi->getPayment($val->stancer_id);
@@ -1786,4 +2096,67 @@ function stancerRegeneratePDFifNeeded(CommonObject $object)
 			$result = $object->generateDocument($object->model_pdf, $langs);
 		}
 	}
+}
+
+
+/**
+ * Build an attempt id that has never been used for this object.
+ *
+ * Stancer reserves a unique_id for ever, so a retry needs a new one. The
+ * column holds 36 characters, so the base tag is trimmed to leave room for
+ * the suffix. Any suffix already stored locally is skipped; if the whole
+ * range is taken, the current time provides a last-resort suffix.
+ *
+ * @param  string $baseTag Tag of the previous attempt (its suffix is dropped).
+ * @param  DoliDB $db      Database handler.
+ * @return string          A tag no local attempt carries yet.
+ */
+function stancerNextFreeTag($baseTag, $db)
+{
+	$maxLength = 36; // llx_stancer_stancer_payments.unique_id is a varchar(36).
+	$baseTag = preg_replace('/\.UNIQ=[A-Za-z0-9]+$/', '', (string) $baseTag);
+
+	for ($i = 1; $i <= 99; $i++) {
+		$suffix = '.UNIQ=' . sprintf('%02d', $i);
+		$candidate = substr($baseTag, 0, $maxLength - strlen($suffix)) . $suffix;
+
+		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "stancer_stancer_payments";
+		$sql .= " WHERE unique_id = '" . $db->escape($candidate) . "'";
+		$resql = $db->query($sql);
+		if (!$resql) {
+			// Never hand back a tag we could not check: fall through to the time suffix.
+			break;
+		}
+		$taken = $db->fetch_object($resql);
+		$db->free($resql);
+		if (!$taken) {
+			return $candidate;
+		}
+	}
+
+	$suffix = '.UNIQ=' . dol_print_date(dol_now(), '%y%m%d%H%M%S');
+	return substr($baseTag, 0, $maxLength - strlen($suffix)) . $suffix;
+}
+
+/**
+ * Build the URL Stancer sends the customer back to after a card payment.
+ *
+ * paymentback.php loads the local attempt by the tag carried in this URL, so
+ * the tag must be the one of the attempt actually sent to Stancer: after a
+ * retry, that is the tag stancerNextFreeTag() returned, not the first one.
+ *
+ * @param  string $tag       Tag of the attempt, i.e. its unique_id.
+ * @param  string $source    Payment source ('order', 'invoice', ...).
+ * @param  string $ref       Reference of the paid object.
+ * @param  string $securekey Security key of the payment page.
+ * @return string            Absolute return URL.
+ */
+function stancerBuildReturnUrl($tag, $source, $ref, $securekey)
+{
+	$args = base64_encode('tag=' . $tag . '&source=' . $source . '&ref=' . $ref . '&securekey=' . $securekey);
+	if (defined('DOLENTITY')) {
+		$args .= '&e=' . DOLENTITY;
+	}
+
+	return dol_buildpath('/stancer/public/paymentback.php', 3) . '?s=' . $args;
 }

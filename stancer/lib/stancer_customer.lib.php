@@ -39,10 +39,13 @@ function stancerUpdateCustomerStancerRef($memberid, $accountType, $customerID)
 	} elseif ($accountType == 'member') {
 		$adherent = new AdherentStancer($db);
 		$res = $adherent->fetch($memberid);
-		print("stancerUpdateCustomerStancerRef : $res");
-		if ($res) {
+		if ($res > 0) {
 			$adherent->array_options['options_stancer_account'] = $customerID;
-			$adherent->update($user);
+			if ($adherent->update($user) < 0) {
+				dol_syslog("stancerUpdateCustomerStancerRef : cannot save the Stancer account of member " . $memberid . ": " . $adherent->error, LOG_ERR);
+			}
+		} else {
+			dol_syslog("stancerUpdateCustomerStancerRef : member " . $memberid . " not found (" . $res . ")", LOG_ERR);
 		}
 	}
 }
@@ -341,7 +344,7 @@ function stancerBuildCardAnchorData($socid, $customerID, $objname, $country_code
 		'fk_soc'          => $socid,
 		'bank'            => null,
 		'label'           => $label,
-		'stancer_account' => $db->escape($customerID),
+		'stancer_account' => $customerID,
 		'last_four'       => 0000,
 		'number'          => 0000,
 		'proprio'         => $objname,
@@ -355,6 +358,207 @@ function stancerBuildCardAnchorData($socid, $customerID, $objname, $country_code
 		'country_code'    => $country_code,
 		'status'          => 1,
 	);
+}
+
+/**
+ * Turn a phone number into the international form Stancer expects.
+ *
+ * Stancer only accepts a mobile in international form ("+33..."). Dolibarr
+ * stores what the user typed, most often a French national number with spaces
+ * or dots, which the raw comparison "does it start with a + ?" rejects. The
+ * conversion assumes France for a national number, which is what the
+ * ZIPAUTOFILL/company country already assumes elsewhere in Dolibarr.
+ *
+ * @param  string $phone       Number as stored in Dolibarr.
+ * @param  string $countryCode Country of the thirdparty, ISO 3166-1 alpha-2.
+ * @return string              International number, or an empty string when nothing usable.
+ */
+function stancerNormalizePhone($phone, $countryCode = 'FR')
+{
+	$phone = preg_replace('/[^0-9+]/', '', (string) $phone);
+	if ($phone === '') {
+		return '';
+	}
+	// Keep a single leading +, drop any other one.
+	$lead = ($phone[0] === '+') ? '+' : '';
+	$digits = str_replace('+', '', $phone);
+	if ($lead === '+') {
+		return (strlen($digits) >= 8) ? '+' . $digits : '';
+	}
+	// "00" is the other way of writing "+".
+	if (strncmp($digits, '00', 2) === 0 && strlen($digits) > 4) {
+		return '+' . substr($digits, 2);
+	}
+	// National French number: 10 digits starting with 0.
+	if (strtoupper($countryCode) === 'FR' && strlen($digits) === 10 && $digits[0] === '0') {
+		return '+33' . substr($digits, 1);
+	}
+
+	return '';
+}
+
+/**
+ * Tell whether an international number looks like a mobile one.
+ *
+ * Stancer wants a mobile and answers 422 on a landline. Only France can be
+ * told apart here with any confidence (06/07), so every other country is
+ * given the benefit of the doubt and left to Stancer to judge.
+ *
+ * @param  string $phone Number already in international form.
+ * @return bool
+ */
+function stancerLooksLikeMobile($phone)
+{
+	if (strncmp((string) $phone, '+33', 3) !== 0) {
+		return true;
+	}
+
+	return preg_match('/^\+33[67]/', $phone) === 1;
+}
+
+/**
+ * Find an email and a mobile Stancer can attach the payment to.
+ *
+ * A Stancer customer needs an email or an international mobile, and refusing
+ * the payment when the thirdparty carries neither means turning down an order
+ * over a form field nobody filled in - while the contacts of that same
+ * thirdparty usually hold both. The search walks, in this order:
+ *   1. the thirdparty itself;
+ *   2. the billing contact of the paid object, then its other contacts;
+ *   3. the contacts of the thirdparty.
+ * The first usable value wins for each field, so an email may come from the
+ * thirdparty and the mobile from a contact.
+ *
+ * NOTHING IS WRITTEN. The values serve this payment only: the thirdparty and
+ * the contacts are left exactly as they are, and it stays a human decision to
+ * copy an address onto a record.
+ *
+ * @param  Societe     $societe Thirdparty that owes the money.
+ * @param  Object|null $object  Paid object, when there is one.
+ * @return array{email:string,mobile:string,email_from:string,mobile_from:string} Values found, and where.
+ */
+function stancerResolvePayerContact($societe, $object = null)
+{
+	global $db, $langs;
+
+	// The source is shown to the user before the payment link is sent: it must
+	// read like a place they know, not like a row id.
+	$langs->loadLangs(array('companies'));
+
+	$found = array('email' => '', 'mobile' => '', 'email_from' => '', 'mobile_from' => '');
+	if (!is_object($societe)) {
+		return $found;
+	}
+	$countryCode = empty($societe->country_code) ? 'FR' : $societe->country_code;
+
+	// Candidates, best first. Each one is a label plus the two fields it may fill.
+	$candidates = array();
+	$candidates[] = array(
+		'label' => $langs->trans('ThirdParty'),
+		'email' => isset($societe->email) ? $societe->email : '',
+		'phones' => array(
+			isset($societe->phone_mobile) ? $societe->phone_mobile : '',
+			isset($societe->phone) ? $societe->phone : '',
+		),
+	);
+
+	// Which contacts are linked to the paid object, and which of them bills it.
+	// liste_contact() answers the roles but carries no phone number at all: its
+	// rows hold the name, the email and the role, nothing else. Reading a phone
+	// from them silently yielded none, which left the billing contact no better
+	// placed than any other for the mobile.
+	$rankOfContact = array();
+	if (is_object($object) && method_exists($object, 'liste_contact') && !empty($object->id)) {
+		$linked = $object->liste_contact(-1, 'external');
+		if (is_array($linked)) {
+			foreach ($linked as $c) {
+				$contactId = (int) (isset($c['id']) ? $c['id'] : 0);
+				if ($contactId <= 0) {
+					continue;
+				}
+				$rankOfContact[$contactId] = (!empty($c['code']) && $c['code'] === 'BILLING') ? 0 : 1;
+			}
+		}
+	}
+
+	// The numbers come from socpeople, in one query covering the contacts of the
+	// thirdparty and the ones linked to the document, which are not always the same.
+	$people = array();
+	if (!empty($societe->id) || !empty($rankOfContact)) {
+		$sql = "SELECT rowid, lastname, firstname, email, phone, phone_mobile, fk_soc FROM " . MAIN_DB_PREFIX . "socpeople";
+		$sql .= " WHERE (fk_soc = " . ((int) $societe->id);
+		if (!empty($rankOfContact)) {
+			$sql .= " OR rowid IN (" . implode(',', array_map('intval', array_keys($rankOfContact))) . ")";
+		}
+		$sql .= ")";
+		$sql .= " AND statut = 1";
+		$sql .= " AND entity IN (" . getEntity('socpeople') . ")";
+		$sql .= " ORDER BY rowid ASC";
+		$resql = $db->query($sql);
+		if ($resql) {
+			while ($obj = $db->fetch_object($resql)) {
+				$people[(int) $obj->rowid] = $obj;
+			}
+			$db->free($resql);
+		} else {
+			dol_syslog("stancerResolvePayerContact: could not read the contacts of socid=" . ((int) $societe->id) . ": " . $db->lasterror(), LOG_ERR);
+		}
+	}
+
+	// Billing contact of the document first, then its other contacts, then the
+	// remaining contacts of the thirdparty, oldest first (usually the main one).
+	$orderedIds = array();
+	foreach (array(0, 1) as $rank) {
+		foreach ($rankOfContact as $contactId => $contactRank) {
+			if ($contactRank === $rank) {
+				$orderedIds[] = $contactId;
+			}
+		}
+	}
+	foreach ($people as $contactId => $person) {
+		if (!isset($rankOfContact[$contactId]) && (int) $person->fk_soc === (int) $societe->id) {
+			$orderedIds[] = $contactId;
+		}
+	}
+
+	foreach ($orderedIds as $contactId) {
+		if (!isset($people[$contactId])) {
+			continue;
+		}
+		$person = $people[$contactId];
+		$contactName = trim((string) $person->firstname . ' ' . (string) $person->lastname);
+		$candidates[] = array(
+			'label' => $langs->trans('Contact') . ($contactName === '' ? ' #' . $contactId : ' : ' . $contactName),
+			'email' => $person->email,
+			'phones' => array($person->phone_mobile, $person->phone),
+		);
+	}
+
+	foreach ($candidates as $candidate) {
+		if ($found['email'] === '' && strpos((string) $candidate['email'], '@') !== false) {
+			$found['email'] = trim((string) $candidate['email']);
+			$found['email_from'] = $candidate['label'];
+		}
+		if ($found['mobile'] === '') {
+			foreach ($candidate['phones'] as $phone) {
+				$normalized = stancerNormalizePhone($phone, $countryCode);
+				if ($normalized !== '' && stancerLooksLikeMobile($normalized)) {
+					$found['mobile'] = $normalized;
+					$found['mobile_from'] = $candidate['label'];
+					break;
+				}
+			}
+		}
+		if ($found['email'] !== '' && $found['mobile'] !== '') {
+			break;
+		}
+	}
+
+	dol_syslog("stancerResolvePayerContact: socid=" . (int) $societe->id
+		. " email=" . ($found['email'] === '' ? 'none' : 'from ' . $found['email_from'])
+		. " mobile=" . ($found['mobile'] === '' ? 'none' : 'from ' . $found['mobile_from']), LOG_DEBUG);
+
+	return $found;
 }
 
 /**
@@ -382,17 +586,10 @@ function stancerAddCustomerIfNeeded($object)
 	//Si c'est déjà une société
 	if ($object->element == 'societe') {
 		$societe = $object;
-		$email = $societe->email;
-		// Prefer the mobile over the landline (Stancer expects a mobile). Use
-		// isset()/cast so a missing property (incomplete object) never fatals.
-		$phone = "";
-		$phoneMobile = isset($societe->phone_mobile) ? trim((string) $societe->phone_mobile) : "";
-		$phoneFixe   = isset($societe->phone) ? trim((string) $societe->phone) : "";
-		if ($phoneMobile != "") {
-			$phone = $phoneMobile;
-		} elseif ($phoneFixe != "") {
-			$phone = $phoneFixe;
-		}
+		// The thirdparty comes first, its contacts next: see stancerResolvePayerContact().
+		$payer = stancerResolvePayerContact($societe, null);
+		$email = $payer['email'];
+		$phone = $payer['mobile'];
 		$objname = $societe->name;
 		$socid = $object->id;
 		$country_code = $societe->country_code;
@@ -402,8 +599,10 @@ function stancerAddCustomerIfNeeded($object)
 		$societe = new Societe($db);
 		$socresult = $societe->fetch($object->socid);
 		if ($socresult) {
-			$email = $societe->email;
-			$phone = $societe->phone;
+			// Contacts of the paid object are searched too, billing ones first.
+			$payer = stancerResolvePayerContact($societe, $object);
+			$email = $payer['email'];
+			$phone = $payer['mobile'];
 			$objname = $societe->name;
 			$socid = $societe->id;
 			$country_code = $societe->country_code;
@@ -412,7 +611,7 @@ function stancerAddCustomerIfNeeded($object)
 	} elseif ($object->element  == 'member') {
 		//un membre (association)
 		$email = $object->email;
-		$phone = $object->phone;
+		$phone = stancerNormalizePhone($object->phone, empty($object->country_code) ? 'FR' : $object->country_code);
 		$objname = $object->firstname . " " . $object->lastname;
 		$memberid = $object->id;
 		$country_code = $object->country_code;
@@ -427,7 +626,7 @@ function stancerAddCustomerIfNeeded($object)
 		//societe / client
 		if (!empty($socid)) {
 			$companypaymentmode = new CompanyPaymentModeStancer($db);
-			$res = $companypaymentmode->fetch(0, '', 0, '', " AND stancer_account <> '' AND fk_soc = '" . $db->escape($socid) . "'");
+			$res = $companypaymentmode->fetch(0, '', 0, '', " AND stancer_account <> '' AND fk_soc = " . ((int) $socid));
 			if ($res) {
 				//dans stancer_account on a le customerid stancer
 				$customerID = $companypaymentmode->stancer_account;
@@ -484,7 +683,7 @@ function stancerAddCustomerIfNeeded($object)
 	}
 
 	// Build customer data for API
-	$stancerApi = StancerApi::getInstance();
+	$stancerApi = new StancerApi();
 	$customerData = array(
 		'name' => stancerFilterSocName($objname)
 	);
@@ -656,7 +855,7 @@ function stancerAddCustomerIfNeeded($object)
 function stancerDeleteSEPA($socid, $stancersepauuid, $companyPaymentModeID)
 {
 	global $db, $conf;
-	$stancerApi = StancerApi::getInstance();
+	$stancerApi = new StancerApi();
 	$user = new User($db);
 	$res = $user->fetch(getDolGlobalInt('STANCER_USER_ACCOUNT_FOR_ACTIONS'));
 	if ($res <= 0) {
@@ -831,7 +1030,7 @@ function stancerAddSEPAIfNeeded($socid, $data)
 {
 	global $db, $conf, $user, $langs;
 
-	$stancerApi = StancerApi::getInstance();
+	$stancerApi = new StancerApi();
 
 	$sepaID = null;
 	$sepaData = null;
@@ -932,8 +1131,8 @@ function stancerAddSEPAIfNeeded($socid, $data)
 		'fk_soc' => $socid,
 		'bank' => $data['bank'],
 		'label' => $label . '_' . date("YmdHi"),
-		'stancer_account' => $db->escape($customerID),
-		'stancer_object_ref' => $db->escape($sepaID),
+		'stancer_account' => $customerID,
+		'stancer_object_ref' => $sepaID,
 		'bic' => isset($sepaData['bic']) ? $sepaData['bic'] : '',
 		'last_four' => isset($sepaData['last4']) ? $sepaData['last4'] : '',
 		'rum' => isset($sepaData['mandate']) ? $sepaData['mandate'] : $data['mandate'],
@@ -973,7 +1172,7 @@ function stancerAddSEPAIfNeeded($socid, $data)
  */
 function stancerSwitchTo3DS($socid, $customerID, $cbData)
 {
-	$stancerApi = StancerApi::getInstance();
+	$stancerApi = new StancerApi();
 	$res = array();
 	dol_syslog("stancerSwitchTo3DS for $socid");
 
@@ -984,7 +1183,7 @@ function stancerSwitchTo3DS($socid, $customerID, $cbData)
 	$uuid = 'PREAUTH=1.CB=' . $last4 . '.CUS=' . $socid . '.UNIQ=' . $uniq;
 	$orderid = 'PREAUTH=' . $last4 . '.UNIQ=' . $uniq;
 
-	$urlretour = DOL_MAIN_URL_ROOT . '/custom/stancer/public/cb.php?s=' . $_SESSION['s'] . "&action=preauth";
+	$urlretour = dol_buildpath('/stancer/public/cb.php', 3) . '?s=' . $_SESSION['s'] . "&action=preauth";
 
 	// Build payment data for pre-authorization with 3DS
 	$paymentApiData = array(
@@ -1030,14 +1229,15 @@ function stancerSwitchTo3DS($socid, $customerID, $cbData)
  *
  * @param   int  $socid    dolibarr soc id
  * @param   array  $data   data to use
+ * @param   string|null  $redirect3dsOut  Output, 3-D Secure URL the page must redirect to, untouched when none
  *
  * @return  string|int|null  stancer cbID like card_..., a negative int code, or null when no card id was returned
  */
-function stancerAddCBIfNeeded($socid, $data)
+function stancerAddCBIfNeeded($socid, $data, &$redirect3dsOut = null)
 {
 	global $db, $conf, $user, $langs;
 
-	$stancerApi = StancerApi::getInstance();
+	$stancerApi = new StancerApi();
 	dol_syslog("stancerAddCBIfNeeded::enter for socid=$socid");
 
 	$redirect3ds = "";
@@ -1048,7 +1248,7 @@ function stancerAddCBIfNeeded($socid, $data)
 	$societe = new Societe($db);
 	$socresult = $societe->fetch($socid);
 	if ($socresult <= 0 || empty($data['cbnumber'])) {
-		dol_syslog("stancerAddCBIfNeeded error: no socid ($socresult) or data cbnumber empty : " . json_encode($data), LOG_ERR);
+		dol_syslog("stancerAddCBIfNeeded error: socid=" . ((int) $socid) . " fetch=" . $socresult . " cbnumber_present=" . (empty($data['cbnumber']) ? '0' : '1'), LOG_ERR);
 		return -1;
 	}
 
@@ -1126,20 +1326,20 @@ function stancerAddCBIfNeeded($socid, $data)
 			'socid' => $socid,
 			'fk_soc' => $socid,
 			'label' => $label,
-			'bank' => $db->escape($brand),
-			'stancer_account' => $db->escape($customerID),
-			'stancer_object_ref' => $db->escape($cbID),
-			'last_four' => $db->escape($last4),
+			'bank' => $brand,
+			'stancer_account' => $customerID,
+			'stancer_object_ref' => $cbID,
+			'last_four' => $last4,
 			'number' => 0000,
-			'proprio' => $db->escape($proprio),
-			'exp_date_month' => $db->escape($expiry_month),
-			'exp_date_year' => $db->escape($expiry_year),
+			'proprio' => $proprio,
+			'exp_date_month' => $expiry_month,
+			'exp_date_year' => $expiry_year,
 			'cvn' => null,
 			'datec' => dol_now(),
-			'card_type' => $db->escape($brand),
+			'card_type' => $brand,
 			'type' => 'card',
 			'entity' => $conf->entity,
-			'country_code' => $db->escape($card_country),
+			'country_code' => $card_country,
 			'status' => 1,
 			'default_rib' => 1, //pour qu'elle soit visible dans la liste
 		];
@@ -1154,13 +1354,10 @@ function stancerAddCBIfNeeded($socid, $data)
 		}
 		// print json_encode($companypaymentmode);
 	}
-	//In case of 3DS
+	// In case of 3DS the page commits and redirects: a library sends no header
 	if (!empty($redirect3ds)) {
-		$db->commit();
-		$db->close();
-		dol_syslog("stancerAddCBIfNeeded redirect to 3DS auth : $redirect3ds");
-		header("Location: " . $redirect3ds);
-		exit;
+		dol_syslog("stancerAddCBIfNeeded 3DS authentication required, redirect handed back to the page");
+		$redirect3dsOut = $redirect3ds;
 	}
 
 	return $cbID;
@@ -1185,11 +1382,11 @@ function stancerAddCompanyPaymentModeifNeeded($data)
 
 	$res = null;
 	if ($data['type'] == "card") {
-		//$res = $companypaymentmode->fetch(0, '', 0, '', " AND fk_soc = " . $db->escape($data['socid']) . " AND label LIKE 'stancer-card%' AND last_four='" . $db->escape($data['last_four']) ."'");
-		$res = $companypaymentmode->fetch(0, '', 0, '', " AND fk_soc = " . $db->escape($data['socid']) . " AND label LIKE 'stancer-card%'");
+		//$res = $companypaymentmode->fetch(0, '', 0, '', " AND fk_soc = " . ((int) $data['socid']) . " AND label LIKE 'stancer-card%' AND last_four='" . $db->escape($data['last_four']) ."'");
+		$res = $companypaymentmode->fetch(0, '', 0, '', " AND fk_soc = " . ((int) $data['socid']) . " AND label LIKE 'stancer-card%'");
 	} else {
 		$iban = $data['iban'] ?? $data['iban_prefix'];
-		$res = $companypaymentmode->fetch(0, '', 0, '', " AND fk_soc = " . $db->escape($data['socid']) . " AND label LIKE 'stancer-sepa%' AND iban_prefix='" . $db->escape($iban) . "'");
+		$res = $companypaymentmode->fetch(0, '', 0, '', " AND fk_soc = " . ((int) $data['socid']) . " AND label LIKE 'stancer-sepa%' AND iban_prefix='" . $db->escape($iban) . "'");
 	}
 	if ($res) {
 		dol_syslog("stancer Un compte existe déjà dans llx_societe_rib " . $db->escape($data['label']), LOG_DEBUG);
@@ -1394,6 +1591,133 @@ function stancerGetDataIBAN($socid, $name)
 
 
 /**
+ * User the public pages act as (no session there): STANCER_USER_ACCOUNT_FOR_ACTIONS,
+ * else the user who last modified the thirdparty, else its creator.
+ *
+ * Societe::fetch() fills user_modification/user_creation up to Dolibarr 18, and
+ * user_modification_id/user_creation_id from Dolibarr 19, so the four spellings
+ * are probed, modification before creation. The *_id properties are not declared
+ * at all on Dolibarr 15, so they are only ever reached through empty(): a direct
+ * read would raise a PHP 8 "Undefined property" warning on that version.
+ *
+ * @param   Societe|null  $societe  Thirdparty concerned by the page, may be null
+ * @return  User|null               Loaded user, null when nobody can be used
+ */
+function stancerLoadPublicActionUser($societe)
+{
+	global $db;
+
+	$user = new User($db);
+	$configured = getDolGlobalInt('STANCER_USER_ACCOUNT_FOR_ACTIONS');
+	if ($configured > 0 && $user->fetch($configured) > 0) {
+		return $user;
+	}
+	dol_syslog("stancer public page: STANCER_USER_ACCOUNT_FOR_ACTIONS (" . $configured . ") is not a valid user, trying the thirdparty author", LOG_WARNING);
+
+	$uid = 0;
+	if (is_object($societe)) {
+		if (!empty($societe->user_modification_id)) {
+			$uid = $societe->user_modification_id;
+		}
+		// @phan-suppress-next-line PhanDeprecatedProperty  only source up to Dolibarr 18
+		if (empty($uid) && !empty($societe->user_modification)) {
+			// @phan-suppress-next-line PhanDeprecatedProperty  only source up to Dolibarr 18
+			$uid = $societe->user_modification;
+		}
+		if (empty($uid) && !empty($societe->user_creation_id)) {
+			$uid = $societe->user_creation_id;
+		}
+		// @phan-suppress-next-line PhanDeprecatedProperty  only source up to Dolibarr 18
+		if (empty($uid) && !empty($societe->user_creation)) {
+			// @phan-suppress-next-line PhanDeprecatedProperty  only source up to Dolibarr 18
+			$uid = $societe->user_creation;
+		}
+	}
+	if (is_object($uid)) {
+		$uid = $uid->id;
+	}
+	if (empty($uid)) {
+		dol_syslog("stancer public page: no fallback user found on thirdparty " . (is_object($societe) ? $societe->id : ''), LOG_ERR);
+		return null;
+	}
+	$user = new User($db);
+	if ($user->fetch((int) $uid) <= 0) {
+		dol_syslog("stancer public page: cannot load fallback user " . ((int) $uid) . ": " . $user->error, LOG_ERR);
+		return null;
+	}
+
+	return $user;
+}
+
+/**
+ * Check the secure key of the public card (CB) and IBAN (SEPA) pages of a customer.
+ *
+ * The key is the hash built by stancerGetOnlineCBLinkForCustomer() and
+ * stancerGetOnlineIBANLinkForCustomer(). Without PAYMENT_SECURITY_TOKEN it can
+ * be computed from the socid and the name alone, so the pages are refused.
+ *
+ * @param   string        $kind     'CB' or 'SEPA'
+ * @param   array         $args     Decoded "s" parameter of the page
+ * @param   Societe|null  $societe  Output, the thirdparty when the key is valid
+ * @return  bool                    True when the key is valid
+ */
+function stancerCheckPublicCustomerKey($kind, $args, &$societe)
+{
+	global $db;
+
+	$societe = null;
+	$secret = getDolGlobalString('PAYMENT_SECURITY_TOKEN');
+	if ($secret === '') {
+		dol_syslog("stancer public " . $kind . " page refused: PAYMENT_SECURITY_TOKEN is not set", LOG_ERR);
+		return false;
+	}
+	$socid = (is_array($args) && isset($args['socid'])) ? (int) $args['socid'] : 0;
+	$given = (is_array($args) && isset($args['securekey'])) ? (string) $args['securekey'] : '';
+	if ($socid <= 0 || $given === '') {
+		dol_syslog("stancer public " . $kind . " page refused: socid or securekey missing", LOG_WARNING);
+		return false;
+	}
+	$tmpsoc = new Societe($db);
+	if ($tmpsoc->fetch($socid) <= 0) {
+		dol_syslog("stancer public " . $kind . " page refused: thirdparty " . $socid . " not found", LOG_WARNING);
+		return false;
+	}
+	$expected = dol_hash($kind . "-" . $socid . "-" . $tmpsoc->name . "-" . $secret, '1');
+	if (!hash_equals((string) $expected, $given)) {
+		dol_syslog("stancer public " . $kind . " page refused: wrong securekey for thirdparty " . $socid, LOG_WARNING);
+		return false;
+	}
+	$societe = $tmpsoc;
+
+	return true;
+}
+
+/**
+ * Tell whether the public card or IBAN form was already submitted with success
+ * for this thirdparty in the current session (reload of the result page).
+ *
+ * @param   string  $kind   'cb' or 'sepa'
+ * @param   int     $socid  Thirdparty id
+ * @return  bool
+ */
+function stancerPublicFormAlreadyDone($kind, $socid)
+{
+	return !empty($_SESSION['stancer_public_done'][$kind][(int) $socid]);
+}
+
+/**
+ * Remember that the public card or IBAN form succeeded for this thirdparty.
+ *
+ * @param   string  $kind   'cb' or 'sepa'
+ * @param   int     $socid  Thirdparty id
+ * @return  void
+ */
+function stancerPublicFormMarkDone($kind, $socid)
+{
+	$_SESSION['stancer_public_done'][$kind][(int) $socid] = 1;
+}
+
+/**
  * Return string with full Url
  *
  * @param   int		$socid		soc id
@@ -1408,13 +1732,13 @@ function stancerGetOnlineIBANLinkForCustomer($socid, $name)
 	$securekey = dol_hash($tst, '1');
 
 	$out = "socid=$socid&action=stancerSEPA&securekey=" . $securekey;
-	dol_syslog("stancer stat securekey (IBAN) is from $tst");
+	dol_syslog("stancer IBAN link built for socid=" . ((int) $socid));
 	// For multicompany
 	if (!empty($out) && !empty($conf->multicompany->enabled)) {
 		$out .= "&entity=" . $conf->entity; // Check the entity because we may have the same reference in several entities
 		$entity .= "&e=" . $conf->entity; //entity in clear for main dolibarr code
 	}
-	return DOL_MAIN_URL_ROOT . '/custom/stancer/public/sepa-iban.php?s=' . base64_encode($out) . $entity;
+	return dol_buildpath('/stancer/public/sepa-iban.php', 3) . '?s=' . base64_encode($out) . $entity;
 }
 
 
@@ -1433,11 +1757,11 @@ function stancerGetOnlineCBLinkForCustomer($socid, $name)
 	$securekey = dol_hash($tst, '1');
 
 	$out = "socid=$socid&action=stancerCB&securekey=" . $securekey;
-	dol_syslog("stancer stat securekey is (CB) from $tst");
+	dol_syslog("stancer CB link built for socid=" . ((int) $socid));
 	// For multicompany
 	if (!empty($out) && !empty($conf->multicompany->enabled)) {
 		$out .= "&entity=" . $conf->entity; // Check the entity because we may have the same reference in several entities
 		$entity .= "&e=" . $conf->entity; //entity in clear for main dolibarr code
 	}
-	return DOL_MAIN_URL_ROOT . '/custom/stancer/public/cb.php?s=' . base64_encode($out) . $entity;
+	return dol_buildpath('/stancer/public/cb.php', 3) . '?s=' . base64_encode($out) . $entity;
 }

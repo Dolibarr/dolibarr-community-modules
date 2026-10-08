@@ -24,3 +24,4 @@ ALTER TABLE llx_stancer_stancer_payouts ADD INDEX idx_stancer_stancer_payouts_st
 
 --ALTER TABLE llx_stancer_stancer_payouts ADD CONSTRAINT llx_stancer_stancer_payouts_fk_field FOREIGN KEY (fk_field) REFERENCES llx_stancer_myotherobject(rowid);
 
+ALTER TABLE llx_stancer_stancer_payouts ADD UNIQUE INDEX uk_stancer_stancer_payouts_payout_id (entity, payout_id);

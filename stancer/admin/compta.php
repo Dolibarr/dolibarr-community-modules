@@ -265,7 +265,7 @@ if ($action == 'regularize') {
 						$errors1 = is_array($bookkeeping->errors) ? implode(', ', $bookkeeping->errors) : '';
 						$errors2 = is_array($bookkeeping2->errors) ? implode(', ', $bookkeeping2->errors) : '';
 						dol_syslog("StancerCompta: Error creating OD for ".$obj->ref." - result1=".$result1." result2=".$result2." error1=".$bookkeeping->error." errors1=".$errors1." error2=".$bookkeeping2->error." errors2=".$errors2, LOG_ERR);
-						setEventMessages("Erreur création OD pour ".$obj->ref.": ".$bookkeeping->error." ".$errors1." / ".$bookkeeping2->error." ".$errors2, null, 'errors');
+						setEventMessages($langs->trans('StancerComptaOdCreateError', $obj->ref, trim($bookkeeping->error." ".$errors1." / ".$bookkeeping2->error." ".$errors2)), null, 'errors');
 					}
 				}
 

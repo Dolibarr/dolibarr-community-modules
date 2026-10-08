@@ -18,7 +18,7 @@
 ALTER TABLE llx_stancer_stancer_payments ADD INDEX idx_stancer_stancer_payments_rowid (rowid);
 ALTER TABLE llx_stancer_stancer_payments ADD INDEX idx_stancer_stancer_payments_stancer_id (stancer_id);
 ALTER TABLE llx_stancer_stancer_payments ADD INDEX idx_stancer_stancer_payments_fk_soc (fk_soc);
-ALTER TABLE llx_stancer_stancer_payments ADD CONSTRAINT llx_stancer_stancer_payments_fk_user_creat FOREIGN KEY (fk_user_creat) REFERENCES llx_user(rowid);
+ALTER TABLE llx_stancer_stancer_payments ADD CONSTRAINT llx_stancer_stancer_payments_fk_user_creat FOREIGN KEY (fk_user_creat) REFERENCES llx_user(rowid) ON DELETE SET NULL;
 ALTER TABLE llx_stancer_stancer_payments ADD INDEX idx_stancer_stancer_payments_status (status);
 -- END MODULEBUILDER INDEXES
 

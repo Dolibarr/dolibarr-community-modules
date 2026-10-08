@@ -58,7 +58,7 @@ class Stancer_disputes extends CommonObject
 	/**
 	 * @var int  Does this object support multicompany module ?
 	 */
-	public $ismultientitymanaged = 0;
+	public $ismultientitymanaged = 1;
 
 	/**
 	 * @var int  Does object support extrafields ?

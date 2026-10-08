@@ -35,3 +35,9 @@ todo*.md
 TODO*.md
 *.log
 .env
+
+# Working notes and shop listing, not part of the module
+hooks.txt
+triggers.list
+dolistore/
+docs/202603-openapi.md
