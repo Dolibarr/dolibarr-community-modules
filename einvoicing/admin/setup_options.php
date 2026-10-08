@@ -402,7 +402,7 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 		$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_LINES_IMPORT_CATEGORY_OF_TARGET_IMPORT_PRODUCT_LIST');
 		$item->setAsCategory('product');
 	}
-  
+
 	// Setup conf to choose the default of the vendor a line of a mixed invoice (BT-23 in M) falls back on.
 	// Empty by default: such an invoice then stops at import when one of its lines needs a default.
 	$item = $formSetup->newItem('EINVOICING_DEFAULT_ROUTING_MIXED')->setAsSelect(array(
