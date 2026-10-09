@@ -962,6 +962,110 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
+	 * A product created at import gets no barcode by default: the codes of our numbering are not to be
+	 * spent on vendor products (#1159).
+	 *
+	 * @return void
+	 */
+	public function testAProductCreatedAtImportGetsNoBarcodeByDefault()
+	{
+		list($res, $item) = $this->importWithBarcodeSetup(0, '');
+		$this->assertGreaterThan(0, (int) $res['res'], 'import: ' . strip_tags((string) ($res['message'] ?? '')));
+		$this->assertSame('', (string) $item->barcode, 'no barcode is taken from the numbering');
+	}
+
+	/**
+	 * A numbering module with a mask requires a barcode on every product: without the option, the
+	 * creation is refused and the message says what to do, where it was empty before (#1159).
+	 *
+	 * @return void
+	 */
+	public function testABarcodeRequiredByTheSetupNamesTheOption()
+	{
+		list($res) = $this->importWithBarcodeSetup(0, '1159{000000}');
+		$this->assertLessThan(0, (int) $res['res']);
+		$this->assertStringContainsString('enable the option giving a barcode to the products created at import', (string) $res['message']);
+	}
+
+	/**
+	 * With the option, the product gets the next code of the numbering module. The word 'auto' was sent,
+	 * unknown before Dolibarr 20: the core checked it against the mask and refused the product (#1159).
+	 *
+	 * @return void
+	 */
+	public function testWithTheOptionAProductCreatedAtImportGetsTheNextBarcode()
+	{
+		list($res, $item) = $this->importWithBarcodeSetup(1, '1159{000000}');
+		$this->assertGreaterThan(0, (int) $res['res'], 'import: ' . strip_tags((string) ($res['message'] ?? '')));
+		$this->assertSame(1, preg_match('/^1159[0-9]{6}$/', (string) $item->barcode), 'the product gets the next code of the numbering module, not ' . $item->barcode);
+	}
+
+	/**
+	 * Import a document billing a product unknown here, with the barcode module on.
+	 *
+	 * @param	int		$option		Value of EINVOICING_PRODUCTS_AUTO_BARCODE
+	 * @param	string	$mask		Mask of the standard numbering module, '' for no numbering
+	 * @return	array{0:array<string,mixed>,1:Product}	Result of the import, product of its first line
+	 */
+	private function importWithBarcodeSetup($option, $mask)
+	{
+		global $conf, $db, $user;
+
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+		if (empty($user->id)) {
+			$user->fetch(1);
+		}
+
+		$R = 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100';
+		$doc = new DOMDocument();
+		$doc->load(__DIR__ . '/fixtures/received_documents/cii_rounding_amount.xml');
+		$xp = new DOMXPath($doc);
+		$xp->registerNamespace('ram', $R);
+		$siren = (string) random_int(100000000, 999999999);
+		$seller = $xp->query('//ram:SellerTradeParty')->item(0);
+		$xp->query('ram:GlobalID', $seller)->item(0)->nodeValue = $siren . '00017';
+		$xp->query('ram:SpecifiedLegalOrganization/ram:ID', $seller)->item(0)->nodeValue = $siren;
+		$xp->query('ram:SpecifiedTaxRegistration/ram:ID', $seller)->item(0)->nodeValue = 'FR00' . $siren;
+		$product = $xp->query('//ram:SpecifiedTradeProduct')->item(0);
+		$product->insertBefore($doc->createElementNS($R, 'SellerAssignedID', 'BC-' . $siren), $product->firstChild);
+		$xp->query('ram:Name', $product)->item(0)->nodeValue = 'BARCODE ' . $siren;
+		$xp->query('//*[local-name()="ExchangedDocument"]/*[local-name()="ID"]')->item(0)->nodeValue = 'BC-' . $siren;
+
+		$saved = array();
+		$settings = array('EINVOICING_THIRDPARTIES_AUTO_GENERATION' => 1, 'EINVOICING_PRODUCTS_AUTO_GENERATION' => 1, 'EINVOICING_IMPORT_AS_FREE_LINES' => 0,
+			'EINVOICING_PRODUCTS_AUTO_BARCODE' => $option, 'BARCODE_PRODUCT_ADDON_NUM' => ($mask !== '' ? 'mod_barcode_product_standard' : ''),
+			'BARCODE_STANDARD_PRODUCT_MASK' => $mask, 'PRODUIT_DEFAULT_BARCODE_TYPE' => 2);
+		foreach ($settings as $name => $value) {
+			$saved[$name] = getDolGlobalString($name);
+			$conf->global->$name = $value;
+		}
+		$savedModule = $conf->modules['barcode'] ?? null;
+		$conf->modules['barcode'] = 'barcode';
+		$savedEnabled = isset($conf->barcode) ? $conf->barcode : null;
+		$conf->barcode = (object) array('enabled' => 1);
+
+		$res = (new CIIProtocol($db))->createSupplierInvoiceFromSource($doc->saveXML(), null, 'test-barcode-' . $siren);
+
+		foreach ($saved as $name => $value) {
+			$conf->global->$name = $value;
+		}
+		if ($savedModule === null) {
+			unset($conf->modules['barcode']);
+		} else {
+			$conf->modules['barcode'] = $savedModule;
+		}
+		$conf->barcode = $savedEnabled;
+
+		$item = new Product($db);
+		if ((int) ($res['res'] ?? 0) > 0) {
+			$invoice = new FactureFournisseur($db);
+			$invoice->fetch((int) $res['res']);
+			$item->fetch((int) $invoice->lines[0]->fk_product);
+		}
+		return array($res, $item);
+	}
+
+	/**
 	 * "0" is a valid vendor reference: emptiness has to be tested on the string, because empty()
 	 * answers true on it and drops BT-155 from the generated line.
 	 *
