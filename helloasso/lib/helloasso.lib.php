@@ -331,7 +331,7 @@ function helloassoGetDataFromObjects($source, $ref, $mode = 'amount', &$payerarr
 					}
 
 					if (!empty($member->last_subscription_amount) && !GETPOSTISSET('newamount') && is_numeric($amount)) {
-						$amount = max($member->last_subscription_amount, $amount);
+						$amount = ($member->last_subscription_amount ? $member->last_subscription_amount : (empty($amountbytype[$typeid]) ? 0 : $amountbytype[$typeid]));
 					}
 					$amount = max(0, getDolGlobalString('MEMBER_MIN_AMOUNT'), $amount);
 				} elseif ($mode == 'payer' && !is_null($payerarray)) {
