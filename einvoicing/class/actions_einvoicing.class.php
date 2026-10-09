@@ -706,6 +706,16 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				}
 			}
 
+			// Action to force the despatch advice reference of the invoice (BT-16, issue #1151)
+			if ($action == 'setdespatchadvice' && $permissiontoedit) {
+				$despatchAdvice = GETPOST('einvoice_despatch_advice', 'alphanohtml');
+				$result = $einvoicing->insertOrUpdateExtraField($object->id, $object->element, EInvoicing::EXTRAFIELD_DESPATCH_ADVICE_REFERENCE, $despatchAdvice);
+				if ($result < 0) {
+					$error++;
+					$this->errors = array_merge($this->errors, $einvoicing->errors);
+				}
+			}
+
 			// Action to set the buyer reference of the invoice (BT-10, issue #678)
 			if ($action == 'setbuyerreference' && $permissiontoedit) {
 				$buyerReference = GETPOST('einvoice_buyer_reference', 'alphanohtml');
