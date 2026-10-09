@@ -471,8 +471,9 @@ if (!empty($parsedLines)) {
 			if (!empty($defaultrouted[$idx])) {
 				$producttmp = new Product($db);
 				$routedto = ($producttmp->fetch($matchresults[$idx]['res']) > 0) ? $producttmp->getNomUrl(1) : $langs->trans("Product").' #'.((int) $matchresults[$idx]['res']);
-				$routedkey = (($matchresults[$idx]['routingtype'] ?? '') == 'service') ? 'LineRoutedToDefaultService' : 'LineRoutedToDefaultProduct';
-				print $form->textwithpicto('<span class="opacitymedium">'.$langs->trans($routedkey).'</span> '.$routedto, $langs->trans("LineRoutedToDefaultProductHelp"), 1, 'warning');
+				$routingtype = (string) ($matchresults[$idx]['routingtype'] ?? '');
+				$routedkey = ($routingtype == 'catchall' ? 'LineRoutedToCatchallProduct' : ($routingtype == 'service' ? 'LineRoutedToDefaultService' : 'LineRoutedToDefaultProduct'));
+				print $form->textwithpicto('<span class="opacitymedium">'.$langs->trans($routedkey).'</span> '.$routedto, $langs->trans($routingtype == 'catchall' ? 'LineRoutedToCatchallProductHelp' : 'LineRoutedToDefaultProductHelp'), 1, 'warning');
 				print '<br>';
 			}
 			if ($reffourn === '') {
