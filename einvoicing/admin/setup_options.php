@@ -390,6 +390,32 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 		$item->fieldParams['warningifon'] = 1;
 	}
 
+	// Setup conf to give a catch-all product to the lines no product and no default of the vendor resolved (issue #1146).
+	// Off by default, and pointless with the automatic product creation, which it would always pre-empt.
+	if (!getDolGlobalString("EINVOICING_PRODUCTS_AUTO_GENERATION")) {
+		$item = $formSetup->newItem('EINVOICING_DEFAULT_PRODUCT_CATCHALL')->setAsYesNo();
+		$item->helpText = $langs->transnoentities('EINVOICING_DEFAULT_PRODUCT_CATCHALL_HELP');
+		$item->defaultFieldValue = '0';
+		$item->cssClass = 'minwidth500';
+		$item->fieldParams['forcereload'] = 1;
+
+		// The product itself, editable only once the option above is on. Saved only when posted, so a
+		// product already chosen survives while the option is off.
+		$item = $formSetup->newItem('EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID')->setAsProduct();
+		$item->helpText = $langs->transnoentities('EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID_HELP');
+		$item->cssClass = 'minwidth500';
+		$item->setValueFromPostCallBack(function () use ($item) {
+			if (!GETPOSTISSET($item->confKey)) {
+				return 0;
+			}
+			$item->fieldValue = (GETPOSTINT($item->confKey) > 0 ? (string) GETPOSTINT($item->confKey) : '');
+			return 1;
+		});
+		if (!getDolGlobalInt('EINVOICING_DEFAULT_PRODUCT_CATCHALL')) {
+			$item->fieldInputOverride = '<span class="opacitymedium">'.$langs->trans('EINVOICING_DEFAULT_PRODUCT_CATCHALL_LOCKED').'</span>';
+		}
+	}
+
 	// Setup conf to choose the default of the vendor a line of a mixed invoice (BT-23 in M) falls back on.
 	// Empty by default: such an invoice then stops at import when one of its lines needs a default.
 	$item = $formSetup->newItem('EINVOICING_DEFAULT_ROUTING_MIXED')->setAsSelect(array(
