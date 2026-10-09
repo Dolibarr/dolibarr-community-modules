@@ -1175,6 +1175,59 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
+	 * The catch-all product of the setup (issue #1146) answers a line only once everything else failed,
+	 * including the defaults of the vendor, and only while its option is on and products are not created.
+	 *
+	 * @return void
+	 */
+	public function testTheCatchallProductIsTheLastResort()
+	{
+		global $conf;
+
+		// The vendor with defaults first: one without any routing leaves its id free for the next call
+		$withdefault = $this->vendorWithDefaults(true, true);
+		$none = $this->vendorWithDefaults(false, false);
+		$catchall = $none['product'];	// a product of the fixture no routing points at
+
+		$names = array('EINVOICING_DEFAULT_PRODUCT_CATCHALL', 'EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID', 'EINVOICING_PRODUCTS_AUTO_GENERATION');
+		$saved = array();
+		foreach ($names as $name) {
+			$saved[$name] = $conf->global->$name ?? null;
+		}
+		try {
+			$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 0;
+			$conf->global->EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID = $catchall;
+			$conf->global->EINVOICING_DEFAULT_PRODUCT_CATCHALL = 0;
+			$this->assertSame(0, (int) $this->matchUnknownLine($none['socid'], 'B1')['res'], 'the product alone must not apply while the option is off');
+
+			$conf->global->EINVOICING_DEFAULT_PRODUCT_CATCHALL = 1;
+			$found = $this->matchUnknownLine($none['socid'], 'B1');
+			$this->assertSame($catchall, (int) $found['res'], 'a line of a vendor without default must use the catch-all');
+			$this->assertSame('defaultrouting', $found['matchtype'] ?? '');
+			$this->assertSame('catchall', $found['routingtype'] ?? '');
+			$this->assertSame($catchall, (int) $this->matchUnknownLine($none['socid'], 'M1', '')['res'], 'a mixed invoice of a vendor without default must use the catch-all');
+
+			$this->assertSame($withdefault['service'], (int) $this->matchUnknownLine($withdefault['socid'], 'S1')['res'], 'the default of the vendor must keep priority');
+			$this->assertSame(-1, (int) $this->matchUnknownLine($withdefault['socid'], 'M1', '')['res'], 'the catch-all must not hide the choice a mixed invoice asks for');
+
+			$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 1;
+			$this->assertSame(0, (int) $this->matchUnknownLine($none['socid'], 'B1')['res'], 'the catch-all must leave the line to the product creation');
+
+			$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 0;
+			$conf->global->EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID = $catchall + 1000000;
+			$this->assertSame(0, (int) $this->matchUnknownLine($none['socid'], 'B1')['res'], 'a deleted catch-all product must not be linked');
+		} finally {
+			foreach ($saved as $name => $value) {
+				if ($value === null) {
+					unset($conf->global->$name);
+				} else {
+					$conf->global->$name = $value;
+				}
+			}
+		}
+	}
+
+	/**
 	 * The bill of exchange awaiting acceptance, and the generic bank card and direct debit codes, reach a
 	 * Dolibarr payment mode on import. 48 and 49 are what many senders write, rather than the credit card (54)
 	 * and SEPA direct debit (59) variants the table already knew.
