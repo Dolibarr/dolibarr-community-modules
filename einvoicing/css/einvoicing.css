@@ -1,0 +1,7 @@
+/* Card of the module in the open elements dashboard of the home page */
+.bg-infobox-einvoicing {
+	color: #a0522d !important;
+}
+.fa-dol-einvoicing:before {
+	content: "\f2f1";
+}
