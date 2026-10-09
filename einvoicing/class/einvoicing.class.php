@@ -3564,8 +3564,8 @@ class EInvoicing
 			}
 		}
 
-		require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
-		require_once DOL_DOCUMENT_ROOT.'/expedition/class/expedition.class.php';
+		dol_include_once('/commande/class/commande.class.php');
+		dol_include_once('/expedition/class/expedition.class.php');
 
 		$invoice->fetchObjectLinked();
 		$shipmentIds = (isset($invoice->linkedObjectsIds['shipping']) && is_array($invoice->linkedObjectsIds['shipping'])) ? array_values($invoice->linkedObjectsIds['shipping']) : array();
