@@ -607,6 +607,18 @@ class EInvoicing
 	const EXTRAFIELD_MERGE_LINE_CHARGES = 'merge_line_charges';
 
 	/**
+	 * Name, into llx_einvoicing_extrafields (element_type 'societe'), of the identifier this customer
+	 * gave us as its supplier (its vendor code). Sent as BT-29 without scheme on its invoices.
+	 */
+	const EXTRAFIELD_SELLER_ID_BY_BUYER = 'seller_id_by_buyer';
+
+	/**
+	 * Name, into llx_einvoicing_extrafields, of the despatch advice reference (BT-16) forced on one
+	 * invoice. When empty, the reference of the shipment linked to the invoice is used.
+	 */
+	const EXTRAFIELD_DESPATCH_ADVICE_REFERENCE = 'despatch_advice_reference';
+
+	/**
 	 * ISO/IEC 6523 scheme identifier of the French routing code ("code de routage"), the scheme the
 	 * Chorus Pro "code service exécutant" is declared under as BT-46 by BR-FR-CPRO-11 and
 	 * BR-FR-CPRO-13 of XP Z12-012. Not to be confused with 0225 (e-invoice address) nor with 0002 /
@@ -2085,6 +2097,35 @@ class EInvoicing
 			$resprints .= '</tr>';
 		}
 
+		// Despatch advice reference (BT-16, issue #1151): the shipment linked to the invoice, unless one is
+		// forced here. Stored into llx_einvoicing_extrafields, like the buyer reference above.
+		if (($object->element == 'facture' || $object->element == 'invoice') && $object->id > 0) {
+			$currentDespatchAdvice = (string) $this->getExtraFieldValue($object->id, $object->element, self::EXTRAFIELD_DESPATCH_ADVICE_REFERENCE);
+			$resprints .= '<tr class="treinvoicing_collapseseparator">';
+			$resprints .= '<td>';
+			$resprints .= $form->editfieldkey($form->textwithpicto($langs->trans("EInvoiceDespatchAdviceReference"), $langs->trans("EInvoiceDespatchAdviceReferenceHelp")), 'einvoice_despatch_advice', '', $object, (int) $editenable);
+			$resprints .= '</td>';
+			$resprints .= '<td>';
+			if ($action == 'editeinvoice_despatch_advice' && $editenable) {
+				$resprints .= '<form name="setdespatchadvice" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
+				$resprints .= '<input type="hidden" name="token" value="' . newToken() . '">';
+				$resprints .= '<input type="hidden" name="action" value="setdespatchadvice">';
+				$resprints .= '<input type="hidden" name="page_y" value="page_y">';
+				$resprints .= '<input type="text" name="einvoice_despatch_advice" class="minwidth200" maxlength="255" value="' . dol_escape_htmltag($currentDespatchAdvice) . '">';
+				$resprints .= '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
+				$resprints .= '</form>';
+			} elseif (trim($currentDespatchAdvice) !== '') {
+				$resprints .= dol_escape_htmltag($currentDespatchAdvice);
+			} else {
+				$linkedDespatchAdvice = $this->getDespatchAdviceReference($object, 0);
+				if ($linkedDespatchAdvice !== '') {
+					$resprints .= '<span class="opacitymedium">' . dol_escape_htmltag($linkedDespatchAdvice) . '</span>';
+				}
+			}
+			$resprints .= '</td>';
+			$resprints .= '</tr>';
+		}
+
 		// If current status requires a reason, display it
 		if (!empty($currentStatusInfo['reasonCode'])) {
 			// Translated, and escaped for the fallback: what used to be printed was the translation KEY.
@@ -2571,6 +2612,8 @@ class EInvoicing
 				$resprints .= '</tr>';
 			}
 
+			$resprints .= $this->sellerIdByBuyerRowHtml($object, $mode, $parameters, $expand_display);
+
 			return $resprints;
 		}
 
@@ -2742,7 +2785,42 @@ class EInvoicing
 			$resprints .= '</tr>';
 		}
 
+		$resprints .= $this->sellerIdByBuyerRowHtml($object, $mode, $parameters, $expand_display);
+
 		return $resprints;
+	}
+
+	/**
+	 * Row of the thirdparty card with the identifier this customer gave us as its supplier (BT-29, issue #1151).
+	 *
+	 * @param	Societe					$object				Thirdparty
+	 * @param	string					$mode				'create', 'edit' or view
+	 * @param	array<string,mixed>		$parameters			Hook parameters
+	 * @param	bool					$expand_display		Whether the block is expanded
+	 * @return	string										HTML of the row, '' when the thirdparty is not a customer
+	 */
+	private function sellerIdByBuyerRowHtml($object, $mode, $parameters, $expand_display)
+	{
+		global $langs, $form;
+
+		if (!in_array((int) $object->client, array(1, 3), true)) {
+			return '';
+		}
+
+		$value = ($mode == 'create') ? '' : (string) $this->getExtraFieldValue($object->id, 'societe', self::EXTRAFIELD_SELLER_ID_BY_BUYER);
+
+		$out = '<tr class="treinvoicing_collapseseparator trseller_id_by_buyer '.($expand_display ? '' : 'hidden').'">';
+		$out .= '<td>' . $form->textwithpicto($langs->trans("EInvoicingSellerIdByBuyer"), $langs->trans("EInvoicingSellerIdByBuyerHelp")) . '</td>';
+		$out .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
+		if ($mode == 'create' || $mode == 'edit') {
+			$out .= '<input type="text" name="einvoicing_seller_id_by_buyer" class="flat minwidth300" maxlength="255" spellcheck="false" value="' . dolPrintHTMLForAttribute($value) . '">';
+		} else {
+			$out .= dol_escape_htmltag($value);
+		}
+		$out .= '</td>';
+		$out .= '</tr>';
+
+		return $out;
 	}
 
 	/**
@@ -3463,6 +3541,85 @@ class EInvoicing
 		}
 
 		return (bool) getDolGlobalInt('EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION');
+	}
+
+	/**
+	 * Despatch advice reference (BT-16) of an invoice: the one forced on the invoice, or else the reference
+	 * of the first validated shipment linked to it, directly or through its orders. A draft shipment has no
+	 * final reference yet and is skipped.
+	 *
+	 * @param	Facture	$invoice	Customer invoice
+	 * @param	int		$withforced	1 to return the reference forced on the invoice when there is one
+	 * @return	string				Reference, '' when there is none
+	 */
+	public function getDespatchAdviceReference($invoice, $withforced = 1)
+	{
+		if ((int) $invoice->id <= 0) {
+			return '';
+		}
+		if ($withforced) {
+			$forced = trim((string) $this->getExtraFieldValue($invoice->id, $invoice->element, self::EXTRAFIELD_DESPATCH_ADVICE_REFERENCE));
+			if ($forced !== '') {
+				return $forced;
+			}
+		}
+
+		require_once DOL_DOCUMENT_ROOT.'/commande/class/commande.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/expedition/class/expedition.class.php';
+
+		$invoice->fetchObjectLinked();
+		$shipmentIds = (isset($invoice->linkedObjectsIds['shipping']) && is_array($invoice->linkedObjectsIds['shipping'])) ? array_values($invoice->linkedObjectsIds['shipping']) : array();
+		if (isset($invoice->linkedObjectsIds['commande']) && is_array($invoice->linkedObjectsIds['commande'])) {
+			foreach ($invoice->linkedObjectsIds['commande'] as $orderId) {
+				$order = new Commande($this->db);
+				if ($order->fetch((int) $orderId) > 0) {
+					$order->fetchObjectLinked();
+					if (isset($order->linkedObjectsIds['shipping']) && is_array($order->linkedObjectsIds['shipping'])) {
+						$shipmentIds = array_merge($shipmentIds, array_values($order->linkedObjectsIds['shipping']));
+					}
+				}
+			}
+		}
+
+		$refs = array();
+		foreach (array_unique($shipmentIds) as $shipmentId) {
+			$shipment = new Expedition($this->db);
+			if ($shipment->fetch((int) $shipmentId) > 0 && (int) $shipment->status > 0 && trim((string) $shipment->ref) !== '') {
+				$refs[] = trim((string) $shipment->ref);
+			}
+		}
+		sort($refs);
+
+		return empty($refs) ? '' : $refs[0];
+	}
+
+	/**
+	 * Reference the customer gives to a product (BT-156), as recorded on the customer prices of the product.
+	 *
+	 * @param	int		$productId	Id of the product
+	 * @param	int		$socid		Id of the customer
+	 * @return	string				Reference, '' when there is none
+	 */
+	public function getCustomerProductReference($productId, $socid)
+	{
+		if ((int) $productId <= 0 || (int) $socid <= 0) {
+			return '';
+		}
+
+		$sql = "SELECT ref_customer FROM " . $this->db->prefix() . "product_customer_price";
+		$sql .= " WHERE fk_product = " . (int) $productId . " AND fk_soc = " . (int) $socid;
+		$sql .= " AND entity IN (" . getEntity('productprice') . ")";
+		$sql .= " AND ref_customer IS NOT NULL AND ref_customer <> ''";
+		$sql .= " ORDER BY rowid DESC";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' ' . $this->db->lasterror(), LOG_ERR);
+			return '';
+		}
+		$obj = $this->db->fetch_object($resql);
+		$this->db->free($resql);
+
+		return $obj ? trim((string) $obj->ref_customer) : '';
 	}
 
 
