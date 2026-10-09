@@ -1677,12 +1677,15 @@ trait CommonProtocol
 			$product->status_buy = 1; // Status to buy
 			$product->note_private = 'Product created automatically from E-invoice import.';
 			$product->import_key = AbstractPDPProvider::$EINVOICING_LAST_IMPORT_KEY; // It does not work here, so we will update it after creation
-			// Set barcode if global ID is provided and is a GTIN/EAN type
-			if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
-				$product->barcode = $lineData['prodglobalid'];
-				$product->barcode_type = getDolGlobalInt('PRODUIT_DEFAULT_BARCODE_TYPE', 0);
-			} else {
-				$product->barcode = 'auto';
+			// A barcode only on request: the codes of our numbering are not to be spent on vendor products (#1159).
+			if (getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_BARCODE') && isModEnabled('barcode')) {
+				if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
+					$product->barcode = $lineData['prodglobalid'];
+					$product->barcode_type = getDolGlobalInt('PRODUIT_DEFAULT_BARCODE_TYPE', 0);
+				} else {
+					// -1 asks create() for the next code: Dolibarr 18 and 19 checked the word 'auto' itself.
+					$product->barcode = '-1';
+				}
 			}
 			// Validate before creation
 			$resCheck = $product->check();
@@ -1711,11 +1714,18 @@ trait CommonProtocol
 				];
 			}
 
-			// Error on creation
-			dol_syslog(__METHOD__ . ' Product creation error: ' . $product->error, LOG_ERR);
+			// Error on creation. verify() reports in errors[] only, which left the message empty.
+			$langs->loadLangs(array('errors', 'products'));
+			$creationErrors = array_map(array($langs, 'trans'), array_filter(array_merge(array($product->error), (array) $product->errors)));
+			$creationError = implode(', ', array_unique($creationErrors));
+			if (in_array('ErrorBarCodeRequired', (array) $product->errors) && !getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_BARCODE')) {
+				$langs->load('einvoicing@einvoicing');
+				$creationError .= '. ' . $langs->trans('ErrorEInvoicingBarcodeRequiredOnImport');
+			}
+			dol_syslog(__METHOD__ . ' Product creation error: ' . $creationError, LOG_ERR);
 			return [
 				'res' => -1,
-				'message' => 'Product creation error: ' . dol_escape_htmltag($product->error),
+				'message' => 'Product creation error: ' . dol_escape_htmltag($creationError),
 			];
 		} else {
 			// Suggest manual creation of product
@@ -1771,11 +1781,9 @@ trait CommonProtocol
 			$createParams['type'] = $prodType;
 			$createParams['tva_tx'] = (float) ($lineData['rateApplicablePercent'] ?? 0);
 			$createParams['status'] = 1; // Active
-			if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
+			if (getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_BARCODE') && !empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
 				$createParams['barcode'] = $lineData['prodglobalid'];
 				$createParams['barcode_type'] = getDolGlobalInt('PRODUIT_DEFAULT_BARCODE_TYPE', 0);
-			} else {
-				$createParams['barcode'] = 'auto';
 			}
 
 			// Create URL to prefill product creation form

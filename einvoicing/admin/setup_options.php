@@ -379,6 +379,15 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 	$item->fieldParams['forcereload'] = 1;
 	$item->fieldParams['warningifon'] = 1;
 
+	// Setup conf to give a barcode to the products created at import. Off by default: the codes of our
+	// numbering are not to be spent on vendor products.
+	if (getDolGlobalString("EINVOICING_PRODUCTS_AUTO_GENERATION") && isModEnabled('barcode')) {
+		$item = $formSetup->newItem('EINVOICING_PRODUCTS_AUTO_BARCODE')->setAsYesNo();
+		$item->helpText = $langs->transnoentities('EINVOICING_PRODUCTS_AUTO_BARCODE_HELP');
+		$item->defaultFieldValue = '0';
+		$item->cssClass = 'minwidth500';
+	}
+
 	// Setup conf to import lines as free description lines when no product is found and no default product exist on supplier
 	// This option is in conflict with EINVOICING_PRODUCTS_AUTO_GENERATION and with MAIN_DISABLE_FREE_LINES,
 	// so it is disabled if EINVOICING_PRODUCTS_AUTO_GENERATION is on or MAIN_DISABLE_FREE_LINES is on
