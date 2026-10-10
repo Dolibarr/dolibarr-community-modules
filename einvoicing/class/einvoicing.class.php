@@ -600,6 +600,15 @@ class EInvoicing
 	const EXTRAFIELD_BUYER_REFERENCE = 'buyer_reference';
 
 	/**
+	 * Name, into llx_einvoicing_extrafields, of the role the seller issues a services invoice under:
+	 * CONTRACTOR_ROLE_SUBCONTRACTOR (BT-23 = S5) or CONTRACTOR_ROLE_COCONTRACTOR (S6). Nothing else in an
+	 * invoice says it, and the same company invoices both directly and as a subcontractor (issue #946).
+	 */
+	const EXTRAFIELD_CONTRACTOR_ROLE = 'contractor_role';
+	const CONTRACTOR_ROLE_SUBCONTRACTOR = 'subcontractor';
+	const CONTRACTOR_ROLE_COCONTRACTOR = 'cocontractor';
+
+	/**
 	 * Name, into llx_einvoicing_extrafields (element_type 'societe'), of the per-supplier override of
 	 * EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION. '1' forces the behaviour on for that supplier, '0'
 	 * forces it off, no row inherits the global default. See shouldMergeLineChargesIntoDescription().
@@ -1660,6 +1669,16 @@ class EInvoicing
 			$baseErrors[] = $langs->trans("FxCheckErrorLinesWithNoName", implode(', ', $linesWithNoName));
 		}
 
+		// S5/S6 only exist for a services invoice: refused here rather than sent silently as B1/M1 (issue #946).
+		if ($invoice->element == 'facture' && $invoice->id > 0
+			&& (string) $this->getExtraFieldValue($invoice->id, $invoice->element, self::EXTRAFIELD_CONTRACTOR_ROLE) !== '') {
+			dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
+			$protocol = new CIIProtocol($this->db);
+			if ($protocol->getBillingFramePrefix($invoice) !== 'S') {
+				$baseErrors[] = $langs->trans("FxCheckErrorContractorRoleNotServices");
+			}
+		}
+
 		if (!empty($baseErrors)) {
 			$res = -1;
 			$message .= '<br> Error: ' . implode('<br> Error: ', $baseErrors);
@@ -2054,6 +2073,34 @@ class EInvoicing
 				$resprints .= '</td>';
 				$resprints .= '</tr>';
 			}
+		}
+
+		// Role the invoice is issued under (BT-23 S5/S6, issue #946). Customer invoices only.
+		if ($object->element == 'facture' && $object->id > 0) {
+			$currentRole = (string) $this->getExtraFieldValue($object->id, $object->element, self::EXTRAFIELD_CONTRACTOR_ROLE);
+			$roleOptions = array(
+				'' => $langs->trans("EInvoiceContractorRoleNone"),
+				self::CONTRACTOR_ROLE_SUBCONTRACTOR => $langs->trans("EInvoiceContractorRoleSubcontractor"),
+				self::CONTRACTOR_ROLE_COCONTRACTOR => $langs->trans("EInvoiceContractorRoleCocontractor"),
+			);
+			$resprints .= '<tr class="treinvoicing_collapseseparator">';
+			$resprints .= '<td>';
+			$resprints .= $form->editfieldkey($form->textwithpicto($langs->trans("EInvoiceContractorRole"), $langs->trans("EInvoiceContractorRoleHelp")), 'einvoice_contractor_role', '', $object, (int) $editenable);
+			$resprints .= '</td>';
+			$resprints .= '<td>';
+			if ($action == 'editeinvoice_contractor_role' && $editenable) {
+				$resprints .= '<form name="setcontractorrole" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
+				$resprints .= '<input type="hidden" name="token" value="' . newToken() . '">';
+				$resprints .= '<input type="hidden" name="action" value="setcontractorrole">';
+				$resprints .= '<input type="hidden" name="page_y" value="page_y">';
+				$resprints .= $form->selectarray('einvoice_contractor_role', $roleOptions, $currentRole, 0, 0, 0, '', 0);
+				$resprints .= '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
+				$resprints .= '</form>';
+			} elseif (isset($roleOptions[$currentRole]) && $currentRole !== '') {
+				$resprints .= dol_escape_htmltag($roleOptions[$currentRole]);
+			}
+			$resprints .= '</td>';
+			$resprints .= '</tr>';
 		}
 
 		// Buyer reference (BT-10): the reference the buyer uses to route the invoice inside its own

@@ -182,4 +182,42 @@ class BillingProcessIdTest extends CommonClassTest
 
 		$this->assertSame('B4', $protocol->getBillingProcessID($invoice, 0.0));
 	}
+
+	/**
+	 * A services invoice issued as subcontractor or co-contractor is the case S5/S6 describe, and the
+	 * role names who files it, so it replaces the initial, already paid and after deposit suffixes.
+	 *
+	 * @return void
+	 */
+	public function testContractorRoleTurnsAServicesInvoiceIntoS5OrS6()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$this->assertSame('S5', $protocol->getBillingProcessID($this->makeInvoice(Facture::STATUS_VALIDATED, 120.0, [1]), 0.0, 'subcontractor'));
+		$this->assertSame('S6', $protocol->getBillingProcessID($this->makeInvoice(Facture::STATUS_VALIDATED, 120.0, [1]), 0.0, 'cocontractor'));
+		$this->assertSame('S5', $protocol->getBillingProcessID($this->makeInvoice(Facture::STATUS_CLOSED, 120.0, [1]), 120.0, 'subcontractor'));
+
+		$afterDeposit = $this->makeInvoice(Facture::STATUS_VALIDATED, 1200.0, [1]);
+		$afterDeposit->lines[0]->desc = '(DEPOSIT)';
+		$this->assertSame('S6', $protocol->getBillingProcessID($afterDeposit, 0.0, 'cocontractor'));
+	}
+
+	/**
+	 * No B5/M5 exists: on goods the role cannot change the frame. The pre-check refuses that invoice
+	 * before generation, this only proves no invalid code is ever produced.
+	 *
+	 * @return void
+	 */
+	public function testContractorRoleLeavesAGoodsOrMixedFrameUnchanged()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$this->assertSame('B1', $protocol->getBillingProcessID($this->makeInvoice(Facture::STATUS_VALIDATED, 120.0, [0]), 0.0, 'subcontractor'));
+		$this->assertSame('M1', $protocol->getBillingProcessID($this->makeInvoice(Facture::STATUS_VALIDATED, 120.0, [0, 1]), 0.0, 'cocontractor'));
+		$this->assertSame('S1', $protocol->getBillingProcessID($this->makeInvoice(Facture::STATUS_VALIDATED, 120.0, [1]), 0.0, ''));
+	}
 }
