@@ -149,6 +149,16 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 				}
 			}
 
+			// Identifier this customer gave us as its supplier, sent as BT-29 (issue #1151). An empty value
+			// deletes it. A save that does not carry the field (API, mass action, import) leaves it untouched.
+			if (GETPOSTISSET('einvoicing_seller_id_by_buyer')) {
+				$result = $einvoicing->insertOrUpdateExtraField($socId, 'societe', EInvoicing::EXTRAFIELD_SELLER_ID_BY_BUYER, trim(GETPOST('einvoicing_seller_id_by_buyer', 'alphanohtml')));
+				if ($result < 0) {
+					$error++;
+					$this->errors[] = $langs->trans('FailedToSaveSellerIdByBuyer').' '.$einvoicing->error;
+				}
+			}
+
 			if ($error) {
 				return -4;
 			}

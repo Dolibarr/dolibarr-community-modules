@@ -139,6 +139,8 @@ $mySchemeGlobalIdProf = $this->getIEC6523Code($mysoc->country_code, 1);
 $sellerGlobalIds   = ($mySchemeGlobalIdProf !== '' && $myGlobalIdProf !== '')
 	? array(array('schemeID' => $mySchemeGlobalIdProf, 'value' => $myGlobalIdProf))
 	: array();
+// BT-29 again, without scheme: the identifier this customer gave us as its supplier (issue #1151).
+$sellerIdByBuyer   = trim((string) $einvoicing->getExtraFieldValue($object->socid, 'societe', EInvoicing::EXTRAFIELD_SELLER_ID_BY_BUYER));
 $myUri             = $einvoicing->getSellerCommunicationURI(0);
 $mySchemeUri       = $this->getIEC6523Code($mysoc->country_code, 2);
 // BT-28, the trading name of the seller: "a name by which the seller is known, other than the
@@ -761,7 +763,7 @@ foreach ($object->lines as $line) {
 		'prodname'                  => $libelle,			// BT-153
 		'proddesc'                  => $description,		// BT-154
 		'prodsellerid'              => $line->product_ref ? $line->product_ref : "",
-		'prodbuyerid'               => null,
+		'prodbuyerid'               => ($line->fk_product > 0 ? $einvoicing->getCustomerProductReference($line->fk_product, $object->socid) : ''),	// BT-156 (issue #1151)
 		'prodglobalidtype'          => null,
 		'prodglobalid'              => null,
 		'prodmultilangs'            => [],
@@ -1137,7 +1139,7 @@ $invoiceData = [
 
 	// Seller part
 	'sellername'                => $mysoc->name,
-	'sellerids'                 => (empty($sellerGlobalIds) ? '' : $myidprof),
+	'sellerids'                 => $sellerIdByBuyer,
 
 	'sellerlineone'             => $sellerAddressLines[0],
 	'sellerlinetwo'             => $sellerAddressLines[1],
@@ -1228,7 +1230,7 @@ $invoiceData = [
 	'orderReference'            => $promise_code,
 	'contractReference'         => $object->array_options['options_d4d_contract_number'] ?? null,
 	'contractReferenceTypeCode' => $contractReferenceTypeCode,
-	'despatchAdviceRef'         => null,
+	'despatchAdviceRef'         => $einvoicing->getDespatchAdviceReference($object),	// BT-16 (issue #1151)
 
 	// VAT breakdown for section ApplicableHeaderTradeSettlement
 	'taxBreakdown'              => $taxBreakdown,
