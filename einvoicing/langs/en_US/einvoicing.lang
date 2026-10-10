@@ -147,6 +147,11 @@ EINVOICING_ENABLE_API_VALIDATION_HELP=If enabled, third-party data (Prof id/SIRE
 InvoiceRoutingOverride=E-invoice target address
 InvoiceRoutingOverrideHelp=You can set here an e-invoice routing address specific to this invoice (BT-49). Keep empty to use the default e-invoice address of the third party
 InvoiceRoutingOverrideDefault=Third-party default address
+EInvoiceContractorRole=Invoice issued as
+EInvoiceContractorRoleHelp=Set it when this services invoice is issued as a subcontractor or as a co-contractor on a contract. The billing frame (BT-23) is then sent as S5 (subcontractor) or S6 (co-contractor) instead of S1, S2 or S4. Only allowed when every line is a service.
+EInvoiceContractorRoleNone=Main contractor (default)
+EInvoiceContractorRoleSubcontractor=Subcontractor (S5)
+EInvoiceContractorRoleCocontractor=Co-contractor (S6)
 RoutingIdInfo=Label (optional)
 FailedToSaveRoutingID=Failed to save routing address
 FailedToDeleteRoutingID=Failed to delete routing address
@@ -805,6 +810,7 @@ DiscountFromDepositNoSource=Down payment deducted
 DiscountFromExcessReceivedNoSource=Payment in excess deducted
 DiscountFromExcessPaidNoSource=Payment in excess deducted
 FxCheckErrorLinesWithNoName=The following lines have neither a product label nor a description, so the item name of the e-invoice (BT-153) would be empty, which rule BR-25 refuses: %s. Enter a description on each of them (rank in the document, then line id).
+FxCheckErrorContractorRoleNotServices=The invoice is marked as issued by a subcontractor or a co-contractor, but it contains goods: the billing frames S5 and S6 only exist for a services invoice. Turn the goods lines into services, or set "Invoice issued as" back to the default.
 
 # A lifecycle status about an invoice we sent, that this run could not record (flow left unstored, retried later)
 CantRecordTheStatusOfTheInvoiceYouSent=The status of an invoice you sent, carried by flow %s, could not be recorded. Nothing was stored, the flow will be retried on the next synchronization.
