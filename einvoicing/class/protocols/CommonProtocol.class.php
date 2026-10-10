@@ -76,34 +76,21 @@ trait CommonProtocol
 	 * @param  float|null	$alreadyPaid	Amount already received that the document will report as
 	 *                                      BT-113 (payments + used credit notes). Null recomputes the
 	 *                                      payments alone, which is enough for a standalone call.
+	 * @param  string		$contractorRole	EInvoicing::CONTRACTOR_ROLE_* the invoice is issued under, '' for none.
+	 *                                      Turns a services frame into S5/S6 (issue #946).
 	 * @return string  BillingProcessID
 	 */
-	public function getBillingProcessID($invoice, $alreadyPaid = null)
+	public function getBillingProcessID($invoice, $alreadyPaid = null, $contractorRole = '')
 	{
-		$hasProduct  = false;
-		$hasService  = false;
+		$prefix = $this->getBillingFramePrefix($invoice);
 
-		// Check invoice lines to determine if invoice contains products, services or both
-		if (!empty($invoice->lines)) {
-			foreach ($invoice->lines as $line) {
-				if ((int) $line->product_type === 0) {
-					$hasProduct = true;
-				}
-
-				if ((int) $line->product_type === 1) {
-					$hasService = true;
-				}
-			}
+		// S5/S6 name who files a services invoice, so they replace the 1/2/4 suffix. No B or M variant
+		// exists: validateInvoiceConfiguration() refuses the role on any other frame before generation.
+		if ($prefix === 'S' && $contractorRole === 'subcontractor') {
+			return 'S5';
 		}
-
-		// Determine prefix B / S / M (B1, B2, B3, B4 / S1, S2, S3, S4 / M1, M2, M3, M4)
-		if ($hasProduct && $hasService) {
-			$prefix = 'M';
-		} elseif ($hasService && !$hasProduct) {
-			$prefix = 'S';
-		} else {
-			// Default to products
-			$prefix = 'B';
+		if ($prefix === 'S' && $contractorRole === 'cocontractor') {
+			return 'S6';
 		}
 
 		// Determine suffix 1 (initial invoice) or 2 (already paid invoice) according to invoice status and payment information and if the invoice contain a line a deposit (prepayment) so final invoice after deposit then suffix is 4
@@ -136,6 +123,43 @@ trait CommonProtocol
 			}
 			return $prefix . '1';
 		}
+	}
+
+	/**
+	 * Prefix of the billing frame (BT-23): B for goods, S for services, M for both.
+	 *
+	 * @param  CommonInvoice	$invoice	Invoice whose lines are read
+	 * @return string						'B', 'S' or 'M'
+	 */
+	public function getBillingFramePrefix($invoice)
+	{
+		$hasProduct  = false;
+		$hasService  = false;
+
+		// Check invoice lines to determine if invoice contains products, services or both
+		if (!empty($invoice->lines)) {
+			foreach ($invoice->lines as $line) {
+				if ((int) $line->product_type === 0) {
+					$hasProduct = true;
+				}
+
+				if ((int) $line->product_type === 1) {
+					$hasService = true;
+				}
+			}
+		}
+
+		// Determine prefix B / S / M (B1, B2, B3, B4 / S1, S2, S3, S4 / M1, M2, M3, M4)
+		if ($hasProduct && $hasService) {
+			$prefix = 'M';
+		} elseif ($hasService && !$hasProduct) {
+			$prefix = 'S';
+		} else {
+			// Default to products
+			$prefix = 'B';
+		}
+
+		return $prefix;
 	}
 
 	/**
