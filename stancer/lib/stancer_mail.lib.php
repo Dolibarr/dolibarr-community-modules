@@ -236,7 +236,7 @@ function stancerBuildManagerLink($paymentId, $displayText)
  *
  * @param   string  $to             recipient email
  * @param   string  $subject        email subject
- * @param   string  $message        email body (HTML)
+ * @param   string  $message        email body (HTML), inserted as is: callers escape every value they build into it
  * @param   bool    $isForCustomer  true if sent to a customer (adds goodbye text)
  * @param   string  $cc             CC email address
  * @param   string  $trackid        tracking id for Dolibarr Email Collector (e.g. 'thi123', 'inv456')

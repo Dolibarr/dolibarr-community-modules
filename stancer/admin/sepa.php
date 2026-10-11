@@ -84,9 +84,6 @@ if (!class_exists('FormSetup')) {
 }
 
 
-if (getDolGlobalString('STANCER_EMAIL_INFO_SEPA', '') == '') {
-	dolibarr_set_const($db, 'STANCER_EMAIL_INFO_SEPA', $mysoc->email, 'chaine', 0, '', $conf->entity);
-}
 
 $formSetup = new FormSetup($db);
 $form = new Form($db);
@@ -135,6 +132,7 @@ $item = $formSetup->newItem('STANCER_SWITCH_SEPA_AMOUNT')->setAsYesNo();
 $item = $formSetup->newItem('STANCER_SWITCH_SEPA_AMOUNT_MAX')->setAsString();
 
 $sql = "SELECT rowid, label,ref FROM ".MAIN_DB_PREFIX."bank_account";
+$sql .= " WHERE entity IN (".getEntity('bank_account').")";
 $result = $db->query($sql);
 $optionsStancer = array();
 $options = array();
@@ -142,6 +140,8 @@ if ($result) {
 	while ($obj = $db->fetch_object($result)) {
 		$options[$obj->rowid] = $obj->label;
 	}
+} else {
+	dol_syslog("stancer admin/sepa.php: cannot list bank accounts: " . $db->lasterror(), LOG_ERR);
 }
 $item = $formSetup->newItem('STANCER_SWITCH_SEPA_TO_OTHER_BANK')->setAsSelect($options);
 

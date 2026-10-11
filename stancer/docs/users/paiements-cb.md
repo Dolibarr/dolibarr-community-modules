@@ -98,3 +98,25 @@ Le module peut ajouter un bouton ou un message de paiement sur vos factures PDF 
 - **Bouton de paiement** : texte affiché sur le bouton
 - **Message de paiement** : texte complémentaire affiché à côté du bouton
 - **Texte pour les acomptes** : texte spécifique pour les paiements d'acompte
+
+## Envoyer le lien de paiement depuis une commande ou une facture
+
+Sur une commande validée ou une facture validée, le bouton **Envoyer le lien de paiement** envoie au client, par email, le lien de la page de paiement en ligne. Une confirmation indique l'adresse retenue et la fiche où elle a été trouvée : le tiers, ou à défaut l'un de ses contacts.
+
+Le lien est permanent : il recalcule le reste à payer et démarre une nouvelle tentative à chaque ouverture. Après un paiement refusé, il suffit donc de renvoyer le même lien, le client peut payer à nouveau.
+
+Si aucune adresse email n'est trouvée, ni sur le tiers ni sur ses contacts, rien n'est envoyé et un message vous invite à la renseigner.
+
+## Paiement par carte sans 3-D Secure
+
+Certaines cartes ne parviennent pas à s'authentifier en 3-D Secure, et leur paiement est alors refusé. Pour ce client uniquement, vous pouvez autoriser le paiement sans 3-D Secure sur **un document précis** :
+
+1. Ouvrez la commande ou la facture concernée.
+2. Cliquez sur **Autoriser le paiement sans 3-D Secure**, puis confirmez.
+3. Les paiements par carte de ce document partent sans authentification jusqu'à son règlement.
+
+Le bouton **Exiger à nouveau 3-D Secure** annule l'autorisation. Chaque changement est enregistré dans les événements du document, avec son auteur.
+
+> **Attention :** sans 3-D Secure, une contestation frauduleuse reste à votre charge, et non à celle de l'émetteur de la carte. Ces boutons demandent le droit d'écriture du module Stancer.
+
+Si le bouton est grisé, désactivez puis réactivez le module Stancer pour terminer sa mise à jour.

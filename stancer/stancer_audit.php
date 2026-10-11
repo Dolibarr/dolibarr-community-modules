@@ -386,12 +386,12 @@ if ($action === 'run') {
 			$apiStatusCss = 'badge-status7';
 		}
 
-		$invoiceLink = $row->db_invoice_ref;
+		$invoiceLink = dol_escape_htmltag($row->db_invoice_ref);
 		if (!empty($row->db_fk_facture)) {
 			$invoiceUrl = DOL_URL_ROOT . '/compta/facture/card.php?id=' . (int) $row->db_fk_facture;
 			$invoiceLink = '<a href="' . $invoiceUrl . '">' . dol_escape_htmltag($row->db_invoice_ref) . '</a>';
 		}
-		$clientLink = $row->db_client;
+		$clientLink = dol_escape_htmltag($row->db_client);
 		if (!empty($row->db_socid)) {
 			$clientUrl = DOL_URL_ROOT . '/societe/card.php?socid=' . (int) $row->db_socid;
 			$clientLink = '<a href="' . $clientUrl . '">' . dol_escape_htmltag($row->db_client) . '</a>';

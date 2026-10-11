@@ -368,7 +368,7 @@ class pdf_sepamandate_stancer extends pdf_sepamandate
 				$pdf->MultiCell($this->page_largeur - $this->marge_gauche - $this->marge_droite, 3, $outputlangs->transnoentitiesnoconv("SEPAFillForm"), 0, 'C');
 
 				$thirdparty=new Societe($this->db);
-				if ($object->socid > 0) {
+				if (!empty($object->socid) && $object->socid > 0) {
 					$thirdparty->fetch($object->socid);
 					// @phan-suppress-next-line PhanDeprecatedProperty  CompanyPaymentMode, also passed to this template, declares fk_soc and no socid
 				} elseif ($object->fk_soc > 0) {
@@ -618,7 +618,12 @@ class pdf_sepamandate_stancer extends pdf_sepamandate
 		$pdf->SetXY($posx, $tab_top);
 		$pdf->MultiCell($largcol, $tab_hl, $outputlangs->transnoentitiesnoconv("StancerSignature"), 0, 'L');
 
-		//uptosign sign here
+		// Signature anchors: UpToSign looks for these two marker strings in the PDF
+		// text (uptosign_auto_position_magic_keywords_*() of its lib/uptosign.lib.php)
+		// to place the signature (UPTOSIGN_SIGN_TO_HERE) and the stamp
+		// (UPTOSIGN_STAMP_SIGN_HERE). They are written in white so that they stay
+		// invisible on paper. Without them UpToSign only has the signPosX / signPosY
+		// coordinates sent by public/sepa-iban.php.
 		$pdf->SetXY($posx, $tab_top + 4);
 		$pdf->SetTextColor(255, 255, 255);
 		$pdf->MultiCell($largcol, $tab_hl, "UPTOSIGN_SIGN_TO_HERE", 0, 'L');
@@ -626,12 +631,9 @@ class pdf_sepamandate_stancer extends pdf_sepamandate
 		$pdf->SetXY($posx, $tab_top + $tab_hl);
 		$pdf->MultiCell($largcol, $tab_hl * 6, '', 0, 'R');
 
-		//uptosign sign here
 		$pdf->SetXY($posx-80, $tab_top + 4);
 		$pdf->MultiCell($largcol, $tab_hl, "UPTOSIGN_STAMP_SIGN_HERE", 0, 'L');
 		$pdf->SetTextColor(0, 0, 0);
-
-		//TODO add UPTOSIGN_STAMP_SIGN_HERE and UPTOSIGN_SIGN_TO_HERE
 
 		return ($tab_hl * 6);
 	}

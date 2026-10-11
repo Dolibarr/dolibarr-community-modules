@@ -60,7 +60,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
 dol_include_once('/stancer/lib/stancer.lib.php');
 
 // Load translation files required by the page
-$langs->loadLangs(array("stancer@stancer"));
+$langs->loadLangs(array("errors", "stancer@stancer"));
 
 $action = GETPOST('action', 'aZ09');
 
@@ -218,6 +218,7 @@ function stancer_find_update($id, $date, $ref, $amount, $fees, $numreleve, $numr
 $html = "";
 $htmlreleve = "";
 if ($action == "import") {
+	stancerCheckWriteActionAllowed($permissiontoadd, 'import_check_reversements import');
 	$numreleve = GETPOST('num_releve', 'alphanohtml');
 	$fk_account = getDolGlobalString('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
 
@@ -278,13 +279,15 @@ if ($action == "import") {
 					// $mf_ = $map["Devise de l'opération"];//19
 
 					// print_r($map);exit;
-					$htmlreleve = "<table class='table table-xs'><thead><tr><th>Identifiant reversement</th><th>Date</th><th>Id Opération</th><th>Ref dolibarr</th><th align='right'>Montant TTC<br />\n(facture client)</th><th align='right'>Total commissions<br />(Stancer)</th><th align='right'>Montant net<br />\n(Compte bq principal)</th></tr></thead><tbody>\n";
+					$htmlreleve = "<table class='noborder centpercent'><thead><tr><th>Identifiant reversement</th><th>Date</th><th>Id Opération</th><th>Ref dolibarr</th><th align='right'>Montant TTC<br />\n(facture client)</th><th align='right'>Total commissions<br />(Stancer)</th><th align='right'>Montant net<br />\n(Compte bq principal)</th></tr></thead><tbody>\n";
 					continue;
 				}
 
 				if (count($map) < 1) {
-					print "<p>Erreur MAPPING Fields : " . json_encode($map) . "</p>";
-					exit;
+					dol_syslog("stancer import_check_reversements: CSV header line not found before the first data line", LOG_ERR);
+					$outputerror = $langs->trans('StancerImportCsvHeaderNotFound');
+					$error++;
+					break;
 				}
 
 				// str_getcsv() yields null for a missing cell: normalise to string
@@ -327,7 +330,7 @@ if ($action == "import") {
 					$netdisplay = "";
 				}
 				$prevpout = $pout;
-				$htmlreleve .= "<tr class='hover'><td>" . dol_escape_htmltag($pout) . "</td><td>" . dol_escape_htmltag($ladate) . "</td><td>" . dol_escape_htmltag($paym) . "</td><td>" . dol_escape_htmltag($ref) . "</td><td align='right'>" . price($amount) . "</td><td align='right'>" . price($fees) . "</td><td align='right'>" . $netdisplay . "</td></tr>\n";
+				$htmlreleve .= "<tr class='oddeven'><td>" . dol_escape_htmltag($pout) . "</td><td>" . dol_escape_htmltag($ladate) . "</td><td>" . dol_escape_htmltag($paym) . "</td><td>" . dol_escape_htmltag($ref) . "</td><td align='right'>" . price($amount) . "</td><td align='right'>" . price($fees) . "</td><td align='right'>" . $netdisplay . "</td></tr>\n";
 
 				//verification du payout = virement vers le compte principal
 				// $html .= "<p><br /><br />ligne $pout, tag=$tag, amount=$pout_amount fees=$pout_fees amount=$amount verif=" . ($pout_amount+$pout_fees) . "</p>";
@@ -355,7 +358,7 @@ if ($action == "import") {
 					}
 				} else {
 					//pout < 0 : il faut faire un virement du compte principal vers le compte stancer pour pouvoir rembourser les clients
-					$stancerApi = StancerApi::getInstance();
+					$stancerApi = new StancerApi();
 					$payoutData = $stancerApi->getPayout($pout);
 					$label = ($payoutData !== false && isset($payoutData['statement_description'])) ? $payoutData['statement_description'] : '';
 					// print "<p>virement CRA ($label) -> stancer</p>";exit;
@@ -396,13 +399,18 @@ if ($action == "import") {
 			if ($error > 0) {
 				$html .= "<p>Erreur !</p>";
 				$html .= "<pre>";
-				$html .= $outputerror;
+				$html .= dol_escape_htmltag($outputerror);
 				$html .= "</pre>";
 				$db->rollback();
 			} else {
 				$db->commit();
 				$importSuccess = true;
 			}
+			fclose($handle);
+		} else {
+			dol_syslog("stancer import_check_reversements: cannot open the uploaded file", LOG_ERR);
+			setEventMessages($langs->trans('ErrorFailedToOpenFile', $langs->transnoentities('File')), null, 'errors');
+			$db->rollback();
 		}
 
 		$htmlreleve .= "</tbody>\n";
@@ -432,7 +440,8 @@ if ($action == "import") {
 				$html .= "<p>Enregistrement à vérifier : " . $obj->num_chq . " </p>";
 			}
 		} else {
-			$html .= "<p>Erreur sql ! $sql</p>";
+			dol_syslog("stancer import_check_reversements: " . $db->lasterror(), LOG_ERR);
+			$html .= "<p>" . $langs->trans('ErrorSQL') . "</p>";
 		}
 
 		//verification du total
@@ -448,7 +457,8 @@ if ($action == "import") {
 				$html .= "<p><span style='color:green'>[OK]</span> Total crédits dolibarr ".$dbtotal." cohérent avec le relevé Stancer : $total</p>";
 			}
 		} else {
-			$html .= "<p>Erreur sql ! $sql</p>";
+			dol_syslog("stancer import_check_reversements: " . $db->lasterror(), LOG_ERR);
+			$html .= "<p>" . $langs->trans('ErrorSQL') . "</p>";
 		}
 
 		//verification du total des débits
@@ -464,7 +474,8 @@ if ($action == "import") {
 				$html .= "<p><span style='color:green'>[OK]</span> Total débits dolibarr ".$dbtotaldeb." cohérent avec le relevé Stancer : $totalfees</p>";
 			}
 		} else {
-			$html .= "<p>Erreur sql ! $sql</p>";
+			dol_syslog("stancer import_check_reversements: " . $db->lasterror(), LOG_ERR);
+			$html .= "<p>" . $langs->trans('ErrorSQL') . "</p>";
 		}
 
 		$html .= "<p>Importer un <a href='stancer_import_check_reversements.php'>autre relevé mensuel</a></p>";
@@ -478,7 +489,7 @@ if ($action == "import") {
 $form = new Form($db);
 $formfile = new FormFile($db);
 
-llxHeader("", $langs->trans("StancerArea"), '', '', 0, 0, [], ['https://cdn.jsdelivr.net/npm/daisyui@4.12.2/dist/full.min.css']);
+llxHeader("", $langs->trans("StancerArea"));
 
 print load_fiche_titre($langs->trans("StancerArea"), '', 'stancer.png@stancer');
 
