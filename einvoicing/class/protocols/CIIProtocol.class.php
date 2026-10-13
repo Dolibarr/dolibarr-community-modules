@@ -2136,6 +2136,39 @@ class CIIProtocol extends AbstractProtocol
 
 
 	/**
+	 * Count the items BR-FREXT-CO-15 and BR-FXEXT-S-08 grant a cent of tolerance each, in total and by VAT rate.
+	 *
+	 * Those are the lines that are not a GROUP or INFORMATION subline (BT-X-8), the document level
+	 * allowances and charges, and the logistics service fees.
+	 *
+	 * @param	DOMXPath	$xpath	XPath on the received document
+	 * @return	array{0:int,1:array<string,int>}	Count of the items, then count by VAT rate
+	 */
+	private function countToleranceItems($xpath)
+	{
+		$total = 0;
+		$byRate = array();
+		$queries = array(
+			'//ram:IncludedSupplyChainTradeLineItem[not(ram:AssociatedDocumentLineDocument/ram:LineStatusReasonCode) or ram:AssociatedDocumentLineDocument/ram:LineStatusReasonCode = "DETAIL"]' => 'ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:RateApplicablePercent',
+			'//ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge' => 'ram:CategoryTradeTax/ram:RateApplicablePercent',
+			'//ram:ApplicableHeaderTradeSettlement/ram:SpecifiedLogisticsServiceCharge' => 'ram:AppliedTradeTax/ram:RateApplicablePercent',
+		);
+		foreach ($queries as $itemExpr => $rateExpr) {
+			$nodes = $xpath->query($itemExpr);
+			if ($nodes === false) {
+				continue;
+			}
+			foreach ($nodes as $node) {
+				$total++;
+				$rate = (string) price2num((float) $this->getXPathValue($xpath, $rateExpr, $node));
+				$byRate[$rate] = ($byRate[$rate] ?? 0) + 1;
+			}
+		}
+
+		return array($total, $byRate);
+	}
+
+	/**
 	 * Parse the invoice header from CII XML.
 	 *
 	 * Special prefixes in $invoiceTemplate:
@@ -2185,6 +2218,9 @@ class CIIProtocol extends AbstractProtocol
 			if (isset($data[$f]))
 				$data[$f] = $this->toFloat($data[$f]);
 		}
+
+		// What an EXTENDED profile counts a cent of tolerance for (issue #1166)
+		list($data['toleranceItemCount'], $data['toleranceItemCountByRate']) = $this->countToleranceItems($xpath);
 
 		return $data;
 	}
@@ -4086,6 +4122,8 @@ class CIIProtocol extends AbstractProtocol
 		// BT-112 plus BT-114, which the invoice carries as a line of its own: what is confronted is what
 		// the buyer owes, BT-115 when the document answers BR-CO-16 (issue #994).
 		$announcedTtc = (float) (SupplierInvoiceHelper::announcedTotalTtc($parsedHeader) ?? (float) $parsedHeader['grandTotalAmount']);
+		// A reimport decides again whether the invoice keeps its VAT rounded per line (issue #1166)
+		SupplierInvoiceHelper::noteVatRoundedPerLine($supplierInvoiceId, null);
 
 		// BT-113 is what the document says was already paid. It moves neither BT-110 nor BT-112, so the
 		// two totals below agree whether or not it was deducted, and an invoice short of its deduction
@@ -4176,6 +4214,10 @@ class CIIProtocol extends AbstractProtocol
 			}
 		}
 
+		if ($this->keepVatRoundedPerLine($supplierInvoiceId, $parsedHeader, $announcedTva, $announcedTtc, $return_messages)) {
+			return;
+		}
+
 		// Neither convention rebuilds the announced totals by calculation. That does not make the document
 		// wrong: a vendor invoice can carry a VAT its own tool rounded differently, and it is what he bills.
 		// The amounts it announces are therefore written onto the lines that carry each rate, so the invoice
@@ -4199,6 +4241,56 @@ class CIIProtocol extends AbstractProtocol
 		$return_messages[] = $langs->trans('EInvoiceImportTotalsMismatchAction');
 
 		dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' does not total the received document (announced ' . $announcedTtc . ' incl. VAT, imported ' . $invoice->total_ttc . '): validation and approval blocked', LOG_WARNING);
+	}
+
+	/**
+	 * Keep an invoice of an EXTENDED document with its VAT rounded per line, when that is what its totals add up.
+	 *
+	 * Such a document may announce its VAT rounded per rate (BT-110, BG-23) while BT-109 and BT-112 add up the
+	 * VAT rounded per line, the two differing within a cent per item (BR-FREXT-CO-15, issue #1166). Both are
+	 * right: the invoice is recalculated per line (mode 1), kept when it then totals BT-109 and BT-112, and
+	 * noted with the two VAT totals so the card can tell why it differs from BT-110.
+	 *
+	 * @param	int					$supplierInvoiceId	Id of the invoice the import has just built
+	 * @param	array<string,mixed>	$parsedHeader		Header data of the received document
+	 * @param	float				$announcedTva		BT-110 of the document
+	 * @param	float				$announcedTtc		What the invoice is expected to total
+	 * @param	array<int,string>	$return_messages	Messages of the import, completed here
+	 * @return	bool									True when the invoice was kept that way
+	 */
+	protected function keepVatRoundedPerLine($supplierInvoiceId, array $parsedHeader, $announcedTva, $announcedTtc, array &$return_messages): bool
+	{
+		global $db, $langs;
+
+		$tolerance = SupplierInvoiceHelper::extendedTolerance($parsedHeader);
+		$announcedHt = SupplierInvoiceHelper::announcedTotalHt($parsedHeader);
+		$invoice = new FactureFournisseur($db);
+		if ($tolerance <= 0 || $announcedHt === null || $invoice->fetch((int) $supplierInvoiceId) <= 0) {
+			return false;
+		}
+		$invoice->fetch_thirdparty();
+		// '0' is the total of rounds: the VAT of each line rounded, then summed
+		if ($invoice->update_price(1, '0', 0, $invoice->thirdparty) <= 0 || $invoice->fetch((int) $supplierInvoiceId) <= 0) {
+			return false;
+		}
+
+		$sign = SupplierInvoiceHelper::documentSign($invoice);
+		$deposits = SupplierInvoiceHelper::linkedDepositTotals((int) $supplierInvoiceId);
+		$tva = $sign * ((float) $invoice->total_tva + $deposits['tva']);
+		$ttc = $sign * ((float) $invoice->total_ttc + $deposits['ttc']);
+		$ht = $ttc - $tva - $sign * ((float) $invoice->total_localtax1 + (float) $invoice->total_localtax2);
+		if (abs($ht - $announcedHt) >= 0.005 || abs($ttc - (float) $announcedTtc) >= 0.005 || abs($tva - (float) $announcedTva) > $tolerance + 0.0001) {
+			return false;
+		}
+
+		SupplierInvoiceHelper::clearTotalsMismatch($supplierInvoiceId);
+		SupplierInvoiceHelper::noteVatRoundedPerLine($supplierInvoiceId, (float) $announcedTva, $tva);
+
+		$langs->load('einvoicing@einvoicing');
+		$return_messages[] = $langs->trans('EInvoiceImportVatRoundedPerLine', price2num($tva, 'MT'), price2num($announcedTva, 'MT'));
+		dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' keeps the VAT rounded per line (' . $tva . '), its EXTENDED document announcing ' . $announcedTva . ' rounded per rate', LOG_DEBUG);
+
+		return true;
 	}
 
 	/**

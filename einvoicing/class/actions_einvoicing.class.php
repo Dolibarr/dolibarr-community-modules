@@ -484,6 +484,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		if (in_array($object->element, ['invoice_supplier']) && !einvoicingReceptionDisabled() && preg_match('/invoicesuppliercard|main/', $parameters['currentcontext'] ?? '')) {
 			$url_button = array();
 
+			// The EXTENDED document announced two VAT totals and the invoice keeps the one rounded per line (issue #1166)
+			dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
+			$vatTotals = SupplierInvoiceHelper::vatRoundedPerLine((int) $object->id);
+			if ($vatTotals !== null) {
+				print '<div class="warning">' . $langs->trans('EInvoiceVatRoundedPerLineNote', price($vatTotals['invoice']), price($vatTotals['announced'])) . '</div>';
+			}
+
 			// Check if this invoice is present into einvoicing_extlinks table to know if it is an imported invoice from PDP or not
 			$sql = "SELECT rowid, provider FROM " . $db->prefix() . "einvoicing_extlinks";
 			$sql .= " WHERE element_type = '" . $db->escape($object->element) . "'";
