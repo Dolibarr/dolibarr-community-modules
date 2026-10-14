@@ -1109,6 +1109,16 @@ class CIIProtocol extends AbstractProtocol
 			$supplierInvoice = new FactureFournisseur($db);
 			$supplierInvoice->fetch($supplierInvoiceId);
 
+			// An invoice keyed in by hand has no link yet, and its card offers the lifecycle statuses only with one.
+			$linkId = $einvoicing->fetchExtLinkId($supplierInvoiceId, $supplierInvoice->element);
+			if ($linkId === 0) {
+				$linkId = $einvoicing->insertOrUpdateExtLink($supplierInvoiceId, $supplierInvoice->element, $flowId);
+			}
+			if ($linkId < 0) {
+				dol_syslog(__METHOD__ . ' Failed to link supplier invoice id=' . $supplierInvoiceId . ' to flow ' . $flowId . ': ' . implode(', ', $einvoicing->errors), LOG_ERR);
+				$return_messages[] = 'Failed to link the existing supplier invoice to the flow: ' . implode(', ', $einvoicing->errors);
+			}
+
 			// Supplier invoice already found but may be that documents are downloaded or were removed
 			// Save documents in supplier invoice attachments if they do not exists yet.
 			$this->storeEmbeddedAttachments($supplierInvoice, $sourceXml, $file, $tempFile, $return_messages);
