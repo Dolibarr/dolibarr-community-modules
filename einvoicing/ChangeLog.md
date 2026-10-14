@@ -2,6 +2,11 @@
 
 ## 1.0.4
 
+NEW: A beforeEinvoiceXmlBuild hook (context einvoicegeneration) is called by the CII builder - and so by
+the Factur-X one - right before the XML is built. It receives $invoiceData and $linesData by reference in
+its parameters, so a module can alter the header and line data written into the document. A negative
+return aborts the generation with the hook errors.
+
 FIX: The supplier invoice list no longer fails on a MySQL server that keeps its default sql_mode. The
 columns the module adds to the SELECT of that list were never added to its GROUP BY, so MySQL refused the
 whole query with error 1055 (only_full_group_by) and the page reported a technical error instead of showing
