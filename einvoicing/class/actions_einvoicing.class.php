@@ -544,8 +544,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			// a wrong vendor is noticed, and the vendor of an existing supplier invoice cannot be changed.
 			// The action itself lives on the flow card, which is also where a flow whose draft has already
 			// been deleted is picked up again.
-			// Greyed rather than hidden without the right, so the user reads why it cannot be used.
-			if (!empty($object->id)) {
+			// Only offered when it can be used: Document::reimport() refuses anything but a draft.
+			if (!empty($object->id) && (int) $object->status === FactureFournisseur::STATUS_DRAFT && $user->hasRight('einvoicing', 'write')) {
 				$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_document";
 				$sql .= " WHERE fk_element_type = 'invoice_supplier'";
 				$sql .= " AND fk_element_id = " . ((int) $object->id);
@@ -556,34 +556,18 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 				$resql = $db->query($sql);
 				if ($resql && ($objdoc = $db->fetch_object($resql))) {
-					// The separator line between the lifecycle statuses and the reimport entry: the core dropdown has no divider of its own, so the line travels as the label
-					// of a disabled entry (no translation exists for '<hr>', so trans() returns it as is, and it is rendered as the HTML it is). The tooltip of a disabled
-					// entry is silenced on Dolibarr 22+ only (the 'attr' key, ignored by older cores); the polyfill of einvoicing.lib.php prints the line itself below 18.
-					if (!empty($url_button)) {
-						$dividerentry = array('divider' => 1, 'enabled' => true, 'perm' => 0, 'label' => '-----', 'labelhtml' => '<span class="opacitymedium">-----</span>', 'url' => '#');
-						$dividerentry['attr'] = array('title' => '');
-						$url_button[] = $dividerentry;
-					}
-
-					// The reimport itself, last entry of the list, grayed on the same rule as the flow card shows the button with: only a draft can be imported again
-					// (Document::reimport() refuses anything else). The reason travels as the entry tooltip, which the dropdown of the core cannot hold before
-					// Dolibarr 22 - there it says "not enough permissions" instead.
-					$reimportofadraft = ((int) $object->status === FactureFournisseur::STATUS_DRAFT);
-					$reimportallowed = $user->hasRight('einvoicing', 'write');
 					$reimporturl = dol_buildpath('/einvoicing/document_card.php', 1) . '?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken();
 					$reimportentry = array(
 						'lang' => 'einvoicing',
 						'enabled' => true,
-						'perm' => (($reimportallowed && $reimportofadraft) ? 1 : 0),
+						'perm' => 1,
 						'label' => 'EInvoiceReimport',
 						'urlroot' => $reimporturl,
 						// 'url' is defined for backward compatibility with v18 and v19, which ignore 'urlroot'
 						'url' => einvoicingDropdownEntryUrl($reimporturl)
 					);
-					if (!$reimportallowed) {
-						$reimportentry['attr'] = array('title' => $langs->trans('NotEnoughPermissions'));
-					} elseif (!$reimportofadraft) {
-						$reimportentry['attr'] = array('title' => $langs->trans('EInvoiceReimportOnlyOnADraft'));
+					if (!empty($url_button)) {
+						$reimportentry['attr'] = array('style' => 'border-top: 1px solid #ddd;');
 					}
 					$url_button[] = $reimportentry;
 				}
@@ -593,6 +577,10 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 
 			if (!empty($url_button)) {
+				// The core centers a button text: a label wrapped in the narrow dropdown would get its second line centered.
+				foreach ($url_button as $key => $entry) {
+					$url_button[$key]['attr']['style'] = 'text-align: start; ' . ($entry['attr']['style'] ?? '');
+				}
 				if ((float) DOL_VERSION < 18) {
 					print einvoicingDolGetButtonActionDropdown($langs->trans('einvoice'), $url_button);
 				} elseif ((float) DOL_VERSION < 22) {
