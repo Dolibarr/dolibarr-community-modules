@@ -174,4 +174,28 @@ class CdarConformanceTest extends CommonClassTest
 		$xml0002 = (string) $handler->generate($this->statusData(CdarHandler::SCHEME_SIREN_0002));
 		$this->assertStringContainsString('<ram:URIID schemeID="0002">424761419</ram:URIID>', $xml0002);
 	}
+
+	/**
+	 * A vendor publishing its SIREN (0002) as its address is answered at 0225:<SIREN>.
+	 *
+	 * @return void
+	 */
+	public function testASirenAddressIsAnsweredOnTheNationalDirectory()
+	{
+		$this->assertSame(CdarHandler::SCHEME_SIREN_0225, CdarHandler::replySchemeFor(CdarHandler::SCHEME_SIREN_0002));
+		$this->assertSame(CdarHandler::SCHEME_SIREN_0225, CdarHandler::replySchemeFor(' 0002 '));
+		$this->assertSame(CdarHandler::SCHEME_SIREN_0225, CdarHandler::replySchemeFor(''));
+	}
+
+	/**
+	 * Any other published scheme is the one the vendor is reachable under, and is kept.
+	 *
+	 * @return void
+	 */
+	public function testAnyOtherAddressSchemeIsKept()
+	{
+		$this->assertSame(CdarHandler::SCHEME_SIREN_0225, CdarHandler::replySchemeFor(CdarHandler::SCHEME_SIREN_0225));
+		$this->assertSame('0208', CdarHandler::replySchemeFor('0208'));
+		$this->assertSame('9925', CdarHandler::replySchemeFor('9925'));
+	}
 }

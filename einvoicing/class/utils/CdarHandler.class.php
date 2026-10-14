@@ -386,13 +386,7 @@ class CdarHandler
 				$vendorURIID = removeAllSpaces($vendorIdentity['uriid']);
 				if ($vendorURIID !== '') {
 					$this->recipientURIIDOrigin = 'einvoice';
-					// MDT-73-1 is the EAS scheme of the address actually used, not a constant: the vendor
-					// published this one on its invoice (BT-34) together with its scheme, and re-labelling
-					// it as a national directory address (0225) would describe it wrongly. Every other rung
-					// does take an address of the national directory, so 0225 stays right for them.
-					if ($vendorIdentity['urischeme'] !== '') {
-						$RecipientURISchemeID = $vendorIdentity['urischeme'];
-					}
+					$RecipientURISchemeID = self::replySchemeFor($vendorIdentity['urischeme']);
 					dol_syslog(__METHOD__ . ' no routing ID recorded for vendor SIREN ' . $InvoiceIssuerGlobalID . ', replying to the electronic address of the invoice it sent us: ' . $vendorURIID, LOG_NOTICE);
 				}
 			}
@@ -613,6 +607,25 @@ class CdarHandler
 	}
 
 	/**
+	 * EAS scheme (MDT-73-1) to reply on, from the one the vendor wrote on its invoice address (BT-34-1).
+	 *
+	 * A SIREN (0002) is no Peppol participant: the vendor is reached at the national directory address
+	 * built on that SIREN (0225). Any other scheme is kept, a foreign vendor being reachable only under its own.
+	 *
+	 * @param  string $publishedScheme  BT-34-1 of the received invoice, empty when it carries none
+	 * @return string
+	 */
+	public static function replySchemeFor($publishedScheme)
+	{
+		$publishedScheme = trim((string) $publishedScheme);
+		if ($publishedScheme === '' || $publishedScheme === self::SCHEME_SIREN_0002) {
+			return self::SCHEME_SIREN_0225;
+		}
+
+		return $publishedScheme;
+	}
+
+	/**
 	 * What the e-invoice we received says about its vendor: the legal identifier it issued under
 	 * (BT-29, or BT-30 when the former is absent) and the electronic address it exchanges from (BT-34).
 	 *
@@ -684,9 +697,6 @@ class CdarHandler
 		$found = $xml->xpath('//ram:SellerTradeParty/ram:URIUniversalCommunication/ram:URIID');
 		if (!empty($found)) {
 			$identity['uriid'] = trim((string) $found[0]);
-			// The scheme comes with the address: MDT-73-1 has to declare the address for what the vendor
-			// published it as, and a vendor reachable under its SIREN (0002) is not a national directory
-			// address (0225). Kept only when the document actually carries one.
 			$scheme = (string) ($found[0]->attributes()->schemeID ?? '');
 			$identity['urischeme'] = trim($scheme);
 		}
