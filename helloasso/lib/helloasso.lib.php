@@ -326,12 +326,11 @@ function helloassoGetDataFromObjects($source, $ref, $mode = 'amount', &$payerarr
 					if (GETPOST("amount", 'alpha')) {
 						$amount = GETPOST("amount", 'alpha');
 					}
+					if (!empty($member->last_subscription_amount) && !GETPOSTISSET('newamount')) {
+						$amount = $member->last_subscription_amount;
+					}
 					if (empty($amount)) {
 						$amount = $adht->amount;
-					}
-
-					if (!empty($member->last_subscription_amount) && !GETPOSTISSET('newamount') && is_numeric($amount)) {
-						$amount = max($member->last_subscription_amount, $amount);
 					}
 					$amount = max(0, getDolGlobalString('MEMBER_MIN_AMOUNT'), $amount);
 				} elseif ($mode == 'payer' && !is_null($payerarray)) {
