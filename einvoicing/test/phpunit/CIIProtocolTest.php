@@ -1373,4 +1373,116 @@ class CIIProtocolTest extends CommonClassTest
 
 		$this->assertSame($id, SupplierInvoiceHelper::findIdByRef($rebuilt->ref_supplier, $socid), 'and no second invoice carries the document');
 	}
+
+	/**
+	 * The files saved by the reception start with the reference of the draft, as the upload form names
+	 * them by default, so the validation renames them with the final reference (#1174), and the received
+	 * XML is still found under its new name.
+	 *
+	 * @return void
+	 */
+	public function testReceivedFilesTakeTheReferenceOfTheInvoiceAtValidation()
+	{
+		global $db, $user;
+
+		$this->importLinesAsFreeLinesWithTheDefaultUploadNaming();
+		$this->createFixtureSeller();
+		$xml = str_replace('EINV994-0001', 'EINV1174-' . strtoupper(bin2hex(random_bytes(4))), (string) file_get_contents(__DIR__ . '/fixtures/received_documents/cii_rounding_amount.xml'));
+
+		$result = (new CIIProtocol($db))->createSupplierInvoiceFromSource($xml, null, 'test1174');
+		$id = (int) ($result['res'] ?? 0);
+		$this->assertGreaterThan(0, $id, 'import: ' . strip_tags((string) ($result['message'] ?? '')));
+		$this->createdInvoiceIds[] = $id;
+
+		$invoice = new FactureFournisseur($db);
+		$invoice->fetch($id);
+		$draftRef = dol_sanitizeFileName($invoice->ref);
+		$draftFiles = $this->namesOfTheFilesOf($invoice);
+		$this->assertNotEmpty($draftFiles, 'the import attached the document');
+		foreach ($draftFiles as $name) {
+			$this->assertSame(0, strpos($name, $draftRef . '-'), $name . ' starts with the reference of the draft');
+		}
+
+		$this->assertGreaterThan(0, $invoice->validate($user), (string) $invoice->error);
+		$validated = new FactureFournisseur($db);
+		$validated->fetch($id);
+		$this->assertStringNotContainsString('PROV', $validated->ref);
+		$expected = array();
+		foreach ($draftFiles as $name) {
+			$expected[] = $validated->ref . substr($name, strlen($draftRef));
+		}
+		$this->assertSame($expected, $this->namesOfTheFilesOf($validated), 'the validation renamed them with the final reference');
+
+		$xmlFile = (new EInvoicing($db))->getSupplierEInvoiceXmlFilePath($validated);
+		$this->assertSame($validated->ref . '-' . dol_sanitizeFileName($validated->ref_supplier . '_einvoice.xml'), basename($xmlFile), 'the received XML is found under its new name');
+	}
+
+	/**
+	 * A document received before #1174 keeps the name it was saved under: received again, it is written
+	 * over that file rather than beside it, and the received XML is still found.
+	 *
+	 * @return void
+	 */
+	public function testAFileSavedBeforeThePrefixKeepsItsName()
+	{
+		global $conf, $db;
+
+		$this->importLinesAsFreeLinesWithTheDefaultUploadNaming();
+		$this->createFixtureSeller();
+		$xml = str_replace('EINV994-0001', 'EINV1174-' . strtoupper(bin2hex(random_bytes(4))), (string) file_get_contents(__DIR__ . '/fixtures/received_documents/cii_rounding_amount.xml'));
+
+		$protocol = new CIIProtocol($db);
+		$first = $protocol->createSupplierInvoiceFromSource($xml, null, 'test1174');
+		$id = (int) ($first['res'] ?? 0);
+		$this->assertGreaterThan(0, $id, 'first import: ' . strip_tags((string) ($first['message'] ?? '')));
+		$this->createdInvoiceIds[] = $id;
+
+		// The name the reception gave before #1174
+		$invoice = new FactureFournisseur($db);
+		$invoice->fetch($id);
+		$dir = $conf->fournisseur->facture->dir_output . '/' . get_exdir($invoice->id, 2, 0, 0, $invoice, 'invoice_supplier') . dol_sanitizeFileName($invoice->ref);
+		$legacyName = dol_sanitizeFileName($invoice->ref_supplier . '_einvoice.xml');
+		$this->assertTrue(dol_move($dir . '/' . dol_sanitizeFileName($invoice->ref) . '-' . $legacyName, $dir . '/' . $legacyName, '0', 1), 'the XML is given its former name');
+
+		$again = $protocol->createSupplierInvoiceFromSource($xml, null, 'test1174');
+		$this->assertSame($id, (int) ($again['res'] ?? 0), 'the same invoice: ' . strip_tags((string) ($again['message'] ?? '')));
+		$this->assertSame(array($legacyName), $this->namesOfTheFilesOf($invoice), 'written over the former file, not beside it');
+		$this->assertSame($dir . '/' . $legacyName, (new EInvoicing($db))->getSupplierEInvoiceXmlFilePath($invoice));
+	}
+
+	/**
+	 * Lines imported as free lines, which every instance can do, and the upload naming of the core left
+	 * to its default.
+	 *
+	 * @return void
+	 */
+	private function importLinesAsFreeLinesWithTheDefaultUploadNaming()
+	{
+		global $conf;
+
+		foreach (array('EINVOICING_IMPORT_AS_FREE_LINES', 'EINVOICING_PRODUCTS_AUTO_GENERATION', 'MAIN_DISABLE_SUGGEST_REF_AS_PREFIX', 'MAIN_DOC_UPLOAD_NOT_RENAME_BY_DEFAULT') as $name) {
+			$this->savedConstants[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
+		}
+		$conf->global->EINVOICING_IMPORT_AS_FREE_LINES = 1;
+		$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 0;
+		unset($conf->global->MAIN_DISABLE_SUGGEST_REF_AS_PREFIX);
+		unset($conf->global->MAIN_DOC_UPLOAD_NOT_RENAME_BY_DEFAULT);
+	}
+
+	/**
+	 * Names of the files in the directory of a supplier invoice, sorted.
+	 *
+	 * @param	FactureFournisseur	$invoice	Supplier invoice
+	 * @return	string[]						File names
+	 */
+	private function namesOfTheFilesOf(FactureFournisseur $invoice)
+	{
+		global $conf;
+
+		$dir = $conf->fournisseur->facture->dir_output . '/' . get_exdir($invoice->id, 2, 0, 0, $invoice, 'invoice_supplier') . dol_sanitizeFileName($invoice->ref);
+		$names = array_column(dol_dir_list($dir, 'files'), 'name');
+		sort($names);
+
+		return $names;
+	}
 }
