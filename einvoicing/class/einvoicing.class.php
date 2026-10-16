@@ -928,9 +928,10 @@ class EInvoicing
 	 * Get the path of the CII XML received for a supplier invoice, if there is one to read.
 	 *
 	 * The file is the one the reception saved beside the supplier invoice, so the naming is the one of
-	 * CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment(): the reference of the supplier names
-	 * the file, and the reference of the invoice names its directory. A document received in Factur-X
-	 * is a PDF, which Dolibarr previews on its own and which is not concerned here.
+	 * CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment(): <ref supplier>_einvoice.xml, prefixed
+	 * with the reference of the invoice unless it was received before #1174 or the prefix is disabled,
+	 * in the directory of the invoice. A document received in Factur-X is a PDF, which Dolibarr
+	 * previews on its own and which is not concerned here.
 	 *
 	 * @param 	FactureFournisseur 	$supplierInvoice 	Supplier invoice the document was received for.
 	 * @return 	string									Full path of the XML, empty string if there is none.
@@ -947,9 +948,11 @@ class EInvoicing
 		$ref = dol_sanitizeFileName($supplierInvoice->ref);
 		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . '_einvoice.xml');
 
-		$path = $base . get_exdir($supplierInvoice->id, 2, 0, 0, $supplierInvoice, 'invoice_supplier') . $ref . '/' . $filename;
-		if (is_readable($path)) {
-			return $path;
+		$dir = $base . get_exdir($supplierInvoice->id, 2, 0, 0, $supplierInvoice, 'invoice_supplier') . $ref;
+		foreach (array($ref . '-' . $filename, $filename) as $name) {
+			if (is_readable($dir . '/' . $name)) {
+				return $dir . '/' . $name;
+			}
 		}
 
 		return '';

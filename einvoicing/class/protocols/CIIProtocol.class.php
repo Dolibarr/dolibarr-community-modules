@@ -3841,6 +3841,11 @@ class CIIProtocol extends AbstractProtocol
 			$fileext = static::INVOICE_FILE_EXTENSION;
 		}
 		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . (empty($suffix) ? '' : '_' . $suffix) . '.' . $fileext);
+		// Prefixed with the reference of the invoice as the upload form does by default, so the validation
+		// renames it with the final reference. A file saved without the prefix before #1174 keeps its name.
+		if (!getDolGlobalString('MAIN_DISABLE_SUGGEST_REF_AS_PREFIX') && !getDolGlobalString('MAIN_DOC_UPLOAD_NOT_RENAME_BY_DEFAULT') && !file_exists($upload_dir . '/' . $filename)) {
+			$filename = dol_sanitizeFileName($supplierInvoice->ref) . '-' . $filename;
+		}
 
 		$dest_path = $upload_dir . '/' . $filename;
 
@@ -4951,7 +4956,7 @@ class CIIProtocol extends AbstractProtocol
 				continue;
 			}
 
-			// Same naming as the other imported files: <ref_supplier>_<suffix>.<ext>
+			// Same naming as the other imported files: <ref>-<ref_supplier>_<suffix>.<ext>
 			$suffix = $attachment['filename'];
 			if (in_array($suffix . '.' . $attachment['extension'], $storednames, true)) {
 				$suffix .= '_' . ((int) $rank + 1);

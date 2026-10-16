@@ -2467,7 +2467,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 			$urlparam = '';
 		} elseif ($modulepart == 'facture_fournisseur') {
-			// Received from a supplier: <ref supplier>_einvoice.xml, the name
+			// Received from a supplier: <ref>-<ref supplier>_einvoice.xml, the name
 			// CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment() gives the file it saves
 			if (!$user->hasRight('fournisseur', 'facture', 'lire') || substr($relativepath, -13) !== '_einvoice.xml') {
 				return 0;
