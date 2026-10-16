@@ -4896,7 +4896,9 @@ class CIIProtocol extends AbstractProtocol
 
 			// Same naming as the other imported files: <ref_supplier>_<suffix>.<ext>
 			$suffix = $attachment['filename'];
-			if (in_array($suffix . '.' . $attachment['extension'], $storednames, true)) {
+			// The received document and its readable view are stored after, under these names, and would overwrite it.
+			$reserved = in_array(strtolower($suffix), array('einvoice', strtolower(getDolGlobalString('EINVOICING_PDP', 'PDP'))), true);
+			if ($reserved || in_array($suffix . '.' . $attachment['extension'], $storednames, true)) {
 				$suffix .= '_' . ((int) $rank + 1);
 			}
 
