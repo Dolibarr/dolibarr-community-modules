@@ -469,11 +469,18 @@ class ImportVatCalculationModeTest extends CommonClassTest
 	 * An instance that does not is a third party creation, which is another subject and another test:
 	 * what is played here is what the import does with BT-114.
 	 *
-	 * @return	int		Id of the created third party
+	 * @return	int		Id of the third party
 	 */
 	private function createFixtureSupplier()
 	{
 		global $db, $user;
+
+		// Another test importing the same fixture may have left it: a second third party with the same
+		// VAT number would make the import refuse the document, so the one there is reused and kept.
+		$resql = $db->query("SELECT rowid FROM " . MAIN_DB_PREFIX . "societe WHERE tva_intra = '" . $db->escape(self::SELLER_VAT) . "' AND entity IN (" . getEntity('societe') . ")");
+		if ($resql && $db->num_rows($resql) == 1) {
+			return (int) $db->fetch_object($resql)->rowid;
+		}
 
 		$supplier = new Societe($db);
 		$supplier->name = 'EINVOICING ROUNDING SELLER';

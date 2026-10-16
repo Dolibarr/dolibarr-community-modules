@@ -1028,19 +1028,21 @@ class CIIProtocolTest extends CommonClassTest
 	 * A vendor id carrying no vendor price at all, so the fixture is the only row the lookup can see.
 	 * A unique key allows a single price with an empty ref_fourn per vendor, so an existing vendor
 	 * cannot be reused; product_fournisseur_price.fk_soc has no foreign key, so no third party is
-	 * needed to hold the row either.
+	 * needed to hold the row either. No routing either: a default product left on that id by a test
+	 * that did not roll back would be found by the lookup.
 	 *
-	 * @return int	Vendor id free of any vendor price
+	 * @return int	Vendor id free of any vendor price and of any routing
 	 */
 	private function vendorWithoutAnyPrice()
 	{
 		global $db;
 
-		$resql = $db->query("SELECT COALESCE(MAX(fk_soc), 0) + 1 as freesoc FROM " . MAIN_DB_PREFIX . "product_fournisseur_price");
-		$this->assertNotFalse($resql, 'could not read the vendor prices: ' . $db->lasterror());
-		$obj = $db->fetch_object($resql);
+		$sql = "SELECT GREATEST((SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "product_fournisseur_price),";
+		$sql .= " (SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "einvoicing_routing)) + 1 as freesoc";
+		$resql = $db->query($sql);
+		$this->assertNotFalse($resql, 'could not find a free vendor id: ' . $db->lasterror());
 
-		return (int) $obj->freesoc;
+		return (int) $db->fetch_object($resql)->freesoc;
 	}
 
 	/**
@@ -1055,12 +1057,8 @@ class CIIProtocolTest extends CommonClassTest
 	{
 		global $conf, $db;
 
-		// A vendor id free of any price and of any routing, so two vendors of the same test never share one
-		$sql = "SELECT GREATEST((SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "product_fournisseur_price),";
-		$sql .= " (SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "einvoicing_routing)) + 1 as freesoc";
-		$resql = $db->query($sql);
-		$this->assertNotFalse($resql, 'could not find a free vendor id: ' . $db->lasterror());
-		$socid = (int) $db->fetch_object($resql)->freesoc;
+		// Free of any price and of any routing, so two vendors of the same test never share one
+		$socid = $this->vendorWithoutAnyPrice();
 		$ids = array('socid' => $socid, 'product' => 0, 'service' => 0);
 		$einvoicing = new EInvoicing($db);
 		foreach (array('product' => $withProduct, 'service' => $withService) as $type => $wanted) {
