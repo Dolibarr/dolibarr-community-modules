@@ -4894,13 +4894,7 @@ class CIIProtocol extends AbstractProtocol
 				continue;
 			}
 
-			// Same naming as the other imported files: <ref_supplier>_<suffix>.<ext>
-			$suffix = $attachment['filename'];
-			// The received document and its readable view are stored after, under these names, and would overwrite it.
-			$reserved = in_array(strtolower($suffix), array('einvoice', strtolower(getDolGlobalString('EINVOICING_PDP', 'PDP'))), true);
-			if ($reserved || in_array($suffix . '.' . $attachment['extension'], $storednames, true)) {
-				$suffix .= '_' . ((int) $rank + 1);
-			}
+			$suffix = $this->embeddedAttachmentSuffix($attachment['filename'], $attachment['extension'], (int) $rank, $storednames);
 
 			$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempPath, $suffix, $attachment['extension']);
 			if ($res['res'] < 0) {
@@ -4915,6 +4909,26 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		return $stored;
+	}
+
+	/**
+	 * Suffix an embedded attachment is stored under, in the <ref_supplier>_<suffix>.<ext> naming of the other imported files.
+	 *
+	 * @param  string   $filename		Name of the attachment, without extension
+	 * @param  string   $extension		Its extension
+	 * @param  int      $rank			Its rank among the attachments
+	 * @param  string[] $storednames	Names already stored by this import, with extension
+	 * @return string					The name itself, or followed by the rank when another attachment, the received document or its readable view has it
+	 */
+	protected function embeddedAttachmentSuffix(string $filename, string $extension, int $rank, array $storednames): string
+	{
+		// The received document and its readable view are stored after, under these names, and would overwrite it.
+		$reserved = in_array(dol_strtolower($filename), array('einvoice', dol_strtolower(getDolGlobalString('EINVOICING_PDP', 'PDP'))), true);
+		if ($reserved || in_array($filename . '.' . $extension, $storednames, true)) {
+			return $filename . '_' . ($rank + 1);
+		}
+
+		return $filename;
 	}
 
 	/**

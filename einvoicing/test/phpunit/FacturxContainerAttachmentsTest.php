@@ -194,6 +194,35 @@ class FacturxContainerAttachmentsTest extends CommonClassTest
 	}
 
 	/**
+	 * An attachment named like the received document, its readable view or an attachment already stored is not overwritten.
+	 *
+	 * @return	void
+	 */
+	public function testAnAttachmentNamedLikeAStoredFileGetsItsRank()
+	{
+		global $conf, $db;
+
+		$savedPdp = getDolGlobalString('EINVOICING_PDP');
+		$conf->global->EINVOICING_PDP = 'SuperPDP';
+		$method = new ReflectionMethod(CIIProtocol::class, 'embeddedAttachmentSuffix');
+		$method->setAccessible(true);
+		$protocol = new CIIProtocol($db);
+
+		try {
+			$this->assertSame('EInvoice_2', $method->invoke($protocol, 'EInvoice', 'pdf', 1, array()));
+			$this->assertSame('superpdp_3', $method->invoke($protocol, 'superpdp', 'pdf', 2, array()));
+			$this->assertSame('photo_2', $method->invoke($protocol, 'photo', 'png', 1, array('photo.png')));
+			$this->assertSame('photo', $method->invoke($protocol, 'photo', 'pdf', 1, array('photo.png')));
+		} finally {
+			if ($savedPdp === '') {
+				unset($conf->global->EINVOICING_PDP);
+			} else {
+				$conf->global->EINVOICING_PDP = $savedPdp;
+			}
+		}
+	}
+
+	/**
 	 * Anything that is not a PDF, such as a CII document, carries no container to read.
 	 *
 	 * @return	void
