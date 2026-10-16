@@ -1407,7 +1407,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				// error on the invoice (product not found, ...) no longer rolls back the created thirdparty.
 				try {
 					// Try to create the supplier + product + invoice
-					$res = $exchangeProtocol->createSupplierInvoiceFromSource($receivedFile, $readableViewFile, $flowId);
+					$res = $exchangeProtocol->createSupplierInvoiceFromSource($receivedFile, $readableViewFile, $flowId, $importable['doc_type'], $this->fetchOtherReceivedFormats($flowId, $importable));
 					if ($res['res'] < 0) {
 						$retarray = array(
 							'res' => -1,
