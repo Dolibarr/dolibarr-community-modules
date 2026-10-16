@@ -478,7 +478,7 @@ abstract class AbstractPDPProvider
 	 *
 	 * @param	string			$flowId				Identifier of the flow to read
 	 * @param	ProtocolManager	$protocolManager	Protocol factory used to recognize the documents
-	 * @return	array{file:?string,protocol:?AbstractProtocol,protocol_name:string,doc_type:string,fetched:int,attempts:string[],client_not_configured:bool}	The importable document, or a null protocol and the reason each shape was rejected
+	 * @return	array{file:?string,protocol:?AbstractProtocol,protocol_name:string,doc_type:string,fetched:int,documents:array<string,string>,attempts:string[],client_not_configured:bool}	The importable document, or a null protocol and the reason each shape was rejected
 	 */
 	protected function fetchImportableFlowDocument($flowId, $protocolManager)
 	{
@@ -488,6 +488,7 @@ abstract class AbstractPDPProvider
 			'protocol_name' => '',
 			'doc_type' => '',
 			'fetched' => 0,				// nb of documents the access point did return, whatever their syntax
+			'documents' => array(),		// every document returned, by docType, readable or not
 			'attempts' => array(),
 			'client_not_configured' => false
 		);
@@ -512,6 +513,7 @@ abstract class AbstractPDPProvider
 			$result['fetched']++;
 
 			$content = (string) $flowResponse['response'];
+			$result['documents'][$docType] = $content;
 			$protocolName = $protocolManager->detectProtocolFromContent($content);
 			if (empty($protocolName)) {
 				$result['attempts'][] = $docType . ": unrecognized syntax";
@@ -545,6 +547,48 @@ abstract class AbstractPDPProvider
 		}
 
 		return $result;
+	}
+
+	/**
+	 * The other formats of a received flow, to be kept as attached files beside the imported one.
+	 *
+	 * Only with EINVOICING_SAVE_ALL_RECEIVED_FORMATS: the Original is the document the issuer really
+	 * sent, and the Converted the one the module reads, so both are archived whatever was imported.
+	 * A document already fetched by fetchImportableFlowDocument() is not asked for twice, and a failure
+	 * is logged without stopping the import.
+	 *
+	 * @param	string	$flowId		Identifier of the flow
+	 * @param	array{doc_type:string,documents?:array<string,string>}	$importable	What fetchImportableFlowDocument() returned
+	 * @return	array<string,string>	The raw documents to keep, by docType ('Original', 'Converted')
+	 */
+	protected function fetchOtherReceivedFormats($flowId, $importable)
+	{
+		$others = array();
+
+		if (!getDolGlobalString('EINVOICING_SAVE_ALL_RECEIVED_FORMATS')) {
+			return $others;
+		}
+
+		foreach (array('Original', 'Converted') as $docType) {
+			if ($docType == $importable['doc_type']) {
+				continue;
+			}
+
+			if (isset($importable['documents'][$docType])) {
+				$others[$docType] = $importable['documents'][$docType];
+				continue;
+			}
+
+			$flowResponse = $this->fetchFlowData($flowId, $docType, 'get_other_format_for_supplier_invoice');
+			if ($flowResponse['status_code'] != 200 || (string) $flowResponse['response'] === '') {
+				dol_syslog(__METHOD__ . " No '" . $docType . "' document kept for flowId " . $flowId . ": HTTP " . $flowResponse['status_code'] . (empty($flowResponse['errorMessage']) ? '' : ' - ' . $flowResponse['errorMessage']), LOG_WARNING, 0, '_einvoicing');
+				continue;
+			}
+
+			$others[$docType] = (string) $flowResponse['response'];
+		}
+
+		return $others;
 	}
 
 	/**
