@@ -2610,4 +2610,63 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		return 0;
 	}
+
+	/**
+	 * Add the state of the scheduled synchronization to the open elements dashboard of the home page
+	 * (issue #1142). It counts as one late element while the job failed or no longer runs.
+	 *
+	 * @param	array<string,mixed>	$parameters		Hook parameters
+	 * @param	object				$object			Unused
+	 * @param	string				$action			Unused
+	 * @param	HookManager			$hookmanager	Hook manager
+	 * @return	int									0 in all cases, the dashboard is only completed
+	 */
+	public function addOpenElementsDashboardLine($parameters, $object, &$action, $hookmanager)
+	{
+		global $db, $langs, $user;
+
+		if (!$user->hasRight('einvoicing', 'read')) {
+			return 0;
+		}
+
+		include_once DOL_DOCUMENT_ROOT.'/core/class/workboardresponse.class.php';	// @phpstan-ignore includeOnce.fileNotFound (PHPStan takes DOL_DOCUMENT_ROOT from install/inc.php of the core, where it is '..')
+		$langs->load("einvoicing@einvoicing");
+
+		$code = einvoicingSyncJobState(einvoicingSyncJobHealth($db));
+		$problem = in_array($code, array('stuck', 'failed', 'late'), true);
+
+		$board = new WorkboardResponse();
+		$board->label = $langs->trans("EInvoicingSyncJobBoard", einvoicingSyncJobStateLabel($code));
+		$board->labelShort = einvoicingSyncJobStateLabel($code);
+		$board->url = dol_buildpath('/einvoicing/einvoicingindex.php', 1);
+		$board->img = img_object('', 'einvoicing@einvoicing');
+		$board->nbtodo = $problem ? 1 : 0;
+		$board->nbtodolate = $problem ? 1 : 0;
+
+		$this->results = array('einvoicing_sync' => $board);
+
+		return 0;
+	}
+
+	/**
+	 * Declare the card that holds the line of addOpenElementsDashboardLine()
+	 *
+	 * @param	array<string,mixed>	$parameters		Hook parameters
+	 * @param	object				$object			Unused
+	 * @param	string				$action			Unused
+	 * @param	HookManager			$hookmanager	Hook manager
+	 * @return	int									0 in all cases
+	 */
+	public function addOpenElementsDashboardGroup($parameters, $object, &$action, $hookmanager)
+	{
+		$this->results = array(
+			'einvoicing' => array(
+				'groupName' => 'EInvoicingSyncWidget',
+				'lang' => 'einvoicing@einvoicing',
+				'stats' => array('einvoicing_sync'),
+			),
+		);
+
+		return 0;
+	}
 }
