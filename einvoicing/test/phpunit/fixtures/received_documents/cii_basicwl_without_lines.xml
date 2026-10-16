@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+	A BASIC WL document: no line (BG-25), only its VAT breakdown (BG-23). Every identity and reference
+	is fictitious. Two rates, a document level charge at 20 % and an allowance at 5.5 %, both inside BT-116.
+-->
+<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
+	<rsm:ExchangedDocumentContext>
+		<ram:GuidelineSpecifiedDocumentContextParameter>
+			<ram:ID>urn:factur-x.eu:1p0:basicwl</ram:ID>
+		</ram:GuidelineSpecifiedDocumentContextParameter>
+	</rsm:ExchangedDocumentContext>
+	<rsm:ExchangedDocument>
+		<ram:ID>EINVWL-0001</ram:ID>
+		<ram:TypeCode>380</ram:TypeCode>
+		<ram:IssueDateTime>
+			<udt:DateTimeString format="102">20261011</udt:DateTimeString>
+		</ram:IssueDateTime>
+	</rsm:ExchangedDocument>
+	<rsm:SupplyChainTradeTransaction>
+		<ram:ApplicableHeaderTradeAgreement>
+			<ram:SellerTradeParty>
+				<ram:Name>EINVOICING REBUILD SELLER</ram:Name>
+				<ram:SpecifiedLegalOrganization>
+					<ram:ID schemeID="0002">999888779</ram:ID>
+				</ram:SpecifiedLegalOrganization>
+				<ram:PostalTradeAddress>
+					<ram:PostcodeCode>75001</ram:PostcodeCode>
+					<ram:LineOne>1 rue du Test</ram:LineOne>
+					<ram:CityName>Paris</ram:CityName>
+					<ram:CountryID>FR</ram:CountryID>
+				</ram:PostalTradeAddress>
+				<ram:SpecifiedTaxRegistration>
+					<ram:ID schemeID="VA">FR34999888779</ram:ID>
+				</ram:SpecifiedTaxRegistration>
+			</ram:SellerTradeParty>
+			<ram:BuyerTradeParty>
+				<ram:Name>EINVOICING TEST BUYER</ram:Name>
+				<ram:SpecifiedLegalOrganization>
+					<ram:ID schemeID="0002">111222333</ram:ID>
+				</ram:SpecifiedLegalOrganization>
+				<ram:PostalTradeAddress>
+					<ram:CountryID>FR</ram:CountryID>
+				</ram:PostalTradeAddress>
+			</ram:BuyerTradeParty>
+		</ram:ApplicableHeaderTradeAgreement>
+		<ram:ApplicableHeaderTradeDelivery/>
+		<ram:ApplicableHeaderTradeSettlement>
+			<ram:InvoiceCurrencyCode>EUR</ram:InvoiceCurrencyCode>
+			<ram:ApplicableTradeTax>
+				<ram:CalculatedAmount>165.45</ram:CalculatedAmount>
+				<ram:TypeCode>VAT</ram:TypeCode>
+				<ram:BasisAmount>827.23</ram:BasisAmount>
+				<ram:CategoryCode>S</ram:CategoryCode>
+				<ram:RateApplicablePercent>20.00</ram:RateApplicablePercent>
+			</ram:ApplicableTradeTax>
+			<ram:ApplicableTradeTax>
+				<ram:CalculatedAmount>5.50</ram:CalculatedAmount>
+				<ram:TypeCode>VAT</ram:TypeCode>
+				<ram:BasisAmount>100.00</ram:BasisAmount>
+				<ram:CategoryCode>S</ram:CategoryCode>
+				<ram:RateApplicablePercent>5.50</ram:RateApplicablePercent>
+			</ram:ApplicableTradeTax>
+			<ram:SpecifiedTradeAllowanceCharge>
+				<ram:ChargeIndicator>
+					<udt:Indicator>true</udt:Indicator>
+				</ram:ChargeIndicator>
+				<ram:ActualAmount>27.23</ram:ActualAmount>
+				<ram:Reason>Freight</ram:Reason>
+				<ram:CategoryTradeTax>
+					<ram:TypeCode>VAT</ram:TypeCode>
+					<ram:CategoryCode>S</ram:CategoryCode>
+					<ram:RateApplicablePercent>20.00</ram:RateApplicablePercent>
+				</ram:CategoryTradeTax>
+			</ram:SpecifiedTradeAllowanceCharge>
+			<ram:SpecifiedTradeAllowanceCharge>
+				<ram:ChargeIndicator>
+					<udt:Indicator>false</udt:Indicator>
+				</ram:ChargeIndicator>
+				<ram:ActualAmount>10.00</ram:ActualAmount>
+				<ram:Reason>Discount</ram:Reason>
+				<ram:CategoryTradeTax>
+					<ram:TypeCode>VAT</ram:TypeCode>
+					<ram:CategoryCode>S</ram:CategoryCode>
+					<ram:RateApplicablePercent>5.50</ram:RateApplicablePercent>
+				</ram:CategoryTradeTax>
+			</ram:SpecifiedTradeAllowanceCharge>
+			<ram:SpecifiedTradePaymentTerms>
+				<ram:DueDateDateTime>
+					<udt:DateTimeString format="102">20261111</udt:DateTimeString>
+				</ram:DueDateDateTime>
+			</ram:SpecifiedTradePaymentTerms>
+			<ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+				<ram:LineTotalAmount>910.00</ram:LineTotalAmount>
+				<ram:ChargeTotalAmount>27.23</ram:ChargeTotalAmount>
+				<ram:AllowanceTotalAmount>10.00</ram:AllowanceTotalAmount>
+				<ram:TaxBasisTotalAmount>927.23</ram:TaxBasisTotalAmount>
+				<ram:TaxTotalAmount currencyID="EUR">170.95</ram:TaxTotalAmount>
+				<ram:GrandTotalAmount>1098.18</ram:GrandTotalAmount>
+				<ram:DuePayableAmount>1098.18</ram:DuePayableAmount>
+			</ram:SpecifiedTradeSettlementHeaderMonetarySummation>
+		</ram:ApplicableHeaderTradeSettlement>
+	</rsm:SupplyChainTradeTransaction>
+</rsm:CrossIndustryInvoice>
