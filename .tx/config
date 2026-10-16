@@ -24,3 +24,9 @@ file_filter = stancer/langs/<lang>/stancer.lang
 source_file = stancer/langs/en_US/stancer.lang
 source_lang = en_US
 type        = MOZILLAPROPERTIES
+
+[o:dolibarr-association:p:dolibarr-community-modules:r:cloudbackup]
+file_filter = cloudbackup/langs/<lang>/cloudbackup.lang
+source_file = cloudbackup/langs/en_US/cloudbackup.lang
+source_lang = en_US
+type        = MOZILLAPROPERTIES
