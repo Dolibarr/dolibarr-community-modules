@@ -80,4 +80,41 @@ class EInvoicingTest extends CommonClassTest
 		$obj = $db->fetch_object($db->query("SELECT lc_status_message FROM " . MAIN_DB_PREFIX . "einvoicing_lifecycle_msg WHERE rowid = " . ((int) $id)));
 		$this->assertSame(dol_substr($message, 0, 255), $obj->lc_status_message);
 	}
+
+	/**
+	 * The subcontractor or co-contractor role only exists for a services invoice (S5/S6): the pre-check
+	 * refuses it on an invoice holding goods, and lets a services invoice through (issue #946).
+	 *
+	 * @return void
+	 */
+	public function testContractorRoleIsRefusedOnAnInvoiceHoldingGoods()
+	{
+		global $db;
+
+		require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+
+		$einvoicing = new EInvoicing($db);
+		$invoice = new Facture($db);
+		$invoice->id = 990000946;
+		$invoice->type = Facture::TYPE_STANDARD;
+		$line = new FactureLigne($db);
+		$line->product_type = 0;
+		$line->desc = 'Concrete';
+		$invoice->lines = array($line);
+
+		$einvoicing->insertOrUpdateExtraField($invoice->id, 'facture', EInvoicing::EXTRAFIELD_CONTRACTOR_ROLE, '');
+		$this->assertSame(1, $einvoicing->validateInvoiceConfiguration($invoice)['res'], 'No role: goods are fine');
+
+		$this->assertGreaterThan(0, $einvoicing->insertOrUpdateExtraField($invoice->id, 'facture', EInvoicing::EXTRAFIELD_CONTRACTOR_ROLE, EInvoicing::CONTRACTOR_ROLE_SUBCONTRACTOR));
+		try {
+			$check = $einvoicing->validateInvoiceConfiguration($invoice);
+			$this->assertSame(-1, $check['res']);
+			$this->assertNotSame('', $check['message']);
+
+			$invoice->lines[0]->product_type = 1;
+			$this->assertSame(1, $einvoicing->validateInvoiceConfiguration($invoice)['res'], 'A services invoice may carry the role');
+		} finally {
+			$einvoicing->insertOrUpdateExtraField($invoice->id, 'facture', EInvoicing::EXTRAFIELD_CONTRACTOR_ROLE, '');
+		}
+	}
 }

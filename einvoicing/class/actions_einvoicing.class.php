@@ -716,6 +716,19 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				}
 			}
 
+			// Action to set the role the invoice is issued under (BT-23 S5/S6, issue #946)
+			if ($action == 'setcontractorrole' && $permissiontoedit && $object->element == 'facture') {
+				$contractorRole = GETPOST('einvoice_contractor_role', 'aZ09');
+				if (!in_array($contractorRole, array(EInvoicing::CONTRACTOR_ROLE_SUBCONTRACTOR, EInvoicing::CONTRACTOR_ROLE_COCONTRACTOR))) {
+					$contractorRole = '';
+				}
+				$result = $einvoicing->insertOrUpdateExtraField($object->id, $object->element, EInvoicing::EXTRAFIELD_CONTRACTOR_ROLE, $contractorRole);
+				if ($result < 0) {
+					$error++;
+					$this->errors = array_merge($this->errors, $einvoicing->errors);
+				}
+			}
+
 			// An invoice already transmitted (a flow_id is assigned) is immutable: re-sending it makes the PA
 			// refuse a duplicate, and regenerating it would only reset the local status. Block both; correct a
 			// transmitted invoice with a credit note. The lock is based on the persistent flow_id, not on the
