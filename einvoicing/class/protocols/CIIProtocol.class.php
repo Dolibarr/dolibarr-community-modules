@@ -985,6 +985,9 @@ class CIIProtocol extends AbstractProtocol
 		$parsedDocument = $this->parseReceivedDocument($file, $tempFile);
 		$parsedHeader = $parsedDocument['header'];
 		$parsedLines = $parsedDocument['lines'];
+		if (empty($parsedLines)) {
+			$parsedLines = $this->buildLinesFromVatBreakdown($parsedHeader);
+		}
 		$sourceXml = $parsedDocument['xml'];
 
 		dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource parsedHeader: ' . json_encode($parsedHeader), LOG_DEBUG);
@@ -1643,7 +1646,7 @@ class CIIProtocol extends AbstractProtocol
 					// The default routing product is a catch-all shared by all the unresolved lines of the
 					// vendor: without the wording of the XML, every line of the invoice would show the same
 					// label. Keep the description of the vendor on top of the product link.
-					$line->desc = trim($parsedLine['prodname'] ?? '') . (!empty($parsedLine['proddesc']) ? "\n" . trim($parsedLine['proddesc']) : '');
+					$line->desc = dol_concatdesc(trim($parsedLine['prodname'] ?? ''), trim($parsedLine['proddesc'] ?? ''));
 				} elseif (!empty($parsedLine['proddesc'])) {
 					// Keep the XML line-level description even when a real product is linked:
 					// it is often project-specific and not carried by the product's own label/description.
@@ -2110,6 +2113,73 @@ class CIIProtocol extends AbstractProtocol
 		$reason = trim((string) ($parsedLine['linestatusreasoncode'] ?? ''));
 
 		return $reason === '' || strtoupper($reason) === 'DETAIL';
+	}
+
+
+	/**
+	 * Lines of a received document that has none (MINIMUM and BASIC WL profiles): one per VAT rate of its breakdown (BG-23).
+	 * BT-116 includes the document level allowances and charges, already imported as lines of their own: they are taken out.
+	 *
+	 * @param	array<string,mixed>				$parsedHeader	The parsed header of the received document
+	 * @return	array<int,array<string,mixed>>					Lines shaped like the ones parseInvoiceLines() returns
+	 */
+	protected function buildLinesFromVatBreakdown(array $parsedHeader)
+	{
+		global $langs;
+
+		if (empty($parsedHeader['taxBreakdown']) || !is_array($parsedHeader['taxBreakdown'])) {
+			return array();
+		}
+		$langs->load('einvoicing@einvoicing');
+
+		$lines = array();
+		foreach ($parsedHeader['taxBreakdown'] as $tax) {
+			if (($tax['typeCode'] ?? '') !== 'VAT') {
+				continue;
+			}
+			$rate = (float) ($tax['rateApplicablePercent'] ?? 0);
+			$category = (string) ($tax['categoryCode'] ?? '');
+			$base = (float) ($tax['basisAmount'] ?? 0);
+			foreach ((array) ($parsedHeader['headerAllowancesCharges'] ?? array()) as $allowanceCharge) {
+				$chargeCategory = (string) ($allowanceCharge['categoryCode'] ?? '');
+				if (abs((float) ($allowanceCharge['rateApplicablePercent'] ?? 0) - $rate) >= 0.001
+					|| ($category !== '' && $chargeCategory !== '' && $chargeCategory !== $category)) {
+					continue;
+				}
+				$amount = (float) ($allowanceCharge['actualAmount'] ?? 0);
+				$base += (($allowanceCharge['indicator'] ?? '') === 'true') ? -$amount : $amount;
+			}
+			$base = (float) price2num($base, 'MT');
+			if ($base == 0.0) {
+				continue;
+			}
+
+			$lines[] = array(
+				'lineid' => (string) (count($lines) + 1),
+				'vatBreakdownLine' => 1,
+				'linestatusreasoncode' => '',
+				'prodname' => '',
+				'proddesc' => dol_concatdesc($langs->transnoentitiesnoconv('EInvoiceLineFromVatBreakdown', price2num($rate)), trim((string) ($tax['ExemptionReason'] ?? ''))),
+				'prodsellerid' => '',
+				'prodbuyerid' => '',
+				'netpriceamount' => $base,
+				'netpricebasisquantity' => 1.0,
+				'billedquantity' => 1.0,
+				'lineTotalAmount' => $base,
+				'typeCode' => 'VAT',
+				'categoryCode' => $category,
+				'rateApplicablePercent' => $rate,
+				'calculatedAmount' => (float) ($tax['calculatedAmount'] ?? 0),
+				'ExemptionReason' => (string) ($tax['ExemptionReason'] ?? ''),
+				'ExemptionReasonCode' => (string) ($tax['ExemptionReasonCode'] ?? ''),
+				'lineAllowances' => array(),
+				'lineGrossPriceAllowances' => array(),
+				'additionalRefDocs' => array(),
+				'parentDocumentNo' => (string) ($parsedHeader['documentno'] ?? ''),
+			);
+		}
+
+		return $lines;
 	}
 
 
