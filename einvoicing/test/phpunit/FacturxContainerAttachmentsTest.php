@@ -182,6 +182,18 @@ class FacturxContainerAttachmentsTest extends CommonClassTest
 	}
 
 	/**
+	 * A container that cannot be read gives no attachment instead of stopping the import.
+	 *
+	 * @return	void
+	 */
+	public function testATruncatedContainerHasNoAttachment()
+	{
+		$container = $this->container(array('lines.csv' => "ref;qty\nA;1\n"));
+
+		$this->assertSame(array(), FacturXProtocol::extractContainerAttachments(substr($container, 0, (int) (strlen($container) / 2))));
+	}
+
+	/**
 	 * Anything that is not a PDF, such as a CII document, carries no container to read.
 	 *
 	 * @return	void

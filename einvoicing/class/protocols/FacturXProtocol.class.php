@@ -647,7 +647,7 @@ class FacturXProtocol extends CIIProtocol
 			$parser = new PdfAttachmentExtractor($file, md5($file));
 			$embedded = $parser->getEmbeddedFiles();
 			$parser->cleanUp();
-		} catch (Exception $e) {
+		} catch (Throwable $e) {
 			dol_syslog(__METHOD__ . ' could not read the embedded files: ' . $e->getMessage(), LOG_WARNING, 0, '_einvoicing');
 			return $attachments;
 		}
