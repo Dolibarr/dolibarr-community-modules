@@ -66,15 +66,34 @@ class SupplierInvoiceHelper
 	/**
 	 * Sign that turns the amounts of a supplier invoice into those of the document it was imported from.
 	 *
-	 * Dolibarr stores a credit note negative and the document announces it positive; any other invoice
-	 * carries the sign of its document, a negative one included (BT-3 380 with negative lines).
+	 * Dolibarr stores a credit note negative and the document announces it positive, unless its issuer
+	 * signed it like an invoice: a negative total is then taken as received, each amount keeping the sign
+	 * of the document (issue #1077). Any other invoice carries the sign of its document, a negative one
+	 * included (BT-3 380 with negative lines).
 	 *
-	 * @param	FactureFournisseur	$invoice	The supplier invoice
-	 * @return	int								-1 for a credit note, 1 otherwise
+	 * @param	FactureFournisseur	$invoice		The supplier invoice
+	 * @param	?float				$announcedTtc	Total the document announces, signed, or null when not known
+	 * @return	int									-1 for a credit note announced positive, 1 otherwise
 	 */
-	public static function documentSign(FactureFournisseur $invoice): int
+	public static function documentSign(FactureFournisseur $invoice, $announcedTtc = null): int
 	{
-		return ((int) $invoice->type === FactureFournisseur::TYPE_CREDIT_NOTE) ? -1 : 1;
+		return self::documentSignOfType((int) $invoice->type, $announcedTtc);
+	}
+
+	/**
+	 * documentSign() for an invoice not built yet, known by its type only.
+	 *
+	 * @param	int		$type			Dolibarr type of the invoice (FactureFournisseur::TYPE_*)
+	 * @param	?float	$announcedTtc	Total the document announces, signed, or null when not known
+	 * @return	int						-1 for a credit note announced positive, 1 otherwise
+	 */
+	public static function documentSignOfType(int $type, $announcedTtc = null): int
+	{
+		if ($type !== FactureFournisseur::TYPE_CREDIT_NOTE) {
+			return 1;
+		}
+
+		return ($announcedTtc !== null && (float) $announcedTtc < 0) ? 1 : -1;
 	}
 
 	/**
@@ -213,7 +232,7 @@ class SupplierInvoiceHelper
 
 		$amountErrors = [];
 
-		$sign = self::documentSign($dolSupplierInvoice);
+		$sign = self::documentSign($dolSupplierInvoice, self::announcedTotalTtc($parsedHeader));
 
 		foreach ($calculationRules as $calculationRule => $vatComputeMode) {
 			$details = self::getInvoiceDetailsForComparison($dolSupplierInvoice, $vatComputeMode);
@@ -626,7 +645,7 @@ class SupplierInvoiceHelper
 		// same footing; it is added signed, so a credit note stored negative comes back to its own total
 		// too. Nothing is attached in the ordinary case and the sums are zero (issue #948).
 		$deposits = self::linkedDepositTotals((int) $invoice->id);
-		$sign = self::documentSign($invoice);
+		$sign = self::documentSign($invoice, $announcedTtc);
 		$invoiceTva = $sign * ((float) $invoice->total_tva + $deposits['tva']);
 		$invoiceTtc = $sign * ((float) $invoice->total_ttc + $deposits['ttc']);
 
