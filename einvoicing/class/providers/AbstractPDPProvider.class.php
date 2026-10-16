@@ -1315,7 +1315,7 @@ abstract class AbstractPDPProvider
 	 * the access point and the build of the module that read it. Same untranslated "EINVOICING - " prefix
 	 * as the status events, so one search on the label finds them all.
 	 *
-	 * @param   FactureFournisseur  $supplierInvoice    The supplier invoice the import created
+	 * @param   FactureFournisseur  $supplierInvoice    The supplier invoice the import created or rebuilt
 	 * @param   Document            $document           The flow record the invoice was imported from
 	 * @return  int                                     Id of the created event, < 0 if KO
 	 */
@@ -1324,9 +1324,11 @@ abstract class AbstractPDPProvider
 		global $langs;
 
 		$langs->load('einvoicing@einvoicing');
-		// transnoentitiesnoconv(): an event label is stored raw and escaped where it is printed.
-		$label = "EINVOICING - " . $langs->transnoentitiesnoconv('EInvoicingEventImportLabel', (string) ($supplierInvoice->ref_supplier ?: $supplierInvoice->ref));
-		$message = $langs->transnoentitiesnoconv('EInvoicingEventImportNote', (string) $document->flow_id, $this->name, einvoicingModuleStamp());
+		// A re-import rebuilds the draft Document::reimport() names for the run. transnoentitiesnoconv():
+		// an event label is stored raw and escaped where it is printed.
+		$prefix = AbstractProtocol::$rebuildSupplierInvoiceId > 0 ? 'EInvoicingEventReimport' : 'EInvoicingEventImport';
+		$label = "EINVOICING - " . $langs->transnoentitiesnoconv($prefix . 'Label', (string) ($supplierInvoice->ref_supplier ?: $supplierInvoice->ref));
+		$message = $langs->transnoentitiesnoconv($prefix . 'Note', (string) $document->flow_id, $this->name, einvoicingModuleStamp());
 
 		$res = $this->addEvent('IMPORT', $label, $message, $supplierInvoice);
 		if ($res < 0) {
