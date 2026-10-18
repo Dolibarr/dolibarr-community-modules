@@ -3517,6 +3517,35 @@ class EInvoicing
 	}
 
 	/**
+	 * Reference the customer gives to a product (BT-156), as recorded on the customer prices of the product.
+	 *
+	 * @param	int		$productId	Id of the product
+	 * @param	int		$socid		Id of the customer
+	 * @return	string				Reference, '' when there is none
+	 */
+	public function getCustomerProductReference($productId, $socid)
+	{
+		if ((int) $productId <= 0 || (int) $socid <= 0) {
+			return '';
+		}
+
+		$sql = "SELECT ref_customer FROM " . $this->db->prefix() . "product_customer_price";
+		$sql .= " WHERE fk_product = " . (int) $productId . " AND fk_soc = " . (int) $socid;
+		$sql .= " AND entity IN (" . getEntity('productprice') . ")";
+		$sql .= " AND ref_customer IS NOT NULL AND ref_customer <> ''";
+		$sql .= " ORDER BY rowid DESC";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' ' . $this->db->lasterror(), LOG_ERR);
+			return '';
+		}
+		$obj = $this->db->fetch_object($resql);
+		$this->db->free($resql);
+
+		return $obj ? trim((string) $obj->ref_customer) : '';
+	}
+
+	/**
 	 * Whether the charges of a received invoice line (BG-28) must be folded into the description of the
 	 * product line they belong to, instead of being imported as a Dolibarr line of their own.
 	 *
