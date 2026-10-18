@@ -4886,7 +4886,8 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		$xmlDoc = new DOMDocument();
-		if (!@$xmlDoc->loadXML(self::stripStrayXmlDeclarations($xmlData))) {
+		$xmlData = self::stripStrayXmlDeclarations($xmlData);
+		if (!@$xmlDoc->loadXML($xmlData)) {
 			dol_syslog(__METHOD__ . " failed to load XML data, no attachment extracted", LOG_WARNING, 0, '_einvoicing');
 			return $attachments;
 		}
