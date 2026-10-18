@@ -111,7 +111,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 							// Check configuration
 							$result = $einvoicing->checkRequiredinformations($invoiceObject);
-							if ($result['res'] < 0) {			// Error case
+							if ($result['res'] < 0) {			// Technical error case
 								$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
 								dol_syslog(__METHOD__ . " " . $message);
 
@@ -161,18 +161,17 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 							$result = $protocol->generateInvoice($invoiceObject, $outputlangs, $pdfPath);		// Generate E-invoice (embed into the real generated file)
 
-							// $result is the path of the file, or -1: under PHP 8 a path compared to 0 is compared as
-							// a string, and "/..." >= "0" is false, so the configuration warning was never shown.
-							if (!is_numeric($result) || $result >= 0) {
-								if (!defined('NOLOGIN')) {	// If in backoffice context
-									setEventMessages($message, array(), $messagecss);
-								}
-							}
+							// $result is the path of the file, or -1
+							// $message is defined if there was a warning in the check.
 
-							if ($result && (!is_numeric($result) || $result > 0)) {
+							if ($result && (!is_numeric($result) || $result > 0)) {		// generation ok
 								if (!defined('NOLOGIN')) {	// If in backoffice context
 									// No error
 									setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+
+									if ($message !== '') {
+										setEventMessages($message, array(), $messagecss);
+									}
 
 									// Forward non-blocking size warning from the protocol if any
 									if (!empty($protocol->warnings)) {
@@ -228,7 +227,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 										}
 									}
 								}
-							} else {
+							} else {			// generation failed
 								// What the hook hands back reaches the user only sometimes: up to Dolibarr 22
 								// pdf_sponge copies ->error/->errors and then answers "no error", so the core
 								// reports a success; and $object->warnings is displayed by the "Generate document"
@@ -244,24 +243,27 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 									$this->errors = array_merge($this->errors, $protocol->errors);
 									return -1;
 								} else {
-									if ($result < 0) {
-										// Whether the user is told at all is decided by the core: up to 22 pdf_sponge answers
-										// "no error" whatever the hook returned, and $object->warnings is displayed in one
-										// place only, core/actions_builddoc.inc.php, which has it from 24. So up to 23 the
-										// failure is raised as an error - the only channel that reaches the screen there -
-										// with the warnings collected above merged in, so that none of them is dropped.
-										if ((float) DOL_VERSION < 24) {
-											$this->errors = array_merge($this->errors, $this->warnings, $protocol->errors);
-											$this->warnings = array();
-										} else {
-											// Append to the warnings already collected above (configuration, routability, auto-send),
-											// which starting the merge from $this->errors used to drop.
-											$this->warnings = array_merge($this->warnings, $protocol->errors);	// We want to return the error as a warning.
+									if (!defined('NOLOGIN')) {	// If in backoffice context
+										if ($message !== '') {
+											setEventMessages($message, array(), $messagecss);
 										}
-										return -1;
-									} else {
-										return 0;
 									}
+
+									// Whether the user is told at all is decided by the core: up to 22 pdf_sponge answers
+									// "no error" whatever the hook returned, and $object->warnings is displayed in one
+									// place only, core/actions_builddoc.inc.php, which has it from 24. So up to 23 the
+									// failure is raised as an error - the only channel that reaches the screen there -
+									// with the warnings collected above merged in, so that none of them is dropped.
+									if ((float) DOL_VERSION < 24) {
+										$this->errors = array_merge($this->errors, $this->warnings, $protocol->errors);
+										$this->warnings = array();
+									} else {
+										// Append to the warnings already collected above (configuration, routability, auto-send),
+										// which starting the merge from $this->errors used to drop.
+										$this->warnings = array_merge($this->warnings, $protocol->errors);	// We want to return the error as a warning.
+									}
+
+									return 0;	// We are in case where EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS is off, we must not return an error.
 								}
 							}
 						}
@@ -483,6 +485,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// Add buttons in supplier invoice card (we test context invoicesuppliercard but also main for old versions of module)
 		if (in_array($object->element, ['invoice_supplier']) && !einvoicingReceptionDisabled() && preg_match('/invoicesuppliercard|main/', $parameters['currentcontext'] ?? '')) {
 			$url_button = array();
+
+			// The EXTENDED document announced two VAT totals and the invoice keeps the one rounded per line (issue #1166)
+			dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
+			$vatTotals = SupplierInvoiceHelper::vatRoundedPerLine((int) $object->id);
+			if ($vatTotals !== null) {
+				print '<div class="warning">' . $langs->trans('EInvoiceVatRoundedPerLineNote', price($vatTotals['invoice']), price($vatTotals['announced'])) . '</div>';
+			}
 
 			// Check if this invoice is present into einvoicing_extlinks table to know if it is an imported invoice from PDP or not
 			$sql = "SELECT rowid, provider FROM " . $db->prefix() . "einvoicing_extlinks";
@@ -1768,6 +1777,32 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function printFieldListSelect($parameters, $object, &$action, $hookmanager)
 	{
+		// Compatibility with Dolibarr <= 19: the thirdparty list (sales representative) and both invoice lists
+		// (user contact) can end their FROM with a comma join, and a JOIN added after it by printFieldListFrom()
+		// no longer sees the alias of the main table ("Unknown column 's.rowid' in 'on clause'"). So no join is
+		// added there and the same values are read by sub queries. To remove once Dolibarr 19 is no longer supported.
+		if ((float) DOL_VERSION <= 19) {
+			global $db;
+
+			$elementtype = self::getExtLinkElementType(explode(':', $parameters['context']));
+			if (in_array($elementtype, ['facture', 'invoice_supplier', 'societe'], true)) {
+				$this->resprints .= ', (' . self::getExtLinkSubQuery($elementtype, 'rowid') . ') AS pdplink_id';
+				$this->resprints .= ', (' . self::getExtLinkSubQuery($elementtype, 'provider') . ') AS pdp_provider';
+			}
+			if ($elementtype == 'facture') {
+				$this->resprints .= ', (' . self::getExtLinkSubQuery('facture', 'syncstatus') . ') AS pdp_syncstatus';
+				$this->resprints .= ', (' . self::getCustomerLifecycleRolesSubQuery() . ') AS pdp_lcrecipients';
+			} elseif ($elementtype == 'invoice_supplier') {
+				$this->resprints .= ', (' . self::getSupplierLifecycleStatusSubQuery() . ') AS pdp_lcstatus';
+			} elseif ($elementtype == 'societe') {
+				$this->resprints .= ', (SELECT defrt.routing_id FROM ' . $db->prefix() . 'einvoicing_routing as defrt';
+				$this->resprints .= ' WHERE defrt.fk_soc = s.rowid';	// Same row as the join of printFieldListFrom()
+				$this->resprints .= " AND defrt.routing_type = 'thirdparty' AND defrt.active = 1 AND defrt.is_default = 1 LIMIT 1) AS routing_id";
+			}
+
+			return 0;
+		}
+
 		// Invoice list
 		if (in_array('invoicelist', explode(':', $parameters['context']))) {
 			$this->resprints .= ', ext.rowid AS pdplink_id, ext.provider AS pdp_provider';
@@ -1807,13 +1842,26 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	protected static function getExtLinkJoinCondition($elementtype)
 	{
+		return ' AND ext.rowid = (' . self::getExtLinkSubQuery($elementtype, 'rowid') . ')';
+	}
+
+	/**
+	 * Build the sub query returning one column of the einvoicing_extlinks row kept for an element of a core list
+	 * (see getExtLinkJoinCondition()).
+	 *
+	 * @param 	'facture'|'invoice_supplier'|'societe'|'product'	$elementtype	Value of einvoicing_extlinks.element_type, which also tells which list of the core is being built
+	 * @param 	'rowid'|'provider'|'syncstatus'						$field			Column of einvoicing_extlinks to return
+	 * @return 	string															SQL sub query (without the surrounding parenthesis)
+	 */
+	protected static function getExtLinkSubQuery($elementtype, $field)
+	{
 		global $db;
 
 		// The 'ViaPartner' suffix tells how the provider is reached, not which provider it is.
 		$providershort = preg_replace('/ViaPartner$/', '', getDolGlobalString('EINVOICING_PDP'));
 		$sqlcurrentprovider = "sub.provider IN ('" . $db->escape($providershort) . "', '" . $db->escape($providershort . 'ViaPartner') . "')";
 
-		$sql = ' AND ext.rowid = (SELECT sub.rowid FROM ' . $db->prefix() . 'einvoicing_extlinks as sub';
+		$sql = 'SELECT sub.' . $db->sanitize($field) . ' FROM ' . $db->prefix() . 'einvoicing_extlinks as sub';
 		$sql .= " WHERE sub.element_type = '" . $db->escape($elementtype) . "'";
 		if ($elementtype == 'societe') {
 			$sql .= ' AND sub.element_id = s.rowid';	// Alias of the thirdparty in the thirdparty list of the core
@@ -1826,9 +1874,33 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// fetchLastknownInvoiceStatus() keeps the LAST link read for the configured provider, but the
 		// FIRST one read for another provider, so the two cases do not order the rowid the same way.
 		$sql .= ' CASE WHEN ' . $sqlcurrentprovider . ' THEN -sub.rowid ELSE sub.rowid END';
-		$sql .= ' LIMIT 1)';
+		$sql .= ' LIMIT 1';
 
 		return $sql;
+	}
+
+	/**
+	 * Return the einvoicing_extlinks.element_type of the elements a core list shows.
+	 *
+	 * @param 	string[]	$contexts		Contexts of the hook
+	 * @return 	string						Element type, or '' when the list is not one the module completes
+	 */
+	protected static function getExtLinkElementType($contexts)
+	{
+		$elementtypes = [
+			'invoicelist' => 'facture',
+			'supplierinvoicelist' => 'invoice_supplier',
+			'thirdpartylist' => 'societe',
+			'societelist' => 'societe',
+			'productservicelist' => 'product',
+		];
+		foreach ($elementtypes as $context => $elementtype) {
+			if (in_array($context, $contexts, true)) {
+				return $elementtype;
+			}
+		}
+
+		return '';
 	}
 
 	/**
@@ -1843,6 +1915,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	public function printFieldListFrom($parameters, $object, &$action, $hookmanager)
 	{
 		global $db;
+
+		// Dolibarr <= 19: no join, see printFieldListSelect()
+		if ((float) DOL_VERSION <= 19) {
+			return 0;
+		}
 
 		// Supplier invoice list, Product list, Soc list
 		$contexts = explode(':', $parameters['context']);
@@ -1896,7 +1973,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			// turning this filter into a no-op.
 			$tmpeinvoicingpartner = preg_replace('/ViaPartner/i', '', getDolGlobalString('EINVOICING_PDP'));
 			if (GETPOST('search_pdplinked', 'alpha') !== '' && GETPOST('search_pdplinked', 'alpha') == $tmpeinvoicingpartner) {
-				$this->resprints .= " AND ext.provider = '" . $db->escape($tmpeinvoicingpartner) . "'";
+				if ((float) DOL_VERSION <= 19) {	// No join, see printFieldListSelect()
+					$this->resprints .= ' AND (' . self::getExtLinkSubQuery(self::getExtLinkElementType($contexts), 'provider') . ") = '" . $db->escape($tmpeinvoicingpartner) . "'";
+				} else {
+					$this->resprints .= " AND ext.provider = '" . $db->escape($tmpeinvoicingpartner) . "'";
+				}
 			}
 		}
 
@@ -1913,7 +1994,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		if (in_array('invoicelist', $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
 			if (GETPOST('search_pdp_syncstatus', 'alpha') !== '' && GETPOST('search_pdp_syncstatus', 'alpha') != -2) {
-				$this->resprints .= ' AND ext.syncstatus = ' . ((int) GETPOST('search_pdp_syncstatus'));
+				if ((float) DOL_VERSION <= 19) {	// No join, see printFieldListSelect()
+					$this->resprints .= ' AND (' . self::getExtLinkSubQuery('facture', 'syncstatus') . ') = ' . ((int) GETPOST('search_pdp_syncstatus'));
+				} else {
+					$this->resprints .= ' AND ext.syncstatus = ' . ((int) GETPOST('search_pdp_syncstatus'));
+				}
 			}
 		}
 
@@ -1951,7 +2036,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function printFieldListGroupBy($parameters, $object, &$action, $hookmanager)
 	{
-		if (in_array('supplierinvoicelist', explode(':', $parameters['context']), true)) {
+		// Dolibarr <= 19: no join, so no column of it, see printFieldListSelect()
+		if ((float) DOL_VERSION > 19 && in_array('supplierinvoicelist', explode(':', $parameters['context']), true)) {
 			$this->resprints .= ', ext.rowid, ext.provider';
 		}
 

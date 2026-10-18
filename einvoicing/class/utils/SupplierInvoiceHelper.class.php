@@ -64,6 +64,39 @@ class SupplierInvoiceHelper
 	}
 
 	/**
+	 * Whether a received document declares an EXTENDED profile in BT-24, Factur-X or French CTC.
+	 *
+	 * @param	array<string,mixed>	$parsedHeader	Header data of the received document
+	 * @return	bool								True for an EXTENDED document
+	 */
+	public static function isExtendedDocument(array $parsedHeader): bool
+	{
+		return (bool) preg_match('/[:#]extended(-ctc-fr)?$/i', trim((string) ($parsedHeader['guidelineId'] ?? '')));
+	}
+
+	/**
+	 * Gap an EXTENDED profile tolerates on a sum: a cent per line, allowance and charge it adds up.
+	 *
+	 * That is BR-FREXT-CO-15 and BR-FXEXT-S-08, which replace BR-CO-15 and BR-S-08 in both EXTENDED
+	 * schematrons (issue #1166). Any other profile tolerates nothing.
+	 *
+	 * @param	array<string,mixed>		$parsedHeader	Header data of the received document
+	 * @param	int|float|string|null	$rate			A VAT rate, or null for the whole document
+	 * @return	float									The tolerated gap, 0 outside an EXTENDED profile
+	 */
+	public static function extendedTolerance(array $parsedHeader, $rate = null): float
+	{
+		if (!self::isExtendedDocument($parsedHeader)) {
+			return 0.0;
+		}
+		if ($rate === null) {
+			return 0.01 * (int) ($parsedHeader['toleranceItemCount'] ?? 0);
+		}
+
+		return 0.01 * (int) ($parsedHeader['toleranceItemCountByRate'][(string) price2num($rate)] ?? 0);
+	}
+
+	/**
 	 * Sign that turns the amounts of a supplier invoice into those of the document it was imported from.
 	 *
 	 * Dolibarr stores a credit note negative and the document announces it positive; any other invoice
@@ -148,6 +181,22 @@ class SupplierInvoiceHelper
 	private static function areAmountsEqual($amount1, $amount2, $roundPrecision = null): bool
 	{
 		return (self::round($amount1, $roundPrecision) === self::round($amount2, $roundPrecision));
+	}
+
+	/**
+	 * Whether two amounts differ by no more than the EXTENDED profile of the document tolerates.
+	 *
+	 * @param	float					$amount1		The amount of the invoice
+	 * @param	float					$amount2		The amount the document announces
+	 * @param	array<string,mixed>		$parsedHeader	Header data of the received document
+	 * @param	int|float|string|null	$rate			A VAT rate, or null for the whole document
+	 * @return	bool									False outside an EXTENDED profile
+	 */
+	private static function withinExtendedTolerance($amount1, $amount2, array $parsedHeader, $rate = null): bool
+	{
+		$tolerance = self::extendedTolerance($parsedHeader, $rate);
+
+		return $tolerance > 0 && abs(self::round($amount1) - self::round($amount2)) <= $tolerance + 0.0001;
 	}
 
 	/**
@@ -242,8 +291,10 @@ class SupplierInvoiceHelper
 				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatInclDifference', $announcedTtc, $details['total_ttc']);
 			}
 
-			// VAT total
-			if (!self::areAmountsEqual($details['total_tva'], $parsedHeader['taxTotalAmount'])) {
+			// VAT total. An EXTENDED document may announce it rounded per rate while the invoice sums it
+			// rounded per line, within a cent per item: both are right (issue #1166).
+			if (!self::areAmountsEqual($details['total_tva'], $parsedHeader['taxTotalAmount'])
+				&& !self::withinExtendedTolerance($details['total_tva'], $parsedHeader['taxTotalAmount'], $parsedHeader)) {
 				$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonTotalVatDifference', $parsedHeader['taxTotalAmount'], $details['total_tva']);
 			}
 
@@ -255,10 +306,12 @@ class SupplierInvoiceHelper
 						$dolVatAmount = $dolSupplierInvoiceVatDetails[$currentRate]['vat_amount'];
 						$dolVatBasis = $dolSupplierInvoiceVatDetails[$currentRate]['vat_basis_amount'];
 
-						if (!self::areAmountsEqual($dolVatBasis, $taxDetailsByRate['basisAmount'])) {
+						if (!self::areAmountsEqual($dolVatBasis, $taxDetailsByRate['basisAmount'])
+							&& !self::withinExtendedTolerance($dolVatBasis, $taxDetailsByRate['basisAmount'], $parsedHeader, $currentRate)) {
 							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatBasisDifference', $currentRate, $taxDetailsByRate['basisAmount'], $dolVatBasis);
 						}
-						if (!self::areAmountsEqual($dolVatAmount, $taxDetailsByRate['calculatedAmount'])) {
+						if (!self::areAmountsEqual($dolVatAmount, $taxDetailsByRate['calculatedAmount'])
+							&& !self::withinExtendedTolerance($dolVatAmount, $taxDetailsByRate['calculatedAmount'], $parsedHeader, $currentRate)) {
 							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatRateDifference', $currentRate, $taxDetailsByRate['calculatedAmount'], $dolVatAmount);
 						}
 					} else {
@@ -773,6 +826,46 @@ class SupplierInvoiceHelper
 		$einvoicing = new EInvoicing($db);
 
 		return $einvoicing->insertOrUpdateExtraField((int) $supplierInvoiceId, 'invoice_supplier', EInvoicing::EXTRAFIELD_TOTALS_MISMATCH, '');
+	}
+
+	/**
+	 * Keep on a supplier invoice the two VAT totals of its EXTENDED document (issue #1166).
+	 *
+	 * The document announces its VAT rounded per rate and its totals add up the VAT rounded per line: the
+	 * invoice records the second, and the note lets the card say why it differs from the first.
+	 *
+	 * @param	int			$supplierInvoiceId	Id of the supplier invoice
+	 * @param	?float		$announcedTva		BT-110 of the document, null to remove the note
+	 * @param	float		$invoiceTva			VAT the invoice records, summed per line
+	 * @return	int								-1 on error, 0 or 1 otherwise
+	 */
+	public static function noteVatRoundedPerLine($supplierInvoiceId, $announcedTva, $invoiceTva = 0.0)
+	{
+		global $db;
+
+		$einvoicing = new EInvoicing($db);
+		$value = ($announcedTva === null) ? '' : (string) json_encode(array('announced' => (float) $announcedTva, 'invoice' => (float) $invoiceTva));
+
+		return $einvoicing->insertOrUpdateExtraField((int) $supplierInvoiceId, 'invoice_supplier', EInvoicing::EXTRAFIELD_VAT_ROUNDED_PER_LINE, $value);
+	}
+
+	/**
+	 * Read the note left by noteVatRoundedPerLine().
+	 *
+	 * @param	int		$supplierInvoiceId	Id of the supplier invoice
+	 * @return	?array{announced:float,invoice:float}	The two VAT totals, or null when the invoice carries no note
+	 */
+	public static function vatRoundedPerLine($supplierInvoiceId)
+	{
+		global $db;
+
+		$einvoicing = new EInvoicing($db);
+		$decoded = json_decode((string) $einvoicing->getExtraFieldValue((int) $supplierInvoiceId, 'invoice_supplier', EInvoicing::EXTRAFIELD_VAT_ROUNDED_PER_LINE), true);
+		if (!is_array($decoded) || !isset($decoded['announced'], $decoded['invoice'])) {
+			return null;
+		}
+
+		return array('announced' => (float) $decoded['announced'], 'invoice' => (float) $decoded['invoice']);
 	}
 
 	/**

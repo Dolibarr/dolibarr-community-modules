@@ -18,7 +18,7 @@ packages:
       de: 'Prüft, ob die installierte Dolibarr-Version von bekannten Sicherheitslücken (CVEs) betroffen ist, indem die öffentliche NVD-Datenbank abgefragt wird. Zeigt einen Indikator für die Gefahrenstufe auf der Startseite an, sendet den Administratoren eine E-Mail, sobald eine neue Sicherheitslücke erkannt wird, und bietet eine detaillierte Berichtsseite, die jeden CVE auflistet.'
     status: 'enabled'
     created_at: '2026-08-21'
-    last_updated_at: "2026-10-05"
+    last_updated_at: "2026-09-20"
     category: '79'
     git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/dolisecure'
     git-branch: 'main'
@@ -58,7 +58,7 @@ packages:
     phpmax: ""
     price: 0
     created_at: '2025-10-10'
-    last_updated_at: "2026-10-05"
+    last_updated_at: "2026-10-18"
     # direct-download is yes if we can download the module to install it in application. Use 'dolistore' to force download from dolistore using dolistore-download
     direct-download: 'yes'
     # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
@@ -80,7 +80,7 @@ packages:
       en: 'Provides a way to make an online checkout of any membership dues, donation, customer invoice or customer order with the HelloAsso API. Also offer an option to synchronize membership.'
     status: 'enabled'
     created_at: '2024-12-10'
-    last_updated_at: "2026-10-05"
+    last_updated_at: "2026-10-18"
     category: '68, 67'
     git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/helloasso'
     git-branch: 'main'
@@ -110,9 +110,9 @@ packages:
     description:
       en: 'Integrates Dolibarr with KSeF (Krajowy System e-Faktur), the Polish National e-Invoice System. Generates FA(3) XML invoices, signs and submits them to KSeF, downloads UPO receipts, and automatically adds QR codes to PDF invoices.'
       pl: 'Integruje Dolibarr z KSeF (Krajowy System e-Faktur), polskim systemem e-faktur. Generuje faktury XML FA(3), podpisuje i przesyła je do KSeF, pobiera potwierdzenia UPO oraz automatycznie dodaje kody QR do faktur PDF.'
-    status: 'enabled'
+    status: 'disabled'
     created_at: '2025-12-04'
-    last_updated_at: "2026-08-15"
+    last_updated_at: "2026-10-18"
     category: '74'
     git: 'https://github.com/InPoint-Automation/Dolibarr-KSeF-Module.git'
     git-branch: 'main'
@@ -141,13 +141,13 @@ packages:
       en: 'Collect payments for your invoices, orders, proposals, memberships and donations by credit card (with 3D Secure) or SEPA direct debit through the Stancer payment platform. Handles SEPA mandates, direct debit rejections with their ISO 20022 codes, refunds, disputes, bank reconciliation of Stancer payouts and automatic payments through a scheduled job.'
     status: 'enabled'
     created_at: '2023-03-12'
-    last_updated_at: "2026-10-05"
+    last_updated_at: "2026-10-08"
     category: '68, 67'
     git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/stancer'
     git-branch: 'main'
     git-system: 'github'
     cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/stancer/cover.png'
-    current_version: "2.0.23"
+    current_version: "2.0.24"
     dolibarrmin: '15'
     dolibarrmax: "24.0"
     phpmin: '7.4'

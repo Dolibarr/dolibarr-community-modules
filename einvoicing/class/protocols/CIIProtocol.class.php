@@ -364,6 +364,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param 	CommonInvoice	$invoice 		Invoice object containing all necessary data.
 	 * @param	?Translate		$outputlangs	Output language
 	 * @return 	string 							XML representation of the invoice.
+	 * @throws	Exception						If a beforeEinvoiceXmlBuild hook fails
 	 */
 	public function generateXML($invoice, $outputlangs = null)
 	{
@@ -551,6 +552,14 @@ class CIIProtocol extends AbstractProtocol
 
 		dol_mkdir(dirname($xmlfile), einvoicingDataRoot(dirname($xmlfile)));
 		dol_delete_file($xmlfile);
+
+		global $action, $hookmanager;
+		$hookmanager->initHooks(array('einvoicegeneration'));
+		$parameters = array('protocol' => 'cii', 'invoiceData' => &$invoiceData, 'linesData' => &$linesData, 'object' => $invoice, 'outputlangs' => $outputlangs);
+		$reshook = $hookmanager->executeHooks('beforeEinvoiceXmlBuild', $parameters, $this, $action);
+		if ($reshook < 0) {
+			throw new Exception(implode(', ', array_filter(array_merge(array($hookmanager->error), $hookmanager->errors))));
+		}
 
 		$xmlcontent = $this->buildXML($invoiceData, $linesData, $this->getBuildXmlProfile($object), $outputlangs);
 
@@ -1015,6 +1024,16 @@ class CIIProtocol extends AbstractProtocol
 	 * The temp-file lifecycle is owned by createSupplierInvoiceFromSource() (the public wrapper).
 	 * The vendor synchronization runs in its own transaction, opened and closed here. The invoice
 	 * import transaction is opened here too, right after, but closed by that same wrapper.
+	 *
+	 * IMPORTANT
+	 * A valid einvoice document can have 2 total amount of vat different in the same document :
+	 * the Amount calculated from sum of (ttc - ht) of each declared line = rounding of lines as expected by accountancy
+	 * the rounding on group of vat found in BT112 field as expected by einvoicing rules).
+	 * Dolibarr will import the document matching the first one.
+	 * Rules applied:
+	 * DOL RULE 1 : The final imported invoice must have amount to pay with tax that is same than einvoice (only 1 value can exists in einvoice = BT110, so we can and must match).
+	 * DOL RULE 2: The total without vat should also be the same (only 1 value in einvoice =BT112, so we can and must match too)
+	 * DOL RULE 3: The total vat can differ (because there is 2 different values in einvoice and one amount can t be both equal to 2 different amounts at once, so we must choose one and it should be the sum of ttc - vat of each line. But in this case, we must have a permanent warning.
 	 *
 	 * @param  string			$file                 Raw CII XML content
 	 * @param  string|null		$readableViewFile     Optional readable view (PDP-generated readable PDF)
@@ -1850,6 +1869,27 @@ class CIIProtocol extends AbstractProtocol
 	 XML parsing methods
 	======================================================================================== */
 	/**
+	 * Make a received XML parsable when an emitter or an access point stacked several XML declarations.
+	 *
+	 * Some documents arrive as "<?xml ...?>\n" + BOM + "<?xml ...?><rsm:CrossIndustryInvoice>": a declaration
+	 * is only legal at the very start, so libxml refuses the whole document and every field reads as empty.
+	 * Only the leading declarations and BOMs are dropped, the last declaration is kept.
+	 *
+	 * @param  string $xml Received XML
+	 * @return string      XML with at most one declaration, at the start
+	 */
+	protected static function stripStrayXmlDeclarations($xml)
+	{
+		$bom = "\xEF\xBB\xBF";
+		$xml = ltrim($xml, $bom . " \t\r\n");
+		if (!preg_match('/^(<\?xml\b[^>]*\?>)((?:\s|\xEF\xBB\xBF)*<\?xml\b[^>]*\?>)+/', $xml)) {
+			return $xml;
+		}
+		// Keep the last declaration: it is the emitter's own, so its encoding is the one that is true.
+		return preg_replace('/^(?:<\?xml\b[^>]*\?>(?:\s|\xEF\xBB\xBF)*)+(?=<\?xml\b)/', '', $xml) ?? $xml;
+	}
+
+	/**
 	 * Initialise DOMDocument + DOMXPath with the three CII namespaces.
 	 *
 	 * @param string $xml XML string to parse
@@ -1858,7 +1898,13 @@ class CIIProtocol extends AbstractProtocol
 	private function initXPath($xml)
 	{
 		$doc = new \DOMDocument();
-		$doc->loadXML($xml);
+		$previous = libxml_use_internal_errors(true);
+		if (!$doc->loadXML(self::stripStrayXmlDeclarations($xml))) {
+			$error = libxml_get_last_error();
+			dol_syslog(__METHOD__ . ' received XML is not well formed: ' . ($error ? trim($error->message) . ' (line ' . $error->line . ')' : 'unknown error'), LOG_ERR, 0, '_einvoicing');
+		}
+		libxml_clear_errors();
+		libxml_use_internal_errors($previous);
 
 		$xpath = new \DOMXPath($doc);
 		$xpath->registerNamespace('rsm', 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100');
@@ -2204,6 +2250,39 @@ class CIIProtocol extends AbstractProtocol
 
 
 	/**
+	 * Count the items BR-FREXT-CO-15 and BR-FXEXT-S-08 grant a cent of tolerance each, in total and by VAT rate.
+	 *
+	 * Those are the lines that are not a GROUP or INFORMATION subline (BT-X-8), the document level
+	 * allowances and charges, and the logistics service fees.
+	 *
+	 * @param	DOMXPath	$xpath	XPath on the received document
+	 * @return	array{0:int,1:array<string,int>}	Count of the items, then count by VAT rate
+	 */
+	private function countToleranceItems($xpath)
+	{
+		$total = 0;
+		$byRate = array();
+		$queries = array(
+			'//ram:IncludedSupplyChainTradeLineItem[not(ram:AssociatedDocumentLineDocument/ram:LineStatusReasonCode) or ram:AssociatedDocumentLineDocument/ram:LineStatusReasonCode = "DETAIL"]' => 'ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax/ram:RateApplicablePercent',
+			'//ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeAllowanceCharge' => 'ram:CategoryTradeTax/ram:RateApplicablePercent',
+			'//ram:ApplicableHeaderTradeSettlement/ram:SpecifiedLogisticsServiceCharge' => 'ram:AppliedTradeTax/ram:RateApplicablePercent',
+		);
+		foreach ($queries as $itemExpr => $rateExpr) {
+			$nodes = $xpath->query($itemExpr);
+			if ($nodes === false) {
+				continue;
+			}
+			foreach ($nodes as $node) {
+				$total++;
+				$rate = (string) price2num((float) $this->getXPathValue($xpath, $rateExpr, $node));
+				$byRate[$rate] = ($byRate[$rate] ?? 0) + 1;
+			}
+		}
+
+		return array($total, $byRate);
+	}
+
+	/**
 	 * Parse the invoice header from CII XML.
 	 *
 	 * Special prefixes in $invoiceTemplate:
@@ -2253,6 +2332,9 @@ class CIIProtocol extends AbstractProtocol
 			if (isset($data[$f]))
 				$data[$f] = $this->toFloat($data[$f]);
 		}
+
+		// What an EXTENDED profile counts a cent of tolerance for (issue #1166)
+		list($data['toleranceItemCount'], $data['toleranceItemCountByRate']) = $this->countToleranceItems($xpath);
 
 		return $data;
 	}
@@ -4154,6 +4236,8 @@ class CIIProtocol extends AbstractProtocol
 		// BT-112 plus BT-114, which the invoice carries as a line of its own: what is confronted is what
 		// the buyer owes, BT-115 when the document answers BR-CO-16 (issue #994).
 		$announcedTtc = (float) (SupplierInvoiceHelper::announcedTotalTtc($parsedHeader) ?? (float) $parsedHeader['grandTotalAmount']);
+		// A reimport decides again whether the invoice keeps its VAT rounded per line (issue #1166)
+		SupplierInvoiceHelper::noteVatRoundedPerLine($supplierInvoiceId, null);
 
 		// BT-113 is what the document says was already paid. It moves neither BT-110 nor BT-112, so the
 		// two totals below agree whether or not it was deducted, and an invoice short of its deduction
@@ -4244,6 +4328,10 @@ class CIIProtocol extends AbstractProtocol
 			}
 		}
 
+		if ($this->keepVatRoundedPerLine($supplierInvoiceId, $parsedHeader, $announcedTva, $announcedTtc, $return_messages)) {
+			return;
+		}
+
 		// Neither convention rebuilds the announced totals by calculation. That does not make the document
 		// wrong: a vendor invoice can carry a VAT its own tool rounded differently, and it is what he bills.
 		// The amounts it announces are therefore written onto the lines that carry each rate, so the invoice
@@ -4267,6 +4355,56 @@ class CIIProtocol extends AbstractProtocol
 		$return_messages[] = $langs->trans('EInvoiceImportTotalsMismatchAction');
 
 		dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' does not total the received document (announced ' . $announcedTtc . ' incl. VAT, imported ' . $invoice->total_ttc . '): validation and approval blocked', LOG_WARNING);
+	}
+
+	/**
+	 * Keep an invoice of an EXTENDED document with its VAT rounded per line, when that is what its totals add up.
+	 *
+	 * Such a document may announce its VAT rounded per rate (BT-110, BG-23) while BT-109 and BT-112 add up the
+	 * VAT rounded per line, the two differing within a cent per item (BR-FREXT-CO-15, issue #1166). Both are
+	 * right: the invoice is recalculated per line (mode 1), kept when it then totals BT-109 and BT-112, and
+	 * noted with the two VAT totals so the card can tell why it differs from BT-110.
+	 *
+	 * @param	int					$supplierInvoiceId	Id of the invoice the import has just built
+	 * @param	array<string,mixed>	$parsedHeader		Header data of the received document
+	 * @param	float				$announcedTva		BT-110 of the document
+	 * @param	float				$announcedTtc		What the invoice is expected to total
+	 * @param	array<int,string>	$return_messages	Messages of the import, completed here
+	 * @return	bool									True when the invoice was kept that way
+	 */
+	protected function keepVatRoundedPerLine($supplierInvoiceId, array $parsedHeader, $announcedTva, $announcedTtc, array &$return_messages): bool
+	{
+		global $db, $langs;
+
+		$tolerance = SupplierInvoiceHelper::extendedTolerance($parsedHeader);
+		$announcedHt = SupplierInvoiceHelper::announcedTotalHt($parsedHeader);
+		$invoice = new FactureFournisseur($db);
+		if ($tolerance <= 0 || $announcedHt === null || $invoice->fetch((int) $supplierInvoiceId) <= 0) {
+			return false;
+		}
+		$invoice->fetch_thirdparty();
+		// '0' is the total of rounds: the VAT of each line rounded, then summed
+		if ($invoice->update_price(1, '0', 0, $invoice->thirdparty) <= 0 || $invoice->fetch((int) $supplierInvoiceId) <= 0) {
+			return false;
+		}
+
+		$sign = SupplierInvoiceHelper::documentSign($invoice);
+		$deposits = SupplierInvoiceHelper::linkedDepositTotals((int) $supplierInvoiceId);
+		$tva = $sign * ((float) $invoice->total_tva + $deposits['tva']);
+		$ttc = $sign * ((float) $invoice->total_ttc + $deposits['ttc']);
+		$ht = $ttc - $tva - $sign * ((float) $invoice->total_localtax1 + (float) $invoice->total_localtax2);
+		if (abs($ht - $announcedHt) >= 0.005 || abs($ttc - (float) $announcedTtc) >= 0.005 || abs($tva - (float) $announcedTva) > $tolerance + 0.0001) {
+			return false;
+		}
+
+		SupplierInvoiceHelper::clearTotalsMismatch($supplierInvoiceId);
+		SupplierInvoiceHelper::noteVatRoundedPerLine($supplierInvoiceId, (float) $announcedTva, $tva);
+
+		$langs->load('einvoicing@einvoicing');
+		$return_messages[] = $langs->trans('EInvoiceImportVatRoundedPerLine', price2num($tva, 'MT'), price2num($announcedTva, 'MT'));
+		dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' keeps the VAT rounded per line (' . $tva . '), its EXTENDED document announcing ' . $announcedTva . ' rounded per rate', LOG_DEBUG);
+
+		return true;
 	}
 
 	/**
@@ -4814,6 +4952,7 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	public static function removeAttachmentFromXml(string $xmlData, string $note = self::ATTACHMENT_REMOVED_NOTE): string
 	{
+		$xmlData = self::stripStrayXmlDeclarations($xmlData);
 		$xmlDoc = new DOMDocument();
 		if (!$xmlDoc->loadXML($xmlData)) {
 			throw new Exception(__METHOD__ . " : failed to load XML data");
@@ -4858,6 +4997,7 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		$xmlDoc = new DOMDocument();
+		$xmlData = self::stripStrayXmlDeclarations($xmlData);
 		if (!@$xmlDoc->loadXML($xmlData)) {
 			dol_syslog(__METHOD__ . " failed to load XML data, no attachment extracted", LOG_WARNING, 0, '_einvoicing');
 			return $attachments;

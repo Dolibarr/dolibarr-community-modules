@@ -281,7 +281,7 @@ function completAutoTags($content, $modulePath)
 
 		if (!empty($tagsToExtractFromDescriptor['current_version'])) {
 			$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..'); // We are in dev/build, we want to go to root of repository
-			$outzip = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . DIRECTORY_SEPARATOR . "module_" . strtolower($modulename) . "-" . $version . ".zip";
+			$outzip = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . "module_" . strtolower($modulename) . "-" . $version . ".zip";
 			print "We check if zip file for module ".$modulename.", with name ".$outzip." exists\n";
 			if (file_exists($outzip)) {
 				// File already exists, nothing is done.
@@ -632,7 +632,7 @@ function buildModulePackages($action, $modulename)
 			mkdirAndCheck($directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin');
 		}
 		$outzip = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . "module_" . $mod . "-" . $version . ".zip";
-		$outzipothers = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . DIRECTORY_SEPARATOR . "module_" . $mod . "-*.zip";
+		$outzipothers = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . "module_" . $mod . "-*.zip";
 		if (file_exists($outzip)) {
 			print "A zip file already exists with this name/version: $outzip\n";
 
