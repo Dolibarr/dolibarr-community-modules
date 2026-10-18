@@ -592,6 +592,12 @@ class EInvoicing
 	const EXTRAFIELD_BUYER_ORDER_REFERENCE = 'buyer_order_reference';
 
 	/**
+	 * Name, into llx_einvoicing_extrafields, of the despatch advice reference (BT-16) forced on one
+	 * invoice. When empty, the reference of the shipment linked to the invoice is used.
+	 */
+	const EXTRAFIELD_DESPATCH_ADVICE_REFERENCE = 'despatch_advice_reference';
+
+	/**
 	 * Name, into llx_einvoicing_extrafields, of the discounts the import created for the document level
 	 * allowances (BG-20) of a received invoice, comma separated. An import made again deletes them before
 	 * creating them anew: only freed, they would stay available as credit on the vendor.
@@ -2098,6 +2104,35 @@ class EInvoicing
 			$resprints .= '</tr>';
 		}
 
+		// Despatch advice reference (BT-16, issue #1151): the shipment linked to the invoice, unless one is
+		// forced here. Stored into llx_einvoicing_extrafields, like the buyer reference above.
+		if (($object->element == 'facture' || $object->element == 'invoice') && $object->id > 0) {
+			$currentDespatchAdvice = (string) $this->getExtraFieldValue($object->id, $object->element, self::EXTRAFIELD_DESPATCH_ADVICE_REFERENCE);
+			$resprints .= '<tr class="treinvoicing_collapseseparator">';
+			$resprints .= '<td>';
+			$resprints .= $form->editfieldkey($form->textwithpicto($langs->trans("EInvoiceDespatchAdviceReference"), $langs->trans("EInvoiceDespatchAdviceReferenceHelp")), 'einvoice_despatch_advice', '', $object, (int) $editenable);
+			$resprints .= '</td>';
+			$resprints .= '<td>';
+			if ($action == 'editeinvoice_despatch_advice' && $editenable) {
+				$resprints .= '<form name="setdespatchadvice" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
+				$resprints .= '<input type="hidden" name="token" value="' . newToken() . '">';
+				$resprints .= '<input type="hidden" name="action" value="setdespatchadvice">';
+				$resprints .= '<input type="hidden" name="page_y" value="page_y">';
+				$resprints .= '<input type="text" name="einvoice_despatch_advice" class="minwidth200" maxlength="255" value="' . dol_escape_htmltag($currentDespatchAdvice) . '">';
+				$resprints .= '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
+				$resprints .= '</form>';
+			} elseif (trim($currentDespatchAdvice) !== '') {
+				$resprints .= dol_escape_htmltag($currentDespatchAdvice);
+			} else {
+				$linkedDespatchAdvice = $this->getDespatchAdviceReference($object, 0);
+				if ($linkedDespatchAdvice !== '') {
+					$resprints .= '<span class="opacitymedium">' . dol_escape_htmltag($linkedDespatchAdvice) . '</span>';
+				}
+			}
+			$resprints .= '</td>';
+			$resprints .= '</tr>';
+		}
+
 		// If current status requires a reason, display it
 		if (!empty($currentStatusInfo['reasonCode'])) {
 			// Translated, and escaped for the fallback: what used to be printed was the translation KEY.
@@ -3535,6 +3570,56 @@ class EInvoicing
 		}
 
 		return (bool) getDolGlobalInt('EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION');
+	}
+
+	/**
+	 * Despatch advice reference (BT-16) of an invoice: the one forced on the invoice, or else the reference
+	 * of the first validated shipment linked to it, directly or through its orders. A draft shipment has no
+	 * final reference yet and is skipped.
+	 *
+	 * @param	Facture	$invoice	Customer invoice
+	 * @param	int		$withforced	1 to return the reference forced on the invoice when there is one
+	 * @return	string				Reference, '' when there is none
+	 */
+	public function getDespatchAdviceReference($invoice, $withforced = 1)
+	{
+		if ((int) $invoice->id <= 0) {
+			return '';
+		}
+		if ($withforced) {
+			$forced = trim((string) $this->getExtraFieldValue($invoice->id, $invoice->element, self::EXTRAFIELD_DESPATCH_ADVICE_REFERENCE));
+			if ($forced !== '') {
+				return $forced;
+			}
+		}
+
+		dol_include_once('/commande/class/commande.class.php');
+		dol_include_once('/expedition/class/expedition.class.php');
+
+		$invoice->fetchObjectLinked();
+		$shipmentIds = (isset($invoice->linkedObjectsIds['shipping']) && is_array($invoice->linkedObjectsIds['shipping'])) ? array_values($invoice->linkedObjectsIds['shipping']) : array();
+		if (isset($invoice->linkedObjectsIds['commande']) && is_array($invoice->linkedObjectsIds['commande'])) {
+			foreach ($invoice->linkedObjectsIds['commande'] as $orderId) {
+				$order = new Commande($this->db);
+				if ($order->fetch((int) $orderId) > 0) {
+					$order->fetchObjectLinked();
+					if (isset($order->linkedObjectsIds['shipping']) && is_array($order->linkedObjectsIds['shipping'])) {
+						$shipmentIds = array_merge($shipmentIds, array_values($order->linkedObjectsIds['shipping']));
+					}
+				}
+			}
+		}
+
+		$refs = array();
+		foreach (array_unique($shipmentIds) as $shipmentId) {
+			$shipment = new Expedition($this->db);
+			if ($shipment->fetch((int) $shipmentId) > 0 && (int) $shipment->status > 0 && trim((string) $shipment->ref) !== '') {
+				$refs[] = trim((string) $shipment->ref);
+			}
+		}
+		sort($refs);
+
+		return empty($refs) ? '' : $refs[0];
 	}
 
 
