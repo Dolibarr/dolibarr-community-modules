@@ -185,6 +185,7 @@ class modEInvoicing extends DolibarrModules
 			2 => array('EINVOICING_FLOWS_SYNC_CALL_LIMIT', 'chaine', '1', '0'),
 			3 => array('EINVOICING_SYNC_MARGIN_TIME_HOURS', 'chaine', '12', '0'),
 			4 => array('EINVOICING_FLOWS_SYNC_CALL_SIZE', 'chaine', '100', '0'),
+			5 => array('EINVOICING_PROTOCOL', 'chaine', 'CII', '0'),
 		);
 
 		// Some keys to add into the overwriting translation tables
