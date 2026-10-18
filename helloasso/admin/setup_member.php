@@ -426,7 +426,7 @@ if ((float) DOL_VERSION >= 21) {
 	}
 }
 echo '<br><span class="">'.$langs->trans("HelloAssoSyncButtonDesc").'</span><br><br>';
-print dolGetButtonAction('', $titlebutton, 'default', $_SERVER["PHP_SELF"].'?action=test', '', 1, array('attr' => array('class' => 'reposition')));
+print dolGetButtonAction('', $titlebutton, 'default', $_SERVER["PHP_SELF"].'?action=test&token='.newToken(), '', 1, array('attr' => array('class' => 'reposition')));
 
 
 print '<br><br>';

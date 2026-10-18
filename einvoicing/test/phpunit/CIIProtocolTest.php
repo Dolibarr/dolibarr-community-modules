@@ -1214,6 +1214,59 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
+	 * The catch-all product of the setup (issue #1146) answers a line only once everything else failed,
+	 * including the defaults of the vendor, and only while its option is on and products are not created.
+	 *
+	 * @return void
+	 */
+	public function testTheCatchallProductIsTheLastResort()
+	{
+		global $conf;
+
+		// The vendor with defaults first: one without any routing leaves its id free for the next call
+		$withdefault = $this->vendorWithDefaults(true, true);
+		$none = $this->vendorWithDefaults(false, false);
+		$catchall = $none['product'];	// a product of the fixture no routing points at
+
+		$names = array('EINVOICING_DEFAULT_PRODUCT_CATCHALL', 'EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID', 'EINVOICING_PRODUCTS_AUTO_GENERATION');
+		$saved = array();
+		foreach ($names as $name) {
+			$saved[$name] = $conf->global->$name ?? null;
+		}
+		try {
+			$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 0;
+			$conf->global->EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID = $catchall;
+			$conf->global->EINVOICING_DEFAULT_PRODUCT_CATCHALL = 0;
+			$this->assertSame(0, (int) $this->matchUnknownLine($none['socid'], 'B1')['res'], 'the product alone must not apply while the option is off');
+
+			$conf->global->EINVOICING_DEFAULT_PRODUCT_CATCHALL = 1;
+			$found = $this->matchUnknownLine($none['socid'], 'B1');
+			$this->assertSame($catchall, (int) $found['res'], 'a line of a vendor without default must use the catch-all');
+			$this->assertSame('defaultrouting', $found['matchtype'] ?? '');
+			$this->assertSame('catchall', $found['routingtype'] ?? '');
+			$this->assertSame($catchall, (int) $this->matchUnknownLine($none['socid'], 'M1', '')['res'], 'a mixed invoice of a vendor without default must use the catch-all');
+
+			$this->assertSame($withdefault['service'], (int) $this->matchUnknownLine($withdefault['socid'], 'S1')['res'], 'the default of the vendor must keep priority');
+			$this->assertSame(-1, (int) $this->matchUnknownLine($withdefault['socid'], 'M1', '')['res'], 'the catch-all must not hide the choice a mixed invoice asks for');
+
+			$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 1;
+			$this->assertSame(0, (int) $this->matchUnknownLine($none['socid'], 'B1')['res'], 'the catch-all must leave the line to the product creation');
+
+			$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 0;
+			$conf->global->EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID = $catchall + 1000000;
+			$this->assertSame(0, (int) $this->matchUnknownLine($none['socid'], 'B1')['res'], 'a deleted catch-all product must not be linked');
+		} finally {
+			foreach ($saved as $name => $value) {
+				if ($value === null) {
+					unset($conf->global->$name);
+				} else {
+					$conf->global->$name = $value;
+				}
+			}
+		}
+	}
+
+	/**
 	 * The bill of exchange awaiting acceptance, and the generic bank card and direct debit codes, reach a
 	 * Dolibarr payment mode on import. 48 and 49 are what many senders write, rather than the credit card (54)
 	 * and SEPA direct debit (59) variants the table already knew.
@@ -1296,6 +1349,111 @@ class CIIProtocolTest extends CommonClassTest
 		$this->assertGreaterThan(0, $invoice->insert_discount($id), (string) $invoice->error);
 
 		return (int) $id;
+	}
+
+	/**
+	 * An EXTENDED document may announce its VAT rounded per rate while BT-109 and BT-112 add up the VAT rounded
+	 * per line (BR-FREXT-CO-15): the invoice keeps the VAT per line, totals BT-109 and BT-112, and notes the two
+	 * VAT totals (issue #1166). The tolerance is a cent per line, 1.01 on 101 lines: one cent more and the
+	 * invoice is marked, like an EN 16931 document, which tolerates nothing.
+	 *
+	 * @return void
+	 */
+	public function testAnExtendedDocumentKeepsItsVatRoundedPerLine()
+	{
+		global $conf, $db;
+
+		foreach (array('EINVOICING_IMPORT_AS_FREE_LINES', 'EINVOICING_PRODUCTS_AUTO_GENERATION') as $name) {
+			$this->savedConstants[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
+		}
+		$conf->global->EINVOICING_IMPORT_AS_FREE_LINES = 1;
+		$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 0;
+		$this->createFixtureSeller();
+
+		$extended = 'urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr';
+		// The document of #1166: six lines of 93.24, 18.66 of VAT per line, 18.65 per rate on a base of 93.25
+		$bred = array('8.70', '0.28', '0.28', '8.70', '0.28', '75.00');
+		$hundredOne = array_fill(0, 101, '10.00');
+		// label => guideline, lines, BT-116, BT-110, BT-112, VAT of the invoice when it is kept (null: marked)
+		$cases = array(
+			'extended' => array($extended, $bred, '93.25', '18.65', '111.90', 18.66),
+			'en16931' => array('urn:cen.eu:en16931:2017', $bred, '93.25', '18.65', '111.90', null),
+			'extended, BT-112 beyond its VAT per line' => array($extended, $bred, '93.25', '18.65', '111.97', null),
+			'extended, 101 lines, 1.01 off' => array($extended, $hundredOne, '1010.00', '200.99', '1212.00', 202.00),
+			'extended, 101 lines, 1.02 off' => array($extended, $hundredOne, '1010.00', '200.98', '1212.00', null),
+		);
+		foreach ($cases as $label => $case) {
+			list($guideline, $lines, $basis, $tax, $grandTotal, $keptVat) = $case;
+			$id = $this->importBuiltDocument($guideline, $lines, $basis, $tax, $grandTotal);
+			$this->assertGreaterThan(0, $id, $label);
+			$invoice = new FactureFournisseur($db);
+			$invoice->fetch($id);
+
+			if ($keptVat !== null) {
+				$lineTotal = array_sum(array_map('floatval', $lines));
+				$this->assertNull(SupplierInvoiceHelper::totalsMismatch($id), $label . ': the invoice is not marked');
+				$this->assertEqualsWithDelta($lineTotal, (float) $invoice->total_ht, 0.001, $label . ': the invoice totals BT-109');
+				$this->assertEqualsWithDelta($keptVat, (float) $invoice->total_tva, 0.001, $label . ': with the VAT rounded per line');
+				$this->assertEqualsWithDelta((float) $grandTotal, (float) $invoice->total_ttc, 0.001, $label . ': and BT-112');
+				$this->assertCount(count($lines), $invoice->lines, $label . ': no line is added');
+				$this->assertSame(array('announced' => (float) $tax, 'invoice' => $keptVat), SupplierInvoiceHelper::vatRoundedPerLine($id), $label . ': both VAT totals are noted');
+			} else {
+				$this->assertNotNull(SupplierInvoiceHelper::totalsMismatch($id), $label . ': the invoice is marked');
+				$this->assertNull(SupplierInvoiceHelper::vatRoundedPerLine($id), $label . ': no note');
+			}
+		}
+	}
+
+	/**
+	 * Import a document built on the rounding fixture: its line repeated at the given amounts, 20 % each.
+	 *
+	 * @param	string				$guideline	BT-24
+	 * @param	array<int,string>	$lines		BT-131 of each line
+	 * @param	string				$basis		BT-116
+	 * @param	string				$tax		BT-117 and BT-110
+	 * @param	string				$grandTotal	BT-112 and BT-115
+	 * @return	int								Id of the invoice the import built
+	 */
+	private function importBuiltDocument($guideline, array $lines, $basis, $tax, $grandTotal)
+	{
+		global $db;
+
+		$doc = new DOMDocument();
+		$doc->load(__DIR__ . '/fixtures/received_documents/cii_rounding_amount.xml');
+		$xp = new DOMXPath($doc);
+		$xp->registerNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
+		$model = $xp->query('//ram:IncludedSupplyChainTradeLineItem')->item(0);
+		foreach ($lines as $n => $amount) {
+			$copy = $model->parentNode->insertBefore($model->cloneNode(true), $model);
+			$xp->query('.//ram:LineID', $copy)->item(0)->nodeValue = (string) ($n + 1);
+			$xp->query('.//ram:ChargeAmount', $copy)->item(0)->nodeValue = $amount;
+			$xp->query('.//ram:LineTotalAmount', $copy)->item(0)->nodeValue = $amount;
+		}
+		$model->parentNode->removeChild($model);
+		$rounding = $xp->query('//ram:RoundingAmount')->item(0);
+		$rounding->parentNode->removeChild($rounding);
+		$lineTotal = number_format(array_sum(array_map('floatval', $lines)), 2, '.', '');
+		$values = array(
+			'//ram:GuidelineSpecifiedDocumentContextParameter/ram:ID' => $guideline,
+			'//*[local-name()="ExchangedDocument"]/ram:ID' => 'EINV1166-' . strtoupper(bin2hex(random_bytes(4))),
+			'//ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/ram:BasisAmount' => $basis,
+			'//ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/ram:CalculatedAmount' => $tax,
+			'//ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:LineTotalAmount' => $lineTotal,
+			'//ram:TaxBasisTotalAmount' => $lineTotal,
+			'//ram:TaxTotalAmount' => $tax,
+			'//ram:GrandTotalAmount' => $grandTotal,
+			'//ram:DuePayableAmount' => $grandTotal,
+		);
+		foreach ($values as $path => $value) {
+			$xp->query($path)->item(0)->nodeValue = $value;
+		}
+
+		$res = (new CIIProtocol($db))->createSupplierInvoiceFromSource($doc->saveXML(), null, 'test1166');
+		$id = (int) ($res['res'] ?? 0);
+		$this->assertGreaterThan(0, $id, strip_tags((string) ($res['message'] ?? '')));
+		$this->createdInvoiceIds[] = $id;
+
+		return $id;
 	}
 
 	/**

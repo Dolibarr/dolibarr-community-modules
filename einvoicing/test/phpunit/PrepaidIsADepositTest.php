@@ -143,17 +143,102 @@ class PrepaidIsADepositTest extends CommonClassTest
 	}
 
 	/**
-	 * Run resolveMissingReferencedDocument() on an unknown preceding invoice "F-1".
+	 * Referenced invoices missing from Dolibarr, with what the import can tell of them.
+	 *
+	 * @return array<string,array{0:string,1:string,2:array<int,array<string,string>>,3:string}>	BT-3, BT-23, BG-3 entries, expected REFERENCE_* constant
+	 */
+	public function referenceProvider()
+	{
+		return array(
+			'typed down payment' => array('380', 'B1', array(array('IssuerAssignedID' => 'F-1', 'TypeCode' => '386')), CIIProtocol::REFERENCE_DOWN_PAYMENT),
+			'typed credit note' => array('380', 'B4', array(array('IssuerAssignedID' => 'F-1', 'TypeCode' => '381')), CIIProtocol::REFERENCE_UNKNOWN),
+			'typed self-billed down payment' => array('380', 'B1', array(array('IssuerAssignedID' => 'F-1', 'TypeCode' => '500')), CIIProtocol::REFERENCE_DOWN_PAYMENT),
+			'unknown type code' => array('380', 'B4', array(array('IssuerAssignedID' => 'F-1', 'TypeCode' => '130')), CIIProtocol::REFERENCE_UNKNOWN),
+			'lone reference after a down payment' => array('380', 'B4', array(array('IssuerAssignedID' => 'F-1')), CIIProtocol::REFERENCE_DOWN_PAYMENT),
+			'two references after a down payment' => array('380', 'B4', array(array('IssuerAssignedID' => 'F-1'), array('IssuerAssignedID' => 'A-9')), CIIProtocol::REFERENCE_UNKNOWN),
+			'ordinary invoice' => array('380', 'B1', array(array('IssuerAssignedID' => 'F-1')), CIIProtocol::REFERENCE_UNKNOWN),
+			'replacement invoice' => array('384', 'B4', array(array('IssuerAssignedID' => 'F-1')), CIIProtocol::REFERENCE_UNKNOWN),
+		);
+	}
+
+	/**
+	 * Only a typed down payment, or the lone reference of a final invoice after a down payment, is taken as one.
+	 *
+	 * @dataProvider referenceProvider
+	 * @param	string								$typeCode		BT-3 of the received document
+	 * @param	string								$framework		BT-23 of the received document
+	 * @param	array<int,array<string,string>>		$refDocs		BG-3 entries of the received document
+	 * @param	string								$expected		Expected REFERENCE_* constant for "F-1"
+	 * @return	void
+	 */
+	public function testWhatAMissingReferenceIsKnownToBe($typeCode, $framework, $refDocs, $expected)
+	{
+		$method = new ReflectionMethod('CIIProtocol', 'classifyReferencedInvoice');
+		$method->setAccessible(true);
+		$header = array('documenttypecode' => $typeCode, 'businessProcessId' => $framework, 'invoiceRefDocs' => $refDocs);
+
+		$this->assertSame($expected, $method->invoke(new CIIProtocol($GLOBALS['db']), 'F-1', $header));
+	}
+
+	/**
+	 * A missing down payment is named with the amount paid, offered as a down payment invoice, and vendor data shown as text.
+	 * @return	void
+	 */
+	public function testAMissingDownPaymentIsOfferedAsOne()
+	{
+		global $langs;
+
+		$ref = '<span onmouseover="x">F-1';
+		$messages = array();
+		$result = $this->resolveMissing(array('documentno' => '<span onmouseover="x">F-2', 'documenttypecode' => '380', 'businessProcessId' => 'B4', 'totalPrepaidAmount' => 120.00, 'invoiceRefDocs' => array(array('IssuerAssignedID' => $ref))), $messages, $ref);
+
+		$this->assertStringContainsString('&type=' . CommonInvoice::TYPE_DEPOSIT . '&', $result['action']);
+		$this->assertStringContainsString(price(120.00, 0, $langs, 1, -1, -1, ''), $result['businessmessage']);
+		$this->assertStringNotContainsString('<span', $result['businessmessage']);
+		$this->assertStringContainsString(' <a ', $result['action']);
+		$this->assertStringNotContainsString('<span', strstr($result['action'], ' <a ', true));
+	}
+
+	/**
+	 * A line reference (BT-128) is never offered as a down payment invoice.
+	 * @return	void
+	 */
+	public function testALineReferenceIsNotOfferedAsADownPayment()
+	{
+		$method = new ReflectionMethod('CIIProtocol', 'postponeForMissingLineDocument');
+		$method->setAccessible(true);
+		$header = array('documentno' => 'F-2', 'documenttypecode' => '380', 'businessProcessId' => 'B4', 'totalPrepaidAmount' => 120.00, 'invoiceRefDocs' => array(array('IssuerAssignedID' => 'F-1')));
+
+		$result = $method->invoke(new CIIProtocol($GLOBALS['db']), 'F-1', '1', 1, $header);
+
+		$this->assertStringNotContainsString('type=', $result['action']);
+	}
+
+	/**
+	 * A replacement does not deduct the invoice it replaces, even a down payment: it is not offered as one.
+	 * @return	void
+	 */
+	public function testAReplacedDownPaymentIsNotOfferedAsADeduction()
+	{
+		$messages = array();
+		$result = $this->resolveMissing(array('documentno' => 'F-2', 'documenttypecode' => '384', 'businessProcessId' => 'B1', 'totalPrepaidAmount' => 120.00, 'invoiceRefDocs' => array(array('IssuerAssignedID' => 'F-1', 'TypeCode' => '386'))), $messages);
+
+		$this->assertStringNotContainsString('type=', $result['action']);
+	}
+
+	/**
+	 * Run resolveMissingReferencedDocument() on an unknown preceding invoice, "F-1" by default.
 	 * @param	array<string,mixed>	$parsedHeader		Parsed header of the received document
 	 * @param	string[]			$messages			Import messages
+	 * @param	string				$refDoc				Reference of the unknown preceding invoice
 	 * @return	array<string,mixed>|null					Postpone result, or null when stepped over
 	 */
-	protected function resolveMissing(array $parsedHeader, array &$messages)
+	protected function resolveMissing(array $parsedHeader, array &$messages, $refDoc = 'F-1')
 	{
 		$method = new ReflectionMethod('CIIProtocol', 'resolveMissingReferencedDocument');
 		$method->setAccessible(true);
 
-		return $method->invokeArgs(new CIIProtocol($GLOBALS['db']), array('F-1', $parsedHeader, 1, 'preceding invoice of', &$messages));
+		return $method->invokeArgs(new CIIProtocol($GLOBALS['db']), array($refDoc, $parsedHeader, 1, 'preceding invoice of', &$messages));
 	}
 
 	/**

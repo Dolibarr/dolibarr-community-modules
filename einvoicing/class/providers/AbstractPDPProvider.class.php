@@ -271,9 +271,27 @@ abstract class AbstractPDPProvider
 		if (isset($response['response']['results']) && is_array($response['response']['results'])) {
 			$lines = $response['response']['results'];
 		}
+		// The search answers one page (25 lines on SuperPDP): a SIREN with more addresses, like the French State
+		// with one per service, loses the address this invoice is sent to. Ask for that one by its exact identifier,
+		// still under the same SIREN, rather than paging through thousands of lines on every check. Only when the
+		// page is short of the total (SuperPDP and Esalink name it differently); a missing total counts as short.
+		$wanted = self::normalizeAddressingIdentifier($addressingidentifier);
+		$total = isset($response['response']['totalNumberOfResults']) ? $response['response']['totalNumberOfResults'] : (isset($response['response']['total_number_results']) ? $response['response']['total_number_results'] : null);
+		if (!empty($lines) && $wanted !== '' && ($total === null || (int) $total > count($lines)) && !in_array($wanted, array_map(function ($line) {
+			return self::normalizeAddressingIdentifier(isset($line['addressingIdentifier']) ? $line['addressingIdentifier'] : '');
+		}, $lines), true)) {
+			$exactbody = json_encode(array('filters' => array(
+				'siren' => array('op' => 'strict', 'value' => $siren),
+				'addressingIdentifier' => array('op' => 'strict', 'value' => $wanted),
+			)));
+			$exact = $this->callApi('afnor-directory/v1/directory-line/search', 'POST', $exactbody, array(), 'precheck_directory');
+			if ((int) (isset($exact['status_code']) ? $exact['status_code'] : 0) == 200 && isset($exact['response']['results']) && is_array($exact['response']['results'])) {
+				$lines = array_merge($lines, $exact['response']['results']);
+			}
+		}
 		$result['entries'] = count($lines);
 
-		if ($result['entries'] > 0 && ($wanted = self::normalizeAddressingIdentifier($addressingidentifier)) !== '') {
+		if ($result['entries'] > 0 && $wanted !== '') {
 			// Keep only the line of the address this invoice is sent to. Whoever recorded a routing
 			// identifier for that third party (or forced one on the invoice) took responsibility for the
 			// address: reporting on a sibling line, open or not, would answer a question nobody asked.
@@ -796,7 +814,7 @@ abstract class AbstractPDPProvider
 			}
 
 			// Neither '_TOKEN' nor '_REFRESH' is in the list dolibarr_set_const() matches, so both would
-			// be stored as received. Reading needs no change, dolDecrypt() is applied to every constant.
+			// be stored as received. They are decrypted when the constants are loaded, and by fetchOAuthTokenDB() in memory.
 			dolibarr_set_const($db, $serviceName.'_TOKEN', self::encryptIfReadable($accessToken), 'chaine', 0, '', $forceentity);
 
 			if ($refreshToken !== null) {
@@ -900,9 +918,11 @@ abstract class AbstractPDPProvider
 				return false;
 			}
 
+			// dolibarr_set_const() leaves in memory the value it stored, encrypted by saveOAuthTokenDB(). dolDecrypt()
+			// returns unchanged a value already in clear (loaded at the start of the page, or read by dolibarr_get_const()).
 			return [
-				'token' => $token,
-				'refresh_token' => $refresh,
+				'token' => dolDecrypt($token),
+				'refresh_token' => dolDecrypt($refresh),
 				'token_expires_at' => $expire
 			];
 		}
@@ -1315,7 +1335,7 @@ abstract class AbstractPDPProvider
 	 * the access point and the build of the module that read it. Same untranslated "EINVOICING - " prefix
 	 * as the status events, so one search on the label finds them all.
 	 *
-	 * @param   FactureFournisseur  $supplierInvoice    The supplier invoice the import created
+	 * @param   FactureFournisseur  $supplierInvoice    The supplier invoice the import created or rebuilt
 	 * @param   Document            $document           The flow record the invoice was imported from
 	 * @return  int                                     Id of the created event, < 0 if KO
 	 */
@@ -1324,9 +1344,11 @@ abstract class AbstractPDPProvider
 		global $langs;
 
 		$langs->load('einvoicing@einvoicing');
-		// transnoentitiesnoconv(): an event label is stored raw and escaped where it is printed.
-		$label = "EINVOICING - " . $langs->transnoentitiesnoconv('EInvoicingEventImportLabel', (string) ($supplierInvoice->ref_supplier ?: $supplierInvoice->ref));
-		$message = $langs->transnoentitiesnoconv('EInvoicingEventImportNote', (string) $document->flow_id, $this->name, einvoicingModuleStamp());
+		// A re-import rebuilds the draft Document::reimport() names for the run. transnoentitiesnoconv():
+		// an event label is stored raw and escaped where it is printed.
+		$prefix = AbstractProtocol::$rebuildSupplierInvoiceId > 0 ? 'EInvoicingEventReimport' : 'EInvoicingEventImport';
+		$label = "EINVOICING - " . $langs->transnoentitiesnoconv($prefix . 'Label', (string) ($supplierInvoice->ref_supplier ?: $supplierInvoice->ref));
+		$message = $langs->transnoentitiesnoconv($prefix . 'Note', (string) $document->flow_id, $this->name, einvoicingModuleStamp());
 
 		$res = $this->addEvent('IMPORT', $label, $message, $supplierInvoice);
 		if ($res < 0) {

@@ -579,6 +579,13 @@ class EInvoicing
 	const EXTRAFIELD_TOTALS_MISMATCH = 'import_totals_mismatch';
 
 	/**
+	 * Name, into llx_einvoicing_extrafields, of the note left on a supplier invoice whose EXTENDED document
+	 * announces its VAT rounded per rate while its totals add up the VAT rounded per line. Holds both VAT
+	 * totals, so the card can tell why the invoice differs from BT-110 (issue #1166).
+	 */
+	const EXTRAFIELD_VAT_ROUNDED_PER_LINE = 'import_vat_rounded_per_line';
+
+	/**
 	 * Name, into llx_einvoicing_extrafields, of the order reference the supplier declared on the
 	 * invoice it sent (BT-13). Kept whether or not it matched a purchase order of Dolibarr.
 	 */
@@ -3244,6 +3251,36 @@ class EInvoicing
 	}
 
 	/**
+	 * Id of the external link record of an object on the current access point
+	 *
+	 * @param int       $elementId      	Linked Element ID
+	 * @param string    $elementType    	Linked Element type
+	 * @return int 							-1 on error, 0 if the object has no record, rowid otherwise
+	 */
+	public function fetchExtLinkId($elementId, $elementType)
+	{
+		global $db;
+
+		$providershort = preg_replace('/ViaPartner/', '', getDolGlobalString('EINVOICING_PDP'));
+
+		$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_extlinks";
+		$sql .= " WHERE element_id = " . (int) $elementId;
+		$sql .= " AND element_type = '" . $db->escape($elementType) . "'";
+		$sql .= " AND provider = '" . $db->escape($providershort) . "'";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			$this->errors[] = $db->lasterror();
+			return -1;
+		}
+
+		$obj = $db->fetch_object($resql);
+		$db->free($resql);
+
+		return $obj ? (int) $obj->rowid : 0;
+	}
+
+	/**
 	 * Insert or update external link record
 	 *
 	 * @param int       $elementId      	Linked Element ID
@@ -3269,20 +3306,12 @@ class EInvoicing
 			return 0;
 		}
 
-		// Check if record exists
-		$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_extlinks";
-		$sql .= " WHERE element_id = " . (int) $elementId;
-		$sql .= " AND element_type = '" . $db->escape($elementType) . "'";
-		$sql .= " AND provider = '" . $db->escape($providershort) . "'";
-
-		$resql = $db->query($sql);
-		if (!$resql) {
-			$this->errors[] = $db->lasterror();
+		$linkId = $this->fetchExtLinkId($elementId, $elementType);
+		if ($linkId < 0) {
 			return -1;
 		}
 
-		$exists = $db->num_rows($resql) > 0;
-		$db->free($resql);
+		$exists = $linkId > 0;
 		if ($exists) {
 			// Update existing record
 			$sql = "UPDATE " . $db->prefix() . "einvoicing_extlinks SET";
