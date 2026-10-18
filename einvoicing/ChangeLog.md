@@ -1,6 +1,465 @@
 # CHANGELOG MODULE EINVOICING FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
-## 1.0.4
+
+IMPORTANT: After each version upgrade, you must disable and enable the module so the migration of data will be done.
+
+
+
+## 1.3.0
+
+- FIX: [einvoicing] 'Import again' no longer gives a 404 on a Dolibarr installed in a sub-path
+- NEW: #771 [einvoicing] Send again an invoice the seller's AP rejected at emission
+- FIX: [einvoicing] A PDF attached to the invoice is no longer taken as the Factur-X carrier
+- FIX: einvoicing: a credit note (negative total) is no longer a false "different amount" conflict
+- DOC: [einvoicing] Bring the memos of doc/ back in line with main
+- FIX: [einvoicing] A text longer than its column stopped the import of a received document
+- FIX: [einvoicing] An invoice declaring itself already paid is not postponed on an unknown preceding invoice
+- FIX: [einvoicing] The scheduled sync uses the batch size set in the setup again
+- FIX: [einvoicing] receiving an invoice whose totals agree no longer fails on PostgreSQL
+- FIX: [einvoicing] A rejection with a long reason is kept in the lifecycle history
+- FIX: [einvoicing] A vendor keeping a code from a former numbering rule can be updated again, on import and when linked by hand
+- FIX: [einvoicing] A paid credit note citing an unknown invoice is imported
+- FIX: [einvoicing] Stop depositing the same lifecycle answer twice
+- FIX: einvoicing: the SIRET disambiguation test loads getCountry(), which Societe::create() of Dolibarr 21 calls unloaded
+- QUAL: [einvoicing] Drop the isEditable() test of the invoice card block, which never locked anything
+- FIX: [einvoicing] The Recap column of the document list is no longer a sort link that stops the page
+- FIX: [einvoicing] The Change entity button kills the supplier invoice card before Dolibarr 23
+- QUAL: [einvoicing] Sync transifex
+- FIX: [einvoicing] A document SIRET disambiguates thirdparties sharing a VAT number
+- FIX: [einvoicing] A lifecycle status the database fails to record is taken again, not marked as processed
+- FIX: [einvoicing] A received Factur-X with a comment before startxref is read below Dolibarr 22
+- FIX: [einvoicing] The configuration warning of a generated e-invoice is shown again on PHP 8
+- FIX: [einvoicing] Running the synchronization requires the write permission
+- FIX: [einvoicing] A received invoice with a negative total is refused at validation
+- NEW: show the address a default-routed invoice is sent to
+- FIX: einvoicing: make queued bad-amount flows actionable + surface the manual-action queue
+- FIX: #1097 [einvoicing] A CII generated for an invoice without PDF no longer fails to copy
+- FIX: [einvoicing] Supplier invoice status check no longer stops after the first try
+- NEW: [einvoicing] A B2G invoice carries the seller SIRET and says it is B2G
+- FIX: einvoicing: manual create product/thirdparty prefill returns 403 on firewall chars
+- FIX: [einvoicing] A line builder that cannot be reached is reported at its cause
+- FIX: [einvoicing] The OAuth token is read where it is saved on Dolibarr 23 pre-releases
+- FIX: [einvoicing] A refreshed OAuth token no longer goes back to the rotated one on a rollback
+- FIX: [einvoicing] AP platform list filter is a no-op for *ViaPartner providers
+- FIX: einvoicing: call dol_set_focus() from Dolibarr 25 only, and give PHPStan its reasons inline
+- FIX: [einvoicing] The PHPUnit tests do not depend on the instance they run on
+- QUAL: [einvoicing] phan accepts depositRefAnnouncedByDocument() until its TODO is done
+- QUAL: [einvoicing] Put phan and PHPStan back to green without hiding the phan findings
+- FIX: [einvoicing]  undefined function dol_is_dir() in CdarHandler when called from trigger
+- FIX: [einvoicing] A reference lookup that fails no longer stops the whole synchronization
+- FIX: [einvoicing] The lines of a received document are totalled with its vendor
+- FIX: einvoicing: proxy must not strip refresh_token charset (silent invalid_grant)
+- FIX: [einvoicing] The Document card no longer queries a "ref" column that does not exist
+- NEW: #995 [einvoicing] Trace columns of llx_einvoicing_call hold a whole document
+- FIX: [einvoicing] The vendor created when a document is imported has no country
+- FIX: [einvoicing] The module descriptor no longer warns when VERSION cannot be read
+- FIX: [einvoicing] The connection test script finds the instance when the module is a symlink
+- FIX: [einvoicing] The status of a generated e-invoice is really stored
+- FIX: [einvoicing] The default product of a vendor hides the product mapping
+- FIX: [einvoicing] Keep the qualifier of a Factur-X line reference
+- NEW: [einvoicing] A received document keeps the files its issuer embedded
+- FIX: [einvoicing] The identifier of a lifecycle message is its own, and fits its field
+- QUAL: [einvoicing] Remove the dead scheduled job left by the ModuleBuilder template
+- FIX: #995 [einvoicing] A payload too big no longer loses the whole API call trace
+- FIX: [einvoicing] A received SEPA credit transfer no longer loses the payment method
+- QUAL: [einvoicing] SuperPDP via-partner proxy refresh failure logs the PA's error body
+- FIX: [einvoicing] A refund is reported to the platform as a cash-out (212)
+- FIX: [einvoicing] The discount of a received line is taken against the line, not against BT-137
+- FIX: [einvoicing] A known vendor with nothing to write on it is no longer saved on import
+- FIX: [einvoicing] A thirdparty refused by verify() is no longer reported as a duplicate supplier code
+- FIX: [einvoicing] Do not try to create directories outside open_basedir
+- FIX: [einvoicing] A duplicate rejection no longer marks the valid invoice as rejected
+- QUAL: [einvoicing] Remove a private method of CIIProtocol nothing calls
+- FIX: [einvoicing] Link the reference of a flow to the object it was issued for
+- NEW: [einvoicing] Preview picto on the two diagnostic documents of the flow list
+- FIX: #1013 [einvoicing] The production credentials reach the database encrypted
+- FIX: [einvoicing] "Rejected" (213) named the seller's AP on a buyer's rejection
+- FIX: #955 [einvoicing] The deposit reprise line references the deposit invoice again
+- FIX: postpone flow default and add missing migration structure change
+- NEW: einvoicing: queue flows needing a manual action instead of aborting the whole synchronization
+- FIX: [einvoicing] An imported invoice totals the amount its document says is due
+- FIX: [einvoicing] A received Factur-X with a malformed date no longer stops the read
+- QUAL: [einvoicing] The comparison of a supplier invoice calls the price function of the core
+- NEW: [einvoicing] A received lifecycle status shows the amount its issuer reports
+- FIX: [einvoicing] Bring `main` back to green on Dolibarr 18, where the seller SIREN of an out-of-scope invoice fails the analysis
+- NEW: [einvoicing] Column lc_recipient_roles on llx_einvoicing_lifecycle_msg
+- NEW: [einvoicing] A sixth specimen, exempt from VAT, so the conformance run sees that case
+- FIX: [einvoicing] A supplier Dolibarr refuses to update no longer stops the synchronization
+- NEW: [einvoicing] The XML of the "Documents" tab gets its preview picto too
+- NEW: [einvoicing] An operation outside the scope of VAT is issued as such (category O)
+- FIX: #974 [einvoicing] An exempt line only repeats its reason where the profile asks for it
+- QUAL: [einvoicing] The setup page shows the legal notice it will write when the field is left empty
+- FIX: [einvoicing] A line whose net amount is entirely absorbed by its own charge is no longer counted twice
+- QUAL: [einvoicing] A flow result no longer carries actiondata set to null
+- FIX: [einvoicing] The multi-entity banner of the document list says something
+- FIX: [einvoicing] An absent product reference is used as a search key on import
+- FIX: [einvoicing] Record the status code on the lifecycle flows we send
+- FIX: [einvoicing] The conformance run reads a Schematron whole, not only its failed assertions
+- FIX: [einvoicing] Propagate supplier order extrafields to the invoice on auto-link
+- FIX: einvoicing: a class using a backported core helper must load compat/ itself
+- FIX: [einvoicing] The buyer SIRET of a Chorus invoice no longer fails the analysis on Dolibarr 18
+- FIX: [einvoicing] An amount already paid is only a deposit when the document says so
+- FIX: [einvoicing] Only raise the generation profile to EXTENDED-CTC-FR when needed
+- FIX: [einvoicing] Name the missing field instead of shipping a placeholder in the document
+- QUAL: [einvoicing] drop the writing side of XmlPatcher and rename it EmbeddedXmlReader
+- FIX: [einvoicing] A failed generation no longer swallows the warning before it, nor stays silent on Dolibarr 23
+- FIX: [einvoicing] A failed e-invoice generation is now said to the user
+- NEW: [einvoicing] Chorus Pro support carries the B2G identifiers the rules read
+- FIX: [einvoicing] The document list links the customer invoice again
+- FIX: [einvoicing] An attached deposit no longer keeps the invoice from being validated
+- QUAL: [einvoicing] The prepaid sample is one character away from ever being validated
+- FIX: [einvoicing] Use idprof function to retrieve SIREN instead of idprof1
+- QUAL: [einvoicing] Drop the VAT point date option the module stopped reading
+- FIX: [einvoicing] A received Factur-X no longer loses the document level charges (BG-21)
+- QUAL: [einvoicing] Remove an unused AJAX endpoint left over from the module skeleton
+- FIX: (einvoicing): seller card of the tracking tab reads the deposit and the local status right
+- FIX: [einvoicing] The last look no longer calls a line of work a discount
+- FIX: [einvoicing] A line reference to a document we do not hold no longer aborts the batch
+- FIX: [einvoicing] A missing deposit no longer disappears from the invoice that deducts it
+- FIX: [einvoicing] The status chosen before validation survives the configuration check
+- FIX: [einvoicing] The invoice a credit note starts from is read as an identifier
+- FIX: [einvoicing] The deliver-to party no longer carries the buyer's company identifier
+- FIX: #912 [einvoicing] The deposit a line deducts is referenced where a preceding invoice belongs
+- FIX: [einvoicing] Refuse an invoice whose currency is not the accounting one
+- FIX: [einvoicing] The e-invoice tracking tab answers on Dolibarr 18 and 19
+- QUAL: hand a string to the three functions that ask for one
+- QUAL: say why the module writes what the analysis reads as suspicious
+- FIX: einvoicing: duplicate agenda event on every supplier invoice status check
+- QUAL: the Factur-X reader calls a deprecated zugferd method for nothing
+- QUAL: drop the numbering machinery neither object can use
+- QUAL: pin the FNFE conformance rules to V1.4.0.04
+- FIX: [einvoicing] The import guard also confronts the amount the document says was already paid
+- QUAL: buildXML() takes the output language it is already handed
+- FIX: #826: einvoicing, mass delete of vendor reference mappings is broken as soon as the list is filtered
+- FIX: [einvoicing] The BASIC profile declares the specification identifier it is registered under
+- FIX: [einvoicing] A received invoice carries the VAT its document announces
+- QUAL: say why the module still calls the deprecated core API
+- FIX: einvoicing: sample invoice test reads a flow id out of a body that has none
+- FIX: [einvoicing] A text value XML cannot carry no longer breaks the document
+- FIX: #880 [einvoicing] Skip InvoiceReferencedDocument check for standard invoices (TypeCode 380)
+- FIX: [einvoicing] A received 0225 identifier is stored by its shape, not by its scheme
+- NEW: [dev] PHPStan on the einvoicing module, next to phan
+- NEW: [einvoicing] #920 The scheme of the party identifier becomes an option
+- FIX: [einvoicing] A lifecycle status about an invoice we sent no longer stalls the synchronization
+- FIX: [einvoicing] Read the 'Converted' CDAR when the access point holds no 'Original'
+- FIX: [einvoicing] The API call trace can be numbered on PostgreSQL
+- FIX: einvoicing: providers write an undeclared $error property
+- FIX: einvoicing: deleting a token ignores the entity holding the setup
+- FIX: einvoicing: the setup page fatals on a provider without initFormSetup
+- QUAL: read the recipient once in checkRecipientRoutableForSend()
+- QUAL: AbstractProtocol declares the method every protocol is called through
+- QUAL: callApi() is documented as refusing the body it is mostly given
+- QUAL: say what getProvider() builds, and drop the test that cannot fail
+- FIX: einvoicing: required-information check on an invoice with no loaded thirdparty
+- QUAL: thirdpartyidprof() reads the thirdparty it just tested
+- QUAL: a call and a document have no thirdparty to clone
+- FIX: #857: EsalinkPDPProvider does not record an incoming supplier invoice lifecycle status
+- FIX: [einvoicing] The extra order references only reach the profiles that declare them
+- FIX: [einvoicing] A customer order with a blank reference no longer makes the invoice invalid
+- FIX: [einvoicing] Enhance retrocompatibility for module activation check in older Dolibarr versions
+- FIX: [einvoicing] The short reference fixture of the supplier lookup test is unique per run
+- FIX: [einvoicing] The four discount sentinels of the core no longer reach the customer
+- FIX: #680 [einvoicing] The columns of the module become reachable on the cores that have no completeArrayFields hook
+- FIX: [einvoicing] Two pages die on Dolibarr 17 on the supplier filter of their third party selector
+- FIX: line discount dropped when BasisAmount is zero
+- FIX: #844 #850 [einvoicing] A received invoice line is imported at the amount it announces
+- FIX: #847 [einvoicing] The commercial name of the customer is the trading name of the document
+- NEW: #861 [einvoicing] A received document the import cannot reproduce no longer reaches validation
+- NEW: einvoicing: match vendor product references whatever their writing
+- FIX: [einvoicing] The dates written into an emitted document no longer depend on a timezone
+- FIX: [einvoicing] The scheduled flow sync no longer reports "Unknown error"
+
+## 1.2.0
+
+- FIX: #853 [einvoicing] The dates of a received document keep the day they state
+- FIX: [einvoicing] The CDAR date test errors on Dolibarr 19 since it landed on main
+- FIX: [einvoicing] Enhance status handling
+- QUAL: einvoicing: format the CDAR dates with the core date helpers
+- FIX: #831 Default legal mentions asserted the opposite of the law
+- FIX: XSS: escape received e-invoice fields shown in the sync results panel
+- FIX: [einvoicing] Realign the compat copies on the core they backport
+- FIX: #784 [einvoicing] The consistency check reads the document the invoice was imported from
+- FIX: [einvoicing] Typos: sotorder in the list title hook, GETPOSt in the OAuth proxy callback
+- FIX: #832: no lifecycle status offered on a flow the platform filed as B2B international
+- FIX: [einvoicing] The module no longer shows a raw translation key
+- NEW: #687 [einvoicing] The e-invoice XML can be read without downloading it
+- QUAL: [einvoicing] Shorten the comment blocks written by the other contributors
+- FIX: einvoicing: the prepaid amount follows what the core counts as paid
+- QUAL: [einvoicing] Shorten the comment blocks of the module to the rule of AGENTS.md
+- QUAL: einvoicing: regroup the phpunit files by the source file they test
+- FIX: einvoicing: give imported supplier invoice lines a rank
+- FIX: einvoicing: run every phpunit file of the module from AllTests
+- DOC: einvoicing: function map of the outbound and inbound chains, generated from the sources
+- NEW: [einvoicing] Export the selected flows or API calls for support
+- QUAL: #794 [einvoicing] An import made again keeps the line of the flow, the number of the draft, and the statuses already received
+- FIX: einvoicing: offer "Payment transmitted" only on an answered, payable invoice
+- FIX: einvoicing: name the platform in the CDAR send failure message
+- FIX: #806 [einvoicing] Write MDT-97 in the CDAR and stop relabelling the recipient address
+- FIX: einvoicing: build the VAT number the way the core does
+- FIX: einvoicing: strip the spaces of an identifier the same way everywhere
+- FIX: einvoicing: look up the payment term in the entity of the invoice
+- FIX: einvoicing: read the VAT dictionary in the entity of the seller
+- QUAL: einvoicing: read the previous situation line through FactureLigne
+- QUAL: einvoicing: handle temporary files with the core file helpers
+- QUAL: einvoicing: read the invoice status from the object, not from its table
+- QUAL: einvoicing: use the core getMultidirOutput() when the core has it
+- QUAL: einvoicing: read the payment mode from the core dictionary helper
+- FIX: einvoicing: accepting a received invoice validates it in Dolibarr
+- FIX: einvoicing: the default product of a vendor cannot be removed (#791)
+- FIX: #761 [einvoicing] A received document is judged on the invoice it carries, not on its envelope
+- FIX: #783 [einvoicing] A discounted line of a received document is imported at the amount it announces
+- FIX: [einvoicing] A mandatory extrafield on thirdparties no longer rejects received documents
+- FIX: also check prodname for ref_fourn
+- NEW: [einvoicing] Say on the synchronization list how to import a document again
+- FIX: [einvoicing] Deleting a flow with no supplier invoice is no longer a fatal
+- FIX: [einvoicing] A price stated per N units is not a price per unit
+- NEW: [einvoicing] The CI runs the suite, opens the pages and installs the package, on a real Dolibarr
+- FIX: #781 [einvoicing] A received invoice is recorded at the totals its document announces
+- FIX: [einvoicing] The message about a missing linked document says which of the two is missing
+- FIX: [einvoicing] Fatal error getCountry() undefined when auto-creating thirdparty in cron context
+- NEW: [einvoicing] Run the EN 16931 and CTC-FR rules on the documents of the module in the CI
+- QUAL: [einvoicing] The two not-for-prod options move to the Dev tools page
+- NEW: [einvoicing] A lifecycle answer says which build wrote it
+- FIX: [einvoicing] Say the CDAR temporary directory cannot be written, not that the file is missing
+- FIX: #772 [einvoicing] A received line that subtracts from the invoice is no longer dropped
+- FIX: [einvoicing] A control character in a description no longer makes the document unreadable
+- FIX: #739 [einvoicing] A structured legal identifier attaches a received document to a third party, a name only on request
+- FIX: #755 [einvoicing] A received e-invoice booked on the wrong third party can be recovered: delete the draft, import the document again
+- QUAL: [einvoicing] The debug stamp names the commit, not only the version
+- FIX: [einvoicing] Translation
+- FIX: [einvoicing] Both providers read the shape of a received flow they can import, not only the Converted one
+- FIX: [einvoicing] Say how to set the AFNOR conversion format on an existing SuperPDP application
+- FIX: [einvoicing] A status refused on the electronic address (MDT-73) says which address, and what to fix
+- FIX: #742 [einvoicing] A received Factur-X in the EXTENDED-CTC-FR profile can be imported again
+- FIX: #739 [einvoicing] ref_ext is not an identity claim for the seller of a received document
+- FIX: #739 [einvoicing] A received invoice stops landing on a thirdparty that only shares the email address
+- FIX: [einvoicing] Declare the hook contexts the module really uses, not 'all'
+- FIX: #680 [einvoicing] The join on einvoicing_routing stops repeating the thirdparties of the list
+- FIX: #735 [einvoicing] An invoice line charge (BG-28) stops being lost and corrupting the discount of its line
+- FIX: #731 [einvoicing] A document level charge (BG-21) of a received document stops leaving the total
+- FIX: #726 [einvoicing] A received line with an amount but no quantity stops being imported as zero
+- FIX: [einvoicing] Remove the unreachable shipping/delivery branch of _isLineFromExternalModule()
+- NEW: Add 'Change entity' button on supplier invoice card (EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE)
+- NEW: [einvoicing] The VAT category of a line is read from its VAT code (reverse charge, AE)
+- FIX: [einvoicing] The three check endpoints stop building their provider list without $mysoc
+- FIX: #720 [einvoicing] The directory check answers about the address the invoice is sent to
+- FIX: [einvoicing] A header allowance no longer breaks the whole synchronization on Dolibarr 18 and 19
+- FIX: #680 [einvoicing] The join on einvoicing_extlinks stops repeating the rows of a list
+- FIX: #680 [einvoicing] Searching a routing identifier stops turning the list into an SQL error
+- FIX: #680 [einvoicing] The tables joined into the lists of Dolibarr carry an index
+- FIX: #704 [einvoicing] The registry check keeps quiet on the fields INSEE does not disclose
+- FIX: #695 An ampersand in a text value empties the CII element that carries it
+- FIX: #674 [einvoicing] A situation invoice states the instalment it asks for, not the cumulative amount
+- FIX: #701 [einvoicing] A received e-invoice is written where the supplier invoice card reads it
+- FIX: #698 [einvoicing] The directory badge says when its answer comes from the fallback endpoint
+- FIX: do not forget $db in your object
+- FIX: #683 [einvoicing] The deliver-to party names the company, and an address keeps its lines
+- FIX: #685 [einvoicing] A deleted e-invoice stops being announced as ready to send
+- NEW: #686 The generated XML names the module commit, not only its version
+- FIX: use EINVOICING_FLOWS_SYNC_CALL_SIZE in cronSyncFlows
+- FIX: #681 [einvoicing] Generating a Factur-X no longer breaks the next PDF of the request
+- FIX: [einvoicing] Converting a deposit no longer raises six PHP warnings per VAT rate
+- FIX: #675 [einvoicing] A received invoice referencing a missing one no longer stops the whole synchronization
+
+## 1.1.0
+
+NEW: The VAT category of a line (BT-151) is read from the VAT code the line carries, so a document can
+declare a regime the rate alone cannot tell. A rate of zero covers zero rated, exempt, reverse charge,
+export and intra-community supplies alike, and the generator used to answer exempt for all of them: a
+building trade subcontractor, whose customer declares the tax under article 283, 2 nonies of the CGI,
+could not issue a single valid invoice. The category is the segment of the code before its first dash -
+'AE' and 'AE-IC' are both reverse charge - and the exemption reason (BT-120) is the note of the
+dictionary line, so two regimes sharing one category quote the article that is theirs. The exemption
+reason code (BT-121) is the one of the dictionary line where the core holds it, the standard code of the
+regime otherwise - VATEX-FR-AE for a French seller under the reverse charge, which names article 283
+of the CGI the invoice has to quote, VATEX-EU-AE for the sellers of the other member states, and
+VATEX-EU-G and VATEX-EU-IC for exports and intra-community supplies. A code the dictionary does not translate is
+still refused by name rather than answered with a guess, a reverse charge code on a taxed rate is
+reported on BR-AE-05 instead of building a document the platform rejects, and a reverse charge line that
+names only one of the two parties is reported on BR-AE-02 or BR-AE-03. Lines with no code, and taxed
+lines, are built exactly as before.
+
+FIX: The remote information of the SuperPDP setup page now describes the e-invoice address the module
+really sends with. A company can hold several entries in the French directory at once - one per
+document family, '<siren>_Invoice' or '<siren>_Status', beside the bare identifier - and the screen
+reported whichever one the platform returned first, that is the oldest one, whatever the routing
+identifier configured in the module. An installation sending with '<siren>_Status' was told its
+address was '<siren>_Invoice'. The entry that matches the routing identifier of the module is now the
+one reported, the other addresses of the company are listed beside it, and an address that has no
+directory entry at all is called out: invoices sent with it are refused for an unknown address, which
+nothing announced before the first refusal. The list of the entries also carried the status and the
+effective date of the first one on every line, so two entries out of three were shown with a date that
+was not theirs.
+
+NEW: The remote information of the SuperPDP setup page now shows the identity the Access Point holds
+for your company - name, company number and address - and compares it with the company set up in
+Dolibarr. A company number that differs is reported as an error, because an invoice issued for a
+company other than the one of the session is refused at sending time, and that refusal was only
+discovered on the first transmission. A name or an address that differs is reported as a note. The
+information comes from the directory entries, which the page already read: the session endpoint of the
+platform returns nothing but the verification statuses.
+
+FIX: The module can obtain an access token from the Esalink access point again. The token request had
+lost its grant_type parameter, which RFC 6749 requires whatever the client authentication method is,
+so the access point answered 400 Bad Request - "must not be blank" - before it ever looked at the
+credentials, and the setup screen could only report that no token could be obtained. No token means no
+exchange at all: no invoice sent and none received, on an installation whose credentials are perfectly
+valid. The parameter was dropped when the token request moved to an Authorization: Basic header for
+issue #586, and the option added afterwards, ESALINK_AUTHENT_USING_CLIENT_CREDENTIAL, restored the
+working form only for the installations that knew to set it - the default stayed without grant_type.
+The full form-urlencoded body - grant_type, client_id and client_secret, with no Basic header - is the
+default again: it is the form scripts/testconnect.php has always sent, which is why the diagnostic
+script kept working while the setup screen failed on the same credentials. HTTP Basic remains
+available behind ESALINK_AUTHENT_USING_BASIC_AUTH for an access point that requires it, with
+grant_type in the body there too and the credentials in the header only, as a client must not use more
+than one authentication method in the same request. An installation that set
+ESALINK_AUTHENT_USING_CLIENT_CREDENTIAL as a workaround keeps working: the constant is now without
+effect, and the request it used to select is the default.
+
+CHANGE: the backport of getMultidirVersion() is removed. That function entered the core in Dolibarr 20
+and the module carried a copy of it for the versions below, but it calls it nowhere - not once in the
+whole repository - so the copy was never reached on any version.
+
+CHANGE: GETPOSTFLOAT(), a function the core gained in Dolibarr 20 and that the module backports for the
+versions below, moves from the library of the module to compat/functions.lib.php, where the module keeps
+what it copies from the core. Pure move, guard included: the library requires that file, so the two call
+sites of admin/setup.php keep finding the function where they used to.
+CHANGE: getDolGlobalFloat(), a function the core gained in Dolibarr 21 and that the module backports for
+the versions below, moves from the library of the module to compat/functions.lib.php, where the module
+keeps what it copies from the core. Pure move, guard included: the library requires that file, so the
+eight call sites of PriceHelper - the rounding rule of the totals - keep finding the function where they
+used to.
+CHANGE: getMultidirTemp(), a function the core gained in Dolibarr 20 and that the module backports for the
+versions below, moves from the library of the module to compat/functions.lib.php, where the module keeps
+what it copies from the core. Pure move, guard included: the library requires that file, so the two call
+sites - the temporary directory the providers write a retrieved test invoice into - keep finding the
+function where they used to.
+CHANGE: dolPrintHTML(), a function the core gained in Dolibarr 18 and that the module backports for
+Dolibarr 17, moves from the library of the module to compat/functions.lib.php, where the module keeps
+what it copies from the core. Pure move, guard included: the library requires that file, so the seven
+call sites keep finding the function where they used to.
+
+CHANGE: dolPrintHTMLForAttribute(), a function the core only gained in Dolibarr 19, was backported in
+the library of the module, among its own functions. It now sits in compat/functions.lib.php, next to the
+other core helpers the module ships for the versions that do not have them. Nothing else changes: the
+library loads that file, so every caller finds the function where it used to. Worth knowing for the
+versions below 19: the backport calls dol_escape_htmltag() with six arguments and that function only
+takes five on Dolibarr 17, so the sixth one is not read there - which changes nothing for this use, the
+fifth argument being 0 already escapes the whole string. Checked on 17 and 18 against the core of 19,
+same output for plain text, accents, html tags, quotes, a javascript: link and an onerror attribute.
+
+FIX: The list of e-invoicing flows works again on Dolibarr 17, the version the descriptor of the module
+declares as the minimum it supports; that page had never been able to render there. It asks
+CommonObject::getFieldList() to leave out of the SELECT the columns it does not read, among them 'recap',
+a virtual column of the list which has no column in the table. That second argument only exists since
+Dolibarr 18: on 17 the method takes the alias alone and ignores the rest without a word, so 'recap' went
+into the query and the page answered a technical error, "Unknown column 't.recap' in 'SELECT'". Below 18
+the page now builds the same list the core builds since 18, and nothing changes on 18 and above, where
+getFieldList() is still the one doing it. Past that, the page died on "Call to undefined function
+GETPOSTDATE()", a helper the core gained in 18 as well: it is backported in compat/functions.lib.php,
+next to the other core helpers the module already ships for 17, and the page loads it. The page also
+loads the library of the module, for dolPrintHTMLForAttribute() - a function the core only gained in
+Dolibarr 19, already polyfilled there, that the same page calls to render its text columns and that
+would fatal on 17 and 18 for the same reason. Finally, the page read
+$conf->main_checkbox_left_column directly, a property the core only carries since Dolibarr 21, so every
+load below that wrote six PHP warnings in the log for a value that is empty there anyway: it is read
+through empty() now, the way one of those six places already read it.
+FIX: The CHORUS extrafields no longer print on the PDF of an invoice or an order when the CHORUS option
+is off (issue #614). They were declared printable = 1, "always print it", while their visibility depends
+on a condition, getDolGlobalInt("EINVOICING_USE_CHORUS"), that the card of the object honours but the PDF
+does not: CommonDocGenerator::getExtrafieldsInHtml() reads that condition on Dolibarr 18, 22, 23 and 24,
+and not on 17, 19, 20 and 21, where three empty labels of a feature nobody turned on reached every
+document. They are declared printable = 2 now, "print it only when it holds something", so an empty field
+stays out of the document on every version. An installation that already carries the extrafields keeps
+its own definition - addExtraField() does not touch an existing one - so the module updates them the way
+it already updates their condition, the next time it is activated.
+FIX: The e-invoice status combo no longer renders an invalid <option> on Dolibarr 17. The code of an
+Access Point status is shown next to its label through a <span> put in the 'data-html' of the option,
+and Form::selectarray() prints the data-* values of an option as they are on 17, where 18 and later
+escape them: the attribute closed on the first quote of that span, and the markup of the whole option
+was broken. The status list escapes the value itself on those cores now, which produces exactly what
+the newer ones produce, and leaves the newer ones untouched rather than escaping twice.
+NEW: The order reference the supplier declared on a received e-invoice (BT-13) is now kept on the
+supplier invoice the import creates, and shown on its card, whether or not it matched a purchase order
+of Dolibarr (issue #603). That reference was only used to auto-link the invoice to an order; the
+no-match case - the ordinary one - dropped it, so the accountant could not see what the supplier had
+declared, nor reconcile the invoice by hand. It is stored as sent, trimmed, in every case, and the
+auto-link keeps behaving exactly as before.
+
+The value does not go into an extrafield: the module deliberately stopped using the extrafields of the
+core, since an admin or a user can rename, empty or delete one while the module is accountable for the
+data it holds. It goes into a new table of the module, llx_einvoicing_extrafields, built on the model of
+llx_einvoicing_extlinks - element_id and element_type identify the object - plus a name and a value, so
+that the next property to keep on an object needs no schema change. EInvoicing::insertOrUpdateExtraField()
+and EInvoicing::getExtraFieldValue() are the way in and out.
+NEW: The reference a received e-invoice carries can now be matched against a ref_supplier that was
+typed with extra text around it. The five lookups the import runs on ref_supplier - the duplicate
+check, the referenced documents at document and at line level, and the source invoice of a credit
+note - were as many copies of the same exact-match query, in the CII path and again in the Factur-X
+one. A supplier invoice entered by hand as "PAY123 - FA202610 - dinner" was therefore never
+recognised as the one the XML calls "FA202610", and the import stopped on a document it could not
+find. Those call sites now share SupplierInvoiceHelper::findIdByRef(), which is still exact by
+default: the hidden option EINVOICING_TOLERANT_SUPPLIER_REF_MATCH adds a fallback, tried only when
+the exact match found nothing, and narrow enough that it cannot answer for the wrong invoice. A
+reference shorter than EINVOICING_TOLERANT_SUPPLIER_REF_MIN_LENGTH (8) or purely numeric is never
+searched for as a substring; the substring must be delimited by a non alphanumeric character or by
+an edge of the ref_supplier, so "FA202610" matches "PAY123 - FA202610 - dinner" but not "FA2026100";
+and the whitespace manual entry adds - "FA 2026 10", tabs and non-breaking spaces included - is
+tolerated without losing the boundary it forms. Several candidates are reported as an ambiguity
+instead of being guessed, and a database failure is no longer reported to the user as a missing
+document.
+
+FIX: The log of the API calls to the Approved Platform no longer loses rows. Call::getNextCallId()
+read the highest call number through the global $db, while logCall() builds and inserts its record on
+the independent $dbhistory - the connection it deliberately uses so the trace survives a rollback of
+the caller. A page working inside a transaction on $db, recording a payment or importing a received
+invoice, holds a consistent-read snapshot taken before the previous call was committed by
+$dbhistory, so the same number was handed out twice and the second insert died on
+uk_einvoicing_call_callid. Every API call after the first one in such a request left no trace at all,
+which in production hid the very transmission that had to be audited. The number is now read on the
+connection the record is written on, with a locking read (FOR UPDATE) held until that insert commits,
+so it can be neither stale nor handed out twice.
+
+FIX: A cash-in is no longer reported with the status 212 on an invoice the Approved Platform refused.
+The guard that decides it reads the 'transmitted' flag, which is true of every status but the local
+ones - and STATUS_ERROR is one it lets through, although that code is exactly what an acknowledgement
+"Error" leaves behind. So an e-invoice whose deposit the platform rejected counted as deposited, and
+the next payment recorded on the invoice reported a cash-in the platform has no invoice to attach it
+to. The cash-in is now skipped on that status, with a warning naming the invoice and a line in the
+log: the e-invoice has to be corrected and sent again, which the "Send" button of the invoice card
+still offers on that very status, and the cash-in reported afterwards.
+  
+FIX: The automatic transmission to the Access Point no longer fires on a document rebuild that has
+nothing to do with a validation. EINVOICING_AUTO_SEND_ON_GENERATION says it transmits "on invoice
+validation", but it lived in afterPDFCreation(), a hook called for every rebuild of the invoice PDF
+and unable to tell what asked for one. Recording a payment rebuilds the invoice document from inside
+Paiement::create(), and so do the "Generate" button of the invoice card and any mass or scheduled PDF
+rebuild. On an invoice validated before the module was set up - or deliberately left to be sent by
+hand - the first such rebuild deposited it at the Access Point on its own: an invoice dated three
+months earlier was submitted at the moment its payment was entered, and being transmitted from then
+on, it also unlocked the cash-in status (212) that the very same payment reported next. The
+BILL_VALIDATE trigger now marks the invoice for the rest of the request - it runs inside
+Facture::validate(), before the caller regenerates the document, and for no other reason - and the
+auto-send is limited to a generation that carries that mark. Nothing changes for the validation flow,
+in the card, in a mass action or through the API; every other rebuild still regenerates the e-invoice
+file and now leaves the transmission to the "Send" button.
+
+FIX: A third party recognised as a private individual is no longer reported as misconfigured when
+EINVOICING_SKIP_B2C is on (issue #600). The option already kept B2C invoices out of the e-invoicing
+scope - needEInvoiceManagement() answers "do not manage" on them, since B2C is reported by e-reporting
+and not transmitted as an e-invoice - but the pre-check of the third party knew nothing about it and
+still demanded a professional id, an identifier a private individual has no reason to own. Generating
+or sending such an invoice failed on "The customer has no professional id (SIREN)", and the invoice
+could be refused altogether where EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS is set. The pre-check
+now reads the same Societe::isACompany() as the decision does, so both ends of the chain agree on who
+is B2C, and neither the professional id nor the routing id is required of a private individual. A
+company without a professional id is still blocked, option or not.
+The same invoices could also reach that pre-check through the other end: needEInvoiceManagement()
+answers with a status code, and the two codes meaning "out of scope" (98 and 99) are truthy, so the
+callers that only tested its answer for truth treated an ignored invoice as one to e-invoice. They
+now ask the boolean question instead - mustManageEInvoice() for an invoice, isIgnoredStatus() for a
+stored status - both reading a single list of the codes that keep an invoice out of the scope. This
+also removes the generation button from an invoice explicitly excluded from e-invoicing.
 
 FIX: The supplier invoice list no longer fails on a MySQL server that keeps its default sql_mode. The
 columns the module adds to the SELECT of that list were never added to its GROUP BY, so MySQL refused the
@@ -25,6 +484,16 @@ PDF/A, and ISO 19005-3 requires every font used for rendering to be embedded. Ge
 in Factur-X while "PDF documents format" is not PDF/A-3b now warns, on the setup page of the module and
 on the invoice, that the recommended format is CII - which needs no PDF at all - and that keeping
 Factur-X means setting PDF/A-3b for the whole Dolibarr, in Home - Setup - PDF.
+NEW: A credit note received for an invoice that was refused can no longer be accepted. Refusing a
+received invoice cancels it - it owes nothing any more - and the vendor answers by issuing the credit
+note that closes the matter on its side. Accepting that credit note would acknowledge the reversal of a
+debt that never entered the accounts, and would leave the exchange saying two contradictory things about
+the same operation. So "Approved" and "Partially approved" are no longer offered on it, validating it no
+longer answers its vendor with "Approved" either, and the card says which refused invoice it credits;
+refusing it stays available, as do the statuses that settle nothing, like "Disputed" or "Suspended". A
+replacement invoice is deliberately left alone: it is the corrected invoice a vendor sends after a
+refusal, which is precisely what one has to be able to accept. A refusal the platform has not confirmed
+yet changes nothing either, since it can still be rejected (issue #594).
 
 NEW: Validating a supplier invoice received through the platform now answers its vendor with the
 "Approved" (205) status, instead of waiting for someone to remember the button on the invoice card.

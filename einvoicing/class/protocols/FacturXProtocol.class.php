@@ -27,43 +27,26 @@
  */
 
 //use custom\facturx\Fidry\FileSystem\FS;
-use horstoeko\zugferd\codelists\ZugferdCountryCodes;
-use horstoeko\zugferd\codelists\ZugferdCurrencyCodes;
-use horstoeko\zugferd\codelists\ZugferdInvoiceType;
-use horstoeko\zugferd\codelists\ZugferdReferenceCodeQualifiers;
-use horstoeko\zugferd\codelists\ZugferdUnitCodes;
-use horstoeko\zugferd\codelists\ZugferdVatCategoryCodes;
-use horstoeko\zugferd\codelists\ZugferdVatTypeCodes;
-use horstoeko\zugferd\ZugferdDocumentBuilder;
-use horstoeko\zugferd\ZugferdProfiles;
-use horstoeko\zugferd\ZugferdSettings;
-use horstoeko\zugferd\ZugferdDocumentPdfBuilder;
-use horstoeko\zugferd\ZugferdDocumentValidator;
 use horstoeko\zugferd\ZugferdDocumentPdfReader;
-use horstoeko\zugferd\ZugferdDocumentPdfReaderExt;
-
-require __DIR__ . "/../../vendor/autoload.php";
 
 dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
 dol_include_once('einvoicing/class/protocols/CommonProtocol.class.php');
-dol_include_once('einvoicing/class/utils/XmlPatcher.class.php');
-dol_include_once('einvoicing/class/utils/CtcFrPdfMerger.class.php');
-// FacturxTcpdfMerger is NOT included here: it descends from TCPDF, which the core only loads when a
-// PDF is actually rendered. Requiring it at load time would make every page that instantiates this
-// protocol die on "Class TCPDF not found". It is included where it is used, which is precisely the
-// branch where the core has already loaded TCPDF.
+dol_include_once('einvoicing/class/utils/EmbeddedXmlReader.class.php');
+dol_include_once('einvoicing/class/utils/PdfAttachmentExtractor.class.php');
+// Neither vendor/autoload.php nor the two mergers are required here. Both mergers descend from a
+// composer class, and that autoloader refuses to run below the PHP its libraries need, so loading
+// them at file scope would make a received Factur-X fatal on a PHP that reads it perfectly well.
+// They belong to generateInvoice(), the only place that writes a container. The same reasoning has
+// always applied to FacturxTcpdfMerger, which descends from TCPDF and needs the core PDF stack.
 
 
 /**
  * FacturX Protocol Class
  *
- * This class handles the FacturX protocol implementation for generating
- * and managing electronic invoices according to the FacturX standard.
- * This also throw an error if data is not correct.
- *
- * This implementation is based on FacturX plugin developed by CAP REL.
- * It has been adapted and integrated into the EInvoicing module to provide
- * electronic invoicing capabilities compliant with the French Factur-X standard.
+ * This class handles the FacturX protocol implementation for generating and managing electronic
+ * invoices according to the FacturX standard. This also throw an error if data is not correct.
+ * Based on the FacturX plugin developed by CAP REL, adapted and integrated into the EInvoicing
+ * module to provide electronic invoicing capabilities compliant with the French Factur-X standard.
  *
  * @author  Eric Seigne <eric.seigne@cap-rel.fr>
  * 			Modified by mdaoud
@@ -74,541 +57,13 @@ class FacturXProtocol extends CIIProtocol
 	use CommonProtocol;
 
 	/** @const string Invoice file extension (without the dot, example 'xml') */
-	protected const INVOICE_FILE_EXTENSION = 'pdf';
+	const INVOICE_FILE_EXTENSION = 'pdf';
 
 	/** @const string Generated invoice file name */
-	protected const GENERATED_INVOICE_XML_FILE_NAME = 'factur-x.xml';
+	const GENERATED_INVOICE_XML_FILE_NAME = 'factur-x.xml';
 
 	/** @const string The profile used to generate XML */
-	protected const BUILD_XML_PROFILE = 'EXTENDED';
-
-	/** @const string Path of the line unit price nodes, relative to the line item node */
-	private const NODE_LINE_ITEM = '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem';
-
-	/**
-	 * Tell the lib how many decimals the norm allows on the nodes where its default of 2 is wrong.
-	 *
-	 * The lib serializes every AmountType and QuantityType with 2 decimals unless a node is
-	 * declared here. That default is right for the amounts, but not for the unit prices
-	 * (BT-146/BT-148, up to 6 decimals) nor for the invoiced quantity (BT-129, up to 4): rounding
-	 * those to 2 loses the accuracy the receiver needs to recalculate the line amount.
-	 *
-	 * @return	void
-	 */
-	protected static function applyNormDecimalPlaces()
-	{
-		ZugferdSettings::addSpecialDecimalPlacesMap(
-			self::NODE_LINE_ITEM . '/ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:ChargeAmount',
-			self::getUnitPriceDecimals()
-		);
-		ZugferdSettings::addSpecialDecimalPlacesMap(
-			self::NODE_LINE_ITEM . '/ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:ChargeAmount',
-			self::getUnitPriceDecimals()
-		);
-		ZugferdSettings::addSpecialDecimalPlacesMap(
-			self::NODE_LINE_ITEM . '/ram:SpecifiedLineTradeDelivery/ram:BilledQuantity',
-			self::MAX_DECIMALS_QUANTITY
-		);
-	}
-
-	/**
-	 * Generate the XML content for a given invoice according to the Factur-X standard.
-	 * This also make a lot of check
-	 *
-	 * This method converts the provided invoice data into a structured XML file
-	 * compliant with the Factur-X specification (hybrid PDF + XML format).
-	 *
-	 * @param 	CommonInvoice	$invoice 		Invoice object containing all necessary data.
-	 * @param	?Translate		$outputlangs	Output language
-	 * @return 	string 							XML representation of the invoice.
-	 */
-	public function generateXML($invoice, $outputlangs = null)
-	{
-		global $conf, $user, $langs, $mysoc, $db;	// Used by the include
-
-		if (!getDolGlobalInt('EINVOICING_USE_EXTERNAL_FACTURX_BUILDER')) {
-			return parent::generateXML($invoice, $outputlangs);
-		} else {
-			// deprecated, use the native $CII->buildXML method instead !
-
-			// Call page to generate the invoice
-			include dol_buildpath('einvoicing/lib/buildinvoicelines.inc.php');
-			/**
-			 * From include:
-			 * @var Facture 			$object			The `$invoice` object used in entry on inc file, but completed.
-			 * @var array{
-			 *   documentno: string,
-			 *   documenttypecode: null|string,
-			 *   documentdate: DateTimeInterface,
-			 *   invoiceCurrency: string|list<string>,
-			 *   taxCurrency: null,
-			 *   documentname: null,
-			 *   documentlanguage: string,
-			 *   effectiveSpecifiedPeriod: 'NA',
-			 *   documentDeliveryDate: DateTimeInterface,
-			 *   invoicingPeriodStart: ?DateTimeInterface,
-			 *   invoicingPeriodEnd: ?DateTimeInterface,
-			 *   businessProcessId: string,
-			 *   isTestDocument: bool,
-			 *   documentNotePublic: string,
-			 *   documentNotePMT: string,
-			 *   documentNotePMD: string,
-			 *   documentNoteAAB: string,
-			 *   documentNoteTXD: string,
-			 *   vatDueDateTypeCode: string,
-			 *   documentNotes: array,
-			 *   sellername: string,
-			 *   sellerids: string,
-			 *   sellerlineone: string,
-			 *   sellerlinetwo: string,
-			 *   sellerlinethree: string,
-			 *   sellerpostcode: string,
-			 *   sellercity: string,
-			 *   sellercountry: string,
-			 *   sellersubdivision: null,
-			 *   sellercontactpersonname: string,
-			 *   sellercontactdepartmentname: null,
-			 *   sellercontactphoneno: string,
-			 *   sellercontactfaxno: string,
-			 *   sellercontactemailaddr: string,
-			 *   sellerCommunicationUriScheme: string,
-			 *   sellerCommunicationUri: string,
-			 *   sellerGlobalIds: list<array{schemeID: string, value: string}>,
-			 *   sellerTaxRegistrations: list<array{type: string, value: string}>,
-			 *   sellervatnumber: string,
-			 *   sellerLegalOrgId: string,
-			 *   sellerLegalOrgScheme: string,
-			 *   sellerTradingName: string,
-			 *   buyername: string,
-			 *   buyerids: string,
-			 *   buyerlineone: string,
-			 *   buyerlinetwo: string,
-			 *   buyerlinethree: string,
-			 *   buyerpostcode: string,
-			 *   buyercity: string,
-			 *   buyercountry: string,
-			 *   buyersubdivision: null,
-			 *   buyervatnumber: string,
-			 *   buyerGlobalIds: list<array{schemeID: string, value: string}>,
-			 *   buyerLegalOrgId: string,
-			 *   buyerLegalOrgScheme: string,
-			 *   buyerTradingName: string,
-			 *   buyerReference: null|string,
-			 *   buyerCommunicationUriScheme: string,
-			 *   buyerCommunicationUri: string,
-			 *   buyercontactpersonname: null,
-			 *   buyercontactemailaddr: null,
-			 *   buyercontactphoneno: null,
-			 *   grandTotalAmount: float|int,
-			 *   duePayableAmount: float|int,
-			 *   lineTotalAmount: float|int,
-			 *   chargeTotalAmount: float,
-			 *   allowanceTotalAmount: float|int,
-			 *   taxBasisTotalAmount: float|int,
-			 *   taxTotalAmount: float|int,
-			 *   roundingAmount: null,
-			 *   totalPrepaidAmount: float|int,
-			 *   iban_id: int,
-			 *   iban: string,
-			 *   bic: string,
-			 *   accountName: string,
-			 *   accountRef: string,
-			 *   accountLabel: string,
-			 *   paymentDueDate: DateTimeInterface,
-			 *   paymentTermsText: string,
-			 *   headerAllowancesCharges: array,
-			 *   invoiceRefDocs: array|list<array{ref: string|int, date: \DateTimeInterface, type: string}>,
-			 *   orderReference: string,
-			 *   contractReference: null|string,
-			 *   despatchAdviceRef: null,
-			 *   taxBreakdown: array|list<array<string, array>>,
-			 *   _chorus: bool,
-			 *   _depositlines: array|list<array{lineId: int, invoiceRef: string, invoiceDate: DateTimeInterface}>,
-			 *   _globalDiscounts: array|list<array{value: float, reason: string, taxRate: float, categoryVAT: string}>,
-			 *   _customerOrderReferenceList: string[],
-			 *   _project: \Project|null,
-			 *   paymentMeansCode?: int,
-			 *   paymentMeansText?: string,
-			 *   _shipFromContactBill?: array{address: null|string, zip: null|string, town: null|string, country: string},
-			 *   _shipFromContactShip?: array{name: string, address: null|string, zip: null|string, town: null|string, country: string}
-			 * }	$invoiceData
-			 * @var array<int, array{
-			 *   lineid: int,
-			 *   linestatuscode: 'NA',
-			 *   linestatusreasoncode: 'NA',
-			 *   lineNote: null,
-			 *   prodname: string,
-			 *   proddesc: string,
-			 *   prodsellerid: string,
-			 *   prodbuyerid: null|string,
-			 *   prodglobalidtype: null|string,
-			 *   prodglobalid: null|string,
-			 *   prodmultilangs: array,
-			 *   prodClassificationCode: null|string,
-			 *   prodClassificationScheme: null|string,
-			 *   prodOriginCountry: null|string,
-			 *   netpriceamount: float,
-			 *   netpricebasisquantity: null|float,
-			 *   netpricebasisquantityunitcode: null|string,
-			 *   billedquantity: float,
-			 *   billedquantityunitcode: string,
-			 *   chargeFreeQuantity: null|float,
-			 *   chargeFreeQuantityunitcode: null|string,
-			 *   packageQuantity: null|float,
-			 *   packageQuantityunitcode: null|string,
-			 *   lineTotalAmount: float|string,
-			 *   totalAllowanceChargeAmount: null|float,
-			 *   categoryCode: string,
-			 *   typeCode: 'VAT',
-			 *   rateApplicablePercent: string,
-			 *   tva_tx: float|string,
-			 *   vat_src_code: string,
-			 *   ExemptionReason: string,
-			 *   ExemptionReasonCode: string,
-			 *   calculatedAmount: null|float,
-			 *   lineAllowances: array,
-			 *   lineGrossPriceAllowances: array,
-			 *   lineremisepercent: 'NA'|float,
-			 *   linePeriodStart: ?\DateTimeInterface,
-			 *   linePeriodEnd: ?\DateTimeInterface,
-			 *   additionalRefDocs: array,
-			 *   isDepositLine: bool,
-			 *   depositInvoiceRef: null|string,
-			 *   depositInvoiceDate: ?DateTimeInterface,
-			 *   parentDocumentNo: null|string,
-			 *   is_deposit: int<0,1>,
-			 *   fk_remise: null|int,
-			 *   discountPercent: float,
-			 *   grosspriceamount: null|float,
-			 *   grosspricebasisquantity: null|float,
-			 *   grosspricebasisquantityunitcode: null|string
-			 * }> $linesData
-			 * @var string 				$outputlang		Value of $outputlangs->defaultlang
-			 * @var Account				$account
-			 * @var EInvoicing			$einvoicing
-			 * @var string 				$schemeUri		Buyer scheme uri
-			 * @var string 				$uri			Buyer uri
-			 */
-			'
-			@phan-var-force Facture 			$object			The $invoice object used in entry on inc file, but completed.
-			@phan-var-force array{documentno:string,documenttypecode:null|string,documentdate:DateTimeInterface,invoiceCurrency:string|array<string>,taxCurrency:null,documentname:null,documentlanguage:string,effectiveSpecifiedPeriod:\'NA\',documentDeliveryDate:DateTimeInterface,invoicingPeriodStart:?DateTimeInterface,invoicingPeriodEnd:?DateTimeInterface,businessProcessId:string,isTestDocument:bool,documentNotePublic:string,documentNotePMT:string,documentNotePMD:string,documentNoteAAB:string,documentNoteTXD:string,documentNotes:array,vatDueDateTypeCode:string,sellername:string,sellerids:string,sellerlineone:string,sellerlinetwo:string,sellerlinethree:string,sellerpostcode:string,sellercity:string,sellercountry:string,sellersubdivision:null,sellercontactpersonname:string,sellercontactdepartmentname:null,sellercontactphoneno:string,sellercontactfaxno:string,sellercontactemailaddr:string,sellerCommunicationUriScheme:string,sellerCommunicationUri:string,sellerGlobalIds:array<array{schemeID:string,value:string}>,sellerTaxRegistrations:array<array{type:string,value:string}>,sellervatnumber:string,sellerLegalOrgId:string,sellerLegalOrgScheme:string,sellerTradingName:string,buyername:string,buyerids:string,buyerlineone:string,buyerlinetwo:string,buyerlinethree:string,buyerpostcode:string,buyercity:string,buyercountry:string,buyersubdivision:null,buyervatnumber:string,buyerGlobalIds:array<array{schemeID:string,value:string}>,buyerLegalOrgId:string,buyerLegalOrgScheme:string,buyerTradingName:string,buyerReference:null|string,buyerCommunicationUriScheme:string,buyerCommunicationUri:string,buyercontactpersonname:null,buyercontactemailaddr:null,buyercontactphoneno:null,grandTotalAmount:float|int,duePayableAmount:float|int,lineTotalAmount:float|int,chargeTotalAmount:float,allowanceTotalAmount:float|int,taxBasisTotalAmount:float|int,taxTotalAmount:float|int,roundingAmount:null,totalPrepaidAmount:float|int,iban_id:int,iban:string,bic:string,accountName:string,accountRef:string,accountLabel:string,paymentDueDate:DateTimeInterface,paymentTermsText:string,headerAllowancesCharges:array,invoiceRefDocs:array|array<array{ref:string|int,date:DateTimeInterface,type:string}>,orderReference:string,contractReference:null|string,despatchAdviceRef:null,taxBreakdown:array|array<array<string,array>>,_chorus:bool,_depositlines:array|array<array{lineId:int,invoiceRef:string,invoiceDate:DateTimeInterface}>,_globalDiscounts:array|array<array{value:float,reason:string,taxRate:float,categoryVAT:string}>,_customerOrderReferenceList:string[],_project:Project|null,paymentMeansCode?:int,paymentMeansText?:string,_shipFromContactBill?:array{address:null|string,zip:null|string,town:null|string,country:string},_shipFromContactShip?:array{name:string,address:null|string,zip:null|string,town:null|string,country:string}} $invoiceData
-			@phan-var-force array<int,array{lineid:int,linestatuscode:\'NA\',linestatusreasoncode:\'NA\',lineNote:null,prodname:string,proddesc:string,prodsellerid:string,prodbuyerid:null|string,prodglobalidtype:null|string,prodglobalid:null|string,prodmultilangs:array,prodClassificationCode:null|string,prodClassificationScheme:null|string,prodOriginCountry:null|string,netpriceamount:float,netpricebasisquantity:null|float,netpricebasisquantityunitcode:null|string,billedquantity:float,billedquantityunitcode:string,chargeFreeQuantity:null|float,chargeFreeQuantityunitcode:null|string,packageQuantity:null|float,packageQuantityunitcode:null|string,lineTotalAmount:float|string,totalAllowanceChargeAmount:null|float,categoryCode:string,typeCode:\'VAT\',rateApplicablePercent:string,tva_tx:float|string,vat_src_code:string,ExemptionReason:string,ExemptionReasonCode:string,calculatedAmount:null|float,lineAllowances:array,lineGrossPriceAllowances:array,lineremisepercent:\'NA\'|float,linePeriodStart:?DateTimeInterface,linePeriodEnd:?DateTimeInterface,additionalRefDocs:array,isDepositLine:bool,depositInvoiceRef:null|string,depositInvoiceDate:?DateTimeInterface,parentDocumentNo:null|string,is_deposit:int<0,1>,fk_remise:null|int,discountPercent:float,grosspriceamount:null|float,grosspricebasisquantity:null|float,grosspricebasisquantityunitcode:null|string}> $linesData
-			@phan-var-force string 				$outputlang		Value of $outputlangs->defaultlang
-			@phan-var-force Account				$account
-			@phan-var-force EInvoicing			$einvoicing
-			@phan-var-force string 				$schemeUri		Buyer scheme uri
-			@phan-var-force string 				$uri			Buyer uri
-			';
-
-			// =====================================================================
-			// Use horstoeko lib to build the XML
-			// =====================================================================
-
-			// The lib serializes every amount and quantity with 2 decimals, which is the accuracy of an
-			// amount, not of a unit price: it would truncate the unit price and make the receiver
-			// recalculate a wrong line amount. Ask for the accuracy the norm allows on these nodes.
-			self::applyNormDecimalPlaces();
-
-			// Initialize ZugferdDocumentBuilder (FacturX XML)
-			dol_syslog(get_class($this) . '::executeHooks create new XML document based on PROFILE_EN16931 (CIUS-FR)');
-			$profile = getDolGlobalString('EINVOICING_PROFILE');
-			switch ($profile) {
-				case 'EN16931':
-					$used_profile = ZugferdProfiles::PROFILE_EN16931;
-					break;
-				default:
-					$used_profile = ZugferdProfiles::PROFILE_EXTENDED;
-					break;
-			}
-			$facturxpdf = ZugferdDocumentBuilder::createNew($used_profile);
-			dol_syslog(get_class($this) . '::executeHooks create new XML document based on ' . $used_profile);
-
-			// Get the type of invoice in FacturX nomenclature
-			$objecttype = $invoiceData['documenttypecode'];
-			if ($objecttype == null) {
-				throw new Exception('BADINVOICETYPE: The type for invoice id ' . $object->id . ' is not yet supported.');
-			}
-
-			//  Build XML Document Header (Seller, Buyer, Dates)
-			$facturxpdf
-				->setDocumentInformation(
-					$invoiceData['documentno'],
-					$invoiceData['documenttypecode'],
-					$invoiceData['documentdate'],
-					$invoiceData['invoiceCurrency'],
-					$object->ref_customer,
-					$outputlang
-				)
-				->addDocumentNote($invoiceData['documentNotePublic'])
-				->addDocumentNote($invoiceData['documentNotePMT'], null, "PMT")
-				->addDocumentNote($invoiceData['documentNotePMD'], null, "PMD")
-				->addDocumentNote($invoiceData['documentNoteAAB'], null, "AAB")
-				->addDocumentNote($invoiceData['documentNoteTXD'], null, "TXD")
-
-				// ---------------- Seller ----------------
-				->setDocumentSeller($invoiceData['sellername'], $invoiceData['sellerids'])
-				// BT-31 or BT-32, whichever the VAT regime of the seller calls for: a seller that charges
-				// no VAT declares its SIREN under the scheme FC where one that does declares its VAT
-				// number under VA. Writing VA unconditionally left a "Non assujetti a la TVA" company
-				// with no tax registration at all and every exempt line tripped BR-E-02 (issue #560).
-				->addDocumentSellerTaxRegistration(
-					$invoiceData['sellerTaxRegistations'][0]['type'] ?? 'VA',
-					$invoiceData['sellerTaxRegistations'][0]['value'] ?? $invoiceData['sellervatnumber']
-				)
-				->setDocumentSellerLegalOrganisation(
-					$invoiceData['sellerLegalOrgId'],
-					$invoiceData['sellerLegalOrgScheme'],
-					$invoiceData['sellerTradingName']
-				)
-				->addDocumentSellerGlobalId($invoiceData['sellerGlobalIds'][0]['value'], $invoiceData['sellerGlobalIds'][0]['schemeID'])
-				->setDocumentSellerCommunication(
-					$invoiceData['sellerCommunicationUriScheme'],
-					$invoiceData['sellerCommunicationUri']
-				)
-				->setDocumentSellerAddress(
-					$invoiceData['sellerlineone'],
-					$invoiceData['sellerlinetwo'],
-					$invoiceData['sellerlinethree'],
-					$invoiceData['sellerpostcode'],
-					$invoiceData['sellercity'],
-					$invoiceData['sellercountry']
-				)
-
-				// ---------------- Buyer ----------------
-				->setDocumentBuyer(
-					$invoiceData['buyername'],
-					$invoiceData['buyerids']
-				)
-				->setDocumentBuyerAddress(
-					$invoiceData['buyerlineone'],
-					$invoiceData['buyerlinetwo'],
-					$invoiceData['buyerlinethree'],
-					$invoiceData['buyerpostcode'],
-					$invoiceData['buyercity'],
-					$invoiceData['buyercountry']
-				)
-				->addDocumentBuyerTaxRegistration("VA", $invoiceData['buyervatnumber'])
-				->setDocumentBuyerLegalOrganisation(
-					$invoiceData['buyerLegalOrgId'],
-					$invoiceData['buyerLegalOrgScheme'],
-					$invoiceData['buyerTradingName']
-				)
-				->addDocumentBuyerGlobalId($invoiceData['buyerGlobalIds'][0]['value'], $invoiceData['buyerGlobalIds'][0]['schemeID'])
-				->setDocumentBuyerCommunication(
-					$schemeUri,
-					$uri
-				);
-
-			// If specimen, we set the test flag
-			if ($invoiceData['isTestDocument']) {
-				$facturxpdf->setIsTestDocument();
-			}
-
-			// Add delivery date for section ApplicableHeaderTradeDelivery
-			$facturxpdf->setDocumentSupplyChainEvent($invoiceData['documentDeliveryDate']);
-
-			// Invoicing period of the document (BG-14 / BT-73 / BT-74), derived from the periods of the
-			// lines - see einvoicingInvoicingPeriodFromLines(). The builder writes whichever side it is
-			// given, so the same single condition as the CII path applies (issue #572). The third
-			// argument is the obsolete BT-X-264 description, which nothing should carry.
-			if ($invoiceData['invoicingPeriodStart'] !== null || $invoiceData['invoicingPeriodEnd'] !== null) {
-				$facturxpdf->setDocumentBillingPeriod($invoiceData['invoicingPeriodStart'], $invoiceData['invoicingPeriodEnd'], null);
-			}
-
-			// Add data of project if invoice is into a project
-			if ($invoiceData['_project'] instanceof Project) {
-				$facturxpdf->setDocumentProcuringProject((string) $invoiceData['_project']->ref, $invoiceData['_project']->title);
-			}
-
-			// Add additional referenced documents (Order references) - Disabled for Chorus
-			if (!$invoiceData['_chorus']) {
-				foreach ($invoiceData['_customerOrderReferenceList'] as $customerOrderRef) {
-					if ($customerOrderRef != $invoiceData['orderReference']) {
-						$facturxpdf->addDocumentAdditionalReferencedDocument($customerOrderRef, "130");
-					}
-				}
-			}
-
-			// Set Trade Contact details (sale representative). No fax: EN16931 has no business term
-			// for it and the CII syntax binding forbids ram:FaxUniversalCommunication (CII-SR-236),
-			// same as for the buyer contact below.
-			$facturxpdf->setDocumentSellerContact(
-				$invoiceData['sellercontactpersonname'],
-				"",
-				$invoiceData['sellercontactphoneno'],
-				"",
-				$invoiceData['sellercontactemailaddr']
-			);
-
-			// Set Buyer Trade Contact details (e.g. invoice billing contact). Only emitted when a contact person is known.
-			if (!empty($invoiceData['buyercontactpersonname'])) {
-				$facturxpdf->setDocumentBuyerContact(
-					$invoiceData['buyercontactpersonname'],
-					"",
-					$invoiceData['buyercontactphoneno'],
-					"",
-					$invoiceData['buyercontactemailaddr']
-				);
-			}
-			// Set Buyer Reference (Service Code for Chorus)
-			if (!empty($invoiceData['buyerReference'])) {
-				$facturxpdf->setDocumentBuyerReference($invoiceData['buyerReference']);
-			}
-
-			// Contract reference
-			if (!empty($invoiceData['contractReference'])) {
-				$facturxpdf->setDocumentContractReferencedDocument($invoiceData['contractReference']);
-			}
-
-			// Commitment number / client ref
-			if (!empty($invoiceData['orderReference'])) {
-				$facturxpdf->setDocumentBuyerOrderReferencedDocument($invoiceData['orderReference']);
-			}
-
-			// Set Business Process ID
-			$facturxpdf->setDocumentBusinessProcess($invoiceData['businessProcessId']);
-
-			// Add reference to source invoice for credit notes (BT-25/BT-26)
-			if (!empty($invoiceData['invoiceRefDocs'])) {
-				foreach ($invoiceData['invoiceRefDocs'] as $refDoc) {
-					$facturxpdf->setDocumentInvoiceReferencedDocument($refDoc['ref'], $refDoc['type'], $refDoc['date']);
-				}
-			}
-
-			// --- Process Invoice Lines ---
-			foreach ($linesData as $numligne => $lineData) {
-				$facturxpdf
-					->addNewPosition((string) $lineData['lineid'])
-					->setDocumentPositionProductDetails($lineData['prodname'], $lineData['proddesc'], $lineData['prodsellerid'])
-					->setDocumentPositionGrossPrice($lineData['grosspriceamount'])
-					->setDocumentPositionNetPrice($lineData['netpriceamount'])
-					->setDocumentPositionQuantity($lineData['billedquantity'], $lineData['billedquantityunitcode'])
-					->setDocumentPositionLineSummation($lineData['lineTotalAmount']);
-
-				// Add reference to original invoice for deposit lines
-				if ($lineData['isDepositLine']) {
-					$facturxpdf->setDocumentInvoiceReferencedDocument($lineData['depositInvoiceRef'], ZugferdInvoiceType::PREPAYMENTINVOICE, $lineData['depositInvoiceDate']);
-				}
-
-				// Set billing period for the line (BG-26 / BT-134 / BT-135). One date alone is a valid
-				// period: BR-CO-20 asks for the start date or the end date, "or both". The builder
-				// leaves out the side it is given as null, so the same condition as the CII path applies.
-				if ($lineData['linePeriodStart'] !== null || $lineData['linePeriodEnd'] !== null) {
-					$facturxpdf->setDocumentPositionBillingPeriod($lineData['linePeriodStart'], $lineData['linePeriodEnd']);
-				}
-
-				// Handle negative amount lines as a line discount
-				if ($lineData['grosspriceamount'] < 0) {
-					dol_syslog("EInvoicing : there is negative line, convert as a global discount", \LOG_INFO);
-					$facturxpdf->addDocumentPositionGrossPriceAllowanceCharge(abs($lineData['grosspriceamount']) * $lineData['billedquantity'], false, null, null, "Discount");
-				}
-
-				// VAT information (Line Tax). The exemption reason is carried on the line too, and not
-				// only in the VAT breakdown: BR-FXEXT-E-08 only counts a line towards its exempt
-				// breakdown when the line repeats the same reason code and text - see the same point in
-				// CIIProtocol::buildLineNode(). horstoeko takes them as the 5th and 6th arguments.
-				$lineExemptionReason = ((string) ($lineData['ExemptionReason'] ?? '') !== '' ? (string) $lineData['ExemptionReason'] : null);
-				$lineExemptionReasonCode = ((string) ($lineData['ExemptionReasonCode'] ?? '') !== '' ? (string) $lineData['ExemptionReasonCode'] : null);
-				if ($lineData['rateApplicablePercent'] > 0) {
-					$facturxpdf->addDocumentPositionTax($lineData['categoryCode'], 'VAT', (empty($lineData['rateApplicablePercent']) ? null : (float) $lineData['rateApplicablePercent']), null, $lineExemptionReason, $lineExemptionReasonCode);
-				} else {
-					$facturxpdf->addDocumentPositionTax($lineData['categoryCode'], 'VAT', 0.00, null, $lineExemptionReason, $lineExemptionReasonCode);
-				}
-
-				// Discount percentage on a line
-				if ($lineData['lineremisepercent'] !== 'NA' && $lineData['lineremisepercent'] > 0) {
-					$remise_amount = $lineData['lineTotalAmount'] - $lineData['grosspriceamount'] * $lineData['billedquantity'];
-					dol_syslog("EInvoicing : there is a discount on that line : " . $lineData['lineremisepercent'] . ", amount is " . $remise_amount);
-					$facturxpdf->addDocumentPositionAllowanceCharge(abs($remise_amount), false, $lineData['lineremisepercent'], $lineData['grosspriceamount'] * $lineData['billedquantity'], null, "Discount");
-				}
-			}
-
-			// Final Document Summation and Payment Means
-
-			// Multi VAT (Document Tax Summary)
-			foreach ($invoiceData['taxBreakdown'] as $k => $v) {
-				$code = ($k == 0) ? 'K' : 'S';
-				// Last argument is BT-8 (VAT point date code), empty when the invoice carries goods only
-				$facturxpdf->addDocumentTax($code, "VAT", $v['totalHT'], $v['totalTVA'], $k, null, null, null, null, null, $invoiceData['vatDueDateTypeCode'] ?: null);
-			}
-
-			// Set final summation details
-			$facturxpdf
-				->setDocumentSummation(
-					$invoiceData['grandTotalAmount'],
-					$invoiceData['duePayableAmount'],
-					$invoiceData['lineTotalAmount'],
-					$invoiceData['chargeTotalAmount'],
-					$invoiceData['allowanceTotalAmount'],
-					$invoiceData['taxBasisTotalAmount'],
-					$invoiceData['taxTotalAmount'],
-					null,
-					$invoiceData['totalPrepaidAmount']
-				)
-				->addDocumentPaymentTerm(
-					$invoiceData['paymentTermsText'],
-					$invoiceData['paymentDueDate']
-				)
-				->addDocumentPaymentMean(
-					(string) $invoiceData['paymentMeansCode'],
-					$invoiceData['paymentMeansText'],
-					null,
-					null,
-					null,
-					null,
-					$invoiceData['iban'],
-					$invoiceData['accountName'],
-					$einvoicing->removeSpaces($account->number),
-					$invoiceData['bic']
-				);
-
-			// Validate the generated XML document
-			dol_syslog(get_class($this) . '::executeHooks try to validate XML');
-
-			$pdfCheck = new ZugferdDocumentValidator($facturxpdf);
-			$res = $pdfCheck->validateDocument();
-			if (count($res) > 0) {
-				$allErrors = "";
-				foreach ($res as $error) {
-					if (is_array($error)) {
-						$allErrors .= json_encode($error) . "\n";
-					} else {
-						$allErrors .= $error . "\n";
-					}
-				}
-				$this->errors = $allErrors;
-				dol_syslog(get_class($this) . '::executeHooks  (1) : ' . $allErrors, LOG_ERR);
-			} else {
-				dol_syslog(get_class($this) . '::executeHooks XML validation ok');
-			}
-
-			// Generate the XML file Factur-X
-			$filename = dol_sanitizeFileName($invoice->ref);
-			$filedir  = getMultidirOutputCompat($invoice, '', 1, 'temp');   // Example '/mydolibarr/documents/facture/temp/FAYYMM-XXXX'
-			$xmlfile  = $filedir . '/' . $filename . '/factur-x3.xml';
-
-			dol_mkdir(dirname($xmlfile));
-			dol_delete_file($xmlfile);
-
-			$facturxpdf->writeFile($xmlfile);
-
-			// Patch the generated XML for better EXTENDED-CTC-FR compatibility
-			if ($invoice->type == $invoice::TYPE_CREDIT_NOTE || !empty($invoiceData['_depositlines'])) {
-				dol_syslog(get_class($this) . '::executeHooks Patch XML for better EXTENDED-CTC-FR compatibility');
-				$patcher    = new XmlPatcher($facturxpdf);
-				$patchedXml = $patcher->patchXmlString($xmlfile, $invoiceData['_depositlines']);
-				file_put_contents($xmlfile, $patchedXml);
-			}
-
-			// Local EN 16931 business rules safety net on the final XML (warnings, or abort in strict mode),
-			// same as the native builder branch above, so the external builder is covered too.
-			$this->checkBusinessRules(file_get_contents($xmlfile), $invoice);
-
-			dolChmod($xmlfile);
-
-			return $xmlfile;
-		}
-	}
+	const BUILD_XML_PROFILE = 'EXTENDED';
 
 	/**
 	 * Generate a complete Factur-X invoice file by embedding the XML into a PDF.
@@ -656,7 +111,7 @@ class FacturXProtocol extends CIIProtocol
 			$xmlfile = $this->generateXML($invoice, $outputlangs);
 		} catch (Exception $e) {
 			dol_syslog(get_class($this) . "::generateInvoice failed to generate XML for invoice id=" . $invoice_id . ". Error " . $e->getMessage(), LOG_ERR);
-			$this->error = $langs->trans("ErrorGeneratingXML") . '. ' . $e->getMessage();
+			$this->error = $langs->trans("ErrorGeneratingXML") . '.<br>' . $e->getMessage();
 			$this->errors[] = $this->error;
 			return -1;
 		}
@@ -675,12 +130,11 @@ class FacturXProtocol extends CIIProtocol
 		$filename = dol_sanitizeFileName($invoice->ref);
 		$filedir = getMultidirOutputCompat($invoice, '', 1);		// Example '/mydolibarr/documents/facture/FAYYMM-XXXX'
 
-		// Resolve the source PDF into which the Factur-X XML will be embedded.
-		// Priority:
-		//   1. $sourceFilePath provided by the generation hook (afterPDFCreation / afterODTCreation).
-		//      ODT/ODS models hand over the .odt path; the PDF rendition (MAIN_ODT_AS_PDF) shares the basename.
+		// Resolve the source PDF into which the Factur-X XML will be embedded, by priority:
+		//   1. $sourceFilePath from the generation hook (ODT/ODS: the MAIN_ODT_AS_PDF rendition shares the basename);
 		//   2. the most recent <ref>*.pdf already present in the output dir (manual generation, ODT output
-		//      like <ref>_Template.pdf for which last_main_doc is not maintained), excluding our own output.
+		//      like <ref>_Template.pdf for which last_main_doc is not maintained), excluding our own output
+		//      and the files attached to the invoice (<ref>-<name>.pdf);
 		//   3. legacy <ref>.pdf, regenerated with the default PDF model if missing.
 		$orig_pdf = '';
 		$fromodt = false;
@@ -700,7 +154,9 @@ class FacturXProtocol extends CIIProtocol
 				if (preg_match('/_facturx\.pdf$/i', $cand['name'])) {		// skip our own Factur-X output
 					continue;
 				}
-				if (strpos($cand['name'], $filename) !== 0) {				// must belong to this invoice ref
+				// Dolibarr names the invoice <ref>.pdf (PDF model) or <ref>_<template>.pdf (ODT as PDF). A file
+				// attached from the page is <ref>-<name>.pdf: it belongs to the invoice but is not the invoice.
+				if (!preg_match('/^' . preg_quote($filename, '/') . '(_.+)?\.pdf$/i', $cand['name'])) {
 					continue;
 				}
 				$orig_pdf = $cand['fullname'];								// list is sorted by date desc: newest first
@@ -722,7 +178,17 @@ class FacturXProtocol extends CIIProtocol
 			}
 			// Source PDF deleted or never generated: regenerate it with the default PDF model before embedding.
 			$modelname = getDolGlobalString('FACTURE_ADDON_PDF') ?: 'crabe';
-			$resultpdf = $invoice->generateDocument($modelname, $langs);
+
+			// That rebuild fires afterPDFCreation, which would generate the document a second time and clean
+			// up the temporary XML this call still needs (issue #658), so the hook is told to stand back.
+			// try/finally: a rebuild that throws must not leave the hook muted for the rest of the request.
+			$resultpdf = -1;
+			EInvoicing::setEInvoiceGenerationInProgress($invoice->id, true);
+			try {
+				$resultpdf = $invoice->generateDocument($modelname, $langs);
+			} finally {
+				EInvoicing::setEInvoiceGenerationInProgress($invoice->id, false);
+			}
 			if ($resultpdf < 0) {
 				dol_syslog(get_class($this) . "::generateInvoice failed to regenerate missing PDF for invoice id=" . $invoice_id, LOG_ERR);
 				$this->error = $langs->trans("ErrorFailedToRegeneratePDF");
@@ -770,7 +236,11 @@ class FacturXProtocol extends CIIProtocol
 
 		// TODO A third method can be tried using the atgp/factur-x library.
 
-		if (!file_exists($orig_pdf)) {
+		// The mergers below take the XML as content, and treat the string as content when it is not the
+		// path of an existing file. A missing XML therefore does not fail, it gets embedded: check it here
+		// rather than hand over a PDF carrying its own file name. Nothing removes that file any more, but
+		// the merge is the last place where the mistake is still catchable (issue #658).
+		if (!file_exists($orig_pdf) || empty($xmlfile) || !file_exists($xmlfile)) {
 			throw new \Exception("XML and/or PDF does not exist");
 		}
 
@@ -790,20 +260,33 @@ class FacturXProtocol extends CIIProtocol
 			$creator = (string) pdfExtractMetadata($orig_pdf, 'Creator');
 		}
 
+		// Below Dolibarr 24 the core declares its own "class FPDF extends TCPDF {}" in
+		// htdocs/includes/tcpdi/tcpdi.php, but only once its PDF stack is loaded. Load that stack now, so
+		// the branch below does not depend on whether this request rendered a PDF already: without it the
+		// module autoloads the real FPDF instead, and the next core PDF of the request dies on "Cannot
+		// redeclare class FPDF". The instance is discarded, only what it loads and the K_* constants matter.
+		if (!class_exists('FPDF', false)) {
+			require_once DOL_DOCUMENT_ROOT . '/core/lib/pdf.lib.php';
+			pdf_getInstance();
+		}
+
+		// From here on the container is written, which is what needs horstoeko/zugferd
+		require_once __DIR__ . '/../../vendor/autoload.php';
+
 		try {
 			if (class_exists('FPDF', false) && is_subclass_of('FPDF', 'TCPDF')) {
-				// Below Dolibarr 24, htdocs/includes/tcpdi/tcpdi.php declares "class FPDF extends TCPDF {}"
-				// as soon as any PDF is rendered in the request - the invoice PDF produced at validation,
-				// right before this hook runs. The horstoeko/zugferd writer then inherits from TCPDF instead
-				// of the real FPDF and dies on ZugferdPdfWriter::_getpagesize(). Merge with TCPDF itself,
-				// which needs no FPDF at all and supports PDF/A-3 natively. Reaching this branch means
-				// the core has loaded TCPDF, which is what the merger descends from.
+				// Below Dolibarr 24, htdocs/includes/tcpdi/tcpdi.php declares "class FPDF extends TCPDF {}".
+				// The horstoeko/zugferd writer then inherits from TCPDF instead of the real FPDF and dies on
+				// ZugferdPdfWriter::_getpagesize(). Merge with TCPDF itself, which needs no FPDF at all and
+				// supports PDF/A-3 natively. Reaching this branch means the core has loaded TCPDF, which is
+				// what the merger descends from.
 				dol_include_once('einvoicing/class/utils/FacturxTcpdfMerger.class.php');
 				$merger = new FacturxTcpdfMerger($xmlfile, $orig_pdf);
 			} else {
 				// CtcFrPdfMerger behaves exactly like ZugferdDocumentPdfMerger, except that it can still
 				// supply the attachment and XMP parameters when the guideline URN is one the library does
 				// not know — which is the case of EXTENDED-CTC-FR.
+				dol_include_once('einvoicing/class/utils/CtcFrPdfMerger.class.php');
 				$merger = new CtcFrPdfMerger($xmlfile, $orig_pdf);
 			}
 
@@ -849,14 +332,18 @@ class FacturXProtocol extends CIIProtocol
 			return -1;
 		}
 
-		// Set status of einvoice
+		// Set status of einvoice, decided on 'storedcode' and not on 'code': the file was written a few
+		// lines above and 'code' is corrected from disk, so it already read GENERATED here whatever the
+		// table held. The condition was therefore never true, and the row stayed at "to generate" for
+		// good - hidden on the invoice card, which reads that same corrected code, but shown by the
+		// invoice list, which displays the column of the table (issue #998).
 		$einvoicing = new EInvoicing($db);
 		$result = $einvoicing->fetchLastknownInvoiceStatus($invoice->id, $invoice->ref);
 
 		if (
-			isset($result['code']) &&
-			(in_array($result['code'], array($einvoicing::STATUS_UNKNOWN, $einvoicing::STATUS_NOT_GENERATED))
-				|| !array_key_exists($result['code'], $einvoicing::STATUS_LABEL_KEYS))
+			isset($result['storedcode']) &&
+			(in_array($result['storedcode'], array($einvoicing::STATUS_UNKNOWN, $einvoicing::STATUS_NOT_GENERATED))
+				|| !array_key_exists($result['storedcode'], $einvoicing::STATUS_LABEL_KEYS))
 		) {
 			// Set status to e-einvoice generated
 			$einvoicing->setEInvoiceStatus($invoice, $einvoicing::STATUS_GENERATED, 'Invoice status set to Generated by generateInvoice()');
@@ -872,13 +359,9 @@ class FacturXProtocol extends CIIProtocol
 	/**
 	 * Check that the produced PDF really is a Factur-X file, and not a PDF with an attachment.
 	 *
-	 * Nothing in the standard makes the difference visible to the eye: both carry the XML and both
-	 * open normally. What a reader and a platform validator look for is the document level /AF array
-	 * and the PDF/A-3 output intent, and a file that has the embedded stream but neither of those is
-	 * refused - after being sent, which is the expensive moment to find out (issue #554).
-	 *
-	 * The check is on the produced file rather than on the code path that produced it, so it also
-	 * covers a merger that silently degrades for another reason.
+	 * A reader and a platform validator look for the document level /AF array and the PDF/A-3 output
+	 * intent, and refuse a file that has the embedded stream but neither of those - after it was sent
+	 * (issue #554). The check is on the produced file, so it also covers a merger that degrades silently.
 	 *
 	 * @param	string	$pathfacturxpdf		Full path of the generated Factur-X PDF
 	 * @return	void
@@ -916,833 +399,318 @@ class FacturXProtocol extends CIIProtocol
 		$this->warnings[] = $message;
 	}
 
+	/**
+	 * Read a received Factur-X document into the header and lines the import works on.
+	 * A Factur-X file carries its CII XML as a PDF/A-3 attachment, so the extraction is all this
+	 * protocol has of its own: once the XML is out, the import itself is the one of CIIProtocol.
+	 *
+	 * @param  string	$file      Raw Factur-X PDF content
+	 * @param  string	$tempFile  That same content, already written to the per-call working file
+	 * @return array{header:array<string,mixed>,lines:array<int,array<string,mixed>>,xml:string}	Parsed header, parsed lines, and the embedded CII XML
+	 */
+	protected function parseReceivedDocument($file, $tempFile)
+	{
+		// Only the embedded CII is extracted here: the PDF/A-3 attachment is read as it stands, and the
+		// profile the document declares is never looked at.
+		$embeddedXml = PdfAttachmentExtractor::getInvoiceXmlFromFile($tempFile);
+
+		if (getDolGlobalInt('EINVOICING_USE_EXTERNAL_FACTURX_READER')) {
+			return $this->parseReceivedDocumentWithExternalReader($tempFile, $embeddedXml);
+		}
+
+		// The default is to use the same parser as the CII one.
+		return array(
+			'header' => $this->parseInvoiceHeader($embeddedXml),
+			'lines' => $this->parseInvoiceLines($embeddedXml),
+			'xml' => $embeddedXml,
+		);
+	}
 
 	/**
-	 * Generate a sample Factur-X invoice for demonstration or testing purposes (for Dolibarr version < 24.0)
+	 * Read a received Factur-X document with horstoeko/zugferd instead of the parser of the module.
+	 * Opt-in through EINVOICING_USE_EXTERNAL_FACTURX_READER, and meant for development and
+	 * cross-checking only: it reads fewer fields than the native parser.
 	 *
-	 * This method creates a dummy invoice with representative data
-	 * to illustrate the Factur-X structure without using real business information.
-	 *
-	 * @param	EInvoicing			$einvoicing			EInvoicing
-	 * @param   Societe|null			$thirdpartySeller		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
-	 * @param   Societe|null			$thirdpartyBuyer		Optional third party object to use for generating the sample invoice. If null, a dummy third party will be created.
-	 * @param   array<string,mixed>		$options				More options
-	 * @return 	array<string,string> 							Path or content of the generated sample invoice.
-	 * @throws  Exception
+	 * @param  string	$tempFile     Working file holding the received PDF
+	 * @param  string	$embeddedXml  CII XML already extracted from that PDF
+	 * @return array{header:array<string,mixed>,lines:array<int,array<string,mixed>>,xml:string}	Parsed header, parsed lines, and the embedded CII XML
 	 */
-	public function generateSampleInvoiceOld($einvoicing, $thirdpartySeller = null, $thirdpartyBuyer = null, $options = array())
+	protected function parseReceivedDocumentWithExternalReader($tempFile, $embeddedXml)
 	{
-		global $conf, $langs, $mysoc;
+		$parsedHeader = [];
+		$parsedLines = [];
 
-		dol_mkdir($conf->einvoicing->dir_temp);
+		// Use a duplicate parser (for test or dev tests)
+		// horstoeko/zugferd resolves the profile by matching the guideline URN of the document against
+		// its own table, which has no entry for EXTENDED-CTC-FR - the French profile this very module
+		// emits. Instantiating that reader is therefore only done on the path that actually uses it,
+		// instead of on every received Factur-X (issue #742).
+		require_once __DIR__ . '/../../vendor/autoload.php';
+		$document = ZugferdDocumentPdfReader::readAndGuessFromFile($tempFile);
 
-		$outputlangs = $langs;		// TODO Use the target language
-		$outputlangs->load("einvoicing@einvoicing");
+		$document->getDocumentInformation($documentno, $documenttypecode, $documentdate, $invoiceCurrency, $taxCurrency, $documentname, $documentlanguage, $effectiveSpecifiedPeriod);
 
-		// require_once, not require: this file declares plain functions, so loading it a second time
-		// in the same PHP request is a fatal redeclare - which is what happens as soon as two samples
-		// are generated in one request, and a fatal error is not something the caller can catch.
-		require_once __DIR__ . "/ExampleHelpers.php";
-
-		$existingPdfFilename = __DIR__ . "/../../doc/00_ZugferdDocumentPdfBuilder_PrintLayout.pdf";
-		$newPdfFilename = $conf->einvoicing->dir_temp . "/INVTEST-".dol_print_date(dol_now(), '%y%m%d-%H%M%S').".pdf";
-		//$AdditionalDocument = __DIR__ . "/../../assets/00_AdditionalDocument.csv";
-
-		// First we create a new valid document in EN16931-Profile (== COMFORT-Profile)
-		// See examples/01_ZugferdDocumentBuilder_EN16931.php for detailed explanations
-
-		$documentBuilder = ZugferdDocumentBuilder::createNew(ZugferdProfiles::PROFILE_EN16931);
-
-		$invoicetype = ZugferdInvoiceType::INVOICE;				// Type "Invoice" (BT-3)
-		if (!empty($options['invoicetype'])) {
-			if ($options['invoicetype'] == Facture::TYPE_CREDIT_NOTE) {
-				$invoicetype = ZugferdInvoiceType::CREDITNOTE;
-			}
-		}
-
-		$documentBuilder->setDocumentInformation(
-			'INVTEST',                                     	// Invoice Number (BT-1)
-			$invoicetype,                        			// Type "Invoice" (BT-3)
-			DateTime::createFromFormat("Ymd", "20241231"),  // Invoice Date (BT-2)
-			ZugferdCurrencyCodes::EURO                      // Invoice currency is EUR (Euro) (BT-5)
+		$document->getDocumentSupplyChainEvent(
+			$documentDeliveryDate
 		);
 
-		$sellername = $mysoc->name ?: "MyBigCompanyTest";
-		$sellervat = $mysoc->tva_intra ?: "FRVAT123456";
+		// Get seller information (supplier)
+		$document->getDocumentSeller($sellername, $sellerids, $sellerdescription);
 
-		$mySchemeIdProf = "0002";
-		//$sellerid = $einvoicing->getSellerCommunicationURI(0);
-		$sellerid = idprof($mysoc);														// May be SIREN
+		// Get seller address
+		$document->getDocumentSellerAddress(
+			$sellerlineone,
+			$sellerlinetwo,
+			$sellerlinethree,
+			$sellerpostcode,
+			$sellercity,
+			$sellercountry,
+			$sellersubdivision
+		);
 
-		$mySchemeGlobalId = "0225";
-		//$sellerglobalid = $einvoicing->getSellerCommunicationURI(0);
-		$sellerglobalid = idprof($mysoc);
+		// Get seller contact
+		$document->getDocumentSellerContact(
+			$sellercontactpersonname,
+			$sellercontactdepartmentname,
+			$sellercontactphoneno,
+			$sellercontactfaxno,
+			$sellercontactemailaddr
+		);
 
-		if ($mySchemeIdProf == "0002" && strlen($sellerid) != 9) {	// If einvoice ID is French SIREN, we check it has 9 chars.
-			throw new Exception('BADPROFID (generateSampleInvoiceOld): The professional ID ' . $sellerid . ' has type SIREN but length is not 9 characters. Fix this in your company or einvoice module setup page.');
+		$document->getDocumentSellerCommunication(
+			$sellerCommunicationUriScheme,
+			$sellerCommunicationUri
+		);
+
+		// Get document summation
+		$document->getDocumentSummation($grandTotalAmount, $duePayableAmount, $lineTotalAmount, $chargeTotalAmount, $allowanceTotalAmount, $taxBasisTotalAmount, $taxTotalAmount, $roundingAmount, $totalPrepaidAmount);
+
+		$document->getDocumentSellerGlobalId(
+			$sellerGlobalIds
+		);
+
+		$document->getDocumentSellerTaxRegistration(
+			$sellerTaxRegistations
+		);
+
+		// Get references to the previous invoices if any (for credit notes for example)
+		$document->getDocumentInvoiceReferencedDocuments($invoiceRefDocs);
+
+		// Debug: print all retrieved variables
+		$parsedHeader = array(
+			'documentno' => $documentno ?? null,
+			'documenttypecode' => $documenttypecode ?? null,
+			'documentdate' => isset($documentdate) && $documentdate instanceof DateTime ? $documentdate->format('Y-m-d') : ($documentdate ?? null),
+			'invoiceCurrency' => $invoiceCurrency ?? null,
+			'taxCurrency' => $taxCurrency ?? null,
+			'documentname' => $documentname ?? null,
+			'documentlanguage' => $documentlanguage ?? null,
+			'effectiveSpecifiedPeriod' => $effectiveSpecifiedPeriod ?? null,
+			'documentDeliveryDate' => isset($documentDeliveryDate) && $documentDeliveryDate instanceof DateTime ? $documentDeliveryDate->format('Y-m-d') : ($documentDeliveryDate ?? null),
+
+			// Seller
+			'sellername' => $sellername ?? null,
+			'sellerids' => $sellerids ?? null,
+			'sellerdescription' => $sellerdescription ?? null,
+
+			// Seller Address
+			'sellerlineone' => $sellerlineone ?? null,
+			'sellerlinetwo' => $sellerlinetwo ?? null,
+			'sellerlinethree' => $sellerlinethree ?? null,
+			'sellerpostcode' => $sellerpostcode ?? null,
+			'sellercity' => $sellercity ?? null,
+			'sellercountry' => $sellercountry ?? null,
+			'sellersubdivision' => $sellersubdivision ?? null,
+
+			// Seller Contact
+			'sellercontactpersonname' => $sellercontactpersonname ?? null,
+			'sellercontactdepartmentname' => $sellercontactdepartmentname ?? null,
+			'sellercontactphoneno' => $sellercontactphoneno ?? null,
+			'sellercontactfaxno' => $sellercontactfaxno ?? null,
+			'sellercontactemailaddr' => $sellercontactemailaddr ?? null,
+
+			// Seller Communication (may be unset due to reader var name)
+			'sellerCommunicationUriScheme' => $sellerCommunicationUriScheme ?? null,
+			'sellerCommunicationUri' => $sellerCommunicationUri ?? null,
+
+			// Summation
+			'grandTotalAmount' => $grandTotalAmount ?? null,
+			'duePayableAmount' => $duePayableAmount ?? null,
+			'lineTotalAmount' => $lineTotalAmount ?? null,
+			'chargeTotalAmount' => $chargeTotalAmount ?? null,
+			'allowanceTotalAmount' => $allowanceTotalAmount ?? null,
+			'taxBasisTotalAmount' => $taxBasisTotalAmount ?? null,
+			'taxTotalAmount' => $taxTotalAmount ?? null,
+			'roundingAmount' => $roundingAmount ?? null,
+			'totalPrepaidAmount' => $totalPrepaidAmount ?? null,
+
+			// Seller Global Ids and Tax Registrations (may be unset due to reader var name)
+			'sellerGlobalIds' => $sellerGlobalIds ?? null,
+			'sellerTaxRegistations' => $sellerTaxRegistations ?? null,
+
+			// Invoice referenced documents
+			'invoiceRefDocs' => $invoiceRefDocs ?? null,
+		);
+
+
+		// Read invoice lines
+		$additionalRefDocs = [];
+		if ($document->firstDocumentPosition()) {
+			do {
+				// Get line information
+				$document->getDocumentPositionGenerals($lineid, $linestatuscode, $linestatusreasoncode);
+				$document->getDocumentPositionProductDetails($prodname, $proddesc, $prodsellerid, $prodbuyerid, $prodglobalidtype, $prodglobalid);
+				$document->getDocumentPositionGrossPrice($grosspriceamount, $grosspricebasisquantity, $grosspricebasisquantityunitcode);
+				$document->getDocumentPositionNetPrice($netpriceamount, $netpricebasisquantity, $netpricebasisquantityunitcode);
+				// The two-argument form is deprecated in zugferd and never read the document for the
+				// second one: it set it to 0.0 and called the simple form for the first. Nothing here
+				// reads that second value, so call the form that is kept.
+				$document->getDocumentPositionLineSummationSimple($lineTotalAmount);
+				$document->getDocumentPositionQuantity($billedquantity, $billedquantityunitcode, $chargeFreeQuantity, $chargeFreeQuantityunitcode, $packageQuantity, $packageQuantityunitcode);
+
+				// Get AdditionalReferencedDocument at line level
+				$reader = new EmbeddedXmlReader($embeddedXml);
+				$additionalRefDocs[(string) $lineid] = $reader->getLineAdditionalReferencedDocuments((string) $lineid);
+
+				// Get tax information for the line
+				//$vatRate = 0;
+				if ($document->firstDocumentPositionTax()) {
+					$document->getDocumentPositionTax($categoryCode, $typeCode, $rateApplicablePercent, $calculatedAmount, $exemptionReason, $exemptionReasonCode);
+					//$vatRate = $rateApplicablePercent;
+				}
+
+				$parsedLines[] = array(
+					'lineid' => $lineid ?? null,
+					'linestatuscode' => $linestatuscode ?? null,
+					'linestatusreasoncode' => $linestatusreasoncode ?? null,
+					'prodname' => $prodname ?? null,
+					'proddesc' => $proddesc ?? null,
+					'prodsellerid' => $prodsellerid ?? null,
+					'prodbuyerid' => $prodbuyerid ?? null,
+					'prodglobalidtype' => $prodglobalidtype ?? null,
+					'prodglobalid' => $prodglobalid ?? null,
+					'grosspriceamount' => $grosspriceamount ?? null,
+					'grosspricebasisquantity' => $grosspricebasisquantity ?? null,
+					'grosspricebasisquantityunitcode' => $grosspricebasisquantityunitcode ?? null,
+					'netpriceamount' => $netpriceamount ?? null,
+					'netpricebasisquantity' => $netpricebasisquantity ?? null,
+					'netpricebasisquantityunitcode' => $netpricebasisquantityunitcode ?? null,
+					'lineTotalAmount' => $lineTotalAmount ?? null,
+					'totalAllowanceChargeAmount' => 0.0,
+					'billedquantity' => $billedquantity ?? null,
+					'billedquantityunitcode' => $billedquantityunitcode ?? null,
+					'chargeFreeQuantity' => $chargeFreeQuantity ?? null,
+					'chargeFreeQuantityunitcode' => $chargeFreeQuantityunitcode ?? null,
+					'packageQuantity' => $packageQuantity ?? null,
+					'packageQuantityunitcode' => $packageQuantityunitcode ?? null,
+					// Tax
+					'categoryCode' => $categoryCode ?? null,
+					'typeCode' => $typeCode ?? null,
+					'rateApplicablePercent' => $rateApplicablePercent ?? null,
+					'calculatedAmount' => $calculatedAmount ?? null,
+					'ExemptionReason' => $exemptionReason ?? null,
+					'ExemptionReasonCode' => $exemptionReasonCode ?? null,
+					// Parent invoice ref
+					'parentDocumentNo' => $parsedHeader['documentno'] ?? null,
+					// Additional referenced documents at line level
+					'additionalRefDocs' => $additionalRefDocs[(string) $lineid] ?? null,
+				);
+
+
+				dol_syslog(get_class($this) . '::parseReceivedDocumentWithExternalReader parsedLines: ' . json_encode($parsedLines), LOG_DEBUG);
+			} while ($document->nextDocumentPosition());
 		}
 
-		$documentBuilder->addDocumentNote($sellername . PHP_EOL . 'Lieferantenstraße 20' . PHP_EOL . '80333 München' . PHP_EOL . 'Deutschland' . PHP_EOL . 'Geschäftsführer: Hans Muster' . PHP_EOL . 'Handelsregisternummer: H A 123' . PHP_EOL . PHP_EOL, null, 'REG');
+		dol_syslog(get_class($this) . '::parseReceivedDocumentWithExternalReader parsedHeader: ' . json_encode($parsedHeader), LOG_DEBUG, 0, '_einvoicing');
 
-
-		$documentBuilder->addDocumentNote(getDolGlobalString('EINVOICING_PMT') ?: $outputlangs->trans('NoInvoiceCollectionFees'), null, "PMT");
-		$documentBuilder->addDocumentNote(getDolGlobalString('EINVOICING_PMD') ?: $outputlangs->trans('NoLatePaymentFees'), null, "PMD");
-		$documentBuilder->addDocumentNote(getDolGlobalString('EINVOICING_AAB') ?: $outputlangs->trans('NoEarlyPaymentDiscount'), null, "AAB");
-
-
-		$documentBuilder->setDocumentBillingPeriod(DateTime::createFromFormat("Ymd", "20250101"), DateTime::createFromFormat("Ymd", "20250131"), "01.01.2025 - 31.01.2025");
-
-		$documentBuilder->addDocumentInvoiceSupportingDocumentWithUri('FA2401-000001', 'https://publiclinktoinvoice', 'LISIBLE');
-		$documentBuilder->addDocumentInvoiceSupportingDocumentWithUri('SO2401-000001', 'https://linktoorder', 'BON_COMMANDE');
-		//$documentBuilder->addDocumentInvoiceSupportingDocumentWithFile('REFDOC-2024/00001-2', $AdditionalDocument, 'Herkunftsnachweis Trennblätter');
-
-		$documentBuilder->addDocumentTenderOrLotReferenceDocument('LOS 738625');
-		$documentBuilder->addDocumentInvoicedObjectReferenceDocument('125', ZugferdReferenceCodeQualifiers::SALE_PERS_NUMB); // Sales person number
-
-		$documentBuilder->setDocumentContractReferencedDocument('CO2401-000001');			// Ref of contract
-
-		$documentBuilder->setDocumentProcuringProject('PR2401-000001', 'Project label');	// Ref of project
-
-		$documentBuilder->addDocumentPaymentMeanToDirectDebit("DE12500105170648489890", "INV-TEST");
-		$documentBuilder->addDocumentPaymentTerm('Wird von Konto DE12500105170648489890 abgebucht', DateTime::createFromFormat("Ymd", "20250131"), 'MANDATE-2024/000001');
-
-		$documentBuilder->setDocumentSeller($sellername, $sellerid);
-		$documentBuilder->setDocumentSellerLegalOrganisation($sellerid, $mySchemeIdProf, $sellername);	// Mandatory: 0002 = SIREN
-		$documentBuilder->addDocumentSellerGlobalId($sellerglobalid, $mySchemeGlobalId);				// Optional : 0225 = SIREN. Can be a more international code like DUNS
-
-		//$documentBuilder->setSpecifiedLegalOrganization();
-		$documentBuilder->addDocumentSellerTaxNumber($sellervat);
-		$documentBuilder->addDocumentSellerVATRegistrationNumber($sellervat);
-
-		$documentBuilder->setDocumentSellerAddress("Lieferantenstraße 20", "", "", "80333", "München", ZugferdCountryCodes::GERMANY);
-		$documentBuilder->setDocumentSellerContact("H. Müller", "", "+49-111-2222222", "+49-111-3333333", "hm@lieferant.de");
-
-		//$documentBuilder->setDocumentSellerCommunication(ZugferdElectronicAddressScheme::UNECE3155_EM, 'sales@lieferant.de');
-		$myUri             = $einvoicing->getSellerCommunicationURI(0);			// Example "315143296_1939"
-		$mySchemeUri       = $this->getIEC6523Code($mysoc->country_code, 2);		// Example "0225"
-		$documentBuilder->setDocumentSellerCommunication($mySchemeUri, $myUri);
-
-		$documentBuilder->setDocumentBuyer("Kunden AG Mitte", "GE2020211");
-		$documentBuilder->setDocumentBuyerAddress("Kundenstraße 15", "", "", "69876", "Frankfurt", ZugferdCountryCodes::GERMANY);
-		$documentBuilder->setDocumentBuyerContact("H. Meier", "", "+49-333-4444444", "+49-333-5555555", "hm@kunde.de");
-
-		//$documentBuilder->setDocumentBuyerCommunication(ZugferdElectronicAddressScheme::UNECE3155_EM, 'purchase@kunde.de');
-		$buyerUri             = $einvoicing->getBuyerCommunicationURI(null);		// Example "315143296_1940"
-		$buyerSchemeUri       = $this->getIEC6523Code($mysoc->country_code, 2);		// Example "0225"
-		if (empty($buyerUri)) {
-			$buyerUri = '315143296_1940';
-		}
-		$documentBuilder->setDocumentBuyerCommunication($buyerSchemeUri, $buyerUri);
-
-		$documentBuilder->setDocumentPayee('Kunden AG Zahlungsdienstleistung');
-		$documentBuilder->setDocumentBuyerOrderReferencedDocument("PO-2024-0003324");
-		$documentBuilder->setDocumentSellerOrderReferencedDocument('SO-2024-000993337');
-
-		// If there is a delivery address
-		$documentBuilder->setDocumentShipTo("Kunden AG Ost");
-		$documentBuilder->setDocumentShipToAddress("Lieferstraße 1", "", "", "04109", "Leipzig", ZugferdCountryCodes::GERMANY);
-		$documentBuilder->setDocumentSupplyChainEvent(DateTime::createFromFormat("Ymd", "20250115"));
-
-		$documentBuilder->addNewPosition("1");
-		$documentBuilder->setDocumentPositionProductDetails("Trennblätter A4", "50er Pack", "TB100A4");
-		$documentBuilder->setDocumentPositionNetPrice(9.9000);
-		$documentBuilder->setDocumentPositionQuantity(20, ZugferdUnitCodes::REC20_PIECE);
-		$vatrate = 20;
-		if (!$this->checkIfVatRateIsValid((string) $vatrate, $mysoc->country_code)) {
-			throw new Exception('BADVATRATE: The VAT rate ' . $vatrate . ' on line is not a valid string value for country ' . $mysoc->country_code . '.');
-		}
-		$documentBuilder->addDocumentPositionTax(ZugferdVatCategoryCodes::STAN_RATE, ZugferdVatTypeCodes::VALUE_ADDED_TAX, $vatrate);
-		$documentBuilder->setDocumentPositionLineSummation(198.0);
-
-		$documentBuilder->addNewPosition("2");
-		$documentBuilder->setDocumentPositionProductDetails("Joghurt Banane", "B-Ware", "ARNR2");
-		$documentBuilder->setDocumentPositionNetPrice(5.5000);
-		$documentBuilder->setDocumentPositionQuantity(50, ZugferdUnitCodes::REC20_PIECE);
-		$vatrate = 7;
-		if (!$this->checkIfVatRateIsValid((string) $vatrate, $mysoc->country_code)) {
-			throw new Exception('BADVATRATE: The VAT rate ' . $vatrate . ' on line is not a valid string value for country ' . $mysoc->country_code . '.');
-		}
-		$documentBuilder->addDocumentPositionTax(ZugferdVatCategoryCodes::STAN_RATE, ZugferdVatTypeCodes::VALUE_ADDED_TAX, $vatrate);
-		$documentBuilder->setDocumentPositionLineSummation(275.0);
-
-		$documentBuilder->addNewPosition("3");
-		$documentBuilder->setDocumentPositionProductDetails("Joghurt Erdbeer", "", "ARNR3");
-		$documentBuilder->setDocumentPositionNetPrice(4.0000);
-		$documentBuilder->setDocumentPositionQuantity(100, ZugferdUnitCodes::REC20_PIECE);
-		$vatrate = 7;
-		if (!$this->checkIfVatRateIsValid((string) $vatrate, $mysoc->country_code)) {
-			throw new Exception('BADVATRATE: The VAT rate ' . $vatrate . ' on line is not a valid string value for country ' . $mysoc->country_code . '.');
-		}
-		$documentBuilder->addDocumentPositionTax(ZugferdVatCategoryCodes::STAN_RATE, ZugferdVatTypeCodes::VALUE_ADDED_TAX, $vatrate);
-
-		$documentBuilder->setDocumentPositionLineSummation(400.0);
-
-		// Add total of vat per vat rate
-		$documentBuilder->addDocumentTax(ZugferdVatCategoryCodes::STAN_RATE, ZugferdVatTypeCodes::VALUE_ADDED_TAX, 198.0, 39.60, 20.0);
-		$documentBuilder->addDocumentTax(ZugferdVatCategoryCodes::STAN_RATE, ZugferdVatTypeCodes::VALUE_ADDED_TAX, 675.0, 47.25, 7.0);
-
-		$documentBuilder->setDocumentSummation(959.85, 959.85, 873.00, 0.0, 0.0, 873.00, 86.85);
-
-
-		// This is a test doc
-		$documentBuilder->setIsTestDocument();
-
-
-		// Next let's do the ZugferddocumentPdfBuilder it's job - let's attach the XML to the PDF. The attachment filename will be factur-x.xml
-		// since we chose the profile EN16931 in the ZugferdDocumentBuilder (see above)
-		// In the following there are multiple methods how you can build a conform PDF from an existing print layout
-
-		// First method: Merge the generated XML from ZugferdDocumentBuilder with an existing print layout file to a new PDF file
-
-		/*
-		$zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfFile($documentBuilder, $existingPdfFilename);
-		$zugferdDocumentPdfBuilder->generateDocument();
-		$zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
-		*/
-
-		// Second method: Merge the generated XML from ZugferdDocumentBuilder with an stream (string) which contains the PDF to a new PDF file
-
-		// Note: We simulate the PDF stream (string) by calling file_get_contents.
-		/*
-		$pdfContent = file_get_contents($existingPdfFilename);
-
-		$zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfString($documentBuilder, $pdfContent);
-		$zugferdDocumentPdfBuilder->generateDocument();
-		$zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
-		*/
-
-		// There is not only the saveDocument method of the ZugferdDocumentPdfBuilder. It is also possible to receive the merged
-		// content (PDF with embedded XML) as a stream (string)
-
-		/*
-		$mergedPdfContent = $zugferdDocumentPdfBuilder->downloadString();
-
-		$pdfContent = file_get_contents($existingPdfFilename);
-
-		$zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfString($documentBuilder, $pdfContent);
-		$zugferdDocumentPdfBuilder->generateDocument();
-		$zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
-		*/
-
-		// And last but not least, it is also possible to add additional attachments to the merged PDF. These can be any files that can help the invoice
-		// recipient with processing. For example, a time sheet as an Excel file would be conceivable.
-		// The method attachAdditionalFileByRealFile has 3 parameters:
-		// - The file to attach which must exist and must be readable
-		// - (Optional) A name to display in the attachments of the PDF
-		// - (Optional) The type of the relationship of the attachment. Valid values are defined in the class ZugferdDocumentPdfBuilderAbstract. The constants are starting with AF_
-		// If you omit the last 2 parameters the following will happen:
-		// - The displayname is calculated from the filename you specified
-		// - The type of the relationship of the attachment will be AF_RELATIONSHIP_SUPPLEMENT (Supplement)
-
-		/*
-		$zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfString($documentBuilder, $pdfContent);
-		$zugferdDocumentPdfBuilder->attachAdditionalFileByRealFile($AdditionalDocument, "Some display Name", ZugferdDocumentPdfBuilderAbstract::AF_RELATIONSHIP_SUPPLEMENT);
-		$zugferdDocumentPdfBuilder->generateDocument();
-		$zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
-
-		// You can also add an attachment to the PDF as an stream (string). The conditions are the same as above for the attachAdditionalFileByRealFile method
-		// The only difference to attachAdditionalFileByRealFile is that the attachAdditionalFileByContent method accepts 4 parameters, whereby here (as with attachAdditionalFileByRealFile)
-		// the last two can be omitted. You only need to specify a file name under which the file is to be embedded
-		// Note: We simulate the attachment stream (string) by calling file_get_contents.
-
-		$attachmentContent = file_get_contents($AdditionalDocument);
-
-		$zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfString($documentBuilder, $pdfContent);
-		$zugferdDocumentPdfBuilder->attachAdditionalFileByContent($attachmentContent, 'additionalDocument.csv', "Some other display Name", ZugferdDocumentPdfBuilderAbstract::AF_RELATIONSHIP_SUPPLEMENT);
-		$zugferdDocumentPdfBuilder->generateDocument();
-		$zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
-		*/
-
-		// Set values for metadata-fields
-		// We can change some meta information such as the title, the subject, the author and the keywords.  This library essentially provides 4 methods for this.
-		// These methods use so-called templates. These methods are:
-
-		// The 4 methods just mentioned accept a free text that can accept the following placeholders:
-		// - %1$s .... contains the invoice number (is extracted from the XML data)
-		// - %2$s .... contains the type of XML document, such as ‘Invoice’ (is extracted from the XML data)
-		// - %3$s .... contains the name of the seller (extracted from the XML data)
-		// - %4$s .... contains the invoice date (extracted from the XML data)
-		// The following example generates...
-		// - the author:  .... Issued by seller with name Lieferant GmbH
-		// - the title    .... Lieferant GmbH : Invoice INV-TEST
-		// - the subject  .... Invoice-Document, Issued by Lieferant GmbH
-		// - the keywords .... INV-TEST, Invoice, Lieferant GmbH, 2024-12-31
-
-		// This rebuild the PDF including the XML and added PDF metadata.
-		// Same choice of engine as generateInvoice(): once the core has declared its own FPDF - which
-		// any page that already rendered a PDF has done - the horstoeko/zugferd writer cannot even be
-		// declared, and the sample generation died on a PHP fatal error instead of producing anything.
-		if (class_exists('FPDF', false) && is_subclass_of('FPDF', 'TCPDF')) {
-			dol_include_once('einvoicing/class/utils/FacturxTcpdfMerger.class.php');
-			$zugferdDocumentPdfBuilder = new FacturxTcpdfMerger($documentBuilder->getContent(), $existingPdfFilename);
-			// The templates below are resolved by horstoeko/zugferd from the XML it parses; this merger
-			// takes plain values, and the sample invoice knows what they are.
-			$zugferdDocumentPdfBuilder->setAuthorTemplate($mysoc->name);
-			$zugferdDocumentPdfBuilder->setSubjectTemplate('Invoice-Document SPECIMEN, Issued by ' . $mysoc->name . ' - Dolibarr ' . DOL_VERSION);
-			$zugferdDocumentPdfBuilder->setKeywordTemplate('SPECIMEN, Invoice, ' . $mysoc->name . ', Dolibarr');
-		} else {
-			$zugferdDocumentPdfBuilder = ZugferdDocumentPdfBuilder::fromPdfFile($documentBuilder, $existingPdfFilename);
-			$zugferdDocumentPdfBuilder->setAuthorTemplate('Issued by %3$s');
-			$zugferdDocumentPdfBuilder->setTitleTemplate('%3$s : %2$s SPECIMEN %1$s');
-			$zugferdDocumentPdfBuilder->setSubjectTemplate('%2$s-Document, Issued by %3$s - Dolibarr ' . DOL_VERSION);
-			$zugferdDocumentPdfBuilder->setKeywordTemplate('%1$s, %2$s, %3$s, %4$s, Dolibarr');
-		}
-		// If you would like to brand the merged PDF with the name of you own solution you can call
-		// the method setAdditionalCreatorTool. Before calling this method the creator of the PDF is identified as 'Factur-X library 1.x.x by HorstOeko'.
-		// After calling this method you get 'MyERPSolution 1.0 / Factur-X PHP library 1.x.x by HorstOeko' as the creator
-		$zugferdDocumentPdfBuilder->setAdditionalCreatorTool('Dolibarr generateSampleInvoiceOld - ' . DOL_VERSION);
-		$zugferdDocumentPdfBuilder->generateDocument();
-		$zugferdDocumentPdfBuilder->saveDocument($newPdfFilename);
-
-		return array('path' => $newPdfFilename, 'ref' => 'INV-TEST');
+		return array('header' => $parsedHeader, 'lines' => $parsedLines, 'xml' => $embeddedXml);
 	}
 
 
 	/**
-	 * Build the supplier invoice from a received Factur-X document written to a per-call working file.
-	 * The temp-file lifecycle is owned by createSupplierInvoiceFromSource() (the public wrapper).
-	 * The vendor synchronization runs in its own transaction, opened and closed here. The invoice
-	 * import transaction is opened here too, right after, but closed by that same wrapper.
+	 * The files a received Factur-X carries beside its invoice XML, such as the PDF the vendor issued.
 	 *
-	 * @param  string			$file                 Raw Factur-X PDF content
-	 * @param  string|null		$ReadableViewFile     Optional readable view (PDP-generated readable PDF)
-	 * @param  string			$flowId               Source flow identifier
-	 * @param  string			$tempFile             Unique working file for the received PDF
-	 * @param  string			$tempFileReadableView Unique working file for the readable view
-	 * @return array{res:int<-1,1>, message:string, action?:string|null}
+	 * A file is kept only when its name gives one of the extensions EN 16931 allows and its content
+	 * starts the way that format does: the name alone never decides what is stored.
+	 *
+	 * @param  string $file Raw content of the received PDF
+	 * @return array<int,array{filename:string,mimecode:string,extension:string,content:string}>
 	 */
-	protected function doCreateSupplierInvoiceFromSource($file, $ReadableViewFile, $flowId, $tempFile, $tempFileReadableView)
+	public static function extractContainerAttachments(string $file): array
 	{
-		global $conf, $db, $user;
-
-		// Duplicate code with doCreateSupplierInvoiceFromSource in CIIProtocol.class.php
-		// TODO Merge tis code with the one into CIIProtocol.class.php to avoid duplicate
-
-		$einvoicing = new EInvoicing($db);
-		$return_messages = array();
-
-		if (file_put_contents($tempFile, $file) === false) {
-			return ['res' => -1, 'message' => 'Failed to save EInvoice file to temporary location'];
+		$attachments = array();
+		if (strncmp($file, '%PDF-', 5) !== 0) {
+			return $attachments;
 		}
 
-		if ($ReadableViewFile) {
-			if (file_put_contents($tempFileReadableView, $ReadableViewFile) === false) {
-				return ['res' => -1, 'message' => 'Failed to save readable view file to temporary location'];
+		try {
+			$parser = new PdfAttachmentExtractor($file, md5($file));
+			$embedded = $parser->getEmbeddedFiles();
+			$parser->cleanUp();
+		} catch (Throwable $e) {
+			dol_syslog(__METHOD__ . ' could not read the embedded files: ' . $e->getMessage(), LOG_WARNING, 0, '_einvoicing');
+			return $attachments;
+		}
+
+		$mimecodes = array_flip(self::ATTACHMENT_MIME_EXTENSIONS);
+		$rank = 0;
+		foreach ($embedded as $name => $content) {
+			$rank++;
+			// dol_sanitizeFileName() keeps a NUL, which makes dol_move() throw; not dol_string_nounprintableascii(): its /u drops a non UTF-8 name.
+			$name = (string) preg_replace('/[\x00-\x1F\x7F]/', '', (string) $name);
+			if (in_array($name, PdfAttachmentExtractor::INVOICE_ATTACHMENT_NAMES, true)) {
+				continue;
 			}
-		}
 
-		//return ['res' => 1, 'message' => 'bypass' ];
+			$extension = strtolower((string) pathinfo((string) $name, PATHINFO_EXTENSION));
+			if ($extension === 'jpeg') {
+				$extension = 'jpg';
+			}
+			if (!isset($mimecodes[$extension]) || !self::contentMatchesExtension((string) $content, $extension)) {
+				dol_syslog(__METHOD__ . ' embedded file #' . $rank . ' ignored, its name or content is not one EN 16931 allows', LOG_WARNING, 0, '_einvoicing');
+				continue;
+			}
 
-		// --- Create Supplier Invoice object
-		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
-		$supplierInvoice = new FactureFournisseur($db);
+			$filename = dol_sanitizeFileName((string) pathinfo(basename((string) $name), PATHINFO_FILENAME));
+			if ($filename === '' || $filename === '-') {
+				$filename = 'attachment' . $rank;
+			}
 
-
-		// --- Read the Factur-X file
-		$document = ZugferdDocumentPdfReader::readAndGuessFromFile($tempFile);
-		$embeddedXml = ZugferdDocumentPdfReaderExt::getInvoiceDocumentContentFromFile($tempFile);
-
-		$parsedHeader = [];
-		$parsedLines = [];
-		if (!getDolGlobalInt('EINVOICING_USE_EXTERNAL_FACTURX_READER')) { // The default is to use the same parser than the CII one.
-			$parsedHeader = $this->parseInvoiceHeader($embeddedXml);
-			$parsedLines  = $this->parseInvoiceLines($embeddedXml);
-		} else {
-			// Use a duplicate parser (for test or dev tests)
-			$document->getDocumentInformation($documentno, $documenttypecode, $documentdate, $invoiceCurrency, $taxCurrency, $documentname, $documentlanguage, $effectiveSpecifiedPeriod);
-
-			$document->getDocumentSupplyChainEvent(
-				$documentDeliveryDate
+			$attachments[] = array(
+				'filename' => $filename,
+				'mimecode' => $mimecodes[$extension],
+				'extension' => $extension,
+				'content' => (string) $content
 			);
-
-			// Get seller information (supplier)
-			$document->getDocumentSeller($sellername, $sellerids, $sellerdescription);
-
-			// Get seller address
-			$document->getDocumentSellerAddress(
-				$sellerlineone,
-				$sellerlinetwo,
-				$sellerlinethree,
-				$sellerpostcode,
-				$sellercity,
-				$sellercountry,
-				$sellersubdivision
-			);
-
-			// Get seller contact
-			$document->getDocumentSellerContact(
-				$sellercontactpersonname,
-				$sellercontactdepartmentname,
-				$sellercontactphoneno,
-				$sellercontactfaxno,
-				$sellercontactemailaddr
-			);
-
-			$document->getDocumentSellerCommunication(
-				$sellerCommunicationUriScheme,
-				$sellerCommunicationUri
-			);
-
-			// Get document summation
-			$document->getDocumentSummation($grandTotalAmount, $duePayableAmount, $lineTotalAmount, $chargeTotalAmount, $allowanceTotalAmount, $taxBasisTotalAmount, $taxTotalAmount, $roundingAmount, $totalPrepaidAmount);
-
-			$document->getDocumentSellerGlobalId(
-				$sellerGlobalIds
-			);
-
-			$document->getDocumentSellerTaxRegistration(
-				$sellerTaxRegistations
-			);
-
-			// Get references to the previous invoices if any (for credit notes for example)
-			$document->getDocumentInvoiceReferencedDocuments($invoiceRefDocs);
-
-			// Debug: print all retrieved variables
-			$parsedHeader = array(
-				'documentno' => $documentno ?? null,
-				'documenttypecode' => $documenttypecode ?? null,
-				'documentdate' => isset($documentdate) && $documentdate instanceof DateTime ? $documentdate->format('Y-m-d') : ($documentdate ?? null),
-				'invoiceCurrency' => $invoiceCurrency ?? null,
-				'taxCurrency' => $taxCurrency ?? null,
-				'documentname' => $documentname ?? null,
-				'documentlanguage' => $documentlanguage ?? null,
-				'effectiveSpecifiedPeriod' => $effectiveSpecifiedPeriod ?? null,
-				'documentDeliveryDate' => isset($documentDeliveryDate) && $documentDeliveryDate instanceof DateTime ? $documentDeliveryDate->format('Y-m-d') : ($documentDeliveryDate ?? null),
-
-				// Seller
-				'sellername' => $sellername ?? null,
-				'sellerids' => $sellerids ?? null,
-				'sellerdescription' => $sellerdescription ?? null,
-
-				// Seller Address
-				'sellerlineone' => $sellerlineone ?? null,
-				'sellerlinetwo' => $sellerlinetwo ?? null,
-				'sellerlinethree' => $sellerlinethree ?? null,
-				'sellerpostcode' => $sellerpostcode ?? null,
-				'sellercity' => $sellercity ?? null,
-				'sellercountry' => $sellercountry ?? null,
-				'sellersubdivision' => $sellersubdivision ?? null,
-
-				// Seller Contact
-				'sellercontactpersonname' => $sellercontactpersonname ?? null,
-				'sellercontactdepartmentname' => $sellercontactdepartmentname ?? null,
-				'sellercontactphoneno' => $sellercontactphoneno ?? null,
-				'sellercontactfaxno' => $sellercontactfaxno ?? null,
-				'sellercontactemailaddr' => $sellercontactemailaddr ?? null,
-
-				// Seller Communication (may be unset due to reader var name)
-				'sellerCommunicationUriScheme' => $sellerCommunicationUriScheme ?? null,
-				'sellerCommunicationUri' => $sellerCommunicationUri ?? null,
-
-				// Summation
-				'grandTotalAmount' => $grandTotalAmount ?? null,
-				'duePayableAmount' => $duePayableAmount ?? null,
-				'lineTotalAmount' => $lineTotalAmount ?? null,
-				'chargeTotalAmount' => $chargeTotalAmount ?? null,
-				'allowanceTotalAmount' => $allowanceTotalAmount ?? null,
-				'taxBasisTotalAmount' => $taxBasisTotalAmount ?? null,
-				'taxTotalAmount' => $taxTotalAmount ?? null,
-				'roundingAmount' => $roundingAmount ?? null,
-				'totalPrepaidAmount' => $totalPrepaidAmount ?? null,
-
-				// Seller Global Ids and Tax Registrations (may be unset due to reader var name)
-				'sellerGlobalIds' => $sellerGlobalIds ?? null,
-				'sellerTaxRegistations' => $sellerTaxRegistations ?? null,
-
-				// Invoice referenced documents
-				'invoiceRefDocs' => $invoiceRefDocs ?? null,
-			);
-
-
-			// Read invoice lines
-			$additionalRefDocs = [];
-			if ($document->firstDocumentPosition()) {
-				do {
-					// Get line information
-					$document->getDocumentPositionGenerals($lineid, $linestatuscode, $linestatusreasoncode);
-					$document->getDocumentPositionProductDetails($prodname, $proddesc, $prodsellerid, $prodbuyerid, $prodglobalidtype, $prodglobalid);
-					$document->getDocumentPositionGrossPrice($grosspriceamount, $grosspricebasisquantity, $grosspricebasisquantityunitcode);
-					$document->getDocumentPositionNetPrice($netpriceamount, $netpricebasisquantity, $netpricebasisquantityunitcode);
-					$document->getDocumentPositionLineSummation($lineTotalAmount, $totalAllowanceChargeAmount);
-					$document->getDocumentPositionQuantity($billedquantity, $billedquantityunitcode, $chargeFreeQuantity, $chargeFreeQuantityunitcode, $packageQuantity, $packageQuantityunitcode);
-
-					// Get AdditionalReferencedDocument at line level
-					$patcher = new XmlPatcher(null, $embeddedXml);
-					$additionalRefDocs[(string) $lineid] = $patcher->getLineAdditionalReferencedDocuments((string) $lineid);
-
-					// Get tax information for the line
-					//$vatRate = 0;
-					if ($document->firstDocumentPositionTax()) {
-						$document->getDocumentPositionTax($categoryCode, $typeCode, $rateApplicablePercent, $calculatedAmount, $exemptionReason, $exemptionReasonCode);
-						//$vatRate = $rateApplicablePercent;
-					}
-
-					$parsedLines[] = array(
-						'lineid' => $lineid ?? null,
-						'linestatuscode' => $linestatuscode ?? null,
-						'linestatusreasoncode' => $linestatusreasoncode ?? null,
-						'prodname' => $prodname ?? null,
-						'proddesc' => $proddesc ?? null,
-						'prodsellerid' => $prodsellerid ?? null,
-						'prodbuyerid' => $prodbuyerid ?? null,
-						'prodglobalidtype' => $prodglobalidtype ?? null,
-						'prodglobalid' => $prodglobalid ?? null,
-						'grosspriceamount' => $grosspriceamount ?? null,
-						'grosspricebasisquantity' => $grosspricebasisquantity ?? null,
-						'grosspricebasisquantityunitcode' => $grosspricebasisquantityunitcode ?? null,
-						'netpriceamount' => $netpriceamount ?? null,
-						'netpricebasisquantity' => $netpricebasisquantity ?? null,
-						'netpricebasisquantityunitcode' => $netpricebasisquantityunitcode ?? null,
-						'lineTotalAmount' => $lineTotalAmount ?? null,
-						'totalAllowanceChargeAmount' => $totalAllowanceChargeAmount ?? null,
-						'billedquantity' => $billedquantity ?? null,
-						'billedquantityunitcode' => $billedquantityunitcode ?? null,
-						'chargeFreeQuantity' => $chargeFreeQuantity ?? null,
-						'chargeFreeQuantityunitcode' => $chargeFreeQuantityunitcode ?? null,
-						'packageQuantity' => $packageQuantity ?? null,
-						'packageQuantityunitcode' => $packageQuantityunitcode ?? null,
-						// Tax
-						'categoryCode' => $categoryCode ?? null,
-						'typeCode' => $typeCode ?? null,
-						'rateApplicablePercent' => $rateApplicablePercent ?? null,
-						'calculatedAmount' => $calculatedAmount ?? null,
-						'ExemptionReason' => $exemptionReason ?? null,
-						'ExemptionReasonCode' => $exemptionReasonCode ?? null,
-						// Parent invoice ref
-						'parentDocumentNo' => $parsedHeader['documentno'] ?? null,
-						// Additional referenced documents at line level
-						'additionalRefDocs' => $additionalRefDocs[(string) $lineid] ?? null,
-					);
-
-
-					dol_syslog(get_class($this) . '::createSupplierInvoiceFromSource parsedLines: ' . json_encode($parsedLines), LOG_DEBUG);
-				} while ($document->nextDocumentPosition());
-			}
 		}
 
-		dol_syslog(get_class($this) . '::createSupplierInvoiceFromSource parsedHeader: ' . json_encode($parsedHeader), LOG_DEBUG);
-		dol_syslog(get_class($this) . '::createSupplierInvoiceFromSource parsedHeader: ' . json_encode($parsedHeader), LOG_DEBUG, 0, '_einvoicing');
+		return $attachments;
+	}
 
-		// Sync or create supplier based on seller info.
-		// Done before the duplicate/ref-docs checks below so those checks can be scoped to this supplier
-		// (ref_supplier is only unique per supplier, not globally - see issue about cross-supplier collisions).
-		//
-		// The vendor is reference data, not part of the invoice: it gets its own transaction, committed
-		// before the import starts. A business error raised further down - a product that cannot be
-		// auto-created, a referenced document missing - must not roll back the thirdparty the operator is
-		// precisely being asked to complete: the "create the product" and "map the product" links returned
-		// with that error carry its socid, so a rolled back vendor makes them point to a thirdparty that
-		// never existed.
-		$db->begin();
-		$this->openedTransactions++;
-
-		$syncSocRes = $this->_syncOrCreateThirdpartyFromEInvoiceSeller($parsedHeader, 'dolibarr', $flowId);
-
-		$socId = $syncSocRes['res'];
-		$return_messages[] = $syncSocRes['message'];
-		if ($socId < 0) {
-			$db->rollback();
-			$this->openedTransactions--;
-			return [
-				'res' => -1,
-				'message' => 'Thirdparty sync or creation error: ' . implode("<br>\n", $return_messages),
-				'actioncode' => $syncSocRes['actioncode'] ?? '',
-				'actionurl' => $syncSocRes['actionurl'] ?? '',
-				'action' => $syncSocRes['action'] ?? null,
-				'actiondata' => $syncSocRes['actiondata'] ?? null
-			];
+	/**
+	 * Whether a content starts the way files of that extension do.
+	 *
+	 * @param  string $content		Raw content
+	 * @param  string $extension	One of the values of ATTACHMENT_MIME_EXTENSIONS
+	 * @return bool					True when the content starts with that format's signature, or for csv is non-empty text without NUL byte
+	 */
+	private static function contentMatchesExtension(string $content, string $extension): bool
+	{
+		switch ($extension) {
+			case 'pdf':
+				return strncmp($content, '%PDF-', 5) === 0;
+			case 'png':
+				return strncmp($content, "\x89PNG\r\n\x1a\n", 8) === 0;
+			case 'jpg':
+				return strncmp($content, "\xFF\xD8\xFF", 3) === 0;
+			case 'xlsx':
+			case 'ods':
+				return strncmp($content, "PK\x03\x04", 4) === 0;
+			case 'csv':
+				return $content !== '' && strpos($content, "\0") === false;
 		}
 
-		$db->commit();
-		$this->openedTransactions--;
-
-		// From this point on, everything belongs to the invoice import (products, invoice, lines) and
-		// stays atomic. This second transaction is closed (commit or rollback) by
-		// createSupplierInvoiceFromSource(), the public wrapper.
-		$db->begin();
-		$this->openedTransactions++;
-
-		// Load supplier (thirdparty)
-		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.class.php';
-		$supplier = new Fournisseur($db);
-		if ($supplier->fetch($socId) < 0) {
-			return ['res' => -1, 'message' => 'Failed to load supplier id ' . $socId];
-		}
-
-		// Check if this invoice has already been imported for this supplier
-		$sql = "SELECT rowid as id FROM " . MAIN_DB_PREFIX . "facture_fourn";
-		$sql .= " WHERE ref_supplier = '" . $db->escape($parsedHeader['documentno']) . "'";
-		$sql .= " AND fk_soc = " . ((int) $socId);
-		$sql .= " AND entity IN (" . getEntity('facture_fourn') . ")";
-		$resql = $db->query($sql);
-		if ($resql) {
-			if ($db->num_rows($resql) > 0) {
-				$supplierInvoiceId = $db->fetch_object($resql)->id;
-				$einvoicing->cleanUpTemporaryFiles(); // Clean up temp files to remove retrieved Einvoice file since invoice already exists
-
-				// FIXME supplierinvoice already found but may be that documents are not linked (this is done later but only after creating invoice,
-				// may be we should also do it in this case to fix inconsistent data).
-
-				return ['res' => $supplierInvoiceId, 'message' => 'Supplier Invoice with reference ' . $parsedHeader['documentno'] . ' already exists'];
-			}
-		} else {
-			return ['res' => -1, 'message' => 'Database error while checking existing supplier invoice: ' . $db->lasterror()];
-		}
-
-		// Check if all referenced documents in the invoice exist in Dolibarr for the same supplier, if not return with error since we need them for correct linking in the invoice
-		if (!empty($parsedHeader['invoiceRefDocs']) && is_array($parsedHeader['invoiceRefDocs'])) {
-			foreach ($parsedHeader['invoiceRefDocs'] as $invoiceRefDoc) {
-				$refDoc = $invoiceRefDoc['IssuerAssignedID'] ?? null;
-				$dateDoc = $invoiceRefDoc['FormattedIssueDateTime'] ?? null;
-				$typeDoc = $invoiceRefDoc['TypeCode'] ?? null;
-
-				$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($refDoc) . "' AND fk_soc = " . ((int) $socId) . " AND entity IN (" . getEntity('facture_fourn') . ") LIMIT 1";
-				$resql = $db->query($sql);
-				if ($db->num_rows($resql) != 1) {
-					return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
-				}
-			}
-		}
-
-		// Set supplier reference
-		$supplierInvoice->socid = $socId;
-		$supplierInvoice->ref_supplier = $parsedHeader['documentno'] ?? '';
-
-		// Set basic invoice information (type, date)
-		$supplierInvoice->type = $this->getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null);
-		if ($supplierInvoice->type === '-1') {
-			return ['res' => -1, 'message' => 'Unfounded dolibarr corresponding Invoice code for document type code: ' . ($parsedHeader['documenttypecode'] ?? 'NA')];
-		}
-		// documentdate is already formatted into 'Y-m-d' by the parser ZugFerd and CII
-		$supplierInvoice->date = !empty($parsedHeader['documentdate']) ? dol_stringtotime($parsedHeader['documentdate']) : null;
-
-		// For credit notes and replacement invoices, link to the source invoice via fk_facture_source
-		// (BT-25). A replacement invoice (BT-3 = 384) corrects the invoice it references just as a credit
-		// note cancels it, and Dolibarr stores that source in the same field for both.
-		if (in_array($supplierInvoice->type, array(FactureFournisseur::TYPE_CREDIT_NOTE, FactureFournisseur::TYPE_REPLACEMENT)) && !empty($parsedHeader['invoiceRefDocs']) && is_array($parsedHeader['invoiceRefDocs'])) {
-			$firstRefDoc = reset($parsedHeader['invoiceRefDocs']);
-			$refSourceSupplier = !empty($firstRefDoc['IssuerAssignedID']) ? (string) $firstRefDoc['IssuerAssignedID'] : '';
-			if ($refSourceSupplier !== '') {
-				$sqlSource = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($refSourceSupplier) . "' AND fk_soc = " . ((int) $socId) . " AND entity IN (" . getEntity('facture_fourn') . ") LIMIT 1";
-				$resqlSource = $db->query($sqlSource);
-				if ($resqlSource) {
-					$objSource = $db->fetch_object($resqlSource);
-					if ($objSource) {
-						$supplierInvoice->fk_facture_source = (int) $objSource->rowid;
-						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Linked to source invoice id=' . $supplierInvoice->fk_facture_source, LOG_DEBUG);
-					} else {
-						dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Source invoice ref_supplier="' . $refSourceSupplier . '" not found for ' . ($parsedHeader['documentno'] ?? ''), LOG_WARNING);
-					}
-				}
-			}
-		}
-
-		// Set currency
-		$supplierInvoice->multicurrency_code = (string) $parsedHeader['invoiceCurrency'];
-
-		// Set import_key
-		$supplierInvoice->import_key = AbstractPDPProvider::$EINVOICING_LAST_IMPORT_KEY;
-
-		// Set payment due date, payment terms and payment method
-		$paymentInfoRes = $this->_applyPaymentInfoToSupplierInvoice($supplierInvoice, $parsedHeader);
-		if (!empty($paymentInfoRes['message'])) {
-			dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource ' . $paymentInfoRes['message'], LOG_DEBUG, 0, '_einvoicing');
-		}
-
-
-		$remise_already_used_line_level_ids = array();
-		$supplierPriceEntries = array(); // Collect product/price data to create supplier prices after invoice creation
-
-		// Create document level discounts (allowances) as discounts in Dolibarr
-		$globalDiscountIds = array();
-		if (!empty($parsedHeader['headerAllowancesCharges'])) {
-			$headerDiscountIds = $this->createHeaderDiscounts($parsedHeader['headerAllowancesCharges'], $socId, (string) $parsedHeader['documentno']);
-			if (!empty($headerDiscountIds[-1])) {
-				return ['res' => -1, 'message' => $headerDiscountIds[-1]];
-			} else {
-				$globalDiscountIds = $headerDiscountIds;
-			}
-		}
-
-		//return ['res' => 1, 'message' => 'Not implemented yet' ];
-
-		// Set invoice totals
-		$supplierInvoice->total_ht = $parsedHeader['taxBasisTotalAmount'] ?? 0;
-		$supplierInvoice->total_tva = $parsedHeader['taxTotalAmount'] ?? 0;
-		$supplierInvoice->total_ttc = $parsedHeader['grandTotalAmount'] ?? 0;
-
-		// Add a note about PDP import ( TODO: add a hook or extrafields to store import details)
-		$supplierInvoice->note_private = "Imported from PDP";
-
-		// TODO : save AAB, PMD, PMT notes (all notes are grouped into documentNotes)
-
-		// Create the invoice
-		$supplierInvoiceId = $supplierInvoice->create($user);
-
-		if ($supplierInvoiceId < 0) {
-			return ['res' => -1, 'message' => 'Invoice creation error: ' . $supplierInvoice->error];
-		} else {
-			// Link the invoice to its purchase order (commande fournisseur) when the order reference
-			// (BT-13) matches a single order for the same supplier. Non-blocking. See issue #303.
-			$orderLinkMessage = $this->_linkSupplierInvoiceToPurchaseOrder($supplierInvoice, $socId, $parsedHeader['orderReference'] ?? '');
-			if ($orderLinkMessage !== '') {
-				$return_messages[] = $orderLinkMessage;
-			}
-
-
-			// --------------------------------------------------
-			// Create supplier invoice lines
-			// --------------------------------------------------
-
-			$res = $this->createSupplierInvoiceLinesFromSource($supplierInvoice, $parsedLines, $remise_already_used_line_level_ids, $supplierPriceEntries, $return_messages, $flowId);
-			if ($res['res'] < 0) {
-				return $res;
-			}
-
-			$create_deposit_line = 0;
-			$fk_remise_for_deposit = 0;
-			// --------------------------------------------------
-			// Loop on linked documents at document level
-			// --------------------------------------------------
-			if (!empty($parsedHeader['invoiceRefDocs']) && is_array($parsedHeader['invoiceRefDocs'])) {
-				foreach ($parsedHeader['invoiceRefDocs'] as $doc) {
-					$refDoc = $doc['IssuerAssignedID'] ?? null;
-					$dateDoc = $doc['FormattedIssueDateTime'] ?? null;
-					$typeDoc = $doc['TypeCode'] ?? null;
-
-					$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_fourn WHERE ref_supplier = '" . $db->escape($refDoc) . "' AND fk_soc = " . ((int) $socId) . " AND entity IN (" . getEntity('facture_fourn') . ") LIMIT 1";
-					$resql = $db->query($sql);
-					if ($db->num_rows($resql) != 1) {
-						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
-					}
-					$linkedObjectId = $db->fetch_object($resql)->rowid;
-
-					// Fetch Object
-					$linkedObject = new FactureFournisseur($db);
-					$resFetchLinkedObject = $linkedObject->fetch($linkedObjectId);
-					if ($resFetchLinkedObject > 0) {
-						// --------------------------------------------------
-						// Deposit handling
-						// --------------------------------------------------
-						if ($linkedObject->type == FactureFournisseur::TYPE_DEPOSIT) {
-							$create_deposit_line = 1;
-
-							$depositDiscountRes = $this->getOrCreateDepositDiscount($linkedObject);
-							if ($depositDiscountRes['res'] < 0) {
-								return $depositDiscountRes;
-							}
-							$fk_remise_for_deposit = $depositDiscountRes['fkRemise'];
-
-							// After creating the discount for the deposit, we create a line in the invoice to link it to the deposit
-							if ($create_deposit_line && !empty($fk_remise_for_deposit)) {
-								if (!in_array($fk_remise_for_deposit, $remise_already_used_line_level_ids)) { // If the discount for deposit is not already used at line level we link it to the invoice, otherwise it is already linked at line level so we skip to avoid duplicates
-									$currentSupplierInvoice = new FactureFournisseur($db);
-									$currentSupplierInvoice->fetch($supplierInvoiceId);
-									$result = $currentSupplierInvoice->insert_discount($fk_remise_for_deposit);
-									if ($result < 0) {
-										return ['res' => -1, 'message' => 'Failed to link discount for deposit to supplier invoice: ' . $currentSupplierInvoice->error];
-									} else {
-										dol_syslog('Deposit line linked to supplier invoice with line id: ' . $result);
-									}
-								}
-							}
-						}
-
-						// Other linked document handling can be implemented here based on the type of the linked document for example credit note etc...
-					} else {
-						return ['res' => -1, 'message' => 'Document : ' . $refDoc . ' linked to document ' . $parsedHeader['documentno'] . ' not found in Dolibarr'];
-					}
-				}
-			}
-
-			// Update thirdparty as a supplier if not already the case
-			if ($supplier->fournisseur != 1) {
-				$supplier->fournisseur = 1;
-				$supplier->code_fournisseur = 'auto';
-				$supplier->update($supplier->id, $user);
-			}
-
-			// Insert global discounts (allowances) as lines in this supplier invoice
-			if (!empty($globalDiscountIds)) {
-				foreach ($globalDiscountIds as $fk_remise_except) {
-					$currentSupplierInvoice = new FactureFournisseur($db);
-					$currentSupplierInvoice->fetch($supplierInvoiceId);
-					$result = $currentSupplierInvoice->insert_discount($fk_remise_except);
-					if ($result < 0) {
-						return ['res' => -1, 'message' => 'Failed to insert global discount into supplier invoice: ' . $currentSupplierInvoice->error];
-					} else {
-						dol_syslog('Global discount inserted into supplier invoice with line id: ' . $result);
-					}
-				}
-			}
-
-			// Create or update supplier prices for imported products
-			if (!empty($supplierPriceEntries)) {
-				require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.product.class.php';
-				foreach ($supplierPriceEntries as $entry) {
-					$productFourn = new ProductFournisseur($db);
-					$productFourn->id = $entry['productId'];
-					$result = $productFourn->update_buyprice(
-						1,                    // qty min
-						$entry['unitPrice'],  // prix unitaire HT
-						$user,
-						'HT',
-						$supplier,
-						0,                    // availability
-						$entry['refFourn'],   // ref fournisseur
-						$entry['tvaTx']
-					);
-					if ($result < 0) {
-						dol_syslog(__METHOD__ . ' Failed to create supplier price for product id=' . $entry['productId'] . ': ' . $productFourn->error, LOG_WARNING);
-					} else {
-						dol_syslog(__METHOD__ . ' Supplier price created/updated for product id=' . $entry['productId'], LOG_DEBUG);
-					}
-				}
-			}
-
-			// Set import_key
-			$sql = 'UPDATE ' . MAIN_DB_PREFIX . "facture_fourn SET import_key = '" . $db->escape($supplierInvoice->import_key) . "'";
-			$sql .= " WHERE rowid = " . ((int) $supplierInvoiceId);
-			$db->query($sql);
-
-			// Add entry in einvoicing_extlinks table to mark that this supplier invoice is imported from PDP
-			$einvoicing->insertOrUpdateExtLink($supplierInvoiceId, $supplierInvoice->element, $flowId);
-
-			dol_syslog(__METHOD__ . ' New supplier invoice created or updated (ID: ' . $supplierInvoiceId . ')');
-
-			$return_messages[] = 'Supplier Invoice created or updated with ID: ' . $supplierInvoiceId;
-
-
-			// Save original invoice in supplier invoice attachments
-			if ($tempFile && file_exists($tempFile)) {
-				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFile);
-
-				if ($res['res'] < 0) {
-					$return_messages[] = 'Failed to save Einvoice file as attachment: ' . $res['message'];
-				} else {
-					$return_messages[] = 'Einvoice file saved as attachment';
-				}
-			} else {
-				dol_syslog("Temporary 'converted pdf file' not found for attachment", LOG_ERR);
-			}
-
-
-			// Save readable view file in supplier invoice attachments
-			if ($ReadableViewFile && $tempFileReadableView && file_exists($tempFileReadableView)) {
-				$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempFileReadableView, getDolGlobalString('EINVOICING_PDP', 'PDP'));
-
-				if ($res['res'] < 0) {
-					$return_messages[] = 'Failed to save readable view file as attachment: ' . $res['message'];
-				} else {
-					$return_messages[] = 'Readable view file saved as attachment';
-				}
-			} else {
-				dol_syslog("Temporary 'readable pdf file' not found for attachment", LOG_ERR);
-			}
-
-			// TODO : Save receivedFile in supplier invoice attachments
-			return ['res' => $supplierInvoiceId, 'message' => implode("\n", $return_messages), 'xml_data' => $embeddedXml];
-		}
+		return false;
 	}
 
 	/**
@@ -1753,7 +721,7 @@ class FacturXProtocol extends CIIProtocol
 	 */
 	public function extractXmlFromFileContent(string $fileContent)
 	{
-		$extractedXml = ZugferdDocumentPdfReaderExt::getInvoiceDocumentContentFromContent($fileContent);
+		$extractedXml = PdfAttachmentExtractor::getInvoiceXmlFromContent($fileContent);
 		return $extractedXml;
 	}
 }

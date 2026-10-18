@@ -258,6 +258,29 @@ if (empty($reshook)) {
 
 	// You can add more action here
 	// if ($action == 'xxx' && $permissiontoxxx) ...
+
+	// Mass action of the module: pack the selection into one archive a maintainer can read without
+	// walking the user through four screens (issue #799). The archive is built by a class of its
+	// own, because page code cannot be exercised by PHPUnit and the redaction it performs has to be
+	// covered by a test; the page only reads the selection and hands the file over.
+	if (empty($error) && ($massaction == 'supportexport' || ($action == 'supportexport' && $confirm == 'yes')) && $permissiontoread) {
+		dol_include_once('einvoicing/class/utils/SupportExport.class.php');
+
+		$supportexport = new SupportExport($db);
+		$supportarchive = $supportexport->build(SupportExport::TYPE_CALL, $toselect, $diroutputmassaction);
+
+		if ($supportarchive == '') {
+			setEventMessages($supportexport->error, null, 'errors');
+			$massaction = '';
+			$action = 'list';
+		} else {
+			// Nothing has been printed yet at this point of the page, so the archive can be sent
+			// as the answer to this very request.
+			SupportExport::deliver($supportarchive);
+			$db->close();
+			exit;
+		}
+	}
 }
 
 
@@ -474,6 +497,13 @@ if ($num == 1 && getDolGlobalInt('MAIN_SEARCH_DIRECT_OPEN_IF_ONLY_ONE') && $sear
 
 llxHeader('', $title, $help_url, '', 0, 0, $morejs, $morecss, '', 'mod-einvoicing page-list bodyforlist');	// Can use also classforhorizontalscrolloftabs instead of bodyforlist for a horizontal scroll in the table instead of page
 
+if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP") && $conf->entity != getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
+	print $langs->trans("EInvoicingInfoManagedByMasterSetup", getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
+
+	llxFooter();
+	exit;
+}
+
 $arrayofselected = is_array($toselect) ? $toselect : array();
 
 $param = '';
@@ -521,10 +551,13 @@ $arrayofmassactions = array(
 	//'builddoc'=>img_picto('', 'pdf', 'class="pictofixedwidth"').$langs->trans("PDFMerge"),
 	//'presend'=>img_picto('', 'email', 'class="pictofixedwidth"').$langs->trans("SendByMail"),
 );
+if (!empty($permissiontoread)) {
+	$arrayofmassactions['presupportexport'] = img_picto('', 'download', 'class="pictofixedwidth"').$langs->trans("EInvoicingSupportExport");
+}
 if (!empty($permissiontodelete)) {
 	$arrayofmassactions['predelete'] = img_picto('', 'delete', 'class="pictofixedwidth"').$langs->trans("Delete");
 }
-if (GETPOSTINT('nomassaction') || in_array($massaction, array('presend', 'predelete'))) {
+if (GETPOSTINT('nomassaction') || in_array($massaction, array('presend', 'predelete', 'presupportexport'))) {
 	$arrayofmassactions = array();
 }
 $massactionbutton = $form->selectMassAction('', $arrayofmassactions);
@@ -562,6 +595,14 @@ $modelmail = "call";
 $objecttmp = new Call($db);
 $trackid = 'xxxx'.$object->id;
 include DOL_DOCUMENT_ROOT.'/core/tpl/massactions_pre.tpl.php';
+
+// Confirmation of the support export, in the shape the core uses for its own mass actions: no ajax
+// and no form tag of its own, so that the buttons submit the list form and the selection survives.
+// The ajax variant jumps to a GET url instead, which would drop toselect[].
+if ($massaction == 'presupportexport') {
+	$formquestion = array('text' => $langs->trans("EInvoicingSupportExportPrivacy"));
+	print $form->formconfirm($_SERVER["PHP_SELF"], $langs->trans("EInvoicingSupportExport"), $langs->trans("EInvoicingSupportExportQuestion", count($toselect)), "supportexport", $formquestion, '', 0, 250, 500, 1);
+}
 
 if ($search_all) {
 	$setupstring = '';

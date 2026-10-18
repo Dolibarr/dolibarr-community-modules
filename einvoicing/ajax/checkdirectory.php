@@ -32,9 +32,8 @@ if (!defined('NOREQUIREHTML')) {
 if (!defined('NOREQUIREAJAX')) {
 	define('NOREQUIREAJAX', '1');
 }
-if (!defined('NOREQUIRESOC')) {
-	define('NOREQUIRESOC', '1');
-}
+// NOREQUIRESOC is deliberately not defined here: this endpoint builds a PDPProviderManager, which reads
+// $mysoc->country_code to decide the list of providers, so $mysoc must exist.
 if (!defined('NOCSRFCHECK')) {
 	define('NOCSRFCHECK', '1');
 }
@@ -97,6 +96,26 @@ $langs->load('einvoicing@einvoicing');
 top_httphead();
 
 /**
+ * Localized provenance of a directory answer, when it carries one.
+ *
+ * Every status but the plain error one may come from somewhere else than the standardized directory
+ * answer: the platform's own endpoint settling a missing line status, or that same endpoint read as a
+ * fallback because the standardized call did not go through. The user compares the badge with the
+ * annuaire consulted by hand, so that difference must be readable without opening the code.
+ *
+ * @param array 	$r 	Result from AbstractPDPProvider::checkRecipientDirectory()
+ * @return string 		Escaped detail, empty when the answer carries no provenance
+ */
+function einvoicing_directory_provenance($r)
+{
+	global $langs;
+	if (empty($r['message'])) {
+		return '';
+	}
+	return dol_escape_htmltag($langs->trans($r['message'], (string) ($r['messageparam'] ?? '')));
+}
+
+/**
  * Build a localized, ready-to-display HTML snippet from a directory result.
  *
  * @param array 	$r 		Result from AbstractPDPProvider::checkRecipientDirectory()
@@ -122,16 +141,21 @@ function einvoicing_directory_html($r, $siren)
 			if (!empty($r['platform'])) {
 				$details[] = $langs->trans("EInvoicingDirectoryPlatformType").': '.dol_escape_htmltag($r['platform']);
 			}
-			// Where the status was read, when it did not come from the standardized directory answer:
-			// the annuaire consulted by hand then shows no status for that line, and the difference
-			// must be explainable without reading the code.
-			if (!empty($r['message'])) {
-				$details[] = dol_escape_htmltag($langs->trans($r['message']));
+			// Where the status was read, when it did not come from the standardized directory answer.
+			if (($provenance = einvoicing_directory_provenance($r)) !== '') {
+				$details[] = $provenance;
 			}
 			if (!empty($details)) {
 				$txt .= ' <span class="opacitymedium small">('.implode(' - ', $details).')</span>';
 			}
 			return img_picto('', 'tick', 'class="color-green paddingright"').$txt;
+		case 'unknownaddress':
+			// The recipient may well be reachable at another address; this invoice is not addressed to
+			// it. Saying "reachable" here, on the strength of a line the document does not carry, is
+			// exactly the answer that lets a transmission leave for a rejection (fr:213). The address
+			// is named so the user can compare it with the annuaire, and correct the routing record
+			// rather than wonder which of the two the badge was talking about.
+			return img_picto('', 'error', 'class="color-red paddingright"').$langs->trans("EInvoicingDirectoryAddressNotDeclared", (string) ($r['identifier'] ?? ''), $siren);
 		case 'absent':
 			return img_picto('', 'error', 'class="color-red paddingright"').$langs->trans("EInvoicingDirectoryAbsent", $siren);
 		case 'inactive':
@@ -149,19 +173,28 @@ function einvoicing_directory_html($r, $siren)
 			if (!empty($r['linestatus'])) {
 				$details[] = $langs->trans("EInvoicingDirectoryLineStatus").': '.dol_escape_htmltag($r['linestatus']);
 			}
-			if (!empty($r['message'])) {
-				$details[] = dol_escape_htmltag($langs->trans($r['message']));
+			if (($provenance = einvoicing_directory_provenance($r)) !== '') {
+				$details[] = $provenance;
 			}
 			if (!empty($details)) {
 				$txt .= ' <span class="opacitymedium small">('.implode(' - ', $details).')</span>';
 			}
 			return img_picto('', 'warning', 'class="paddingright"').$txt;
 		case 'undetermined':
-			// Neutral on purpose: a line exists but its status was not communicated, so the check fails
-			// open without asserting anything. Green here is what let an undeliverable invoice be sent.
+			// Neutral on purpose: the line exists but its status was not communicated, so fail open
+			// without asserting anything. Green here would let an undeliverable invoice be sent.
+			// Report the provenance: a terse directory answer and a failed call reach the same
+			// wording, and only the message tells the two apart (issue #698).
 			$txt = $langs->trans("EInvoicingDirectoryUndetermined", $siren);
+			$details = array();
 			if (!empty($r['identifier'])) {
-				$txt .= ' <span class="opacitymedium small">('.dol_escape_htmltag($r['identifier']).')</span>';
+				$details[] = dol_escape_htmltag($r['identifier']);
+			}
+			if (($provenance = einvoicing_directory_provenance($r)) !== '') {
+				$details[] = $provenance;
+			}
+			if (!empty($details)) {
+				$txt .= ' <span class="opacitymedium small">('.implode(' - ', $details).')</span>';
 			}
 			return '<span class="opacitymedium">'.img_picto('', 'info', 'class="paddingright"').$txt.'</span>';
 		case 'unsupported':
@@ -192,15 +225,23 @@ if ($invoice->id <= 0) {
 // Authorize the fetched invoice with the standard invoice/third-party access rules: the e-invoicing
 // read right alone must not expose an invoice (and its recipient data) the user cannot otherwise read.
 restrictedArea($user, 'facture', $invoice->id, '', '', 'fk_soc', 'rowid');
+dol_include_once('einvoicing/lib/einvoicing.lib.php');
 
 $invoice->fetch_thirdparty();
-$siren = is_object($invoice->thirdparty) ? preg_replace('/[^0-9]/', '', (string) $invoice->thirdparty->idprof1) : '';
+$siren = is_object($invoice->thirdparty) ? preg_replace('/[^0-9]/', '', (string) idprof($invoice->thirdparty)) : '';
 if ($siren === '') {
 	print json_encode(array(
 		'status' => 'error',
 		'reachable' => -1,
 		'html' => img_picto('', 'warning', 'class="warning"').' '.$langs->trans("EInvoicingDirectoryNoSiren"),
 	));
+	$db->close();
+	exit;
+}
+
+if (einvoicingIsSendDisabled()) {
+	// Generation-only mode (or the sync toggle): nothing is ever sent, so there is no recipient to reach.
+	print json_encode(array('status' => 'unsupported', 'html' => einvoicing_directory_html(array('status' => 'unsupported'), $siren)));
 	$db->close();
 	exit;
 }
@@ -214,8 +255,17 @@ if (!is_object($provider)) {
 	exit;
 }
 
-$r = $provider->checkRecipientDirectory($siren);
+// The badge must answer about the address this invoice is sent to, so it asks for it the same way the
+// generation does: invoice-level override first, then the third-party default routing, then the SIREN.
+// Reading only the SIREN told the user a recipient was reachable while the document went to a
+// SIRET-suffixed address the check had never looked at.
+require_once "../class/einvoicing.class.php";
+$einvoicing = new EInvoicing($db);
+$routingid = $einvoicing->getBuyerCommunicationURI($invoice->thirdparty, $invoice);
+
+$r = $provider->checkRecipientDirectory($siren, $routingid);
 $r['siren'] = $siren;
+$r['routingid'] = $routingid;
 $r['html'] = einvoicing_directory_html($r, $siren);
 
 print json_encode($r);

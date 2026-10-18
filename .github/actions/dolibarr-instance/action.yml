@@ -1,0 +1,158 @@
+---
+name: Dolibarr instance
+description: >
+  Checks out a Dolibarr release, loads the demo database that release ships and configures it, so a
+  job can run the module against a real instance. Needs a MySQL/MariaDB service declared by the job.
+
+inputs:
+  dolibarr:
+    description: Release tag of the core to run against, e.g. "23.0.4"
+    required: true
+  php:
+    description: PHP version to install
+    required: true
+  db-host:
+    description: Host of the database service
+    required: false
+    default: 127.0.0.1
+  db-port:
+    description: Port of the database service
+    required: false
+    default: "3306"
+  db-name:
+    description: Database the dump is loaded into
+    required: false
+    default: dolibarr
+  db-user:
+    description: Database user
+    required: false
+    default: root
+  db-password:
+    description: Password of that user
+    required: false
+    default: dolibarr
+
+outputs:
+  htdocs:
+    description: The htdocs directory of the instance, also exported as DOLIBARR_HTDOCS
+    value: ${{ steps.configure.outputs.htdocs }}
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout Dolibarr ${{ inputs.dolibarr }}
+      uses: actions/checkout@v6
+      with:
+        repository: Dolibarr/dolibarr
+        ref: ${{ inputs.dolibarr }}
+        path: dolibarr
+
+    - name: Setup PHP ${{ inputs.php }}
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ inputs.php }}
+        extensions: mysqli, intl, gd, mbstring, zip, xml, curl
+        tools: phpunit:9.6
+        coverage: none # disable xdebug, pcov
+
+    - name: Load the Dolibarr demo database
+      # The release ships the dump of its own demo database next to the sources; that is what the
+      # core CI loads too. Building the schema out of htdocs/install/mysql by hand would mean
+      # reimplementing the installer, and loading an older dump would mean driving the migration.
+      shell: bash
+      run: |
+        set -euo pipefail
+        major=${DOLIBARR_VERSION%%.*}
+        dump=$(ls dolibarr/dev/initdemo/mysqldump_dolibarr_${major}.*.sql 2>/dev/null | head -1)
+        if [ -z "$dump" ]; then
+          echo "::error::No demo dump for Dolibarr ${major} in dolibarr/dev/initdemo/"
+          ls dolibarr/dev/initdemo/ || true
+          exit 1
+        fi
+        echo "Loading $dump"
+        # Dumps taken with a MySQL client open with "/*!999999\- enable the sandbox mode */", which
+        # the MariaDB client reads as a command it does not know and refuses at line 1. The dumps of
+        # 20 and 21 carry it; those of 23 and 24 use the MariaDB form, which is ignored.
+        sed '1{/enable the sandbox mode/d;}' "$dump" \
+          | mysql --host "$DB_HOST" --port "$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME"
+        # The tests write documents; the umask of the demo is the one of the machine it was dumped
+        # on, and a stricter one makes the generation fail on a file it cannot read back.
+        mysql --host "$DB_HOST" --port "$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" \
+          -e "UPDATE llx_const SET value = '0666' WHERE name = 'MAIN_UMASK';"
+        # Some demo databases are a dump of a real instance, custom fields included: the demo of 22
+        # carries fields of the hosting provider that dumped it, declared mandatory and stored in
+        # NOT NULL columns. Every update of a third party is then refused - "ErrorFieldRequired",
+        # then "Column 'dolicloud' cannot be null" - for a field that has nothing to do with this
+        # module or with Dolibarr. A plain instance has none, so they stop being mandatory here.
+        mysql --host "$DB_HOST" --port "$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" \
+          -e "UPDATE llx_extrafields SET fieldrequired = 0 WHERE fieldrequired <> 0;"
+        mysql --host "$DB_HOST" --port "$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" -N -B \
+          -e "SELECT CONCAT('ALTER TABLE ', table_name, ' MODIFY ', column_name, ' ', column_type, ' NULL;')
+                FROM information_schema.columns
+               WHERE table_schema = DATABASE() AND table_name LIKE 'llx_%_extrafields'
+                 AND is_nullable = 'NO' AND column_name NOT IN ('rowid', 'fk_object');" \
+          | mysql --host "$DB_HOST" --port "$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME"
+        # The demo enables supplier invoices but never numbers them, and a numbering module is what
+        # FactureFournisseur::create() asks for first: without it the import of a received document
+        # fails with no message at all. Any instance that receives invoices has one set.
+        mysql --host "$DB_HOST" --port "$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" \
+          -e "INSERT INTO llx_const (name, entity, value, type, visible)
+                SELECT 'INVOICE_SUPPLIER_ADDON_NUMBER', 1, 'mod_facture_fournisseur_cactus', 'chaine', 0
+                FROM DUAL WHERE NOT EXISTS (
+                  SELECT 1 FROM llx_const WHERE name = 'INVOICE_SUPPLIER_ADDON_NUMBER' AND entity = 1);"
+      env:
+        DOLIBARR_VERSION: ${{ inputs.dolibarr }}
+        DB_HOST: ${{ inputs.db-host }}
+        DB_PORT: ${{ inputs.db-port }}
+        DB_NAME: ${{ inputs.db-name }}
+        DB_USER: ${{ inputs.db-user }}
+        DB_PASSWORD: ${{ inputs.db-password }}
+
+    - name: Configure that Dolibarr
+      id: configure
+      shell: bash
+      run: |
+        set -euo pipefail
+        htdocs="${GITHUB_WORKSPACE}/dolibarr/htdocs"
+        mkdir -p "${GITHUB_WORKSPACE}/documents/admin/temp" "${htdocs}/custom"
+        chmod -R 777 "${GITHUB_WORKSPACE}/documents"
+        # No web server has run the installer here, and the core refuses to work while it believes it
+        # is mid-installation.
+        touch "${GITHUB_WORKSPACE}/documents/install.lock"
+        # The login of the first user, which the page smoke test logs in as.
+        autouser=$(mysql --host "$DB_HOST" --port "$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" \
+          -N -B -e "SELECT login FROM llx_user WHERE rowid = 1;")
+        echo "Pages will be read as: ${autouser}"
+        mysql --host "$DB_HOST" --port "$DB_PORT" -u"$DB_USER" -p"$DB_PASSWORD" "$DB_NAME" \
+          -e "SELECT rowid, login, admin, statut FROM llx_user WHERE rowid = 1;"
+        cat > "${htdocs}/conf/conf.php" <<PHPCONF
+        <?php
+        \$dolibarr_main_url_root='http://127.0.0.1:8080';
+        \$dolibarr_main_document_root='${htdocs}';
+        \$dolibarr_main_url_root_alt='/custom';
+        \$dolibarr_main_document_root_alt='${htdocs}/custom';
+        \$dolibarr_main_data_root='${GITHUB_WORKSPACE}/documents';
+        \$dolibarr_main_db_host='${DB_HOST}';
+        \$dolibarr_main_db_port='${DB_PORT}';
+        \$dolibarr_main_db_name='${DB_NAME}';
+        \$dolibarr_main_db_prefix='llx_';
+        \$dolibarr_main_db_user='${DB_USER}';
+        \$dolibarr_main_db_pass='${DB_PASSWORD}';
+        \$dolibarr_main_db_type='mysqli';
+        \$dolibarr_main_db_character_set='utf8';
+        \$dolibarr_main_db_collation='utf8_unicode_ci';
+        // No password is typed in a CI: the pages are read as the first user of the instance.
+        \$dolibarr_main_authentication='forceuser';
+        \$dolibarr_auto_user='${autouser}';
+        \$dolibarr_main_prod='0';
+        \$dolibarr_main_instance_unique_id='cieinvoicing';
+        PHPCONF
+        cat "${htdocs}/conf/conf.php"
+        echo "htdocs=${htdocs}" >> "$GITHUB_OUTPUT"
+        echo "DOLIBARR_HTDOCS=${htdocs}" >> "$GITHUB_ENV"
+      env:
+        DB_HOST: ${{ inputs.db-host }}
+        DB_PORT: ${{ inputs.db-port }}
+        DB_NAME: ${{ inputs.db-name }}
+        DB_USER: ${{ inputs.db-user }}
+        DB_PASSWORD: ${{ inputs.db-password }}

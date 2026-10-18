@@ -95,6 +95,13 @@ if (!$res) {
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.formfile.class.php';
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.formprojet.class.php';
+// Two functions this page reaches are not there on Dolibarr 18, where it is therefore blank:
+// dragAndDropFileUpload(), which dol_get_fiche_head() calls for the drag-and-drop upload area and
+// which lives in a core library nothing else here loads; and dolPrintHTMLForAttribute(), called by
+// Document::getNomUrl() and only added to the core in Dolibarr 19 - backported in
+// compat/functions.lib.php, which document_list.php already includes for the same reason.
+include_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
+include_once __DIR__.'/compat/functions.lib.php';
 dol_include_once('/einvoicing/class/document.class.php');
 dol_include_once('/einvoicing/lib/einvoicing_document.lib.php');
 
@@ -207,6 +214,24 @@ if (empty($reshook)) {
 
 	// Action to build doc
 	include DOL_DOCUMENT_ROOT.'/core/actions_builddoc.inc.php';
+
+	// Import a received document again, once the data it is matched on has been fixed. The draft it
+	// was booked on is rebuilt in place, or a new one created if it has been deleted: the user is sent
+	// to the invoice, the result of the import.
+	if ($action == 'confirm_reimport' && $confirm == 'yes' && $permissiontoadd) {
+		$result = $object->reimport($user);
+		if ($result['res'] > 0) {
+			setEventMessages($langs->trans('EInvoiceReimportDone', $object->flow_id), null, 'mesgs');
+			if ($result['res'] > 1) {
+				header('Location: '.DOL_URL_ROOT.'/fourn/facture/card.php?id='.((int) $result['res']));
+			} else {
+				header('Location: '.dol_buildpath('/einvoicing/document_list.php', 1));
+			}
+			exit;
+		}
+		setEventMessages($langs->trans('EInvoiceReimportFailed', $object->flow_id), array($result['message']), 'errors');
+		$action = '';
+	}
 
 	// Other special actions
 	/*
@@ -352,6 +377,19 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		$formconfirm = $form->formconfirm($_SERVER["PHP_SELF"].'?id='.$object->id.'&lineid='.$lineid, $langs->trans('DeleteLine'), $langs->trans('ConfirmDeleteLine'), 'confirm_deleteline', '', 0, 1);
 	}
 
+	// Import a received document again
+	if ($action == 'reimport') {
+		$formconfirm = $form->formconfirm(
+			$_SERVER["PHP_SELF"].'?id='.$object->id,
+			$langs->trans('EInvoiceReimport'),
+			$langs->trans('EInvoiceReimportRebuildConfirm', $object->flow_id),
+			'confirm_reimport',
+			'',
+			0,
+			1
+		);
+	}
+
 	// Clone confirmation
 	if ($action == 'clone') {
 		// Create an array for form
@@ -434,7 +472,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	$morehtmlref .= '</div>';
 
 
-	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
+	dol_banner_tab($object, 'id', $linkback, 1, 'rowid', 'ref', $morehtmlref);
 
 
 	print '<div class="fichecenter">';
@@ -551,7 +589,7 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 
 			// Clone
 			if ($permissiontoadd) {
-				print dolGetButtonAction('', $langs->trans('ToClone'), 'clone', $_SERVER['PHP_SELF'].'?id='.$object->id.(!empty($object->socid) ? '&socid='.$object->socid : '').'&action=clone&token='.newToken(), '', $permissiontoadd);
+				print dolGetButtonAction('', $langs->trans('ToClone'), 'clone', $_SERVER['PHP_SELF'].'?id='.$object->id.'&action=clone&token='.newToken(), '', $permissiontoadd);
 			}
 
 			/*
@@ -581,6 +619,35 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 			}
 			$params = array();
 			print dolGetButtonAction('', $langs->trans("Delete"), 'delete', $deleteUrl, $buttonId, $permissiontodelete, $params);
+		}
+		print '</div>'."\n";
+	}
+
+	// Actions on a received document. The block above is the skeleton one, left disabled by the
+	// module builder: it offers the CRUD of a flow record, which is written by synchronizations
+	// and not by hand.
+	// Same rule as the supplier invoice card (actions_einvoicing.class.php): a received SupplierInvoice only.
+	if ($action != 'presend' && $action != 'editline'
+		&& $object->flow_direction == 'In' && $object->fk_element_type == 'invoice_supplier'
+		&& $object->flow_type == 'SupplierInvoice' && !empty($object->flow_id)) {
+		print '<div class="tabsAction">'."\n";
+
+		// The import replaces the invoice this document was booked on, and only a draft can be
+		// replaced (Document::reimport() refuses anything else), so say it here rather than later.
+		$reimportofadraft = true;
+		if (!empty($object->fk_element_id)) {
+			require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';	// @phpstan-ignore requireOnce.fileNotFound (PHPStan takes DOL_DOCUMENT_ROOT from install/inc.php of the core, where it is '..')
+			$linkedinvoice = new FactureFournisseur($db);
+			if ($linkedinvoice->fetch((int) $object->fk_element_id) > 0
+				&& (int) $linkedinvoice->status !== FactureFournisseur::STATUS_DRAFT) {
+				$reimportofadraft = false;
+			}
+		}
+
+		if ($reimportofadraft) {
+			print dolGetButtonAction('', $langs->trans('EInvoiceReimport'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=reimport&token='.newToken(), '', $permissiontoadd);
+		} else {
+			print '<span class="butActionRefused classfortooltip" title="'.dol_escape_htmltag($langs->trans('EInvoiceReimportOnlyOnADraft')).'">'.$langs->trans('EInvoiceReimport').'</span>';
 		}
 		print '</div>'."\n";
 	}

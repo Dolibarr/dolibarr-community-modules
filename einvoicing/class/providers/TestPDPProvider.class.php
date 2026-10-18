@@ -31,15 +31,10 @@ dol_include_once('einvoicing/class/call.class.php');
 /**
  * Reference implementation of a PDP provider.
  *
- * This class is the skeleton to copy to integrate a new platform, either here or from an external
- * module (see einvoicing/doc/ADD-A-PDP-PROVIDER.md). It implements every method the rest of the
- * module calls, with the smallest body that is still honest: nothing here reaches the network, and
- * the methods that would need a platform to answer return an explicit error instead of pretending.
- *
- * What it does exercise for real, because it needs no platform: the configuration form of the setup
- * page, the storage of a token, the generation of a sample invoice by the exchange protocol, and the
- * logging of the API calls. That is enough to check that a new provider is correctly declared before
- * writing a single line of HTTP.
+ * The skeleton to copy to integrate a new platform, here or from an external module (see
+ * einvoicing/doc/ADD-A-PDP-PROVIDER.md). Nothing here reaches the network: the methods that would need a
+ * platform to answer return an explicit error. Only the setup form, the token storage, the sample invoice
+ * generation and the API call logging are exercised for real.
  */
 class TestPDPProvider extends AbstractPDPProvider
 {
@@ -81,7 +76,9 @@ class TestPDPProvider extends AbstractPDPProvider
 		);
 
 		// Retrieve and complete the OAuth token information from the database
-		$this->tokenData = $this->fetchOAuthTokenDB();
+		$this->tokenData = $this->fetchOAuthTokenDB(getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
+
+		$this->helpToGetCredentials = '<br><br>';	// No crednetial required
 
 		// The protocol builds the XML (CII, Factur-X, UBL...). It is chosen by the user, not by the
 		// provider, so every provider loads it the same way.
@@ -143,7 +140,7 @@ class TestPDPProvider extends AbstractPDPProvider
 		// getAccessToken() below.
 		if (!empty($this->config['api_key'])) {
 			$item = $formSetup->newItem($prefix.'TOKEN'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
-			$item->nameText = $langs->trans('AccessToken');
+			$item->nameText = $langs->trans('EInvAccessToken');
 			$item->cssClass = 'maxwidth500';
 			$item->fieldOverride = '';
 			if (!empty($tokenData['token'])) {
@@ -214,7 +211,7 @@ class TestPDPProvider extends AbstractPDPProvider
 			return null;
 		}
 
-		$this->tokenData = $this->fetchOAuthTokenDB();
+		$this->tokenData = $this->fetchOAuthTokenDB(getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
 
 		return $token;
 	}
@@ -247,6 +244,21 @@ class TestPDPProvider extends AbstractPDPProvider
 		return array(
 			'status_code' => 200,
 			'message' => $langs->trans('APApiReachable', $this->name).' ('.$this->getApiUrl('api').')',
+		);
+	}
+
+
+	/**
+	 * Retrieve and format remote account/company information from the provider and peppol directory, if available,
+	 * For display to the user.
+	 *
+	 * @return array{status_code:int,message:string}
+	 */
+	public function getRemoteInfo()
+	{
+		return array(
+			'status_code' => -1,
+			'message' => 'Not yet implemented',
 		);
 	}
 
@@ -303,7 +315,7 @@ class TestPDPProvider extends AbstractPDPProvider
 	 * @param mixed		$object			Invoice object (CustomerInvoice or SupplierInvoice)
 	 * @param int		$statusCode		Status code to send
 	 * @param string	$reasonCode		Reason code to send (optional)
-	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>} $paymentData Cashed amount for status 212
+	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>,reason?:string} $paymentData Amount moved for status 212, negative on a refund
 	 * @return array{res:int, message:string}	'res' 1 on success, -1 on failure
 	 */
 	public function sendStatusMessage($object, $statusCode, $reasonCode = '', $paymentData = array())

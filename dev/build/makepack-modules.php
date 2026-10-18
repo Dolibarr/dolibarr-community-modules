@@ -19,9 +19,24 @@
  */
 
 /**
- * This script searches through all directories for files named 'index.yaml'
- * and combines their contents into a single 'index.yaml' file.
+ * This script searches through all module directories for files named 'index.yaml'
+ * and combines their contents into a single 'index.yaml' file at the root of the repository.
  */
+
+// Name of the directory, relative to the root of the repository, that contains the modules.
+// Keep empty if modules are directly at the root of the repository.
+define('MODULES_DIR_NAME', '');
+
+/**
+ * Return the full path of the directory that contains the modules.
+ *
+ * @param   string  $rootDir    Root directory of the repository.
+ * @return  string              Path of the modules directory.
+ */
+function getModulesDir($rootDir)
+{
+	return (MODULES_DIR_NAME === '' ? $rootDir : $rootDir . DIRECTORY_SEPARATOR . MODULES_DIR_NAME);
+}
 
 /**
  * Recursively searches directories for 'index.yaml' files.
@@ -235,8 +250,7 @@ function completAutoTags($content, $modulePath)
 
 				// If we process tag version and it was not found inside the descriptor file, we try to get it from VERSION file
 				if ($tag == 'current_version' && empty($version)) {
-					$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..'); // We are in dev/build, we want to go to root of repository
-					$versionfile = $directoryToSearch . DIRECTORY_SEPARATOR . strtolower($modulename) . DIRECTORY_SEPARATOR . "VERSION";
+					$versionfile = $modulePath . DIRECTORY_SEPARATOR . "VERSION";
 					print "Try to guess version from VERSION file ".$versionfile."\n";
 					if (file_exists($versionfile)) {
 						$version = file_get_contents($versionfile);
@@ -267,7 +281,7 @@ function completAutoTags($content, $modulePath)
 
 		if (!empty($tagsToExtractFromDescriptor['current_version'])) {
 			$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..'); // We are in dev/build, we want to go to root of repository
-			$outzip = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . DIRECTORY_SEPARATOR . "module_" . strtolower($modulename) . "-" . $version . ".zip";
+			$outzip = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . "module_" . strtolower($modulename) . "-" . $version . ".zip";
 			print "We check if zip file for module ".$modulename.", with name ".$outzip." exists\n";
 			if (file_exists($outzip)) {
 				// File already exists, nothing is done.
@@ -285,8 +299,14 @@ function completAutoTags($content, $modulePath)
 			$value = "";
 			$urltoget = "";
 
-			// TODO Try to guess value from git sources
-			if (empty($gitsystem) || $gitsystem == 'github') {
+			// The module sources are in this repository, so we take the date of the last local commit on the module directory
+			$output = array();
+			$returnCode = 0;
+			exec('git -C ' . escapeshellarg($modulePath) . ' log -1 --format=%cs -- . 2>/dev/null', $output, $returnCode);
+			if ($returnCode === 0 && !empty($output[0])) {
+				$content = preg_replace('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', "$1\"".trim($output[0])."\"", $content);
+				print "Replaced auto for '".$tag."' with value of last local commit: ".trim($output[0])."\n";
+			} elseif (empty($gitsystem) || $gitsystem == 'github') {
 				$urltoget = preg_replace('/https:\/\/github.com/', 'https://api.github.com/repos', $git);
 				$urltoget = preg_replace('/\/tree\/.*$/', '/commits?per_page=1&sha='.$gitbranch, $urltoget);
 				$urltoget = preg_replace('/\.git$/', '/commits?per_page=1&sha='.$gitbranch, $urltoget);
@@ -339,6 +359,167 @@ function completAutoTags($content, $modulePath)
 }
 
 /**
+ * Check that the module ChangeLog.md has an entry for the version being released.
+ *
+ * When the entry is missing, it is added with the titles of all pull requests merged
+ * since the previous version tag (tag format is {project}_{version}). The format of
+ * the new entry (with or without a "-- date" suffix) follows the one already used in
+ * the file. Returns true when the changelog was modified, false otherwise.
+ *
+ * @param   string  $mod        Module name (lowercase, from detectModule).
+ * @param   string  $version    Version being released.
+ * @param   string  $project    Project name (lowercase directory name, used for the tag prefix).
+ * @param   string  $repo       Full path to the module directory.
+ * @return  bool    True if the changelog was modified, false otherwise.
+ */
+function checkAndCompleteChangelog($mod, $version, $project, $repo)
+{
+	$changelogFile = $repo . DIRECTORY_SEPARATOR . 'ChangeLog.md';
+	if (!file_exists($changelogFile)) {
+		print "No ChangeLog.md found at " . $changelogFile . ", skipping changelog check.\n";
+		return false;
+	}
+
+	$content = file_get_contents($changelogFile);
+
+	// Check if the changelog already has an entry for this version.
+	// Entries look like "## 1.2.0" or "## 2.0.23 -- 2026-09-05".
+	if (preg_match('/^##\s+' . preg_quote($version, '/') . '\b/m', $content)) {
+		print "ChangeLog.md already has an entry for version " . $version . ".\n";
+		return false;
+	}
+
+	print "ChangeLog.md does not have an entry for version " . $version . ".\n";
+
+	// Find the previous version tag (tag format is {project}_{version}).
+	$tagPrefix = $project . '_';
+	$output = array();
+	$returnCode = 0;
+	$command ='git -C ' . escapeshellarg($repo) . ' tag --list ' . escapeshellarg($tagPrefix . '*') . ' --sort=-version:refname';
+	print $command."\n";
+	exec($command, $output, $returnCode);
+	$previousTag = '';
+	if (!empty($output)) {
+		$previousTag = $output[0];
+		print "Previous version tag found: " . $previousTag . "\n";
+	} else {
+		print "No previous version tag found, taking all merged pull requests.\n";
+	}
+
+	// Get the titles of all pull requests merged since the previous tag.
+	// The repository is a monorepo: a merge window can contain pull requests for
+	// other modules. Only keep the ones that touch at least one file whose path
+	// starts with the module directory name.
+	$logRange = $previousTag ? $previousTag . '..HEAD' : '';
+	$output = array();
+	$returnCode = 0;
+	$command = sprintf(
+		'git -C %s log %s --merges --grep="Merge pull request" --format="___CHANGELOG_SEP___%%H___TITLE___%%b"',
+		escapeshellarg($repo),
+		$logRange !== '' ? escapeshellarg($logRange) : ''
+	);
+	print $command."\n";
+	exec($command, $output, $returnCode);
+
+	$prTitles = array();
+	$rawBody = implode("\n", $output);
+	$entries = explode("___CHANGELOG_SEP___", $rawBody);
+	$modulePrefix = (MODULES_DIR_NAME === '' ? '' : MODULES_DIR_NAME . '/') . $project . '/';
+	foreach ($entries as $entry) {
+		$entry = trim($entry);
+		if ($entry === '') {
+			continue;
+		}
+
+		// Split the SHA and the title body.
+		$parts = explode("___TITLE___", $entry, 2);
+		$sha = trim($parts[0]);
+		$title = trim(isset($parts[1]) ? $parts[1] : '');
+		if ($sha === '' || $title === '') {
+			continue;
+		}
+
+		// Keep only the first line of a multi-line title.
+		$firstLine = preg_replace('/\n.*$/s', '', $title);
+
+		// Get the files changed by this merge (diff against first parent).
+		$filesOutput = array();
+		$filesReturnCode = 0;
+		$filesCommand = sprintf(
+			'git -C %s diff --name-only %s^1 %s',
+			escapeshellarg($repo),
+			escapeshellarg($sha),
+			escapeshellarg($sha)
+		);
+		exec($filesCommand, $filesOutput, $filesReturnCode);
+
+		// Keep the PR only if it touches at least one file under the module directory.
+		$touchesModule = false;
+		foreach ($filesOutput as $file) {
+			$file = trim($file);
+			if ($file !== '' && strpos($file, $modulePrefix) === 0) {
+				$touchesModule = true;
+				break;
+			}
+		}
+
+		if ($touchesModule) {
+			// Normalize the prefix: keep only titles starting with a recognized
+			// keyword (FIX, NEW, QUAL, PERF, DOC, CLOSE, SEC) followed by ":".
+			// Discard entries that do not match.
+			$prefixPattern = '/^(FIX|NEW|QUAL|PERF|DOC|CLOSE|SEC)\b\s*:?\s*(.*)$/i';
+			if (preg_match($prefixPattern, $firstLine, $prefixMatch)) {
+				$rest = ltrim($prefixMatch[2]);
+				// Strip any leading colons to avoid "::" sequences.
+				$rest = preg_replace('/^:+\s*/', '', $rest);
+				$normalized = strtoupper($prefixMatch[1]) . ': ' . $rest;
+				$prTitles[] = $normalized;
+			} else {
+				print "Skip PR (no recognized prefix): " . $firstLine . "\n";
+			}
+		} else {
+			print "Skip PR (no file under " . $modulePrefix . "): " . $firstLine . "\n";
+		}
+	}
+
+	// Detect whether the changelog uses the "-- date" format.
+	$useDate = false;
+	if (preg_match('/^##\s+\d+\.\d+[\.\d]*\s+--\s/m', $content)) {
+		$useDate = true;
+	}
+
+	// Build the new entry.
+	$header = '## ' . $version;
+	if ($useDate) {
+		$header .= ' -- ' . date('Y-m-d');
+	}
+	$newEntry = $header . "\n\n";
+	if (!empty($prTitles)) {
+		foreach ($prTitles as $title) {
+			$newEntry .= '- ' . $title . "\n";
+		}
+	} else {
+		$newEntry .= "No merged pull requests found since previous version.\n";
+	}
+	$newEntry .= "\n";
+
+	// Insert the new entry after the header line(s) and before the first existing "## " entry.
+	$newContent = '';
+	$match = array();
+	if (preg_match('/^(.*?)(?=^##\s)/ms', $content, $match, PREG_OFFSET_CAPTURE)) {
+		$insertPos = $match[0][1] + strlen($match[0][0]);
+		$newContent = substr($content, 0, $insertPos) . $newEntry . substr($content, $insertPos);
+	} else {
+		// No existing "## " entry found, append after a blank line.
+		$newContent = rtrim($content) . "\n\n" . $newEntry;
+	}
+
+	file_put_contents($changelogFile, $newContent);
+	print "Added new entry to ChangeLog.md for version " . $version . " with " . count($prTitles) . " pull request title(s).\n";
+	return true;
+}
+
+/**
  * build modules zip file if module sources are available into the repository.
  *
  * @param	string	$action			Action code
@@ -356,14 +537,21 @@ function buildModulePackages($action, $modulename)
 		'compat',
 		'css',
 		'core',
+		'doctemplates',
+		'icons',
+		'images',
 		'img',
+		'includes',
 		'js',
 		'langs',
 		'lib',
 		'public',
 		'scripts',
 		'sql',
+		'theme',
+		'tools',
 		'tpl',
+		'user',
 		'vendor',
 		'*.md',
 		'*.json',
@@ -377,8 +565,9 @@ function buildModulePackages($action, $modulename)
 
 	// Get path of module dir
 	$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..'); // We are in dev/build, we want to go to root of repository
+	$modulesDir = getModulesDir($directoryToSearch);
 	$outputFile = $directoryToSearch . DIRECTORY_SEPARATOR . 'index.yaml';
-	$yamlFiles = findIndexYamlFiles($directoryToSearch, 2);
+	$yamlFiles = findIndexYamlFiles($modulesDir, 2);
 	$yamlFiles = array_filter($yamlFiles, function ($file) use ($outputFile) {
 		return $file != $outputFile; // Exclude the output file from the list of files to combine
 	});
@@ -403,13 +592,18 @@ function buildModulePackages($action, $modulename)
 
 	print "\n";
 
+	$lastmessagetoshow = "";
 
 	// For each module, we generate the zip file
 	foreach ($projects as $project) {
-		print "*** Build package for project: ".$project." in directory ".$directoryToSearch . DIRECTORY_SEPARATOR . $project."\n";
+		print "*** Build package for project: ".$project." in directory ".$modulesDir . DIRECTORY_SEPARATOR . $project."\n";
 
 		// Change current dir to module dir, we will execute all next operations from this dir
-		chdir($directoryToSearch . DIRECTORY_SEPARATOR . $project);
+		if (!is_dir($modulesDir . DIRECTORY_SEPARATOR . $project) || !chdir($modulesDir . DIRECTORY_SEPARATOR . $project)) {
+			print "[fail] Directory ".$modulesDir . DIRECTORY_SEPARATOR . $project." not found, skipped.\n";
+			print "\n";
+			continue;
+		}
 
 		list($mod, $version) = detectModule();
 		if ($mod == "" || $version == "") {
@@ -419,9 +613,26 @@ function buildModulePackages($action, $modulename)
 			// TODO : Try to retrieve zip from Dolistore or make a git clone and then generate the build from sources.
 		}
 
+		// When creating a tag, verify the changelog has an entry for the version being released.
+		// If the entry is missing, it is added from the merged PR titles and the script stops so
+		// the change can be committed before relaunching.
+		if ($action == 'makeziptag') {
+			$repo = $modulesDir . DIRECTORY_SEPARATOR . $project;
+			if (checkAndCompleteChangelog($mod, $version, $project, $repo)) {
+				print "\n";
+				print "The ChangeLog.md was updated with a new entry for version " . $version . ".\n";
+				print "PLEASE REVIEW THE CHANGES AND VERSION, COMMIT THEM, AND RELAUCH THE SCRIPT...\n";
+				print "\n";
+				exit(1);
+			}
+		}
+
 		//  Define the name of the output zip file and remove it if already exists
+		if (!is_dir($directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin')) {
+			mkdirAndCheck($directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin');
+		}
 		$outzip = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . "module_" . $mod . "-" . $version . ".zip";
-		$outzipothers = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . DIRECTORY_SEPARATOR . "module_" . $mod . "-*.zip";
+		$outzipothers = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . "module_" . $mod . "-*.zip";
 		if (file_exists($outzip)) {
 			print "A zip file already exists with this name/version: $outzip\n";
 
@@ -446,10 +657,11 @@ function buildModulePackages($action, $modulename)
 				if ($action == 'makeziptag') {
 					$output = '';
 					$returnCode = 0;
-					$repo = $directoryToSearch . DIRECTORY_SEPARATOR . $project;
+					$repo = $modulesDir . DIRECTORY_SEPARATOR . $project;
 					$command = sprintf('git -C %s tag %s 2>&1', escapeshellarg($repo), escapeshellarg($tag));
-					print "YOU MUST COMMIT ALL FILES AND CREATE A TAG WITH COMMAND:\n";
-					print $command."\n";
+					$command .= "; git tag push origin ".escapeshellarg($tag);
+					$lastmessagetoshow .= "YOU MUST COMMIT ALL FILES (INCLUDING THE ZIP) AND CREATE A TAG WITH COMMAND:\n";
+					$lastmessagetoshow .= $command."\n";
 					/*exec(
 						$command,
 						$output,
@@ -494,6 +706,7 @@ function buildModulePackages($action, $modulename)
 		}
 
 		// TODO dir to exclude to store somewhere
+		print "Exclude some directories not useful.\n";
 		$dirsToExclude = array(
 			'einvoicing/vendor/horstoeko/zugferd/tests',
 			'einvoicing/vendor/horstoeko/zugferd/examples'
@@ -503,6 +716,23 @@ function buildModulePackages($action, $modulename)
 				print "Delete dir $tmpdir/$dirToExclude\n";
 				delTree($tmpdir . '/' . $dirToExclude);
 			}
+		}
+
+
+		// Stamp the package with the commit it was built from. A zip carries no repository, so
+		// this is the only moment where that commit can be known; the einvoicing module reads
+		// the file back to name its sources in the XML it generates (issue #686). The commit is
+		// kept out of VERSION on purpose: that file is compared with version_compare() by the
+		// core and names both the zip and the release tag here.
+		$commitoutput = array();
+		$returnCode = 0;
+		exec('git rev-parse --short HEAD 2>/dev/null', $commitoutput, $returnCode);
+		if ($returnCode === 0 && !empty($commitoutput[0])) {
+			$commit = trim($commitoutput[0]);
+			print "Stamp package with commit ".$commit."\n";
+			file_put_contents($dst . '/COMMIT', $commit."\n");
+		} else {
+			print "Could not read the current commit, the package is not stamped\n";
 		}
 
 
@@ -520,6 +750,9 @@ function buildModulePackages($action, $modulename)
 			print "\n";
 		}
 	}
+
+	print "\n";
+	print $lastmessagetoshow."\n";
 }
 
 /**
@@ -754,8 +987,274 @@ function zipDir($folder, &$zip, $root = "")
 }
 
 
-// Main
+/**
+ * Format a Dolibarr version for the Dolistore min/max extrafields: "24.0" or "24" gives "V24", "24.1" gives "V24.1".
+ *
+ * @param   string  $version    Version found in index.yaml.
+ * @return  string              Version with syntax Vxx.
+ */
+function formatDolistoreVersion($version)
+{
+	$version = preg_replace('/^v/i', '', trim($version));
+	$version = preg_replace('/(\.0)+$/', '', $version);
+	return 'V' . $version;
+}
 
+
+/**
+ * Push a module zip package to the Dolistore (remote Dolibarr instance) using the REST API.
+ *
+ * The product ID is read from the dolistore-download URL found in the root index.yaml file.
+ * The product reference is then fetched from the API so the file can be attached to the right product.
+ * After the upload, the product extrafields (module version, Dolibarr/PHP min/max, submission date)
+ * are updated from the values found in the index.yaml.
+ *
+ * @param   string  $apikey             DOLISTORE_API_KEY for the remote Dolibarr API.
+ * @param   string  $dolistoreApiUrl     Base URL of the Dolistore REST API.
+ * @param   string  $modulename         Module name (lowercase).
+ * @param   string  $directoryToSearch   Root directory of the repository.
+ * @return  void
+ */
+function pushModuleToDolistore($apikey, $dolistoreApiUrl, $modulename, $directoryToSearch)
+{
+
+	// Read the root index.yaml to extract the module data
+	$yamlFile = $directoryToSearch . DIRECTORY_SEPARATOR . 'index.yaml';
+	if (!file_exists($yamlFile)) {
+		print "[fail] No index.yaml file found at " . $yamlFile . "\n";
+		return;
+	}
+
+	$content = file_get_contents($yamlFile);
+
+	// Extract the block for this module (modulename in yaml may use different case than $modulename)
+	$moduleBlock = '';
+	$pattern = '/^  - modulename:\s*[\'"]' . preg_quote($modulename, '/') . '[\'"]/im';
+	if (preg_match($pattern, $content, $reg, PREG_OFFSET_CAPTURE)) {
+		$start = $reg[0][1];
+		$rest = substr($content, $start + strlen($reg[0][0]));
+		if (preg_match('/^  - modulename:/m', $rest, $reg2, PREG_OFFSET_CAPTURE)) {
+			$moduleBlock = substr($content, $start, strlen($reg[0][0]) + $reg2[0][1]);
+		} else {
+			$moduleBlock = substr($content, $start);
+		}
+	}
+	if (empty($moduleBlock)) {
+		print "[fail] Can't find module " . $modulename . " in root index.yaml\n";
+		return;
+	}
+
+	// Extract the Dolistore product ID and public URL from the dolistore-download URL
+	$reg = array();
+	if (!preg_match('/dolistore-download:\s*[\'"]?(https:\/\/www\.dolistore\.com\/product\.php\?id=(\d+))/', $moduleBlock, $reg)) {
+		print "[fail] Can't extract Dolistore product ID from index.yaml for module " . $modulename . "\n";
+		return;
+	}
+	$dolistoreDownloadUrl = $reg[1];
+	$productId = $reg[2];
+	print "Found Dolistore product ID: " . $productId . " for module " . $modulename . "\n";
+	print "Dolistore download URL: " . $dolistoreDownloadUrl . "\n";
+
+	// Extract module metadata from the index.yaml block
+	$moduleVersion = '';
+	$dolibarrMin = '';
+	$dolibarrMax = '';
+	$phpMin = '';
+	$phpMax = '';
+	$lastUpdatedAt = '';
+
+	if (preg_match('/current_version:\s*["\']?([^"\'\n]+)["\']?/', $moduleBlock, $reg)) {
+		$moduleVersion = trim($reg[1]);
+	}
+	if (preg_match('/dolibarrmin:\s*["\']?([^"\'\n]+)["\']?/', $moduleBlock, $reg)) {
+		$dolibarrMin = trim($reg[1]);
+	}
+	if (preg_match('/dolibarrmax:\s*["\']?([^"\'\n]+)["\']?/', $moduleBlock, $reg)) {
+		$dolibarrMax = trim($reg[1]);
+	}
+	if (preg_match('/phpmin:\s*["\']?([^"\'\n]+)["\']?/', $moduleBlock, $reg)) {
+		$phpMin = trim($reg[1]);
+	}
+	if (preg_match('/phpmax:\s*["\']?([^"\'\n]+)["\']?/', $moduleBlock, $reg)) {
+		$phpMax = trim($reg[1]);
+	}
+	if (preg_match('/last_updated_at:\s*["\']?([^"\'\n]+)["\']?/', $moduleBlock, $reg)) {
+		$lastUpdatedAt = trim($reg[1]);
+	}
+
+	$newdate = time();
+
+	print "Module version: " . $moduleVersion . "\n";
+	print "Dolibarr min/max: " . $dolibarrMin . " / " . $dolibarrMax . "\n";
+	print "PHP min/max: " . $phpMin . " / " . $phpMax . "\n";
+	print "Last updated at: " . $lastUpdatedAt . " -> " . date('Y-m-d H:i:s', $newdate) . "\n";
+	$lastUpdatedAt = date('Y-m-d H:i:s', $newdate);
+
+	// Find the zip file for the module in dev/build/bin/
+	$zipPattern = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . "module_" . $modulename . "-*.zip";
+	$zipFiles = glob($zipPattern);
+	if (empty($zipFiles)) {
+		print "[fail] No zip file found for module " . $modulename . " in dev/build/bin/ (pattern: " . $zipPattern . ")\n";
+		return;
+	}
+	// Use the first (and normally only) zip file found
+	$zipFile = $zipFiles[0];
+	print "Using zip file: " . $zipFile . "\n";
+
+	if (!extension_loaded('curl')) {
+		print "[fail] The cURL extension is not loaded. Please install php-curl.\n";
+		return;
+	}
+
+	$urltouse =$dolistoreApiUrl . "/products/" . $productId;
+	print "URL to use: " . $urltouse . "\n";
+
+	// Step 1: Fetch the product by ID to get its reference (the documents API uses ref, not id, for products)
+	$ch = curl_init();
+	curl_setopt($ch, CURLOPT_URL, $urltouse);
+	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+	curl_setopt($ch, CURLOPT_HTTPGET, true);
+	curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+		'DOLAPIKEY: ' . $apikey,
+		'Accept: application/json'
+	));
+
+	$response = curl_exec($ch);
+	$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+	$curlError = curl_error($ch);
+	curl_close($ch);
+
+	if ($curlError) {
+		print "[fail] cURL error while fetching product: " . $curlError . "\n";
+		return;
+	}
+	if ($httpCode != 200) {
+		print "[fail] Failed to fetch product with ID " . $productId . " (HTTP " . $httpCode . "): " . $response . "\n";
+		return;
+	}
+
+	$product = json_decode($response, true);
+	if (empty($product) || empty($product['ref'])) {
+		print "[fail] Product found but no ref returned for product ID " . $productId . "\n";
+		return;
+	}
+	$productRef = $product['ref'];
+	$productUrl = isset($product['url']) ? trim($product['url']) : '';
+	print "Product reference: " . $productRef . "\n";
+	print "Product current public URL: " . (empty($productUrl) ? '(empty)' : $productUrl) . "\n";
+
+	// Step 2: Upload the zip file to the product via the documents/upload API
+	$fileContent = file_get_contents($zipFile);
+	if ($fileContent === false) {
+		print "[fail] Failed to read zip file: " . $zipFile . "\n";
+		return;
+	}
+	$base64Content = base64_encode($fileContent);
+	$filename = basename($zipFile);
+
+	$postData = array(
+		'filename' => $filename,
+		'modulepart' => 'product',
+		'ref' => $productRef,
+		'filecontent' => $base64Content,
+		'fileencoding' => 'base64',
+		'overwriteifexists' => 1,
+		'createdirifnotexists' => 1,
+		'share' =>1
+	);
+
+	$ch = curl_init();
+	curl_setopt($ch, CURLOPT_URL, $dolistoreApiUrl . "/documents/upload");
+	curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+	curl_setopt($ch, CURLOPT_POST, true);
+	curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($postData));
+	curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+		'DOLAPIKEY: ' . $apikey,
+		'Content-Type: application/json',
+		'Accept: application/json'
+	));
+
+	$response = curl_exec($ch);
+	$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+	$curlError = curl_error($ch);
+	curl_close($ch);
+
+	if ($curlError) {
+		print "[fail] cURL error while uploading file: " . $curlError . "\n";
+		return;
+	}
+	if ($httpCode != 200 && $httpCode != 201) {
+		print "[fail] Failed to upload file to product (HTTP " . $httpCode . "): " . $response . "\n";
+		return;
+	}
+
+	print "[success] File " . $filename . " uploaded to Dolistore product ID " . $productId . " (ref: " . $productRef . ")\n";
+
+	// Step 3: Update the product extrafields with module metadata from index.yaml
+	$arrayOptions = array();
+	if (!empty($moduleVersion)) {
+		$arrayOptions['options_marketplace_module_version'] = $moduleVersion;
+	}
+	if (!empty($dolibarrMin)) {
+		$arrayOptions['options_marketplace_min_version'] = formatDolistoreVersion($dolibarrMin);
+	}
+	if (!empty($dolibarrMax)) {
+		$arrayOptions['options_marketplace_max_version'] = formatDolistoreVersion($dolibarrMax);
+	}
+	if (!empty($phpMin)) {
+		$arrayOptions['options_marketplace_php_min_version'] = $phpMin;
+	}
+	if (!empty($phpMax)) {
+		$arrayOptions['options_marketplace_php_max_version'] = $phpMax;
+	}
+	if (!empty($lastUpdatedAt)) {
+		$arrayOptions['options_marketplace_submitted'] = $lastUpdatedAt;
+	}
+
+	// Build the PUT data: extrafields + public URL if it is empty on the product
+	$putData = array();
+	if (!empty($arrayOptions)) {
+		$putData['array_options'] = $arrayOptions;
+	}
+	if (empty($productUrl) && !empty($dolistoreDownloadUrl)) {
+		$putData['url'] = $dolistoreDownloadUrl;
+		print "Public URL is empty, will set it to: " . $dolistoreDownloadUrl . "\n";
+	}
+
+	if (!empty($putData)) {
+		$ch = curl_init();
+		curl_setopt($ch, CURLOPT_URL, $dolistoreApiUrl . "/products/" . $productId);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
+		curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($putData));
+		curl_setopt($ch, CURLOPT_HTTPHEADER, array(
+			'DOLAPIKEY: ' . $apikey,
+			'Content-Type: application/json',
+			'Accept: application/json'
+		));
+
+		$response = curl_exec($ch);
+		$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		$curlError = curl_error($ch);
+		curl_close($ch);
+
+		if ($curlError) {
+			print "[fail] cURL error while updating product extrafields: " . $curlError . "\n";
+			return;
+		}
+		if ($httpCode != 200 && $httpCode != 201) {
+			print "[fail] Failed to update product extrafields (HTTP " . $httpCode . "): " . $response . "\n";
+			return;
+		}
+
+		print "[success] Product updated for Dolistore product ID " . $productId . " - " . $productRef . " - " . $filename . " - " . $lastUpdatedAt . "\n";
+	} else {
+		print "No metadata to update in product.\n";
+	}
+}
+
+
+// Main
 $sapi_type = php_sapi_name();
 $script_file = basename(__FILE__);
 $path = dirname(__FILE__).'/';
@@ -775,10 +1274,10 @@ if (!extension_loaded('zip')) {
 }
 
 if (empty($argv[1])) {
-	print "Usage:   ".$script_file." index|makezip|pushdolistore\n";
+	print "Usage:   ".$script_file." index|makezip|makeziptag|pushdolistore\n";
 	print "Example: ".$script_file." index                           to rebuild the index.yaml file (used by Dolibarr to retrieve list of community modules)\n";
 	print "Example: ".$script_file." makezip|makeziptag [modulename] to regenerate zip of packages (and set Tag of version)\n";
-	print "Example: ".$script_file." pushdolistore      [modulename] to regenerate zip of packages and publish them on dolistore (TODO)\n";
+	print "Example: ".$script_file." pushdolistore      [modulename] to publish zip of packages on dolistore (ask for API key)\n";
 	print "\n";
 	exit(1);
 }
@@ -788,7 +1287,7 @@ if ($argv[1] == 'index') {
 	$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..');
 	$outputFile = $directoryToSearch . DIRECTORY_SEPARATOR . 'index.yaml';
 
-	$yamlFiles = findIndexYamlFiles($directoryToSearch, 2);
+	$yamlFiles = findIndexYamlFiles(getModulesDir($directoryToSearch), 2);
 
 	// Exclude the output file from the list of files to combine
 	$yamlFiles = array_filter($yamlFiles, function ($file) use ($outputFile) {
@@ -810,10 +1309,72 @@ if ($argv[1] == 'index') {
 	print "\n";
 }
 
-if ($argv[1] == 'dolistore') {
-	// TODO Ask the api key
+if ($argv[1] == 'pushdolistore') {
+	$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..');
 
-	// Scan all modules, for each one, call the makepack.pl to regenerate the zip file then publish the file using the api key.
+	// Get the API key from environment variable DOLISTORE_API_KEY, or ask the user if not set
+	$apikey = getenv('DOLISTORE_API_KEY');
+	if (empty($apikey)) {
+		print "Enter your Dolistore API key (DOLISTORE_API_KEY): ";
+		$apikey = trim(fgets(STDIN));
+		if (empty($apikey)) {
+			print "Error: No API key provided.\n";
+			exit(1);
+		}
+	} else {
+		print "API key found in environment variable DOLISTORE_API_KEY: ".substr($apikey, 0, 4)."*****...\n";
+	}
+
+	// Get the Dolistore API URL from environment variable DOLISTORE_API_URL, or ask the user if not set
+	$dolistoreApiUrl = getenv('DOLISTORE_API_URL');
+	if (empty($dolistoreApiUrl)) {
+		print "Enter the Dolistore API URL (leave empty for default https://www.dolistore.com/api/index.php): ";
+		$dolistoreApiUrl = trim(fgets(STDIN));
+		if (empty($dolistoreApiUrl)) {
+			$dolistoreApiUrl = 'https://www.dolistore.com/api/index.php';
+		}
+	} else {
+		print "Dolistore API URL found in environment variable DOLISTORE_API_URL: ".$dolistoreApiUrl."\n";
+	}
+
+	// Build the list of modules to push
+	if (empty($argv[2])) {
+		// Scan the directory dev/build/bin to get all module zip files
+		$moduletopush = array();
+		$zipFiles = glob($directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . "module_*.zip");
+		foreach ($zipFiles as $zipFile) {
+			$reg = array();
+			if (preg_match('/module_([a-z]+)-[\d.]+\.zip$/', basename($zipFile), $reg)) {
+				$moduletopush[] = $reg[1];
+			}
+		}
+		if (empty($moduletopush)) {
+			print "No zip file found in dev/build/bin/. Run makezip first.\n";
+			exit(1);
+		}
+		print "Found " . count($moduletopush) . " module(s) to push: " . implode(', ', $moduletopush) . "\n";
+	} else {
+		$moduletopush = array(strtolower($argv[2]));
+		print "Module to push: " . strtolower($argv[2]);
+		//print filesize($directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . "module_" . strtolower($argv[2]) . ".zip")."ko";
+		print "\n";
+	}
+
+	print "\n";
+	print "Please type enter to confirm to push zip file on Dolistore (CTR+C to cancel): ";
+	$confirmkey = trim(fgets(STDIN));
+	if (!empty($confirmkey)) {
+		print "Operation canceled.\n";
+		exit(1);
+	}
+
+	// Push each module to the Dolistore
+	foreach ($moduletopush as $modulename) {
+		print "\n*** Push module " . $modulename . " to Dolistore ***\n";
+		pushModuleToDolistore($apikey, $dolistoreApiUrl, $modulename, $directoryToSearch);
+	}
+
+	print "\nAll done.\n";
 }
 
 if ($argv[1] == 'makezip' || $argv[1] == 'makeziptag') {

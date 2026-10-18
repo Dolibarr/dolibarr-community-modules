@@ -2,6 +2,7 @@
 /* Copyright (C) 2007-2017  Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2024       Frédéric France             <frederic.france@free.fr>
  * Copyright (C) 2025       SuperAdmin                  <daoud.mouhamed@gmail.com>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  * Copyright (C) 2026       Alexandre Spangaro          <alexandre@inovea-conseil.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  *
@@ -74,16 +75,24 @@ include_once DOL_DOCUMENT_ROOT.'/core/class/html.formcompany.class.php';
 include_once DOL_DOCUMENT_ROOT.'/core/lib/date.lib.php';
 include_once DOL_DOCUMENT_ROOT.'/core/lib/company.lib.php';
 include_once DOL_DOCUMENT_ROOT.'/core/class/html.form.class.php';
-include_once __DIR__.'/class/providers/PDPProviderManager.class.php';
-include_once __DIR__.'/class/protocols/ProtocolManager.class.php';
+dol_include_once('einvoicing/lib/einvoicing.lib.php');
+dol_include_once('einvoicing/class/providers/PDPProviderManager.class.php');
+dol_include_once('einvoicing/class/protocols/ProtocolManager.class.php');
+dol_include_once('einvoicing/class/einvoicing.class.php');
+dol_include_once('einvoicing/class/document.class.php');
+
+dol_include_once('einvoicing/compat/functions.lib.php');
 
 // load module libraries
-include_once __DIR__.'/class/document.class.php';
+// GETPOSTDATE() arrived in the core in Dolibarr 18 and dolPrintHTMLForAttribute() in Dolibarr 19; this
+// page calls both, so it would fatal below the version the module declares it supports. Both are
+// backported in compat/functions.lib.php, and that is all this page needs from the two libraries.
+include_once __DIR__.'/compat/functions.lib.php';
 // for other modules
 //dol_include_once('/othermodule/class/otherobject.class.php');
 
 // Load translation files required by the page
-$langs->loadLangs(array("einvoicing@einvoicing", "other"));
+$langs->loadLangs(array("einvoicing@einvoicing", "bills", "other"));
 
 // Get parameters
 $action     = GETPOST('action', 'aZ09') ? GETPOST('action', 'aZ09') : 'view'; // The action 'create'/'add', 'edit'/'update', 'view', ...
@@ -153,7 +162,6 @@ if (!$sortorder) {
 }
 
 // Add a recap field into $object->fields array for list (we add it into object directly to be able to position it)
-// TODO : Update Module Builder to manage virtual fields
 $object->fields['recap'] = array(
 	'label' => $langs->trans("flowRecap"),
 	'type' => 'text',
@@ -165,12 +173,29 @@ $object->fields['recap'] = array(
 	'notsearchable' => 1
 );
 
+// Add a virtual "thirdparty" field into $object->fields for the list (resolved on the fly from the linked invoice, like native invoice lists).
+// Opt-in: resolving the thirdparty relies on LEFT JOINs toward the invoice tables (llx_einvoicing_document has no fk_soc), which can be
+// heavy on very large bases, so the whole column is gated behind a hidden constant and disabled by default.
+$showthirdpartycol = getDolGlobalInt('EINVOICING_SHOW_THIRDPARTY_COLUMN', 1);
+if ($showthirdpartycol) {
+	$object->fields['thirdparty'] = array(
+		'label' => $langs->trans("ThirdParty"),
+		'type' => 'text',
+		'visible' => 1,
+		'enabled' => '1',
+		'position' => 136,
+		'checked' => 1,
+		'csslist' => 'tdoverflowmax150'
+	);
+}
+
 
 // Initialize array of search criteria
 $search_all = trim(GETPOST('search_all', 'alphanohtml'));
+$search_thirdparty = trim(GETPOST('search_thirdparty', 'alphanohtml'));
 $search = array();
 foreach ($object->fields as $key => $val) {
-	if ($key == 'recap') {
+	if ($key == 'recap' || $key == 'thirdparty') {
 		continue;
 	}
 	if (GETPOST('search_'.$key, 'alpha') !== '') {
@@ -244,14 +269,21 @@ if (!$permissiontoread) {
 	accessforbidden();
 }
 
+// When the multicompany master setup is enabled and the current entity is not the master one,
+// the page is read-only: no sync, no edit, no delete — only the list with filters and sorting.
+$isSlaveEntity = getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP") && $conf->entity != getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP");
+if ($isSlaveEntity) {
+	$permissiontoadd = 0;
+	$permissiontodelete = 0;
+}
 
 
 // Fixed slots of the "last invoice that could not be processed" diagnostic, written by
 // AbstractProtocol::cleanupIncomingTempFiles(): one per protocol (einvoice.xml for a CII flow,
 // einvoice.pdf for a Factur-X one), plus the readable view when the platform provided one.
 $protocolManager = new ProtocolManager($db);
-$diagFileNames = $protocolManager->getIncomingDiagnosticFileNames();
-$diagReadableFileName = AbstractProtocol::INCOMING_DIAGNOSTIC_READABLE_FILE_NAME;
+$diagFileNames = $protocolManager->getIncomingDiagnosticFileNames();				// Return the document Converted in format of the default Protocol.
+$diagReadableFileName = AbstractProtocol::INCOMING_DIAGNOSTIC_READABLE_FILE_NAME;	// Return the document Readable (a generated PDF)
 
 
 
@@ -279,6 +311,7 @@ if (empty($reshook)) {
 
 	// Purge search criteria
 	if (GETPOST('button_removefilter_x', 'alpha') || GETPOST('button_removefilter.x', 'alpha') || GETPOST('button_removefilter', 'alpha')) { // All tests are required to be compatible with all browsers
+		$search_thirdparty = '';
 		foreach ($object->fields as $key => $val) {
 			$search[$key] = '';
 			if (preg_match('/^(date|timestamp|datetime)/', $val['type'])) {
@@ -305,15 +338,39 @@ if (empty($reshook)) {
 
 	// You can add more action here
 	// if ($action == 'xxx' && $permissiontoxxx) ...
+
+	// Mass action of the module: pack the selection into one archive a maintainer can read without
+	// walking the user through four screens (issue #799). The archive is built by a class of its
+	// own, because page code cannot be exercised by PHPUnit and the redaction it performs has to be
+	// covered by a test; the page only reads the selection and hands the file over.
+	if (empty($error) && ($massaction == 'supportexport' || ($action == 'supportexport' && $confirm == 'yes')) && $permissiontoread) {
+		dol_include_once('einvoicing/class/utils/SupportExport.class.php');
+
+		$supportexport = new SupportExport($db);
+		$supportarchive = $supportexport->build(SupportExport::TYPE_FLOW, $toselect, $diroutputmassaction);
+
+		if ($supportarchive == '') {
+			setEventMessages($supportexport->error, null, 'errors');
+			$massaction = '';
+			$action = 'list';
+		} else {
+			// Nothing has been printed yet at this point of the page, so the archive can be sent
+			// as the answer to this very request.
+			SupportExport::deliver($supportarchive);
+			$db->close();
+			exit;
+		}
+	}
 }
 
 
-if (getDolGlobalString('EINVOICING_PDP')) {
+if (!$isSlaveEntity && getDolGlobalString('EINVOICING_PDP')) {
 	$providerManager = new PDPProviderManager($db);
 	$provider = $providerManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 }
 
-if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confirm == 'yes') {
+// The sync creates supplier invoices and vendors: reading the list is not enough to run it.
+if ($action == 'confirm_sync' && !$isSlaveEntity && $permissiontoadd && getDolGlobalString('EINVOICING_PDP') && $confirm == 'yes') {
 	if (isset($provider)) {
 		// Sync all flows
 		$sync_result = $provider->syncFlows($syncFromDate, $maxflows);
@@ -334,6 +391,20 @@ if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confir
 			if (!empty($sync_result['syncedFlows']) && $sync_result['syncedFlows'] > 0) {
 				// If sync was successful and we processed 1 new record, we clear the submitted date so a new one will be suggested from the last record in db.
 				$syncfromdate = 0;
+			}
+		}
+
+		// After a synchronization, remind the operator of the flows still queued for a manual action:
+		// they are errors to resolve, and are easy to miss once the run reports only its success count.
+		if (getDolGlobalInt('EINVOICING_ENABLE_MANUAL_ACTION_QUEUE')) {
+			$nbpendingqueue = 0;
+			$resqlpendingqueue = $db->query("SELECT COUNT(*) as nb FROM ".MAIN_DB_PREFIX."einvoicing_sync_pending WHERE entity IN (".getEntity('einvoicing').") AND status = 0");	// 0 = STATUS_PENDING
+			if ($resqlpendingqueue) {
+				$objpendingqueue = $db->fetch_object($resqlpendingqueue);
+				$nbpendingqueue = (int) $objpendingqueue->nb;
+			}
+			if ($nbpendingqueue > 0) {
+				setEventMessages($langs->trans("EInvoiceSyncPendingRemindAfterSync", $nbpendingqueue).' <a href="'.dol_buildpath('/einvoicing/sync_pending_list.php', 1).'">'.$langs->trans("EInvoiceSyncPending").'</a>', null, 'warnings');
 			}
 		}
 	} else {
@@ -359,7 +430,25 @@ $morecss = array();
 // Build and execute select
 // --------------------------------------------------------------------
 $sql = "SELECT";
-$sql .= " ".$object->getFieldList('t', array('recap', 'xml_data'));
+// Fields of the table for the SELECT. 'recap' and 'thirdparty' are virtual columns of this list - they
+// have no column in the table - and 'xml_data' is never displayed, so the three must stay out of the query.
+$columns = array('recap', 'xml_data', 'thirdparty');
+if ((float) DOL_VERSION < 18) {
+	// CommonObject::getFieldList() takes what to exclude only since Dolibarr 18: on 17 it takes the alias
+	// alone and ignores the rest without a word, which sends 't.recap' into the query and fails it. Build
+	// the same list as the core builds since 18.
+	$fields = array();
+	foreach (array_keys($object->fields) as $fieldname) {
+		if (in_array($fieldname, $columns)) {
+			continue;
+		}
+		$fields[] = 't.'.$fieldname;
+	}
+	$selectFields = implode(',', $fields);
+} else {
+	$selectFields = $object->getFieldList('t', $columns);
+}
+$sql .= " ".$selectFields;
 // Add fields from extrafields
 if (!empty($extrafields->attributes[$object->table_element]['label'])) {
 	foreach ($extrafields->attributes[$object->table_element]['label'] as $key => $val) {
@@ -371,6 +460,14 @@ $parameters = array();
 $reshook = $hookmanager->executeHooks('printFieldListSelect', $parameters, $object, $action); // Note that $action and $object may have been modified by hook
 $sql .= $hookmanager->resPrint;
 $sql = preg_replace('/,\s*$/', '', $sql);
+
+// Virtual "thirdparty_name"/"thirdparty_id" columns resolved from the linked invoice (display + sort of the Tiers column)
+// Two LEFT JOINs are added in the FROM clause: one toward the customer invoice (facture) and one toward the supplier
+// invoice (facture_fourn), each joined to its societe. COALESCE picks whichever side matches the fk_element_type.
+if ($showthirdpartycol) {
+	$sql .= ", COALESCE(soc.rowid, socf.rowid, 0) as thirdparty_id";
+	$sql .= ", COALESCE(soc.nom, socf.nom, '') as thirdparty_name";
+}
 
 $sqlfields = $sql; // $sql fields to remove for count total
 
@@ -384,14 +481,20 @@ $parameters = array();
 $reshook = $hookmanager->executeHooks('printFieldListFrom', $parameters, $object, $action); // Note that $action and $object may have been modified by hook
 $sql .= $hookmanager->resPrint;
 
+// LEFT JOINs for the virtual thirdparty column: customer invoice link and supplier invoice link, each to its societe.
+if ($showthirdpartycol) {
+	$sql .= " LEFT JOIN ".$db->prefix()."facture as f ON t.fk_element_type = 'facture' AND t.fk_element_id = f.rowid";
+	$sql .= " LEFT JOIN ".$db->prefix()."societe as soc ON soc.rowid = f.fk_soc";
+	$sql .= " LEFT JOIN ".$db->prefix()."facture_fourn as ff ON t.fk_element_type = 'invoice_supplier' AND t.fk_element_id = ff.rowid";
+	$sql .= " LEFT JOIN ".$db->prefix()."societe as socf ON socf.rowid = ff.fk_soc";
+}
+
 if (!empty($object->ismultientitymanaged) && (int) $object->ismultientitymanaged == 1) {
-	$sql .= " WHERE t.entity IN (".getEntity($object->element, (GETPOSTINT('search_current_entity') ? 0 : 1)).")";
-} elseif (preg_match('/^\w+@\w+$/', (string) $object->ismultientitymanaged)) {
-	$tmparray = explode('@', (string) $object->ismultientitymanaged);
-	$sql .= " LEFT JOIN ".$object->db->prefix().$db->sanitize($tmparray[1])." as pt ON t.".$db->sanitize($tmparray[0])." = pt.rowid";
-	$sql .= " WHERE pt.entity IN (".getEntity($object->element, (GETPOSTINT('search_current_entity') ? 0 : 1)).")";
-} else {
-	$sql .= " WHERE 1 = 1";
+	if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
+		$sql .= " WHERE t.entity IN (".getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP").")";
+	} else {
+		$sql .= " WHERE t.entity IN (".getEntity($object->element).")";
+	}
 }
 foreach ($search as $key => $val) {
 	if (array_key_exists($key, $object->fields)) {
@@ -462,6 +565,11 @@ if ($socid) {
 */
 //$sql.= dolSqlDateFilter("t.field", $search_xxxday, $search_xxxmonth, $search_xxxyear);
 // Add where from extra fields
+// Filter on thirdparty resolved from the linked invoice (facture / facture fournisseur)
+if ($showthirdpartycol && $search_thirdparty != '') {
+	$sql .= " AND (".natural_search("soc.nom", $search_thirdparty, 0, 1);
+	$sql .= " OR ".natural_search("socf.nom", $search_thirdparty, 0, 1).")";
+}
 include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_list_search_sql.tpl.php';
 // Add where from hooks
 $parameters = array();
@@ -551,22 +659,14 @@ if ($num == 1 && getDolGlobalInt('MAIN_SEARCH_DIRECT_OPEN_IF_ONLY_ONE') && $sear
 // Output page
 // --------------------------------------------------------------------
 
-llxHeader('', $title, $help_url, '', 0, 0, $morejs, $morecss, '', 'mod-einvoicing page-list bodyforlist');	// Can use also classforhorizontalscrolloftabs instead of bodyforlist for a horizontal scroll in the table instead of page
+// The version alone does not name sources between two releases, so the commit the module was
+// built from is stamped next to it, exactly as the comment opening a generated XML does.
+llxHeader('', $title.' '.einvoicingModuleStamp(), $help_url, '', 0, 0, $morejs, $morecss, '', 'mod-einvoicing page-list bodyforlist');	// Can use also classforhorizontalscrolloftabs instead of bodyforlist for a horizontal scroll in the table instead of page
 
-// Example : Adding jquery code
-// print '<script type="text/javascript">
-// jQuery(document).ready(function() {
-// 	function init_myfunc()
-// 	{
-// 		jQuery("#myid").removeAttr(\'disabled\');
-// 		jQuery("#myid").attr(\'disabled\',\'disabled\');
-// 	}
-// 	init_myfunc();
-// 	jQuery("#mybutton").click(function() {
-// 		init_myfunc();
-// 	});
-// });
-// </script>';
+if ($isSlaveEntity) {
+	print '<div class="warning">'.$langs->trans("EInvoicingImportManagedByMasterSetup", getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")).'</div>';
+}
+
 
 $arrayofselected = is_array($toselect) ? $toselect : array();
 
@@ -602,6 +702,9 @@ foreach ($search as $key => $val) {
 	}
 }
 // Add $param from extra fields
+if ($search_thirdparty != '') {
+	$param .= '&search_thirdparty='.urlencode($search_thirdparty);
+}
 include DOL_DOCUMENT_ROOT.'/core/tpl/extrafields_list_search_param.tpl.php';
 // Add $param from hooks
 $parameters = array('param' => &$param);
@@ -615,10 +718,13 @@ $arrayofmassactions = array(
 	//'builddoc'=>img_picto('', 'pdf', 'class="pictofixedwidth"').$langs->trans("PDFMerge"),
 	//'presend'=>img_picto('', 'email', 'class="pictofixedwidth"').$langs->trans("SendByMail"),
 );
+if (!empty($permissiontoread)) {
+	$arrayofmassactions['presupportexport'] = img_picto('', 'download', 'class="pictofixedwidth"').$langs->trans("EInvoicingSupportExport");
+}
 if (!empty($permissiontodelete)) {
 	$arrayofmassactions['predelete'] = img_picto('', 'delete', 'class="pictofixedwidth"').$langs->trans("Delete");
 }
-if (GETPOSTINT('nomassaction') || in_array($massaction, array('presend', 'predelete'))) {
+if (GETPOSTINT('nomassaction') || in_array($massaction, array('presend', 'predelete', 'presupportexport'))) {
 	$arrayofmassactions = array();
 }
 $massactionbutton = $form->selectMassAction('', $arrayofmassactions);
@@ -648,8 +754,24 @@ $newcardbutton = '';
 
 // Manual mapping of the vendor products of a flow onto existing Dolibarr products (useful when the automatic
 // creation of products is disabled and a synchronization is blocked on an unknown product).
-$newcardbutton .= dolGetButtonTitle($langs->trans('MapEInvoiceProducts'), '', 'fa fa-link', dol_buildpath('/einvoicing/product_mapping.php', 1), '', $permissiontoadd);
+if (!$isSlaveEntity && getDolGlobalString('EINVOICING_SHOW_MAPPING_TOOL_ON_VENDOR_PRICE_LIST')) {	// Hidden option because editing mapping outside of an import process is discouraged.
+	$newcardbutton .= dolGetButtonTitle($langs->trans('MapEInvoiceProducts'), '', 'fa fa-link', dol_buildpath('/einvoicing/product_mapping.php', 1), '', $permissiontoadd);
+}
 
+// Link to the manual-action queue (error management): the flows a synchronization could not import
+// because they need a manual action (missing product/thirdparty, supplier invoice with a different
+// amount) are listed there. Shown only when the queue is enabled, with the number still pending so a
+// blocked flow is not missed from this screen.
+if (getDolGlobalInt('EINVOICING_ENABLE_MANUAL_ACTION_QUEUE')) {
+	$nbpendingqueue = 0;
+	$resqlpendingqueue = $db->query("SELECT COUNT(*) as nb FROM ".MAIN_DB_PREFIX."einvoicing_sync_pending WHERE entity IN (".getEntity('einvoicing').") AND status = 0");	// 0 = STATUS_PENDING
+	if ($resqlpendingqueue) {
+		$objpendingqueue = $db->fetch_object($resqlpendingqueue);
+		$nbpendingqueue = (int) $objpendingqueue->nb;
+	}
+	$labelpendingqueue = $langs->trans('EInvoiceSyncPending').($nbpendingqueue > 0 ? ' ('.$nbpendingqueue.')' : '');
+	$newcardbutton .= dolGetButtonTitle($labelpendingqueue, '', 'fa fa-hourglass-half', dol_buildpath('/einvoicing/sync_pending_list.php', 1), '', 1);
+}
 
 $providershort = '';
 if ($provider) {
@@ -659,13 +781,20 @@ if ($provider) {
 
 print_barre_liste($title, $page, $_SERVER["PHP_SELF"], $param, $sortfield, $sortorder, $massactionbutton, $num, $nbtotalofrecords, $object->picto, 0, $newcardbutton, '', $limit, 0, 0, 1);
 
-
 // Add code for pre mass action (confirmation or email presend form)
 $topicmail = "SendDocumentRef";
 $modelmail = "document";
 $objecttmp = new Document($db);
 $trackid = 'xxxx'.$object->id;
 include DOL_DOCUMENT_ROOT.'/core/tpl/massactions_pre.tpl.php';
+
+// Confirmation of the support export, in the shape the core uses for its own mass actions: no ajax
+// and no form tag of its own, so that the buttons submit the list form and the selection survives.
+// The ajax variant jumps to a GET url instead, which would drop toselect[].
+if ($massaction == 'presupportexport') {
+	$formquestion = array('text' => $langs->trans("EInvoicingSupportExportPrivacy"));
+	print $form->formconfirm($_SERVER["PHP_SELF"], $langs->trans("EInvoicingSupportExport"), $langs->trans("EInvoicingSupportExportQuestion", count($toselect)), "supportexport", $formquestion, '', 0, 250, 500, 1);
+}
 
 if ($search_all) {
 	$setupstring = '';
@@ -702,7 +831,7 @@ if (!empty($moreforfilter)) {
 
 $varpage = empty($contextpage) ? $_SERVER["PHP_SELF"] : $contextpage;
 //$varpage = '';
-$htmlofselectarray = $form->multiSelectArrayWithCheckbox('selectedfields', $arrayfields, $varpage, $conf->main_checkbox_left_column);  // This also change content of $arrayfields with user setup
+$htmlofselectarray = $form->multiSelectArrayWithCheckbox('selectedfields', $arrayfields, $varpage, empty($conf->main_checkbox_left_column) ? 0 : $conf->main_checkbox_left_column);  // This also change content of $arrayfields with user setup
 $selectedfields = (($mode != 'kanban' && $mode != 'kanbangroupby') ? $htmlofselectarray : '');
 $selectedfields .= (count($arrayofmassactions) ? $form->showCheckAddButtons('checkforselect', 1) : '');
 
@@ -748,20 +877,22 @@ foreach ($diagFileNames as $f) {
 }
 
 if ($diagFileName) {
-	$urlOriginalFile = DOL_URL_ROOT . '/document.php?modulepart=einvoicing&file=' . urlencode('temp/' . $diagFileName);
+	$urlConvertedFile = DOL_URL_ROOT . '/document.php?modulepart=einvoicing&file=' . urlencode('temp/' . $diagFileName);
 
 	$last_supplier_invoice_error = '<span class="opacitylowx">'.img_picto('', 'times', 'class="pictofixedwidth"');
 	$last_supplier_invoice_error .= ' ' . $langs->trans("LastSupplierInvoiceCouldNotBeProcessed");
 	$last_supplier_invoice_error .= '<i class="fas fa-info-circle em088 opacityhigh classfortooltip" title="'. $langs->trans("LastSupplierInvoiceCouldNotBeProcessedInfo") .'"></i>';
 	$last_supplier_invoice_error .= ' : </span>';
-	$last_supplier_invoice_error .= '<a href="'.$urlOriginalFile.'">' . $langs->trans("facturXDownloadOriginal") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
+	$last_supplier_invoice_error .= '<a href="'.$urlConvertedFile.'" target="_blank">' . $langs->trans("DocDownloadConverted") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
+	$last_supplier_invoice_error .= einvoicingDiagnosticPreviewLink($diagFileName);
 
 	// The readable view is only stored when the platform provided one with the flow
 	if (file_exists($conf->einvoicing->dir_temp . '/' . $diagReadableFileName)) {
-		$urlConvertedFile = DOL_URL_ROOT . '/document.php?modulepart=einvoicing&file=' . urlencode('temp/' . $diagReadableFileName);
+		$urlReadableFile = DOL_URL_ROOT . '/document.php?modulepart=einvoicing&file=' . urlencode('temp/' . $diagReadableFileName);
 
 		$last_supplier_invoice_error .= ' <span class="opacitylow">|</span> ';
-		$last_supplier_invoice_error .= '<a href="'.$urlConvertedFile.'">' . $langs->trans("facturXDownloadConverted") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
+		$last_supplier_invoice_error .= '<a href="'.$urlReadableFile.'" target="_blank">' . $langs->trans("DocDownloadReadable") . ' ' . img_picto('', 'download', 'class="pictofixedwidth"') . '</a>';
+		$last_supplier_invoice_error .= einvoicingDiagnosticPreviewLink($diagReadableFileName);
 	}
 }
 
@@ -772,8 +903,8 @@ if ($provider) {
 
 	print '<div class="formconsumeproduce" style="padding: 10px;">'."\n";
 
-	print '<div class="div-table-responsive">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
-	print '<table>'."\n";
+	print '<div class="div-table-responsive-no-min">'; // We need no min to support the selection of fields
+	print '<table class="inline-block valignmiddle marginrightonly">'."\n";
 
 	print '<tr>';
 	print '<td class="syncFormLabel">'.$langs->trans("StartSynchronizationFrom").'</td>';
@@ -813,15 +944,6 @@ if ($provider) {
 
 	print '</td>';
 
-	$rowspan = getDolGlobalInt('EINVOICING_FLOWS_SYNC_CALL_LIMIT') ? 2 : 1;
-	print '<td style="padding-left: 40px; padding-right: 40px"'.($rowspan > 1 ? ' rowspan="'.$rowspan.'"' : '').'>';
-
-	// Button to submit (sync manage both in and update of out invoices)
-	print '<a href="#" id="runSyncBtn" class="butAction small" style="margin: 0;">';
-	print img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC");
-	print '</a>'."\n";
-
-	print '</td>';
 	print '</tr>';
 
 	if (getDolGlobalInt('EINVOICING_FLOWS_SYNC_CALL_LIMIT')) {
@@ -837,6 +959,18 @@ if ($provider) {
 	}
 
 	print '</table>'."\n";
+
+	// Button to submit (sync manage both in and update of out invoices)
+	if ($permissiontoadd) {
+		print '<a class="inline-block valignmiddle butAction small margintoponly marginbottomonly" href="#" id="runSyncBtn" style="margin: 0;">';
+		print img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC");
+		print '</a>'."\n";
+	} else {
+		print '<span class="inline-block valignmiddle butActionRefused classfortooltip small margintoponly marginbottomonly" style="margin: 0;" title="'.dol_escape_htmltag($langs->trans("NotEnoughPermissions")).'">';
+		print img_picto('', 'refresh', 'class="pictofixedwidth"').' '.$langs->trans("RUN_SYNC");
+		print '</span>'."\n";
+	}
+
 	print '</div>';
 	print '</div>'."\n";
 
@@ -856,27 +990,29 @@ if ($provider) {
 
 	print "</div>\n";
 
-	print '<script>'."\n";
-	print "document.getElementById('runSyncBtn').addEventListener('click', function(e){\n";
-	print "  e.preventDefault();\n";
-	print "  var maxFlows = document.getElementById('maxflows') ? encodeURIComponent(document.getElementById('maxflows').value) : '0';\n";
-	print "  var token = encodeURIComponent('".newToken()."');\n";
-	print "  var lastSyncDatetimehour = document.getElementById('last_sync_datetimehour') ? encodeURIComponent(document.getElementById('last_sync_datetimehour').value) : '0';\n";
-	print "  var lastSyncDatetimemin = document.getElementById('last_sync_datetimemin') ? encodeURIComponent(document.getElementById('last_sync_datetimemin').value) : '0';\n";
-	print "  var lastSyncDatetimemonth = document.getElementById('last_sync_datetimemonth') ? encodeURIComponent(document.getElementById('last_sync_datetimemonth').value) : '0';\n";
-	print "  var lastSyncDatetimeday = document.getElementById('last_sync_datetimeday') ? encodeURIComponent(document.getElementById('last_sync_datetimeday').value) : '0';\n";
-	print "  var lastSyncDatetimeyear = document.getElementById('last_sync_datetimeyear') ? encodeURIComponent(document.getElementById('last_sync_datetimeyear').value) : '0';\n";
-	print "  window.location.href = '".$_SERVER["PHP_SELF"]."?action=sync&maxflows=' + maxFlows + '&last_sync_datetimehour=' + lastSyncDatetimehour + '&last_sync_datetimemin=' + lastSyncDatetimemin + '&last_sync_datetimemonth=' + lastSyncDatetimemonth + '&last_sync_datetimeday=' + lastSyncDatetimeday + '&last_sync_datetimeyear=' + lastSyncDatetimeyear + '&token=' + token;\n";
-	print "});\n";
-	print "</script>\n";
-} else {
+	if ($permissiontoadd) {
+		print '<script>'."\n";
+		print "document.getElementById('runSyncBtn').addEventListener('click', function(e){\n";
+		print "  e.preventDefault();\n";
+		print "  var maxFlows = document.getElementById('maxflows') ? encodeURIComponent(document.getElementById('maxflows').value) : '0';\n";
+		print "  var token = encodeURIComponent('".newToken()."');\n";
+		print "  var lastSyncDatetimehour = document.getElementById('last_sync_datetimehour') ? encodeURIComponent(document.getElementById('last_sync_datetimehour').value) : '0';\n";
+		print "  var lastSyncDatetimemin = document.getElementById('last_sync_datetimemin') ? encodeURIComponent(document.getElementById('last_sync_datetimemin').value) : '0';\n";
+		print "  var lastSyncDatetimemonth = document.getElementById('last_sync_datetimemonth') ? encodeURIComponent(document.getElementById('last_sync_datetimemonth').value) : '0';\n";
+		print "  var lastSyncDatetimeday = document.getElementById('last_sync_datetimeday') ? encodeURIComponent(document.getElementById('last_sync_datetimeday').value) : '0';\n";
+		print "  var lastSyncDatetimeyear = document.getElementById('last_sync_datetimeyear') ? encodeURIComponent(document.getElementById('last_sync_datetimeyear').value) : '0';\n";
+		print "  window.location.href = '".$_SERVER["PHP_SELF"]."?action=sync&maxflows=' + maxFlows + '&last_sync_datetimehour=' + lastSyncDatetimehour + '&last_sync_datetimemin=' + lastSyncDatetimemin + '&last_sync_datetimemonth=' + lastSyncDatetimemonth + '&last_sync_datetimeday=' + lastSyncDatetimeday + '&last_sync_datetimeyear=' + lastSyncDatetimeyear + '&token=' + token;\n";
+		print "});\n";
+		print "</script>\n";
+	}
+} elseif (!$isSlaveEntity) {
 	// Message to check module configuration
 	print info_admin($langs->transnoentities("checkEInvoicingModuleConfiguration"), 0, 0, '1', '', '', 'warning');
 }
 
 
 // Confirmation dialog
-if ($action == 'sync' && $provider) {
+if ($action == 'sync' && $provider && $permissiontoadd) {
 	$validationFormError = 0;
 
 	if ($maxflows < 0) {
@@ -979,7 +1115,7 @@ if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confir
 		if ($sync_result['actions']) {
 			print '<br><br>';
 			print '<!-- suggested action -->'."\n";
-			print '<strong><u>'.$langs->trans("SuggestedActions").'</u></strong></br>';
+			print '<strong><u>'.$langs->trans("SuggestedActions").'</u></strong><br>';
 			$i = 0;
 			foreach ($sync_result['actions'] as $tmpactioncode => $tmpactionstodo) {
 				print '<!-- action for code '.$tmpactioncode.' -->';
@@ -997,12 +1133,23 @@ if ($action == 'confirm_sync' && getDolGlobalString('EINVOICING_PDP') && $confir
 		if ($sync_result['res'] < 0 && empty($sync_result['actions']) && !getDolGlobalInt('EINVOICING_DEBUG_MODE')) {
 			print '<!-- message to recommend to enable debug mode -->'."\n";
 			print '<div class="wordbreak warning clearboth">';
-			print '<strong><u>'.$langs->trans("SuggestedActions").' :</u></strong></br>';
+			print '<strong><u>'.$langs->trans("SuggestedActions").' :</u></strong><br>';
 			print $langs->trans("EnableDebugModeToSeeMoreDetails");
 			print '</div>';
 		}
 		print '<br>';
 	}
+}
+
+// Where the "import a received document again" action lives. This list is where a user lands after
+// deleting the draft supplier invoice a reception created: the flow is still here, so re-running a
+// synchronization or deleting the line looks like the way to get the document back, and neither is.
+// The action is on the flow card, one click away but invisible from here, hence this reminder.
+if ($provider && !einvoicingReceptionDisabled()) {
+	print '<div class="opacitymedium small paddingtop paddingleft">';
+	print img_picto('', 'info', 'class="pictofixedwidth"').' ';
+	print $langs->trans('EInvoiceReimportHint', $langs->transnoentitiesnoconv('EInvoiceReimport'));
+	print '</div>'."\n";
 }
 
 
@@ -1018,7 +1165,7 @@ print '<table class="tagtable nobottomiftotal noborder liste'.($moreforfilter ? 
 // --------------------------------------------------------------------
 print '<tr class="liste_titre_filter">';
 // Action column
-if ($conf->main_checkbox_left_column) {
+if (!empty($conf->main_checkbox_left_column)) {
 	print '<td class="liste_titre center maxwidthsearch">';
 	$searchpicto = $form->showFilterButtons('left');
 	print $searchpicto;
@@ -1059,6 +1206,8 @@ foreach ($object->fields as $key => $val) {
 			print $formadmin->select_language((isset($search[$key]) ? $search[$key] : ''), 'search_lang', 0, array(), 1, 0, 0, 'minwidth100imp maxwidth125', 2);
 		} elseif ($val['type'] === 'boolean') {
 			print $form->selectyesno('search_' . $key, $search[$key] ?? '', 1, false, 1);
+		} elseif ($key == 'thirdparty') {
+			print '<input type="text" class="flat maxwidth100" name="search_thirdparty" value="'.dol_escape_htmltag($search_thirdparty).'">';
 		} else {
 			if (!empty($val['notsearchable'])) {
 				continue;
@@ -1079,7 +1228,7 @@ print $hookmanager->resPrint;
 	print '<td class="liste_titre"></td>';
 }*/
 // Action column
-if (!$conf->main_checkbox_left_column) {
+if (empty($conf->main_checkbox_left_column)) {
 	print '<td class="liste_titre center maxwidthsearch">';
 	$searchpicto = $form->showFilterButtons();
 	print $searchpicto;
@@ -1094,7 +1243,7 @@ $totalarray['nbfield'] = 0;
 // --------------------------------------------------------------------
 print '<tr class="liste_titre">';
 // Action column
-if ($conf->main_checkbox_left_column) {
+if (!empty($conf->main_checkbox_left_column)) {
 	print getTitleFieldOfList($selectedfields, 0, $_SERVER["PHP_SELF"], '', '', '', '', $sortfield, $sortorder, 'center maxwidthsearch ')."\n";
 	$totalarray['nbfield']++;
 }
@@ -1111,7 +1260,9 @@ foreach ($object->fields as $key => $val) {
 	}
 	$cssforfield = preg_replace('/small\s*/', '', $cssforfield);	// the 'small' css must not be used for the title label
 	if (!empty($arrayfields['t.'.$key]['checked'])) {
-		print getTitleFieldOfList($arrayfields['t.'.$key]['label'], 0, $_SERVER['PHP_SELF'], 't.'.$key, '', $param, ($cssforfield ? 'class="'.$cssforfield.'"' : ''), $sortfield, $sortorder, ($cssforfield ? $cssforfield.' ' : ''), 0, (empty($val['helplist']) ? '' : $val['helplist']))."\n";
+		// recap is built for display and is not a column of the table: its title must not be a sort link.
+		$sortablefield = ($key == 'recap' ? '' : ($key == 'thirdparty' ? 'thirdparty_name' : 't.'.$key));
+		print getTitleFieldOfList($arrayfields['t.'.$key]['label'], 0, $_SERVER['PHP_SELF'], $sortablefield, '', $param, ($cssforfield ? 'class="'.$cssforfield.'"' : ''), $sortfield, $sortorder, ($cssforfield ? $cssforfield.' ' : ''), 0, (empty($val['helplist']) ? '' : $val['helplist']))."\n";
 		$totalarray['nbfield']++;
 	}
 }
@@ -1126,7 +1277,7 @@ print $hookmanager->resPrint;
 	$totalarray['nbfield']++;
 }*/
 // Action column
-if (!$conf->main_checkbox_left_column) {
+if (empty($conf->main_checkbox_left_column)) {
 	print getTitleFieldOfList($selectedfields, 0, $_SERVER["PHP_SELF"], '', '', '', '', $sortfield, $sortorder, 'center maxwidthsearch ')."\n";
 	$totalarray['nbfield']++;
 }
@@ -1149,6 +1300,9 @@ $i = 0;
 $savnbfield = $totalarray['nbfield'];
 $totalarray = array();
 $totalarray['nbfield'] = 0;
+require_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
+$companystatic = new Societe($db);
+
 $imaxinloop = ($limit ? min($num, $limit) : $num);
 while ($i < $imaxinloop) {
 	$obj = $db->fetch_object($resql);
@@ -1225,7 +1379,7 @@ while ($i < $imaxinloop) {
 		print '<tr data-rowid="'.$object->id.'" class="oddeven row-with-select">';
 
 		// Action column
-		if ($conf->main_checkbox_left_column) {
+		if (!empty($conf->main_checkbox_left_column)) {
 			print '<td class="nowrap center">';
 			if ($massactionbutton || $massaction) { // If we are in select mode (massactionbutton defined) or if we have already selected and sent an action ($massaction) defined
 				$selected = 0;
@@ -1253,7 +1407,9 @@ while ($i < $imaxinloop) {
 			} elseif ($key == 'ref') {
 				$cssforfield .= ($cssforfield ? ' ' : '').'nowraponall';
 			}
-
+			if ($key == 'tracking_idref') {
+				$cssforfield .= ($cssforfield ? ' ' : '').'tdlineheightsmall';
+			}
 			if (in_array($val['type'], array('double(24,8)', 'double(6,3)', 'integer', 'real', 'price')) && !in_array($key, array('id', 'rowid', 'ref', 'status')) && empty($val['arrayofkeyval'])) {
 				$cssforfield .= ($cssforfield ? ' ' : '').'right';
 			}
@@ -1267,7 +1423,7 @@ while ($i < $imaxinloop) {
 				print '>';
 				if ($key == 'flow_direction') {
 					$isOut = ($object->flow_direction === 'Out');
-					$label = $isOut ? $langs->trans('Output') : $langs->trans('Input');
+					$label = $isOut ? $langs->trans('EInvOutput') : $langs->trans('EInvInput');
 					$picto = $isOut ? '1uparrow' : '1downarrow';
 					//$class = $isOut ? 'stockmovementexit' : 'stockmovemententry';
 					$class = $isOut ? 'badge badge-primary' : 'badge badge-secondary';
@@ -1281,36 +1437,28 @@ while ($i < $imaxinloop) {
 				} elseif ($key == 'rowid') {
 					print $object->showOutputField($val, $key, (string) $object->id, '');
 				} elseif ($key == 'tracking_idref') {
-					$out = dol_escape_htmltag($object->tracking_idref);
-
-					if (!empty($object->fk_element_type) && !empty($object->fk_element_id)) {
-						if ($object->fk_element_type === 'facture') {
-							require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
-							$linkedobj = new Facture($db);
-
-							if ($linkedobj->fetch((int) $object->fk_element_id) > 0) {
-								$out = $linkedobj->getNomUrl(1);
-							}
-						} elseif ($object->fk_element_type === 'invoice_supplier') {
-							require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
-							$linkedobj = new FactureFournisseur($db);
-
-							if ($linkedobj->fetch((int) $object->fk_element_id) > 0) {
-								$out = $linkedobj->getNomUrl(1);
-							}
-						}
-					}
+					$out = $object->getElementNomUrl(1);
 
 					if (strpos($out, '<a ') !== false) {
 						$out = preg_replace('/<a /', '<a target="_blank" rel="noopener noreferrer" ', $out, 1);
 					}
 
 					print $out;
+				} elseif ($key == 'thirdparty') {
+					// Thirdparty resolved in the SELECT (thirdparty_id/thirdparty_name); render through a
+					// reusable light company object to avoid re-fetching the whole invoice for every row.
+					$out = '';
+					if (!empty($obj->thirdparty_id) && !empty($obj->thirdparty_name)) {
+						$companystatic->id = (int) $obj->thirdparty_id;
+						$companystatic->name = $obj->thirdparty_name;
+						$out = $companystatic->getNomUrl(1, '', 24);
+					}
+					print $out;
 				} elseif ($key == 'fk_element_type') {
 					print '<span class="nowraponall">';
-					if ((string) $object->$key == 'Facture' || (string) $object->$key == 'invoice') {
+					if (strtolower((string) $object->$key) == 'facture' || strtolower((string) $object->$key) == 'invoice') {
 						print img_picto('', 'bill', 'class="pictofixedwidth"').$langs->trans("Invoice");
-					} elseif ((string) $object->$key == 'FactureFournisseur' || (string) $object->$key == 'invoice_supplier') {
+					} elseif (strtolower((string) $object->$key) == 'facturefournisseur' || strtolower((string) $object->$key) == 'invoice_supplier') {
 						print img_picto('', 'supplier_invoice', 'class="pictofixedwidth"').$langs->trans("SupplierInvoice");
 					}
 					print  '</span>';

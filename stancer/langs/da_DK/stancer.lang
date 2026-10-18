@@ -1,0 +1,783 @@
+# Copyright (C) 2023 Eric Seigne <eric.seigne@cap-rel.fr>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+#
+# Generic
+#
+
+# Module label 'ModuleStancerName'
+ModuleStancerName = Stancer
+ModuleStancerDesc = Stancer betalingsmodul
+
+#
+# Dashboard
+#
+StancerDashboard = Stancer-dashboard
+StancerTestModeWarning = Testtilstand aktiv - viste data kommer fra testmiljøet
+StancerDashboardKPI = Månedlige indikatorer
+StancerDashboardRevenue = Stancer-kollektioner
+StancerDashboardPayments = Betalinger
+StancerDashboardRefunds = Refusioner
+StancerDashboardDisputes = Tvister
+StancerDashboardCaptured = fanget
+StancerDashboardThisMonth = denne måned
+StancerDashboardOpen = åben
+StancerDashboardMethods = Oversigt over betalingsmetode
+StancerDashboardYearlyComparison = Årlig sammenligning af Stancer-kollektioner
+StancerDashboardMethodMonthly = Månedlige CB/SEPA-opkrævninger
+StancerDashboardAlerts = Advarsler
+StancerDashboardAlertDisputes = %s åben(e) tvist(er) for i alt %s
+StancerDashboardAlertRefunds = %s afventer refusion(er) for i alt %s
+StancerDashboardLastPayments = Seneste betalinger
+
+#
+# Admin page
+#
+StancerSetup = Stancer-konfiguration: Generelt
+StancerSetupSepa = Stancer-konfiguration: SEPA
+StancerSettingsMenu = Generel
+StancerSetupPage = Stancer-konfigurationsside
+StancerSignupURL = https://stancer.com/fr/paiement-en-ligne?mtm_campaign=Dolibarr&mtm_source=Dolibarr
+StancerNoApiKeysMessage = Har du endnu ikke en Stancer-konto? <a href="%s" target="_blank">Opret din gratis konto</a> for at få dine API-nøgler og begynde at acceptere kreditkort- og SEPA-betalinger.
+StancerSignupPromo = Anbefal Stancer! <a href="%s" target="_blank">Opret en Stancer-konto</a>
+StancerPartnershipMessage = Dette modul er gratis takket være Stancer-partnerskabet. <a href="%s" target="_blank">Opret din Stancer-konto</a> for at drage fordel af en enkel og konkurrencedygtig betalingsløsning.
+
+STANCER_PROD_PARAMS = Produktionstilstand
+
+STANCER_PROD_PUBLIC_KEY = Offentlig nøgle (produktionstilstand)
+STANCER_PROD_PUBLIC_KEYTooltip = Indsæt din offentlige produktionsnøgle til Stancer her (præfikset pprod_ eller plive_).
+STANCER_PROD_PRIVATE_KEY = Privat nøgle (produktionstilstand)
+STANCER_PROD_PRIVATE_KEYTooltip = Indsæt din private produktionsnøgle fra Stancer her (præfikset sprod_ eller slive_).
+
+STANCER_TEST_PARAMS = Testtilstand
+
+STANCER_TEST_PUBLIC_KEY = Offentlig nøgle (TEST-tilstand)
+STANCER_TEST_PUBLIC_KEYTooltip = Indsæt din offentlige Stancer-testnøgle her (præfiks ptest_).
+STANCER_TEST_PRIVATE_KEY = Privat nøgle (TEST-tilstand)
+STANCER_TEST_PRIVATE_KEYTooltip = Indsæt din private testnøgle til Stancer her (præfikset test_).
+STANCER_KEY_HINT = Skal starte med %s
+STANCER_KEY_INVALID = Nøglen %s skal starte med %s. Inputtet blev afvist, og den tidligere værdi blev bevaret.
+STANCER_USER_ACCOUNT_FOR_ACTIONS = Dolibarr-bruger til automatiske Stancer-operationer
+
+#
+# About page
+#
+About = Om
+StancerAbout = Om Stancer
+StancerAboutPage = Om siden
+
+StancerTest = Testområde
+StancerAccount = Tilknyttet Stancer-konto
+CreateAccountOnStancer = Opret (eller link) kundekonto på Stancer
+StancerAccountID = Identifikator
+StancerAccountDeleteLink = Slet link med Stancer-konto
+StancerAccountReady = Stancer-kundekontoen %s er knyttet til denne post.
+StancerAccountCreationFailed = Oprettelse af kundekonto på Stancer mislykkedes. Se Dolibarr-loggen for årsagen.
+StancerCompanyNameMissing = Det er ikke muligt at oprette din kundes Stancer-konto: deres registrering har intet navn.
+StancerOrderID = Intern reference.
+StancerUniqueID = Unikt ID
+StancerPartialPayment = Depositum
+StancerCustomer = Stancer-kunde
+StancerCBCard = Kreditkort
+STANCER_PAY_BUTTON = Betal med kort
+STANCER_PAY_BUTTON_MESSAGE = Du vil blive omdirigeret til Stancers hjemmeside for at fortsætte med betalingen.
+STANCER_PAY_BUTTON_DEPOSIT = Depositumsbetaling af %s %% dvs. %s
+STANCER_CB_ORDER_PARTIAL_PAY = Aktivér delvis betaling for ordrer med automatisk oprettelse af depositumfaktura
+STANCER_CB_ORDER_PARTIAL_PAYTooltip = Denne mulighed giver mulighed for at opsætte "30%% betaling på ordre" for eksempel. Mere information om <a href="https://doc.cap-rel.fr/projet_stancer/versement_d_un_acompte_a_la_commande">dokumentationen</a>
+STANCER_CB_PROPAL_PARTIAL_PAY = Aktivér delvis betaling for tilbud med automatisk oprettelse af depositumsfaktura
+STANCER_CB_PROPAL_PARTIAL_PAYTooltip = Denne indstilling giver mulighed for at opsætte "20%% betaling ved tilbudssignatur", for eksempel ved hjælp af den indbetalingsprocent, der er defineret i tilbudsbetalingsbetingelserne.
+
+STANCER_AUTO_SEPA_ONLY_FOR_CONTRACTS = Udløs kun automatiske SEPA-betalinger, hvis fakturaen er knyttet til en kontrakt
+STANCER_AUTO_SEPA_ONLY_FOR_CONTRACTSTooltip = Lad dette felt være umarkeret, hvis du ønsker, at en faktura, hvis betalingsmetode er Betalingsservice, automatisk skal debiteres af den planlagte opgave.
+STANCER_SEPA_GROUP_SAME_DAY = Saml fakturaer fra samme kunde samme dag i én SEPA-betaling
+STANCER_SEPA_GROUP_SAME_DAYTooltip = Aktiver denne indstilling for at reducere Stancer-gebyrer: Hvis en kunde har flere fakturaer udstedt samme dag, udstedes en enkelt SEPA-betaling for det samlede beløb. Referencen vist på bankudtoget sammenkæder fakturareferencerne (f.eks. FA2603-0001+FA2603-0002).
+stancer_status_to_capture = Betaling accepteret
+MainAPIURI = Serveradresse
+STANCER_IS_PROD = Aktivér "produktions"-tilstand (lad være med at markere i testtilstand)
+STANCER_BANK_ACCOUNT_FOR_PAYMENTS = Dedikeret Dolibarr-bankkonto til Stancer-betalinger
+STANCER_BANK_ACCOUNT_FOR_PAYMENTSTooltip = Normalt blev der oprettet en "Stancer"-konto, da modulet blev aktiveret. Brug den. Bland ikke alt sammen med din hovedkonto.
+STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTS = Dolibarr bankkonto, hvortil Stancer overfører penge
+STANCER_BANK_MAIN_ACCOUNT_FOR_PAYOUTSTooltip = Din primære bankkonto
+STANCER_CHECK_PAYMENT_STATUS = Kontrol af betalingsstatus for transaktionen:
+STANCER_REDIRECT = Hvis din browser ikke automatisk skifter til betalingssiden, skal du klikke på følgende link:
+response = Detaljer
+created = Dato
+AmountCents = Beløb
+Amount = Beløb
+Fees = Gebyrer
+details = Detaljer
+date_bank = Dato (bank)
+date_paym = Dato (betaling)
+StancerRefused = Afvist
+StancerToCapture = Venter på banken
+StancerDisputed = Bestride
+StancerCaptured = Fanget
+StancerPopupCB = Betaling af faktura ref. %s med kort.
+StancerCardStart = Stancer CB
+StancerCardTPE = Stancer POS
+stancerFindPaymentInvoice = Automatisk betalingssøgning
+SepaMandateForStancer = SEPA-mandat - Stancer
+SepaMandateForStancerPageTitle = Oprettelse af din SEPA-aftale
+SEPALegalTextStancer = Ved at underskrive denne fuldmagtsformular giver du (A) %s tilladelse til at sende instruktioner til din bank om at debitere din konto, og (B) din bank til at debitere din konto i overensstemmelse med %s instruktionerne. Du har ret til at få refunderet beløbet fra din bank i henhold til de betingelser, der er beskrevet i din aftale med den. En anmodning om refusion skal indsendes inden for 8 uger efter den dato, hvor din konto blev debiteret for en autoriseret debitering. Du accepterer at modtage besked om kommende debiteringer inden for 2 dage før deres indtræffen. Enhver afvist debitering vil også blive opkrævet i henhold til vores generelle vilkår og betingelser.
+SEPALegalTextStancer2 = Ved at udfylde denne fuldmagtsformular giver du (A) %s tilladelse til at sende instruktioner til din bank om at debitere din konto, og (B) din bank til at debitere din konto i overensstemmelse med %s instruktionerne. Du har ret til at få refunderet beløbet fra din bank i henhold til de betingelser, der er beskrevet i din aftale med den. En anmodning om refusion skal indsendes inden for 8 uger efter den dato, hvor din konto blev debiteret for en autoriseret debitering. Du accepterer at modtage besked om kommende debiteringer inden for 2 dage før deres indtræffen. Enhver afvist debitering vil også blive opkrævet i henhold til vores generelle vilkår og betingelser.
+SEPALegalTextStancerDPO = Oplysningerne i dette mandat er udelukkende beregnet til at blive brugt af kreditor til forvaltning af sit forhold til sin kunde. Kreditor kan give anledning til at udøve sine rettigheder til indsigelse, adgang, sletning, dataportabilitet, begrænsning og berigtigelse, som fastsat i artikel 38 ff. i lov nr. 78-17 af 6. januar 1978 om databehandling, filer og friheder, ved at sende en e-mail til %s.
+PleaseReturnMandateStancer = Returner venligst denne fuldmagt via e-mail til %s eller med post til
+ShowInStancer = Flere detaljer på Stancers hjemmeside
+ShowRawApiResponse = Vis råt Stancer API-svar
+StancerRawApiTitle = Rå Stancer API-svar
+StancerRawApiLoading = Indlæser Stancer API-svar...
+StancerRawApiError = Fejl under kald af Stancer API
+StancerRefreshThisPayout = Opdater denne udbetaling fra Stancer API
+StancerRefreshInvalidPayoutId = Ugyldig udbetalingsidentifikator
+StancerPayoutRefreshed = Udbetaling %s opdateret fra Stancer API
+STANCER_SHOW_RAW_API_PICTO = Vis forstørrelsesglas-picto for at vise rå Stancer API-svar
+STANCER_SHOW_RAW_API_PICTOTooltip = Når aktiveret, tilføjes et forstørrelsesglas-pikto ud for Stancer-id'er på listesider (udbetalinger, betalinger, refusioner, indsigelser) for at vise det rå Stancer API JSON-svar. Nyttigt til fejlfinding. Kan eksponere følsomme data (kunders e-mails, kortets sidste cifre...): kun for administratorer.
+StancerPayments = Betalinger
+StancerPayouts = Udbetalinger
+StancerRefunds = Refusioner
+StancerDisputes = Tvister
+StancerDisputeID = Stancer-tvistens ref.
+StancerPaymentID = Stancer betalingsref.
+StancerSEPA = SEPA-mandatområde
+CreateSEPAOnStancer = Opret denne SEPA-aftale på Stancer
+ErrorStancer = Stancer-fejlmeddelelse
+StancerSEPAID = Eksisterende SEPA-identifikator på Stancer
+StancerCBID = Eksisterende CB-identifikator på Stancer
+StancerSEPAstart = SEPA Betalingsservice fra Stancer
+StancerPleaseEnterYourIBANTitle = Automatisk direkte debitering
+StancerPleaseEnterYourIBAN = Indtast venligst din IBAN-kode for at oprette automatisk direkte debitering (SEPA) for dine fakturaer.
+StancerYouAcceptPaymentViaSEPA =
+StancerYourIBAN = Din IBAN-kode:
+StancerIBANCBinpoutSecurekeyError = Sikkerhedsnøglen til at få adgang til denne side er forkert. Kontroller venligst med din leverandør, at adgangslinket til denne side ikke er ændret.
+StancerLinkFoCustomerIBAN = Du kan tilbyde din kunde selv at indtaste sin IBAN-kode for at administrere Betalingsservice-aftalen ved at give dem dette særlige link.
+StancerLinkFoCustomerIBANforce = Du kan tilbyde din kunde at oprette en ny fuldmagt til at erstatte den nuværende. I dette tilfælde skal du give dem linket nedenfor.
+stancerSEPAinvalidIBAN = Det angivne IBAN-nummer er forkert. Kontroller det, og indsend din anmodning igen.
+StancerCustomerName = Navn på din organisation (organisation / virksomhed / institution...)
+StancerCustomerNameOnIBAN = Bankkontoindehaver (ændre hvis forskelligt fra virksomhedsnavn)
+StancerBankName = Navnet på din bank
+StancerSuccessSEPAdone = Oprettelsen af din SEPA-betalingsaftale er fuldført!
+StancerPleaseEnterYourIBANorCBTitleDone = Tak!
+StancerPleaseEnterYourIBANDone = Din SEPA-betalingsmetode er nu registreret.
+StancerPleaseEnterYourCBDone = Din kreditkortbetalingsmetode er nu registreret.
+StancerPleaseEnterYourIBANWillBeSent = Underskriftsmandatet vil blive sendt til dig snarest.
+StancerPleaseEnterYourIBANWillBeSentByUptoSign = Din fuldmagt er klar, du skal blot underskrive den. Vores partner for elektronisk signatur (uptosign) bør sende dig en e-mail med en invitation til at følge den elektroniske signaturprocedure inden for få minutter på <b> %s </b>. Hvis dette ikke er din adresse, bedes du kontakte os.
+StancerPleaseEnterYourIBANisReadyToSign = Mandatet til elektronisk underskrift er klar, %s klik her for at fortsætte med underskrivelsen via vores partner uptosign %s.
+StancerPleaseEnterYourIBANisReadyToSignAutoRedir = Mandatet til elektronisk underskrift er klar. Du vil automatisk blive omdirigeret til uptosigns platform til elektronisk underskrift. Vent et par sekunder. Hvis der ikke sker noget, %s klik her for at gå dertil.%s.
+StancerSEPAMenu = SEPA-mandat
+StancerCBMenu = Kreditkort
+StancerCBConfig = Konfiguration af kreditkortbetaling
+StancerMandateConfig = SEPA-betalingsmandat
+StancerMandatePresentation = Dette modul giver dig mulighed for at opsætte SEPA-betalinger. Til dette skal din kunde underskrive SEPA-mandatet. Hvis du har %s UptoSign %s-modulet installeret på din Dolibarr, kan du opsætte automatisk elektronisk signatur...
+StancerMandatePresentationWarning = Glem ikke at oplyse dit ICS-nummer til Stancer, før du forsøger at foretage direkte debitering, som angivet %s i deres dokumentation %s!
+STANCER_PUBLIC_IBAN_PAGE = Aktivér den offentlige side, der giver dine kunder mulighed for at indtaste deres IBAN
+STANCER_PUBLIC_IBAN_PAGETooltip = Dine kunder vil selv kunne indtaste deres IBAN/RIB-kode for at oprette deres Betalingsservice-aftale.
+STANCER_PUBLIC_IBAN_PAGE_FORCE = Aktivér den offentlige side, så dine kunder kan indtaste deres IBAN, selvom de allerede har et aktivt mandat
+STANCER_PUBLIC_IBAN_PAGE_FORCETooltip = Giver din kunde mulighed for at erstatte den nuværende fuldmagt ved at oprette en ny SEPA-fuldmagt
+STANCER_SEPA_CHECK_IBAN = Bekræft IBAN ved oprettelse af SEPA-mandat
+STANCER_SEPA_CHECK_IBANTooltip = Bruger Stancers SEPAMail-verifikationstjeneste til at validere, at IBAN-nummeret matcher kontohaverens. Virker kun for franske og italienske banker.
+StancerSepaCheckSuccess = IBAN-verifikation: score %s/100 (klassificering %s)
+StancerSepaCheckWarning = IBAN-verifikation: lav score %s/100 (klassificering %s) - bekræft venligst bankoplysninger
+StancerSepaCheckPending = IBAN-verifikation iværksat (id: %s), resultat afventer - mandat er oprettet, resultat vil være tilgængeligt senere
+StancerSepaCheckSkipped = IBAN-bekræftelse er ikke tilgængelig for denne tredjepart (tjenesten er begrænset til franske/ittiske banker med et juridisk identifikationsnummer)
+StancerSepaCheckError = IBAN-bekræftelsesfejl: %s
+StancerSepaCheckAccountNotReachable = IBAN-bekræftelse: Bankkontoen kan ikke oprettes eller findes ikke. Oprettelse af SEPA-mandat afvist. Bekræft venligst dine bankoplysninger.
+STANCER_MANDATE_AUTO = Generer automatisk SEPA-mandatet i PDF-format
+STANCER_MANDATE_AUTOTooltip = Ved at aktivere denne indstilling genereres SEPA-mandatet automatisk, når din kunde indtaster sit IBAN-nummer
+STANCER_MANDATE_AUTO_UPTOSIGN = Start automatisk den elektroniske underskriftsprocedure via UpToSign
+STANCER_MANDATE_AUTO_UPTOSIGNTooltip = Muligheden er kun tilgængelig, hvis du har UptoSign-modulet på din Dolibarr. I dette tilfælde startes den elektroniske signatur automatisk. Vær omhyggelig med at konfigurere den automatiske signaturplacering samt standardkontaktpersonen for underskrivere til mandater i kundefilen. For flere detaljer kan du se <a href="https://doc.cap-rel.fr/projet_stancer/saisie_du_rib_par_votre_client_pour_creer_son_mandat_de_prelevement_sepa">onlinedokumentationen</a>.
+STANCER_INSTALL_UPTOSIGN = Installer tilføjelsesmodulet <a href="https://www.dolistore.com/fr/modules/1656-uptosign---signature---lectronique-eidas.html">UptoSign ved at følge dette link </a> for at levere eIDAS-kompatibel elektronisk signaturtjeneste (underskrift af direkte debiteringsmandater, tilbud, fakturaer osv.)
+STANCER_INSTALL_UPTOSIGN_UPGRADENEEDED = Advarsel, dit uptosign-modul ser ikke ud til at være opdateret, og den automatiske kobling til den elektroniske signatur af mandatet er derfor ikke mulig! Opdater det venligst, og kontakt CAP-REL, hvis denne meddelelse fortsætter.
+StancerPublicIBANPageDisabled = Den offentlige IBAN-indtastningsside er ikke aktiveret i %smodulkonfigurationen%s
+StancerAddManualExistingMandate = Hvis du allerede har en aktiv SEPA-betalingsaftale med denne kunde, kan du tilføje den ved at klikke på knappen i slutningen af den tilsvarende kontolinje.
+StancerCompanyMailOrPhone = Det er ikke muligt at oprette din kundes Stancer-konto. Rediger venligst deres fil for at tilføje en e-mailadresse eller et telefonnummer i internationalt format.
+StancerCompanyMailOrPhoneNewPayment = Betaling via Stancer er ikke mulig. Oplys venligst din e-mailadresse eller dit telefonnummer (i internationalt format), så vi kan færdiggøre din fil, før du genoptager onlinebetalingen.
+YouCanAccelSignWithUptoSign = Bemærk, at du kan fremskynde og strømline processen ved at opsætte en eIDAS-kompatibel elektronisk signatur ved at tilføje %s UptoSign-tilføjelsesmodulet %s til din Dolibarr...
+NiceUptoSignIsEnabled = UptoSign er aktiv, så din kunde kan elektronisk underskrive din fuldmagt online!
+StancerAlreadyPaid = Ifølge Stancer er denne transaktion allerede betalt. Kontakt venligst %s for at bekræfte.
+ErrorStancerPleaseContactBy = Kontakt venligst virksomheden
+ErrorStancerPleaseContactByPhone = Via telefon, på %s
+ErrorStancerPleaseContactByMail = Via e-mail, på %s
+StancerSEPAisNotConfiguredForThatCustomer = SEPA-betalingsmetoden er ikke konfigureret for denne kunde. Klik på fanen Stancer i deres kundefil for at konfigurere SEPA-betaling.
+StancerPaymentDoneSuccessTitle = Tak!
+StancerPaymentDoneSuccessMessage = Din betaling er valideret. Du finder oplysningerne om din transaktion nedenfor:
+StancerPaymentDoneSuccessMessageFacture = Din faktura vil snart være tilgængelig i dit kundeområde og vil også blive sendt til dig via e-mail. Hvis du ikke har modtaget noget inden for 24 timer, bedes du kontakte os efter at have tjekket dine spam- og andre filtre.
+StancerPaymentDoneID = Transaktions-ID: %s
+StancerPaymentDoneStatus = Status: %s
+StancerPaymentInvoiceOrOrder = Faktura- eller ordrereference: %s
+StancerPaymentAmount = Betalingsbeløb: %s %s
+StancerPaymentDoneEndMessage = Du kan gemme denne besked for at beholde transaktionsnummeret og derefter lukke dette vindue eller gå til vores hjemmeside: %s
+StancerPaymentDoneErrorTitle = Fejl!
+StancerPaymentDoneErrorMessage = Der opstod en fejl under betalingsprocessen. Du finder yderligere oplysninger nedenfor.
+StancerPaymentDoneErrorMessageShortByStancer = Fejlmeddelelse (resumé): %s
+StancerPaymentDoneErrorEndMessage = Tag venligst et skærmbillede af denne fejl, og send det til %s sammen med din ordre- eller fakturareference.
+StancerPaymentDoneErrorSeverityStancer = Stancer-fejlens alvorlighedsgrad: %s
+StancerPaymentOrderRef = Betaling af ordre eller faktura %s
+StancerPaymentMembership = Medlemsbetaling
+StancerPaymentPropal = Betaling for tilbud %s
+StancerPaymentDonation = Donation til %s
+ErrorStancerPleaseUniqueID = Reference til at levere: %s
+NotAvailableInTestMode = Denne liste er ikke tilgængelig, når du bruger testnøgler
+StancerReloadDetected = Der er registreret en genindlæsning af siden (eller en returnering fra en delbetaling, der endnu ikke er håndteret af Dolibarr). Yderligere behandling er ikke nødvendig. Du kan lukke dette vindue eller gå til vores hjemmeside: %s.
+StancerSEPAalreadyInProgress = En SEPA-betaling er allerede i gang for denne faktura: %s se den nuværende procedure %s
+StancerAlreadyInProgress = En betalingsprocedure er allerede i gang
+StancerSEPAalreadyInProgressForceClicOnYes = Klik på knappen Ja, hvis du vil gennemtvinge en ny Betalingsservice.
+statementDescription = Beskrivelse
+PayoutID = Reference
+StancerPaid = Færdiggjort
+StancerCaptureSent = I gang
+StancerToPay = Planlagt
+STANCER_BANK = Konfiguration af bankkonti
+STANCER_ADD_FEES_ON_BANK_FOR_EACH_PAYMENT = Tilføj en debetlinje for hvert gebyr relateret til en betaling
+STANCER_ADD_FEES_ON_BANK_FOR_EACH_PAYOUT = Tilføj en debetlinje, der globaliserer gebyrer ved overførsel til hovedkontoen
+STANCER_ADD_FEES = Automatisk tilføjelse af gebyrer til bankkontoen
+STANCER_ADD_FEESTooltip = Denne mulighed giver dig mulighed for at vælge, om hver Stancer-betaling skal involvere tilføjelse af en linje til gebyrer relateret til transaktionen, eller om du foretrækker, at den skal være globaliseret ved overførsel fra konto til konto. Hvis du ikke aktiverer denne mulighed, skal du tilføje din kompensationspost manuelt. <a href="https://doc.cap-rel.fr/projet_stancer/ecritures_sur_le_compte_bancaire">Klik her for at se detaljeret dokumentation</a>
+STANCER_ADD_FEES_ON_BANK_NONE = Ingen, bliv i manuel tilstand
+StancerFees = Stancer-gebyrer
+StancerCheckPay = Daglig Stancer (bank)
+StancerCheckPaymentAndPayout = Verifikation af Stancer-betalinger og udbetalinger
+StancerTransferFromToDone = Overførsel fra %s til %s (beløb %s %s) er gennemført.
+StancerCheckTakePayments = Stancer automatiske betalinger
+StancerCheckTakePaymentsDetails = Automatisk lancering af CB-betalinger og SEPA-betalinger: Lancering af automatisk betaling for enhver ubetalt faktura, hvis betalingsmetode er (CB eller betaling via direkte debitering) + Stancer bankkonto. Flere detaljer: <a href="https://doc.cap-rel.fr/projet_stancer/paiement_automatique_des_factures">https://doc.cap-rel.fr/projet_stancer/paiement_automatique_des_factures</a>
+STANCER_NUMBER_OF_ITEMS_TO_SYNC = Antal transaktioner, der skal downloades under opdatering
+STANCER_NUMBER_OF_ITEMS_TO_SYNCTooltip = Grænse for det maksimale antal transaktioner, der skal synkroniseres med Stancer hver nat, baseret på den planlagte opgave og i lister. Undtagelsesvis kan du vælge 200 eller 1000, men behold aldrig denne værdi til mere end én synkronisering, da dette kan forårsage netværksoverbelastning med Stancer og deaktivering af din konto.
+STANCER_NB_DAYS_TO_SYNC = Antal dage til download ved opdatering af historikken
+STANCER_NB_DAYS_TO_SYNCTooltip = Når du genstarter historiksynkroniseringen, kan du vælge, hvor langt tilbage i tiden du vil gå. Undtagelsesvis kan du vælge 1 år eller 2, men behold aldrig denne værdi i mere end én synkronisering, da dette kan forårsage netværksoverbelastning med Stancer og deaktivering af din konto.
+STANCER_AUDIT_CAPTURED_WINDOW_DAYS = Genrevisionsvindue for hævede betalinger (dage)
+STANCER_AUDIT_CAPTURED_WINDOW_DAYSTooltip = Stancer sender ingen notifikation (webhook): En betaling markeret som registreret lokalt kan senere blive afvist, bestridt eller refunderet af banken. Ved hver planlagt jobkørsel forespørger modulet API'en igen for registrerede betalinger, hvis oprettelsesdato falder inden for dette vindue, for at rette deres lokale status (for eksempel registreret -> afvist). Et bredere vindue øger antallet af API-kald. Indstil til 0 for at deaktivere denne kontrol.
+PRELEVEMENT_ICS = Dit ICS-nummer (SEPA-kreditoridentifikator)
+PRELEVEMENT_ICSTooltip = Dette nummer får du fra din bankudbyder (bank eller Stancer). Det er unikt for hver virksomhed og skal leveres af den franske bank. Det er den kode, der identificerer din virksomhed med SEPA-systemet.
+ModeRECUR = Tilbagevendende betalinger
+StancerSignature = Elektronisk signatur
+StancerMailSubjectIBANandMandateReady = IBAN tilføjet og fuldmagt klar
+StancerMailIBANandMandateReady = Din kunde har tilføjet et IBAN-nummer %s, mandatet er genereret som konfigureret i modulindstillingerne, og den elektroniske signaturproces er startet.
+StancerMailSubjectIBANandMandateReadyToSign = IBAN tilføjet, og fuldmagt klar til underskrift
+StancerMailIBANandMandateReadyToSignErr = Din kunde har tilføjet et IBAN-nummer %s. Mandatet er genereret som konfigureret i modulindstillingerne, men den elektroniske signaturproces kunne ikke startes (uptosign-modulet er inkompatibelt eller mangler). Du skal overtage og fuldføre proceduren manuelt.
+StancerMailIBANandMandateReadyToSign = Din kunde har tilføjet et IBAN-nummer %s. Mandatet er genereret som konfigureret i modulindstillingerne, men er ikke underskrevet. Du skal nu tage de nødvendige skridt.
+StancerMailSubjectIBANandMandateErr = IBAN tilføjet, men fejl ved oprettelse af fuldmagt
+StancerMailIBANandMandateErr = Din kunde har tilføjet et IBAN-nummer %s, men fuldmagten er ikke blevet genereret. Fortsæt venligst med at oprette en manuel fuldmagt og sørg derefter for at få den underskrevet af din kunde.
+StancerMailSubjectIBANsimple = IBAN tilføjet
+StancerMailIBANsimple = Din kunde har tilføjet et IBAN-nummer %s. Mandatet er ikke genereret i henhold til modulindstillingerne. Du skal nu manuelt oprette mandatet og få det underskrevet af din kunde.
+StancerMailHello = Hej,
+StancerMailGoodBye = For yderligere oplysninger kan du se <a href="https://doc.cap-rel.fr/projet_stancer/accueil">onlinedokumentationen</a>
+StancerMailSignature = Sendt af Stancer-modulet til Dolibarr fra %s
+STANCER_EMAIL_INFO_SEPA = Hvilken e-mailadresse ønsker du at modtage beskeder om IBAN-posteringer?
+STANCER_EMAIL_INFO_SEPATooltip = Når en kunde indtaster sit IBAN-nummer på din offentlige side, sendes der en e-mail til denne adresse for at invitere dig til at følge proceduren...
+StancerDocTitleForUptoSign = SEPA-mandat %s - %s
+StancerYourMandateRefIs = Din mandatreference (RUM) er: <b> %s </b>. Vi opfordrer dig til at notere den og gemme den indtil den endelige underskrift af mandatet. Den kan være nyttig i tilfælde af problemer i den nuværende procedure.
+StancerPublicIBANCBPageReload = Genindlæsning af siden registreret. Yderligere behandling er ikke nødvendig. Du kan lukke dette vindue eller gå til vores hjemmeside: %s.
+StancerMailIBANandMandateReadyButMissingSignPeople = Din kunde har tilføjet et IBAN-nummer %s. Mandatet er genereret, men den elektroniske signatur kunne ikke startes, fordi der ikke er angivet nogen kontaktperson som "Kontraktunderskriver (elektronisk signatur)" for denne tredjepart. Du skal manuelt starte den elektroniske signaturproces, når du har angivet den underskrivende kontaktperson.
+SepaMandateFileName = SEPA-mandat
+StancerUptoSignNotOnlyOneSigner = Advarsel, mere end én kontaktperson, der er knyttet til denne tredjepart, har rollen "Elektronisk signatur (kontrakt)". Derfor vil SEPA-mandatet ikke automatisk blive sendt til elektronisk signatur (indtil videre bør kun én kontaktperson pr. tredjepart have denne rolle).
+StancerUptoSignNoSigner = Advarsel, ingen kontaktpersoner tilknyttet denne tredjepart har rollen "Elektronisk signatur (kontrakt)" (eller hvis det er tilfældet, har de ikke et mobiltelefonnummer), derfor vil SEPA-mandatet ikke automatisk blive sendt til elektronisk signatur. Denne kontaktperson skal have en gyldig e-mailadresse og et mobilnummer i internationalt format, der kan modtage SMS'er.
+StancerYourBIC = BIC/SWIFT-kode
+StancerReturnsJsonNull = Den JSON, der returneres af Stancer, er tom (null)
+STANCER_DEFAULT_CUSTOMER_IF_NULL = Standardkunde, der skal tilknyttes betalinger, når der ikke er tilknyttet en kundekonto (f.eks. direkte POS-betaling)
+STANCER_DEFAULT_CUSTOMER_IF_NULLTooltip = Hvis du bruger Stancer POS direkte uden at gå gennem Dolibarr, er betalinger ikke knyttet til nogen Dolibarr-kundekonto. Denne mulighed giver dig mulighed for at oprette en standardtilknytning og undgå en "blank side"-fejl.
+STANCER_DELAY_SEPA = Forsinkelse (i dage) for SEPA-betaling
+STANCER_DELAY_SEPATooltip = Indtast her det antal dage, du ønsker mellem fakturadatoen og betalingsdatoen for at overholde reglerne (i Frankrig 14 dage) - <a href="https://particuliers.banque-france.fr/moyens-de-paiement/prelevement-sepa">https://particuliers.banque-france.fr/moyens-de-paiement/prelevement-sepa</a>
+STANCER_DELAY_SEPA_UPDATE_INVOICES = Opdater fakturaens forfaldsdato?
+STANCER_DELAY_SEPA_UPDATE_INVOICESTooltip = Markér denne boks, hvis du ønsker, at Stancer-modulet skal opdatere forfaldsdatoen for fakturaer, hvis betalingsmetode er SEPA-betaling, til den ovenfor konfigurerede faktureringsdato + forsinkelse.
+StancerCBisNotConfiguredForThatCustomer = Denne kunde (%s) har ikke en centralbank registreret på sin Stancer-konto.
+StancerdoTakePaymentStancerResultMessageA = Én faktura er blevet betalt ud af i alt %s kvalificerede faktura(er) (Stancer betalingsmetode) %s.
+StancerdoTakePaymentStancerResultMessageAP = %s fakturaer er blevet betalt ud af i alt %s kvalificerede fakturaer (Stancer betalingsmetode) %s.
+StancerdoTakePaymentStancerResultMessageB = Én faktura blev ikke behandlet (dato endnu ikke nået, manglende betalingsoplysninger, kortnummer eller betalingsfejl) %s.
+StancerdoTakePaymentStancerResultMessageBP = %s fakturaer blev ikke behandlet (dato endnu ikke nået, manglende betalingsoplysninger, kortnummer eller betalingsfejl) %s.
+StancerdoTakePaymentStancerResultMessageC = Én ny faktura (SEPA-betaling) er blevet behandlet (informationsmail sendt): %s.
+StancerdoTakePaymentStancerResultMessageCP = %s nye fakturaer (SEPA direkte debitering) er blevet behandlet (informationsmail sendt): %s.
+StancerdoTakePaymentStancerResultMessageD = Én faktura (SEPA-betaling via direkte debitering) har endnu ikke nået sin betalingsdato: %s.
+StancerdoTakePaymentStancerResultMessageDP = %s fakturaer (SEPA direkte debitering) har endnu ikke nået deres betalingsdato: %s.
+STANCER_AUTO_MAIL_INVOICES_CB = Automatiser afsendelse af fakturaer betalt af CB via e-mail
+STANCER_AUTO_MAIL_INVOICES_CBTooltip = Denne mulighed giver dig mulighed for automatisk at sende fakturaen, når CB-betalingen iværksættes af Stancers planlagte opgave, eller når din kunde betaler en faktura direkte online.
+STANCER_AUTO_MAIL_INVOICES_CB_MAILTYPE = Vælg den skabelon, du vil bruge til CB-betalingsnotifikations-e-mailen
+STANCER_AUTO_MAIL_INVOICES_CB_MAILTYPETooltip = For at oprette en e-mailskabelon, gå til Hjem > Konfiguration > E-mails
+STANCER_AUTO_MAIL_INVOICES_SEPA_INFORMATION = Automatiser afsendelse af forudgående SEPA-e-mail med direkte debiteringsoplysninger
+STANCER_AUTO_MAIL_INVOICES_SEPA_INFORMATIONTooltip = Med denne mulighed sendes der en e-mail på den dag, fakturaen udstedes, for at informere din kunde om, at direkte debitering vil blive foretaget inden for den forsinkelse, der er konfigureret i SEPA-fanen.
+STANCER_AUTO_MAIL_INVOICES_SEPA = Automatiser afsendelse af fakturaer betalt via SEPA-betaling via e-mail
+STANCER_AUTO_MAIL_INVOICES_SEPATooltip = Med denne mulighed sendes der en e-mail den dag, SEPA-betalingen iværksættes.
+StancerMailMenu = Post
+STANCER_AUTO_MAIL_INVOICES_SEPA_INFORMATION_MAILTYPE = Vælg den skabelon, du vil bruge til den indledende informationsmail (SEPA)
+STANCER_AUTO_MAIL_INVOICES_SEPA_MAILTYPE = Vælg den skabelon, du vil bruge til betalings-e-mailen (SEPA)
+STANCER_AUTO_MAIL_INVOICES_SEPA_PAID = Send faktura til kunden, når SEPA-betalingen er gennemført
+STANCER_AUTO_MAIL_INVOICES_SEPA_PAID_MAILTYPE = Vælg den skabelon, du vil bruge til den udfyldte betalingsmail (SEPA)
+StancerMailConfig = E-mail
+StancerMailPresentation = Dette modul giver dig mulighed for at automatisere afsendelse af e-mails til dine kunder, der betaler via Stancer. For yderligere oplysninger kan du se <a href="https://doc.cap-rel.fr/projet_stancer/envoyez_automatiquement_les_mails">onlinedokumentationen </a>.
+STANCER_AUTO_MAIL_INVOICES_ERROR = Vælg den e-mailskabelon, du vil bruge i tilfælde af en betalingsfejl
+STANCER_AUTO_MAIL_INVOICES_ERRORTooltip = Denne e-mailskabelon vil blive brugt i tilfælde af betalingsfejl, uanset om det er via CB eller SEPA direkte debitering.
+STANCER_AUTO_MAIL_ALL_INVOICES_TITLE = Automatisk afsendelse af alle fakturaer (enhver betalingsmetode)
+STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE = Send faktura via e-mail ved validering (alle fakturaer, enhver betalingsmetode)
+STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATETooltip = Med denne mulighed sender modulet fakturaen til kunden ved hver validering, uanset betalingsmetode (check, overførsel, kontant, centralbank, SEPA...). Det er nyttigt at delegere afsendelsen af alle kundefakturaer til Stancer. ActionComm-baseret deduplikering forhindrer dobbeltafsendelse, hvis e-mailen allerede er sendt.
+STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_MAILTYPE = Vælg den e-mailskabelon, der skal bruges ved fakturavalidering
+STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_MAILTYPETooltip = For at oprette en e-mailskabelon skal du gå til Hjem > Konfiguration > E-mails (skriv "Send fakturaer til kunder")
+STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_DELAY = Forsinkelse før automatisk afsendelse (i timer)
+STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_DELAYTooltip = Antal timer, der skal ventes efter fakturavalidering, før den automatisk sendes via e-mail. Under denne forsinkelse kan et menneske stadig sende fakturaen manuelt (den automatiske afsendelse annulleres derefter). 0 = øjeblikkelig afsendelse ved validering. Typisk værdi: 24 (sendes den næste dag, hvis ingen har handlet).
+StancerBillValidatePendingTitle = Automatisk afsendelse af faktura %s planlagt om %s timer
+StancerBillValidatePendingNote = Valideringsmail planlagt om %s timer ved hjælp af skabelonen %s. Hvis fakturaen sendes manuelt inden da, annulleres den automatiske afsendelse.
+StancerBillValidatePendingCancelled = Automatisk afsendelse annulleret på grund af %s
+StancerBillValidateManuallySent = Automatisk afsendelse annulleret: faktura blev sendt manuelt i mellemtiden
+StancerSendPendingValidationMails = Automatisk afsendelse af validerede fakturaer
+StancerSendPendingValidationMailsDetails = Sender automatisk validerede fakturaer, hvis henstand er udløbet, via e-mail, medmindre de allerede er sendt manuelt
+StancerDashboardPendingValidationMails = Planlagte fakturamails
+StancerDashboardPendingValidationMailsDue = Frist %s
+STANCER_AUTO_MAIL_ALL_INVOICES_PAYED = Send faktura via e-mail ved betaling (alle fakturaer, enhver betalingsmetode)
+STANCER_AUTO_MAIL_ALL_INVOICES_PAYEDTooltip = Med denne mulighed sender modulet fakturaen (eller en betalingskvittering) til kunden, når fakturaen ændrer status til "betalt", uanset betalingsmetode. ActionComm-baseret deduplikering forhindrer dobbeltforsendelse, hvis en Stancer-e-mail (CB/SEPA) allerede er sendt for denne betaling.
+STANCER_AUTO_MAIL_ALL_INVOICES_PAYED_MAILTYPE = Vælg den e-mailskabelon, der skal bruges ved fakturabetaling
+STANCER_AUTO_MAIL_ALL_INVOICES_PAYED_MAILTYPETooltip = For at oprette en e-mailskabelon skal du gå til Hjem > Konfiguration > E-mails (skriv "Send fakturaer til kunder")
+ErrorStancerSEPAdelay = Notifikationsforsinkelsen (%s dage) er endnu ikke nået
+ErrorStancerSEPAdelayTitle = SEPA-forsinkelse
+ErrorStancerInvoiceDateDue = Fakturaens betalingsdato er endnu ikke nået
+ErrorStancerCBdueTitle = Betalingsdato
+StancerThereIsNoSocID = Der er opstået en fejl. Din kundefil kan ikke findes. Kontakt os venligst.
+STANCER_PUBLIC_CB_PAGE = Aktivér den offentlige side, der giver en kunde mulighed for at indtaste sine kreditkortoplysninger
+STANCER_PUBLIC_CB_PAGETooltip = Hvis du aktiverer denne mulighed, vil en offentlig side være tilgængelig, hvor dine kunder kan indtaste deres CB-betalingsoplysninger (f.eks. nyttigt til et abonnement med automatisk CB-betaling)
+StancerPageTitleForCB = Tilføjelse af dit kreditkort som betalingsmetode
+StancerCBAccount = Kreditkortområde
+CBLegalTextStancer2 = Ved at udfylde denne formular giver du %s tilladelse til at bruge disse oplysninger til at behandle betalinger for ventende og fremtidige fakturaer. Dit kreditkortnummer gemmes ikke i vores system, det overføres direkte til vores sikre betalingsudbyder Stancer, som returnerer et fingeraftryk, der vil blive brugt til fremtidige betalinger.
+StancerPleaseEnterYourCBTitle = CB-betalingsoplysninger
+StancerPleaseEnterYourCB = Udfyld venligst nedenstående formular for kreditkortbetaling af dit abonnement
+StancerHolderName = Kreditkortindehaverens navn
+StancerCBNumber = Kreditkortnummer
+StancerCBExpiry = Udløbsdato
+StancerCBCCV = CCV-kode (bagside)
+StancerNoCBRecord = Der er endnu ikke registreret noget kreditkort
+StancerLinkFoCustomerCB = Du kan tilbyde din kunde at udfylde følgende formular selv for at administrere automatiske kreditkortbetalinger.
+CardNumber = Antal
+CardExpiry = Udløbsdato
+CardType = Netværk
+StancerPublicCBpageDisabled = Den offentlige kreditkortregistreringsside er ikke aktiveret! Aktiver venligst denne mulighed i %smodulkonfigurationen%s.
+StancerPayBalanceCB = Betal saldo via centralbank
+StancerPayBalanceAmountCB = Lønsaldo (%s) af CB (eksperimentel)
+StancerPopupCBexists = Der er registreret et centralbankkort for denne kunde. Vil du bruge det til at fortsætte med direkte betaling? Hvis ja, skal du klikke på knappen "ja". For at annullere, skal du klikke på "nej".
+StancerPaymentDoneOn = Betaling igangsat for fakturaer %s
+StancerPaymentNoInvoice = Ingen fakturaer venter på betaling
+StancerPaymentErrorOn = Betalingsfejl for fakturaer %s
+StancerPaymentInProgress = En betaling via Stancer er i gang på denne faktura, og vil være synlig her, så snart den er endeligt valideret af udbyderen (24 timer for kreditkort, et par dage for SEPA-betaling). %s[dokumentation]%s (Status: %s)
+StancerAssoMenu = Foreninger
+StancerAssoConfig = Konfiguration for foreninger
+StancerAssoPresentation = Foreningens ledelse (medlemmer, kontingent, donationer...)
+STANCER_ASSO_ACTIVE = Aktivér understøttelse af foreningsspecifikke funktioner
+STANCER_AUTO_MAIL_NOTIFICATIONS = Aktivér automatiske e-mail-notifikationer
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT = E-mailadresse til at give besked, når betalinger er bekræftet
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT_DETAILS = Modtag en detaljeret e-mail for hver betalingsfejl (kan være kilden til mange e-mails)
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT_DETAILSTooltip = Hvis du ikke markerer dette felt, modtager du en e-mail med en samlet opsummering (syntese) af fejl.
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENTTooltip = Lad dette felt stå tomt, hvis du ikke ønsker at modtage notifikationer. For yderligere oplysninger kan du se <a href="https://doc.cap-rel.fr/projet_stancer/notifications_par_mail">onlinedokumentationen</a>.
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT = E-mailadresse til at give besked, når en overførsel (udbetaling) foretages
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUTTooltip = Lad dette felt stå tomt, hvis du ikke ønsker at modtage notifikationer. For yderligere oplysninger kan du se <a href="https://doc.cap-rel.fr/projet_stancer/notifications_par_mail">onlinedokumentationen</a>.
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT_DETAILS = Modtag en detaljeret e-mail for hver bankoverførselsfejl fra Stancer-kontoen til din hovedkonto (kan være kilden til mange e-mails)
+STANCER_AUTO_MAIL_NOTIFICATIONS_PAYOUT_DETAILSTooltip = Hvis du ikke markerer dette felt, modtager du en e-mail med en samlet opsummering (syntese) af fejl.
+StancerMailSubjectPaymentConfirm = Betalingsbekræftelse - %s : %s €
+StancerMailPaymentConfirm = Betaling af %s € for faktura %s (kunde: %s) er bekræftet af Stancer.
+StancerMailSubjectPaymentConfirmButError = Betalingsbekræftelse (administrationsfejl) - %s : %s €
+StancerMailPaymentConfirmButError = Betaling af %s € for faktura %s (kunde: %s) er bekræftet af Stancer, men registreringen på Dolibarr er fejlagtig. Kontroller og håndter venligst situationen manuelt.
+StancerMailSubjectPaymentError = Betalingsfejl - %s : %s €
+StancerMailPaymentError = Betaling af %s € for faktura %s (kunde: %s) er fejlagtig. Du finder fejlmeddelelsen nedenfor: %s
+StancerMailSubjectPaymentExeption = Fejl i planlagt opgave (betalinger)
+StancerMailPaymentExeption = Der er opstået en alvorlig fejl. Du finder meddelelsen nedenfor. Tøv ikke med at kontakte CAP-REL for at finde en løsning, hvis det er nødvendigt: %s
+StancerMailPayment = Nedenfor finder du en liste over fejl eller særlige behandlingstilfælde for betalinger: <br />%s
+StancerMailSubjectPayoutExeption = Fejl i planlagt opgave (udbetalinger)
+StancerMailPayoutExeption = Der er opstået en alvorlig fejl. Du finder meddelelsen nedenfor. Tøv ikke med at kontakte CAP-REL for at finde en løsning, hvis det er nødvendigt: %s
+StancerApiAuthError = Stancer API-godkendelsesfejl (401), tjek venligst dine API-nøgler. Detaljer: %s
+StancerMailSubjectPayoutDone = Bankoverførsel gennemført: %s €
+StancerMailPayoutDone = Overførsel af %s € fra Stancer til din hovedkonto er fuldført. Detaljeret besked: %s
+StancerMailSendBy = Sendt af <a href="https://www.dolistore.com/fr/modules/1857-Stancer-paiement---lectronique-CB-SEPA.html">Stancer-modulet til Dolibarr</a>
+StancerMailPayoutError = Fejl ved bankoverførsel
+StancerMailPayout = Nedenfor finder du en liste over fejl eller særlige behandlingstilfælde for overførsler fra Stancer til din hovedkonto: <br />%s
+StancerMailSubjectPayoutError = Der er opstået en fejl. Du finder fejlmeddelelsen nedenfor: %s
+StancerMailSubjectPayment = Betalinger planlagt opgave
+StancerMailSubjectPayout = Udbetalinger planlagt opgave
+StancerMailTableHeaderStancer = Stancer
+StancerMailTableHeaderDolibarr = Dolibarr
+StancerMailTableHeaderAmount = Beløb
+StancerMailTableHeaderMessage = Besked
+StancerMailTableHeaderDate = Dato
+StancerMailSubjectCB = Ny betalingsmetode tilføjet (CB)
+StancerMailCB = En ny central styringsenhed er blevet tilføjet til %s
+STANCER_AUTO_MAIL_NOTIFICATIONS_ON_NEW_CB_AND_SEPA = E-mail-besked, når en kunde registrerer sit kreditkortfingeraftryk
+ErrorStancerModuleVersionDatabase = Stancer-modul: Advarsel, din modulversion er ikke i overensstemmelse med databaseversionen. Deaktiver og genaktiver venligst modulet...
+ErrorStancerDPOmissing = Advarsel, din DPO-e-mailadresse er endnu ikke udfyldt. Disse oplysninger er nødvendige for Betalingsservice-aftalen.
+ErrorStancerCustomerNotFound = Kunden kunne ikke identificeres på Stancer. Tjek venligst kundens e-mail og kontaktoplysninger, eller prøv en anden betalingsmetode.
+draft = Udkast
+authorized = Autoriseret
+StancerAuthorized = Autoriseret
+captured = Fanget
+capture_sent = I gang
+disputed = Bestride
+expired = Udløbet
+StancerExpired = Udløbet
+failed = Fejl
+StancerFailed = Fejl
+refused = Afvist
+to_capture = Venter på banken
+STANCER_EMAIL_DPO = Din databeskyttelsesrådgivers e-mailadresse
+STANCER_EMAIL_DPOTooltip = Påkrævet for oplysningerne på SEPA-mandatformularen
+STANCER_ENABLE_CB = Aktivér kreditkortadministration
+STANCER_ENABLE_CBTooltip = Du kan deaktivere denne indstilling for kun at bruge SEPA-betalinger, f.eks.
+StancerCBPresentation = Stancer-modulet tillader modtagelse af kreditkortbetalinger. Hvis du vil aktivere denne funktion, skal du markere feltet.
+STANCER_ENABLE_SEPA = Aktivér SEPA-betalingsstyring
+STANCER_NO_CODE_CB = Der er ingen 'CB'-kode i de aktive betalingsmetoder på din Dolibarr. Du kan finde flere oplysninger i <a href="https://doc.cap-rel.fr/projet_stancer/cb_et_pre_dans_le_dictionnaire_des_moyens_de_paiements">den følgende onlinedokumentation</a>.
+STANCER_NO_CODE_PRE = Der er ingen 'PRE'-kode i de aktive betalingsmetoder på din Dolibarr. Du kan finde flere oplysninger i <a href="https://doc.cap-rel.fr/projet_stancer/cb_et_pre_dans_le_dictionnaire_des_moyens_de_paiements">den følgende onlinedokumentation</a>.
+STANCER_MANDATE_AUTO_UPTOSIGN_NOCLICK = Automatisk omdirigering til uptosign elektronisk signatur
+STANCER_MANDATE_AUTO_UPTOSIGN_NOCLICKTooltip = Hvis du ikke aktiverer denne mulighed, skal din kunde klikke på linket "gå til online elektronisk signatur" i fuldmagten, når den er udfyldt.
+StancerInCaseOfTroubleYourLinkTopay = Hvis din webbrowser ikke tillod dig at betale direkte, kan du prøve igen <a href="%s">ved at følge dette link </a>.
+StancerMailSubjectConfirmLinkToPay = Betalingslink til din ordre
+StancerMailPayoutConfirmMail = Tak for din ordre.
+
+STANCER_AUTO_MAIL_ORDER_CB = Send en ordrepåmindelse med betalingslinket, før du omdirigerer til Stancer-webstedet
+STANCER_AUTO_MAIL_ORDER_CBTooltip = Denne mulighed sender en påmindelsesmail om ordren til din kunde med betalingslinket, der skal bruges, hvis omdirigeringen ikke virker, eller betalingsprocessen mislykkes.
+STANCER_AUTO_MAIL_ORDER_CB_MAILTYPE = Vælg den e-mailskabelon, der skal sendes, når ordren automatisk sendes via e-mail
+StancerCheckInvoicesPaid = Markér fakturaer som betalte
+StancerCheckInvoicesPaidDetails = Søg i alle fakturaer med et resterende beløb lig med nul og betalingsstatus "Betaling startet" for at tvinge dem til status "Betalt" (oprydning)
+StancerSendPaymentReminders = Betalingspåmindelser
+StancerSendPaymentRemindersDetails = Automatisk afsendelse af e-mailpåmindelser til kunder, hvis betaling er mislykkedes i henhold til den konfigurerede tidsplan
+STANCER_PAYMENT_REMINDER_TITLE = Betalingspåmindelser
+STANCER_PAYMENT_REMINDER_ENABLED = Aktivér automatiske påmindelser om betalingsfejl
+STANCER_PAYMENT_REMINDER_ENABLEDTooltip = Når en betaling mislykkes (afvist, udløbet, bestridt), sender modulet automatisk e-mail-påmindelser til kunden i henhold til den nedenfor konfigurerede tidsplan.
+STANCER_PAYMENT_REMINDER_MAILTYPE = Standard e-mailskabelon til betalingspåmindelser
+STANCER_PAYMENT_REMINDER_MAILTYPETooltip = Reserveskabelon, hvis der ikke er konfigureret en specifik skabelon (soft, hard, månedlig) nedenfor. Vælg en skabelon af typen "Fakturaafsendelse". Du kan bruge variablen __ONLINE_PAYMENT_URL__ eller __STANCER_PAYMENT_URL__ til at inkludere linket til online betaling.
+STANCER_PAYMENT_REMINDER_MAILTYPE_SOFT = E-mailskabelon til den 1st påmindelse (soft)
+STANCER_PAYMENT_REMINDER_MAILTYPE_SOFTTooltip = Skabelon brugt til den første påmindelse (standard D+7). Hvis tom, bruges standardskabelonen ovenfor
+STANCER_PAYMENT_REMINDER_MAILTYPE_HARD = E-mailskabelon til den 2. påmindelse (hård)
+STANCER_PAYMENT_REMINDER_MAILTYPE_HARDTooltip = Skabelon brugt til anden påmindelse (standard D+14). Hvis tom, bruges standardskabelonen ovenfor
+STANCER_PAYMENT_REMINDER_MAILTYPE_MONTHLY = E-mailskabelon til månedlige påmindelser
+STANCER_PAYMENT_REMINDER_MAILTYPE_MONTHLYTooltip = Skabelon brugt til efterfølgende månedlige påmindelser (op til ca. 6 måneder efter fejl). Hvis tom, bruges standardskabelonen ovenfor.
+STANCER_PAYMENT_REMINDER_SCHEDULE = Påmindelsesplan (dage efter fejl)
+STANCER_PAYMENT_REMINDER_SCHEDULETooltip = Kommasepareret liste over dage efter betaling, der ikke sendes til hver påmindelse. Standard: 7, 14, 44, 74, 104, 134, 164 (D+7 blød, D+14 hård, derefter månedlig op til ca. 6 måneder)
+StancerPaymentFailedReopenTitle = Faktura %s genåbnet efter en betalingsfejl i Stancer
+StancerPaymentFailedReopenReason = Betaling mislykkedes (status=%s, id=%s) -- faktura genåbnet automatisk
+STANCER_PAYMENT_REMINDER_ADMIN_SUMMARY = Send en påmindelsesoversigt til administratoren
+STANCER_PAYMENT_REMINDER_ADMIN_SUMMARYTooltip = Administratoren modtager en e-mail med en oversigt over påmindelser, der sendes under hver planlagt opgaveudførelse.
+StancerMailSubjectPaymentFailure = Betalingsfejl
+StancerMailPaymentFailure = Betaling af %s for fakturareference %s mislykkedes (status: %s). Tjek venligst situationen.
+StancerMailSubjectReminders = Oversigt over betalingspåmindelser
+StancerRemindersSentList = Påmindelser sendt
+StancerRemindersErrorList = Fejl under afsendelse af påmindelser
+StancerdoCheckInvoicesPaidResultMessageA = Én faktura er blevet markeret som betalt ud af i alt %s kvalificerede faktura(er) %s.
+StancerdoCheckInvoicesPaidResultMessageAP = %s fakturaer er blevet markeret som betalt ud af i alt %s kvalificerede fakturaer %s.
+STANCER_CB_AS_PAID = Marker fakturaen som betalt med det samme ved positiv Stancer-returnering uden at vente på endelig bekræftelse.
+STANCER_CB_AS_PAIDTooltip = Hvis du aktiverer denne mulighed, vil din kundes faktura blive markeret som betalt ved den første forhåndsgodkendelsesreturnering fra Stancer. Advarsel: Disse oplysninger kan blive modsagt et par dage senere, hvis betalingen afvises af din kundes bank. Se <a href="https://doc.cap-rel.fr/projet_stancer/des_le_retour_de_pre-acceptation_du_paiement_cb">dokumentationen for at få flere oplysninger </a>
+STANCER_CB_ALLOW_RETRY = Tillad et nyt CB-betalingsforsøg via Stancer efter en fejl
+STANCER_CB_ALLOW_RETRYTooltip = Som standard vises knappen Stancer-betaling ikke længere på den offentlige side, hvis en Stancer-betaling allerede er blevet forsøgt (selvom den mislykkedes). Hvis du aktiverer denne mulighed, vises knappen igen, så længe der ikke er blevet registreret nogen betaling.
+STANCER_SWITCH_SEPA_AMOUNT = Aktivér automatisk udbyderskift, når beløbet til debitering overstiger en grænse?
+STANCER_SWITCH_SEPA_AMOUNTTooltip = Hvis du aktiverer denne indstilling, skal følgende to felter udfyldes
+STANCER_SWITCH_SEPA_AMOUNT_MAX = Maksimalt beløb for SEPA-betalinger, der kan foretages af Stancer
+STANCER_SWITCH_SEPA_AMOUNT_MAXTooltip = På grund af den variable procentdel på SEPA-betalinger er det ofte billigere at bruge en anden betalingsformidler end Stancer til SEPA-betalinger over 60, men du kan her angive det beløb, over hvilket du ikke længere ønsker, at Stancer bruges til at foretage betalingen.
+STANCER_SWITCH_SEPA_TO_OTHER_BANK = Valg af bank, der skal bruges, når debetbeløbet overstiger den ovenfor definerede grænse
+STANCER_SWITCH_SEPA_TO_OTHER_BANKTooltip = Angiv for eksempel din Stripe-konto eller andet for at forhindre Stancer-modulet i at starte direkte debiteringer for fakturaer, der er berørt af denne grænseoverskridelse.
+StancerPayCB = Stancer CB-betaling
+StancerPaySEPA = Stancer SEPA-betaling
+StancerPayAmountStarted = Betaling af %s er igangsat
+StancerPayWithRedirectStarted = Betaling af %s initieret via webbetalingssiden
+
+cbType = Korttype
+cbNumber = Antal
+cbEOL = Udløbsdato
+
+StancerNewPaymentMode = Betalingskilde tilføjet
+StancerNewPaymentModeAdded = En ny betalingsmetode er blevet tilføjet: %s
+StancerUpdatePaymentMode = Opdatering
+StancerUpdatePaymentModeDone = Betalingsmetoden %s er blevet opdateret
+StancerForceRefreshAccount = Opdater data fra Stancer
+DeleteSEPAOnStancer = Slet
+StancerEventAdded = Begivenhed tilføjet til historikken
+CleanStancerTestsDataHelp = Klik på denne knap, hvis du brugte Stancer Test-tilstand til at rense din database (unikt kunde-id hos Stancer)
+CleanStancerTestsData = Rengør testdata
+CleanStancerTestsDataDone = Stancer-testdata er blevet slettet
+CleanStancerTestsDataKeptMandates = %s test SEPA-mandat(er) blev bevaret: de har et ægte IBAN og RUM underskrevet af dine kunder, og sletning af dem ville fjerne bankkontoen fra tredjeparten (ingen direkte debitering mulig længere). Gennemgå dem en efter en fra kundens faneblad Betalingsmetode.
+CleanStancerTestsDataError = Rensning af testdata mislykkedes, se hændelsesloggen
+
+
+# Refund
+StancerRefundStart = Refusion via Stancer
+StancerRefundTitle = Stancer-refusion
+StancerRefundConfirmMessage = Du er ved at refundere %s %s via Stancer. Bekræfter du denne handling?
+StancerRefundOriginalInvoice = Original faktura: %s
+StancerRefundSuccess = Refusion gennemført (ID: %s)
+StancerRefundError = Refusionsfejl: %s
+StancerRefundNoPaymentFound = Ingen Stancer-betaling fundet for denne faktura
+StancerRefundNoLinkedPayment = Ingen Stancer-betaling knyttet til den oprindelige faktura
+StancerRefundAlreadyDone = En refusion er allerede blevet behandlet for dette beløb
+
+# Propal (quote) payment
+STANCER_PROPAL_TITLE = Betalinger med tilbud
+STANCER_AUTO_INVOICE_ON_PROPAL_PAID = Opret automatisk en faktura, når et tilbud er betalt
+STANCER_AUTO_INVOICE_ON_PROPAL_PAIDTooltip = Hvis denne indstilling er aktiveret, oprettes og valideres der automatisk en faktura, når en kunde betaler et tilbud via Stancer.
+StancerPropalPaymentLink = Stancer betalingslink
+StancerPropalPaymentLinkNeedEmail = Tredjepartsfilen indeholder ikke en e-mailadresse. Den er nødvendig for at iværksætte en betaling via Stancer!
+
+# Supplier invoice payment matching
+StancerBankAccountNotConfigured = Stancer bankkonto er ikke konfigureret
+StancerPaymentLinksCreated = %s betalingslink(er) oprettet for i alt %s EUR
+StancerNoMatchingPayments = Ingen matchende betalinger fundet for faktureringsperioden
+StancerErrorCreatingPaymentLink = Fejl ved oprettelse af leverandørbetalingslink
+StancerInvoiceAlreadyPaid = Fakturaen er allerede fuldt betalt eller overbetalt (resterende: %s EUR)
+STANCER_MONTHLY_SUBSCRIPTION_FEE = Stancer POS månedligt abonnementsgebyr (i EUR)
+STANCER_MONTHLY_SUBSCRIPTION_FEETooltip = Fast månedligt beløb opkrævet af Stancer for serviceabonnementet (f.eks. 18 EUR/måned for POS)
+
+# Accounting
+StancerComptaMenu = Regnskab
+StancerComptaSetup = Stancer-opsætning: Regnskab
+StancerComptaSetupDesc = Konfiguration til automatisk regulering af regnskabsmæssige huller på Stancer-leverandørfakturaer.
+StancerComptaJournalOD = Journal for OD-poster
+StancerComptaAccountEcart = Regnskabsmæssig redegørelse for huller
+StancerComptaAccountEcartTooltip = Normalt bruges konto 658 (Diverse administrationsudgifter) til at registrere små afrundingsforskelle.
+StancerComptaSeuilEcart = Maksimal tærskel for huller (i EUR)
+StancerComptaSupplier = Stancer-leverandør
+StancerComptaGapsFound = Der er fundet huller i %s
+StancerComptaEcart = Gab
+StancerComptaRegularize = Reguler %s mellemrum(er)
+StancerComptaRegulEcart = Regularisering af Stancer-gab
+StancerComptaRegularized = %s huller er blevet reguleret
+StancerComptaNoGapFound = Ingen mellemrum registreret
+StancerComptaConfigIncomplete = Konfigurationen er ufuldstændig. Udfyld venligst journal, regnskabskonto og leverandør.
+StancerComptaSupplierNoAccount = Den valgte leverandør har ingen konfigureret leverandørregnskabskonto.
+
+# Disputes & Refunds notifications
+StancerMailSubjectNewDispute = Tvist %s - %s - TXPROTECT-ecb2ec87f49f-span>: <TXEND class='notranslate'>%s
+StancerMailNewDispute = Tvist registreret:<br /><br />TXPROTECT-aee83C-TXustomEND:<span>f class='notranslate'></b> %s<br /><b>Faktura:</b> %s<br /><b>Beløb:</b> %s</span class='notranslate'><br /><b>Type:</b> %s</span class='notranslate'><br /><b>Status:</b> class='notranslate'>%s
+StancerMailNewDisputeDetails = <br /><b>SEPA-kode:TXPROTECT-9a4b739f17f8-END class='notranslate'>%s<br /><b>ID:</b> %s<br /><br />Gennemgå og håndter venligst denne tvist.
+StancerMailSubjectNewRefund = Ny refusion - %s: %s
+StancerMailNewRefund = Der er registreret en ny refusion: ID %s, beløb %s, relateret betaling %s. Gennemgå venligst.
+StancerDisputeLostReopenReason = Tvist tabt (%s): fakturaen er automatisk blevet sat tilbage til ubetalt.
+StancerRefundConfirmedReopenReason = Refusion bekræftet (%s): fakturaen er automatisk blevet sat tilbage til ubetalt.
+StancerApiServerError = Stancer API-serverfejl (HTTP %s): %s. Behandlingen er blevet stoppet.
+
+# SEPA rejection fees configuration
+STANCER_SEPA_REJECTION_FEE = Gebyr for afvisning af Stancer (i EUR)
+STANCER_SEPA_REJECTION_FEETooltip = Beløb opkrævet af Stancer for afvisning af SEPA-betaling (standard 5 EUR). Dette er kun til orientering og bruges ikke til kundefakturering.
+STANCER_SEPA_REJECTION_FEE_AUTO_APPLY = Opret automatisk en faktura for afvisningsgebyr for kunden
+STANCER_SEPA_REJECTION_FEE_AUTO_APPLYTooltip = Hvis aktiveret, oprettes og valideres der automatisk en faktura for at opkræve gebyrer for afvisning fra kunden i henhold til dine vilkår og betingelser. Det anvendte beløb vil være prisen på det produkt/den tjeneste, der er valgt nedenfor.
+STANCER_SEPA_REJECTION_FEE_PRODUCT_ID = Produkt/tjenesteydelse til fakturalinjen for afvisningsgebyr
+STANCER_SEPA_REJECTION_FEE_PRODUCT_IDTooltip = Vælg det produkt eller den tjeneste, der skal bruges til fakturalinjen for SEPA-afvisningsgebyret
+StancerSepaRejectionFeeDesc = Gebyr for afvisning af SEPA-betaling
+StancerSepaRejectionFeeOrigInvoice = original faktura: %s
+StancerSepaFeeInvoiceCreated = Faktura for SEPA-afvisningsgebyr oprettet: %s
+
+# SEPA rejection customer emails
+StancerMailSubjectSepaRejection = SEPA direkte debitering afvisning - %s
+StancerMailSepaRejectionBody = SEPA-betalingen for din faktura %s er blevet afvist af din bank.<br /><br />Afvisningskode: <b>%s</b><br />Årsag: <b>%s</b><br /><br />Betal venligst din konto hurtigst muligt.
+
+# SEPA response codes (ISO 20022)
+StancerSepaAC01 = Forkert IBAN
+StancerSepaAC04 = Konto lukket
+StancerSepaAC06 = Konto blokeret
+StancerSepaAC13 = Ugyldig debitorkontotype
+StancerSepaAG01 = Transaktion forbudt på denne konto
+StancerSepaAG02 = Ugyldig transaktionskode
+StancerSepaAM04 = Utilstrækkelige midler
+StancerSepaAM05 = Duplikatbetaling
+StancerSepaBE05 = Ugyldig kreditor-id
+StancerSepaCNOR = Kreditorbanken kan ikke nås
+StancerSepaDNOR = Debitorbanken kan ikke nås
+StancerSepaED05 = Afregningsdato ugyldig
+StancerSepaFF01 = Ugyldigt filformat
+StancerSepaMD01 = Intet gyldigt mandat
+StancerSepaMD02 = Manglende eller ukorrekte fuldmagtsdata
+StancerSepaMD06 = Refusion anmodet af debitor
+StancerSepaMD07 = Debitor afdød
+StancerSepaMS02 = Årsag ikke angivet af banken
+StancerSepaMS03 = Årsag ikke angivet af agent
+StancerSepaRC01 = Ugyldig BIC
+StancerSepaRR01 = Manglende eller ukorrekte debitorkontooplysninger
+StancerSepaRR02 = Manglende eller forkert debitornavn/adresse
+StancerSepaRR03 = Manglende eller forkert kreditornavn/adresse
+StancerSepaRR04 = Reguleringsmæssig årsag
+StancerSepaSL01 = Specifik service anmodet
+StancerCronSummaryReported = Betalingsstatus rapporteret: %s - %s - TXPROTECT-ecb2ec87f49f €-END
+StancerCronSummaryReportedDesc = Betalingen %s med status %s (%s €) blev rapporteret i den planlagte opgaveoversigtsmail.
+
+#
+# About page (feedback, links)
+#
+StancerAboutModuleInfo = Modulinformation
+StancerAboutUsefulLinks = Nyttige links
+StancerOnlineDocumentation = Online dokumentation
+StancerAboutSAV = Støtte
+StancerAboutForum = Forum
+StancerAboutContact = Kontakte
+StancerDolibarrMinVersion = Minimum Dolibarr-version
+StancerPHPMinVersion = Minimum PHP-version
+StancerDoYouLikeModule = Kan du lide dette modul?
+StancerFeedbackIntro = Din feedback hjælper med at forbedre vores moduler. Del din oplevelse, og hjælp andre brugere med at opdage dette modul!
+StancerYourRating = Din vurdering
+StancerYourFeedback = Din feedback
+StancerYourEmail = Din e-mail
+StancerFeedbackPlaceholder = Fortæl os, hvad du kan lide, hvad der kan forbedres...
+StancerSendFeedback = Send min feedback
+StancerSendFeedbackSending = Sender...
+StancerComptaRegularizing = Regulering...
+StancerFeedbackSent = Tak for din feedback!
+StancerFeedbackSendError = Fejl ved afsendelse af feedback
+StancerAndDolibarrCommunity = og Dolibarr-samfundet
+
+#
+# Missing module-specific keys
+#
+ibanBank = Bank
+ibanBIC = BIC
+ibanDateSign = Underskriftsdato
+ibanRUM = Unik mandatreference (RUM)
+ShowStancer_payments = Vis betaling
+ShowStancer_payouts = Vis udbetaling
+ShowStancer_refunds = Vis refusion
+Stancer = Stancer
+StancerApiTest = API-test
+StancerArea = Stancer-området
+StancerCBalreadyInProgress = En CB-betaling er allerede i gang for denne faktura: %s se den nuværende procedure %s
+StancerMailSubjectIBANandMandateReadyToSignErr = IBAN tilføjet, men fejl under elektronisk underskrift
+StancerMassAction = Stancer masseaktion
+StancerPayBalanceAmountSEPA = Betal resterende saldo via SEPA
+Stancer_payments = Stancer-betalinger
+Stancer_payouts = Stancer-udbetalinger
+StancerPending = Indtil
+STANCER_PENDING_PAYMENT_DESC = Afventer betaling
+StancerPublicCBPageDisabled = Den offentlige kreditkortbetalingsside er ikke aktiveret i %%smodulkonfigurationen%%s
+StancerRefreshDone = Opdatering fuldført
+StancerSavedCardsTitle = Gemte Stancer-kreditkort
+StancerShowInDashboard = Vis i Stancer-dashboardet
+Stancer_refunds = Stancer-refusioner
+STANCER_SANDBOX_MESSAGE = Du er i TEST-tilstand, der vil ikke blive udført nogen egentlig transaktion.
+STANCER_WARNING_BANK = Konfigurer venligst Stancer-bankkontoen, før du fortsætter
+
+# Generic keys used in module (not in core)
+Optional = Valgfri
+Path = Sti
+Success = Succes
+NoData = Ingen data
+ClassNotFound = Klasse ikke fundet
+ErrorNumberingModuleNotSetup = Nummereringsmodul ikke konfigureret (element: %s)
+AmountTo = Beløb til
+PaymentDoneOn = Betaling foretaget den: %s
+StartFix = Start reparation
+StartImport = Start import
+StancerNewVersionAvailable = Stancer: en nyere version er tilgængelig (installeret %s, tilgængelig %s). Overvej venligst at opdatere.
+StancerNotifyCustomers = Giv modtagere besked via e-mail
+StancerRefreshSelected = Tving opdatering af valgte rækker
+StancerForceRefreshSelectedDone = Tvungen opdatering af %s betaling(er) er gennemført. Tjek loggene for detaljer om de anvendte rettelser.
+
+# Stancer payment attribution audit (page stancer_audit.php)
+StancerAuditTitle = Revision af Stancer-betalingstilskrivning
+StancerAuditIntro = Denne side forespørger Stancer API'en for hver lokal betaling og kontrollerer, at kunden, fakturaen og beløbet, der er gemt i Dolibarr, stemmer overens med de faktiske Stancer-data. Der skrives ikke: siden er udelukkende skrivebeskyttet. Klik på "Kør revision" for at hente rapporten.
+StancerAuditRun = Kør revision
+StancerAuditResults = Revisionsresultater
+StancerAuditSummary = Oversigt
+StancerAuditRowsAudited = %s betaling(er) revideret inden for %s sekund(er).
+StancerAuditOptionalSocid = (valgfrit - lad stå tomt for at kontrollere alle kunder)
+StancerAuditMaxRows = Kasket
+StancerAuditMaxRowsHelp = Højst %s betaling(er) vil blive revideret pr. kørsel (kan konfigureres via STANCER_AUDIT_MAX_ROWS).
+StancerAuditNoRows = Ingen Stancer-betaling fundet inden for den valgte periode.
+StancerAuditTooMany = Mere end %s betaling(er) matcher. Kun de seneste revideres. Indskrænk perioden, eller øg STANCER_AUDIT_MAX_ROWS.
+StancerAuditSqlError = SQL-fejl under hentning af betalinger. Se logfiler.
+StancerAuditAuthStop = Stancer API-godkendelsesfejl (HTTP 401). Revisionen blev afbrudt. Kontroller den private nøgle, der er konfigureret til den aktuelle tilstand.
+StancerAuditPaymId = Stancer-ID
+StancerAuditApiStatus = Stancer-status
+StancerAuditStatus = Revisionsstatus
+StancerAuditDoublesTitle = Dobbeltopladningsdetektion
+StancerAuditDoublesIntro = Dette afsnit viser Stancer-fakturaer (api_order_id), der har modtaget 2 eller flere betalinger. Når mere end én betaling registreres på den samme faktura, er kunden blevet opkrævet to gange.
+StancerAuditDoublesAlert = ADVARSEL: Faktura(r) fra %s er blevet opkrævet mere end én gang. Der skal sandsynligvis udstedes en refusion fra Stancer-grænsefladen, før der kan rettes en kreditering.
+StancerAuditDoublesOrderId = Stancer-faktura (api_order_id)
+StancerAuditDoublesNbPayments = Nb-betalinger
+StancerAuditDoublesCapturedCount = Nb fanget
+StancerAuditDoublesFlag = Tilstand
+StancerAuditDoublesFlagDouble = DOBBELT OPLADTNING
+StancerAuditDoublesFlagOk = Ingen dobbelt
+StancerAuditDoublesDetail = Betalingsoplysninger
+
+# Action buttons + modal (phase 2)
+StancerAuditActions = Handlinger
+StancerAuditFix = Lave
+StancerAuditIgnore = Ignorere
+StancerAuditDone = Fast
+StancerAuditStatusIgnored = Ignoreret
+StancerAuditModalTitleFix = Ret betalingstilskrivning
+StancerAuditModalTitleIgnore = Ignorer denne betaling
+StancerAuditConfirmFix = Bekræft flytning af denne betaling til den faktura, der er angivet af Stancer API'en? Handlingen logges i hændelser for hver berørt faktura.
+StancerAuditConfirmIgnore = Markér denne betaling som "skal ignoreres" i efterfølgende revisioner? Brug dette til legitime tilfælde (datterselskab, kundefletning), der ikke skal korrigeres automatisk.
+StancerAuditModalDoubleWarning = ADVARSEL: Denne betaling er en del af et dobbelt betalingspar. Målfakturaen vil være overbetalt efter denne flytning. Du skal udstede en kreditnota eller en separat refusion.
+StancerAuditPaymInDoubleTooltip = Dette paym_id er en del af et dobbeltfaktureringspar, der er registreret på den samme Stancer-faktura (api_order_id).
+StancerAuditNetworkError = Netværksfejl under afsendelse.
+StancerAuditApiCustomer = Kunde (API)
+StancerAuditApiOrderId = Fakturareference (API)
+StancerAuditApiAmount = Beløb (API)
+StancerAuditDbClient = Kunde (Dolibarr)
+StancerAuditDbInvoice = Faktura (Dolibarr)
+StancerAuditDbAmount = Beløb (Dolibarr)
+StancerAuditDetails = Detaljer
+StancerAuditStatus_OK = Okay
+StancerAuditStatus_grouped = Grupperet SEPA
+StancerAuditStatus_wrong_invoice_same_customer = Forkert faktura (samme kunde)
+StancerAuditStatus_wrong_customer = Forkert kunde
+StancerAuditStatus_wrong_customer_unmapped = Forkert kunde (ikke tilknyttet - bekræft venligst)
+StancerAuditStatus_wrong_amount = Inkonsekvent beløb
+StancerAuditStatus_no_mapping = Ikke-kortlagt Stancer-kunde
+StancerAuditStatus_api_unreachable = API'en er ikke tilgængelig
+StancerAuditStatus_api_not_found = Ikke fundet på Stancer
+StancerAuditStatus_api_auth_error = API-godkendelsesfejl
+
+# Repair / verification tools (admin)
+StancerRepairTitle = Verifikations- og reparationsværktøjer
+StancerRepairIntro = Denne side registrerer og retter uoverensstemmelser mellem Stancer-kunder og Dolibarr-tredjeparter. Registrering er skrivebeskyttet; reparationer er eksplicitte, atomare pr. tredjepart og spores i fanen Hændelse.
+StancerRepairScan = Scan delte kunder
+StancerRepairSharedTitle = Stancer-kunder delt mellem flere tredjeparter
+StancerRepairNoneFound = Ingen delte Stancer-kunder fundet. Alt er konsistent.
+StancerRepairFoundCount = %s Stancer-kunde(r) delt mellem flere tredjeparter fundet.
+StancerRepairSharedBetween = delt mellem %s tredjeparter
+StancerRepairApiError = Stancer API er ikke tilgængelig for denne kunde: %s
+StancerRepairApiCustomer = Stancer-kunde
+StancerRepairOwner = Opløst ejer
+StancerRepairOwnerConfident = løst via e-mail
+StancerRepairOwnerUnknown = ejer ukendt
+StancerRepairRibLink = Gemt link
+StancerRepairNbPayments = Betalinger
+StancerRepairRole = Rolle
+StancerRepairRoleOwner = Ejer
+StancerRepairRoleIntruder = At løsne
+StancerRepairKeepOwner = Tredjepart skal beholdes som ejer
+StancerRepairSimulate = Simuler
+StancerRepairApply = Reparation (frigør ubudne gæster)
+StancerRepairConfirmApply = Bekræft reparation? Hver tredjepart, der ønsker at indtrængen, får en ny, distinkt Stancer-kunde, dens forkerte links vil blive slettet, og dens betalinger vil blive omdøbt. Ejeren beholder den oprindelige kunde.
+StancerRepairWorking = Arbejder...
+StancerRepairNetworkError = Netværksfejl:
+StancerRepairPlanned = simulering
+StancerRepairDoneLabel = fast
+StancerRepairErrorLabel = fejl
+StancerRepairUnpostedTitle = Hævede betalinger, der ikke er knyttet til en faktura
+StancerRepairUnpostedIntro = Betalinger registreret på Stancer-siden, men uden matchende Dolibarr-betaling (ofte afvist af den fejlagtige tilskrivningsvagt, fordi den indespærrede kunde peger på en anden tredjepart). Tvangspostering registrerer betalingen på fakturaen, der er angivet med dens order_id, og omgår kun kundechecken (order_id og beløbschecks forbliver aktive).
+StancerRepairUnpostedNone = Ingen registreret, ikke-tilknyttet betaling.
+StancerRepairPaymId = Betalings-id
+StancerRepairOrderId = Reference (ordre_id)
+StancerRepairActions = Handlinger
+StancerRepairForcePost = Tving link
+StancerRepairConfirmForce = Vil du tvinge denne betaling til den faktura, der er angivet med dens order_id? Kundechecken omgås, men order_id og beløb verificeres stadig.
+StancerRepairManualForcePostLabel = Tvungen bogføring af en betaling via dens Stancer-id
+StancerRepairManualForcePostHint = Bruges når betalingen er korrekt på Stancer (faktura afregnet, korrekt beløb), men Stancer tilskriver den til den forkerte kunde, eller når den ikke vises på listen nedenfor (f.eks. ældre end synkroniseringsvinduet). Fakturaen, der er angivet med order_id, markeres som betalt med en bankpostering og mulig overførsel til regnskab.
+StancerRepairInvalidPaymId = Ugyldigt betalings-id (forventet format: paym_...).
+StancerRepairInvoiceState = Fakturastatus
+StancerRepairInvoiceNotFound = faktura ikke fundet
+StancerRepairAlreadySettled = ALLEREDE AFGJORT (dobbelt?)
+StancerRepairPaidVia = betalt via %s
+StancerRepairGroupedInvoices = %s grupperede fakturaer
+StancerRepairRemaining = Resterende %s
+StancerRepairDoubleHint = Sandsynligvis dobbelt - refusion
+StancerRepairOverpaidTitle = Overbetalte fakturaer (Stancer + et andet middel)
+StancerRepairOverpaidIntro = Fakturaer med en Stancer-betaling OG hvis samlede betalte beløb overstiger TTC-beløbet: en Stancer-betaling og en anden (Stripe, Mollie...) blev begge afstemt.
+StancerRepairOverpaidNone = Ingen overbetalt faktura med en Stancer-betaling.
+StancerRepairDbInvoice = Faktura
+StancerRepairPaid = Betalt
+StancerRepairExcess = Overskud
+StancerRepairPaymentMethods = Betalingsmidler
+StancerRepairAddAnyway = Tilføj alligevel (åbner fakturaen igen)
+StancerRepairConfirmOverpay = Denne faktura er allerede betalt. Vil du lægge denne Stancer-betaling oveni? Fakturaen vil blive genåbnet, og betalingen registreret, hvilket skaber en overbetaling, der skal afstemmes efterfølgende (kreditnota eller refusion).
+StancerRepairStaleStatusIntro = %s betaling(er) med en forældet lokal status (afvist/annulleret på Stancer eller ubekræftet): ekskluderet fra den registrerede liste ovenfor.
+StancerRepairRealStatus = Ægte Stancer-status
+StancerRepairStatusUnknown = ubekræftet

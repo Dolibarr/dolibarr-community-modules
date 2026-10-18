@@ -4,6 +4,7 @@
  * Copyright (C) 2019-2026	Frédéric France				<frederic.france@free.fr>
  * Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -77,7 +78,11 @@ class modEInvoicing extends DolibarrModules
 		$this->editor_squarred_logo = '';					// Must be image filename into the module/img directory followed with @modulename. Example: 'myimage.png@einvoicing'
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = trim(file_get_contents(__DIR__.'/../../VERSION'));
+		// Read guarded like einvoicingModuleStamp() guards the same file: a deployment is free to drop
+		// VERSION, and __DIR__ resolves outside the instance when the module is a symlink, so an
+		// unguarded read prints two PHP warnings on the module list instead of leaving the value empty.
+		$versionfile = __DIR__.'/../../VERSION';
+		$this->version = (is_readable($versionfile) ? trim((string) file_get_contents($versionfile)) : '');
 		// Url to the file with your last numberversion of this module
 		$this->url_last_version = 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/refs/heads/main/einvoicing/VERSION';
 
@@ -118,8 +123,15 @@ class modEInvoicing extends DolibarrModules
 			),
 			// Set here all hooks context managed by module. To find available hook context, make a "grep -r '>initHooks(' *" on source code. You can also set hook context to 'all'
 			/* BEGIN MODULEBUILDER HOOKSCONTEXTS */
+			// Contexts are listed one by one on purpose: 'all' loads this class into every HookManager of the
+			// request, including the ones other modules build for their own contexts.
 			'hooks' => [
-				'all', 'invoicecard'
+				'invoicecard', 'invoicesuppliercard', 'thirdpartycard', 'thirdpartycomm', 'productcard',
+				'invoicedocument', 'invoicesuppliercarddocument',
+				'invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'societelist', 'productlist',
+				'productservicelist', 'accountancysupplierlist',
+				'pdfgeneration', 'odtgeneration',
+				'api',
 			],
 			/* END MODULEBUILDER HOOKSCONTEXTS */
 			// Set this to 1 if features of module are opened to external users
@@ -139,9 +151,9 @@ class modEInvoicing extends DolibarrModules
 
 		// Dependencies
 		// A condition to hide module
-		$this->hidden = getDolGlobalInt('MODULE_EINVOICING_DISABLED'); // A condition to disable module;
+		$this->hidden = (!empty($conf->global->MODULE_EINVOICING_DISABLED) ? (int) $conf->global->MODULE_EINVOICING_DISABLED : 0); // A condition to disable module;
 		// List of module class names that must be enabled if this module is enabled. Example: array('always'=>array('modModuleToEnable1','modModuleToEnable2'), 'FR'=>array('modModuleToEnableFR')...)
-		$this->depends = array('always'=>array('modFacture', 'modFournisseur'));
+		$this->depends = array('always'=>array('modFacture', 'modFournisseur', 'modProduct'));
 		// List of module class names to disable if this one is disabled. Example: array('modModuleToDisable1', ...)
 		$this->requiredby = array();
 		// List of module class names this module is in conflict with. Example: array('modModuleToDisable1', ...)
@@ -151,9 +163,9 @@ class modEInvoicing extends DolibarrModules
 		$this->langfiles = array("einvoicing@einvoicing");
 
 		// Prerequisites
-		$this->phpmin = array(7, 2); // Minimum version of PHP required by module
+		$this->phpmin = array(7, 0); // Minimum version of PHP required by module
 		// $this->phpmax = array(8, 0); // Maximum version of PHP required by module
-		$this->need_dolibarr_version = array(17, -3); // Minimum version of Dolibarr required by module
+		$this->need_dolibarr_version = array(18, -3); // Minimum version of Dolibarr required by module
 		// $this->max_dolibarr_version = array(19, -3); // Maximum version of Dolibarr required by module
 		$this->need_javascript_ajax = 0;
 
@@ -181,7 +193,15 @@ class modEInvoicing extends DolibarrModules
 			'fr_FR:ParentCompany'=>'Maison mère ou revendeur'
 		)*/
 
-		if (!isModEnabled("einvoicing")) {
+		// For retrocompatibility with older Dolibarr versions to avoid crashing when module is present into custom modules repository of an older Dolibarr installation
+		if (function_exists('isModEnabled')) {
+			$moduleIsEnabled = isModEnabled("einvoicing");
+		} else {
+			$moduleIsEnabled = !empty($conf->einvoicing->enabled);
+		}
+
+		// Check if the module is enabled and initialize the configuration if not
+		if (!$moduleIsEnabled) {
 			$conf->einvoicing = new stdClass();
 			$conf->einvoicing->enabled = 0;
 		}
@@ -190,9 +210,7 @@ class modEInvoicing extends DolibarrModules
 		/* BEGIN MODULEBUILDER TABS */
 		// Don't forget to deactivate/reactivate your module to test your changes
 		$this->tabs = array();
-		//$this->tabs[] = array('data' => 'invoice:+CustomerLCtab:einvoicecustomerlctab:einvoicing@einvoicing:$user->hasRight("facture", "read"):/einvoicing/einvoice_object_timeline.php?id=__ID__');
-
-		//$this->tabs[] = array('data' => 'invoice:+EinvoiceEvents:EinvoiceEventsTab:@einvoicing:$user->hasRight("facture","read"):/einvoicing/einvoice_events.php?id=__ID__&elementtype=invoice');
+		$this->tabs[] = array('data' => 'invoice:+EinvoiceEvents:EinvoiceEventsTab:@einvoicing:$user->hasRight("facture","read") && getDolGlobalString("EINVOICING_ADD_A_DEDICATED_AGENDA_VIEW"):/einvoicing/einvoice_tracking.php?id=__ID__');
 
 		/* END MODULEBUILDER TABS */
 		// Example:
@@ -287,26 +305,8 @@ class modEInvoicing extends DolibarrModules
 				  'test' => 'isModEnabled("einvoicing")',
 				  'priority' => 50,
 				  ),
-			//  0 => array(
-			//      'label' => 'MyJob label',
-			//      'jobtype' => 'method',
-			//      'class' => '/einvoicing/class/call.class.php',
-			//      'objectname' => 'Call',
-			//      'method' => 'doScheduledJob',
-			//      'parameters' => '',
-			//      'comment' => 'Comment',
-			//      'frequency' => 2,
-			//      'unitfrequency' => 3600,
-			//      'status' => 0,
-			//      'test' => 'isModEnabled("einvoicing")',
-			//      'priority' => 50,
-			//  ),
 		);
 		/* END MODULEBUILDER CRON */
-		// Example: $this->cronjobs=array(
-		//    0=>array('label'=>'My label', 'jobtype'=>'method', 'class'=>'/dir/class/file.class.php', 'objectname'=>'MyClass', 'method'=>'myMethod', 'parameters'=>'param1, param2', 'comment'=>'Comment', 'frequency'=>2, 'unitfrequency'=>3600, 'status'=>0, 'test'=>'isModEnabled("einvoicing")', 'priority'=>50),
-		//    1=>array('label'=>'My label', 'jobtype'=>'command', 'command'=>'', 'parameters'=>'param1, param2', 'comment'=>'Comment', 'frequency'=>1, 'unitfrequency'=>3600*24, 'status'=>0, 'test'=>'isModEnabled("einvoicing")', 'priority'=>50)
-		// );
 
 		// Permissions provided by this module
 		$this->rights = array();
@@ -367,7 +367,7 @@ class modEInvoicing extends DolibarrModules
 			'url' => '/einvoicing/einvoicingindex.php',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1000,
-			'enabled' => 'isModEnabled("einvoicing")',
+			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
 			'perms' => '$user->hasRight("einvoicing", "read")',
 			'target' => '',
 			'user' => 2,
@@ -384,7 +384,7 @@ class modEInvoicing extends DolibarrModules
 			'url' => '/einvoicing/document_list.php',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1001,
-			'enabled' => 'isModEnabled("einvoicing")',
+			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
 			'perms' => '$user->hasRight("einvoicing", "write")',
 			'target' => '',
 			'user' => 2,
@@ -401,7 +401,7 @@ class modEInvoicing extends DolibarrModules
 			'url' => '/einvoicing/product_mapping.php',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1002,
-			'enabled' => 'isModEnabled("einvoicing")',
+			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE") && !getDolGlobalString("EINVOICING_DISABLE_SYNC_AP_TO_DOLI")',
 			'perms' => '$user->hasRight("einvoicing", "write")',
 			'target' => '',
 			'user' => 2,
@@ -418,13 +418,30 @@ class modEInvoicing extends DolibarrModules
 			'url' => '/einvoicing/vendorref_list.php',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1003,
-			'enabled' => 'isModEnabled("einvoicing")',
+			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE") && !getDolGlobalString("EINVOICING_DISABLE_SYNC_AP_TO_DOLI")',
 			'perms' => '$user->hasRight("einvoicing", "read")',
 			'target' => '',
 			'user' => 2,
 			'object' => '',
 		);
 		/* END MODULEBUILDER LEFTMENU PDPMAPPEDVENDORREFS */
+		/* BEGIN MODULEBUILDER LEFTMENU PDPSYNCPENDING */
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=einvoicing_documents',
+			'type' => 'left',
+			'titre' => 'EInvoiceSyncPending',
+			'mainmenu' => 'billing',
+			'leftmenu' => 'einvoicing_sync_pending',
+			'url' => '/einvoicing/sync_pending_list.php',
+			'langs' => 'einvoicing@einvoicing',
+			'position' => 1004,
+			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE") && getDolGlobalInt("EINVOICING_ENABLE_MANUAL_ACTION_QUEUE")',
+			'perms' => '$user->hasRight("einvoicing", "read")',
+			'target' => '',
+			'user' => 2,
+			'object' => '',
+		);
+		/* END MODULEBUILDER LEFTMENU PDPSYNCPENDING */
 		/* BEGIN MODULEBUILDER LEFTMENU PDPSOCIETIES */
 		// $this->menu[$r++] = array(
 		// 	'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=einvoicing_billing',
@@ -452,7 +469,7 @@ class modEInvoicing extends DolibarrModules
 			'url' => '/einvoicing/call_list.php',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1003,
-			'enabled' => 'isModEnabled("einvoicing")',
+			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
 			'perms' => '$user->hasRight("einvoicing", "read")',
 			'target' => '',
 			'user' => 2,
@@ -589,68 +606,24 @@ class modEInvoicing extends DolibarrModules
 		$param = array('options' => array(1 => 0));
 		$sql = array();
 
-		// Product extrafields
-		/*
-		$result = $extrafields->addExtraField(
-			'einvoicing_product_separator',
-			$langs->trans('EInvoicing'),
-			'separate',
-			95020,
-			'',
-			'product',
-			0,
-			1,
-			'',
-			$param,
-			1,
-			'',
-			1,
-			0,
-			'',
-			'',
-			'einvoicing@einvoicing',
-			'isModEnabled("einvoicing")'
-		);
-		*/
-		// $result = $extrafields->addExtraField(
-		// 	'einvoicing_source',
-		// 	$langs->trans('EInvoicingProductSource'),
-		// 	'varchar',
-		// 	95022,
-		// 	100,
-		// 	'product',
-		// 	0,
-		// 	0,
-		// 	'',
-		// 	null,
-		// 	1,
-		// 	'',
-		// 	1,
-		// 	0,
-		// 	'',
-		// 	'',
-		// 	'einvoicing@einvoicing',
-		// 	'isModEnabled("einvoicing")',
-		// 	0,
-		// 	1
-		// );
-
-		// Invoice extrafields
 		// Chorus fields
-		// TODO : Remove Chorus extrafields and move them to einvoicing_extlinks table
+		// TODO : Remove Chorus extrafields and move them to einvoicing_extrafield table
+		// The text fields are declared printable = 2 ("print only when filled") and not 1: on cores 19, 20
+		// and 21 getExtrafieldsInHtml() ignores the 'enabled' condition, so a field of a feature nobody
+		// turned on still reached the PDF of every invoice and every order (issue #614).
 		$result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 95024, '', 'facture', 0, 1, '', $param, 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")');
-		$result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 95026, '100', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
-		$result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 95028, '50', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
-		$result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 95030, '50', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
+		$result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 95026, '100', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 2);
+		$result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 95028, '50', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 2);
+		$result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 95030, '50', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 2);
 		// No computed formula here: the field must stay editable (see openDSI note below). A formula
 		// pointing at options_chorus_id also warns on every render, that extrafield belongs to openDSI.
 		$result = $extrafields->addExtraField('d4d_chorus_id', $langs->trans('ChorusId'), 'varchar', 95032, '36', 'facture', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
 
 		// Same fields for orders
 		$result = $extrafields->addExtraField('d4d_separator', $langs->trans('ChorusSeparator'), 'separate', 95042, '', 'commande', 0, 1, '', $param, 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")');
-		$result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 95044, '100', 'commande', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
-		$result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 95046, '50', 'commande', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
-		$result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 95048, '50', 'commande', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 1);
+		$result = $extrafields->addExtraField('d4d_service_code', $langs->trans('ChorusServiceCode'), 'varchar', 95044, '100', 'commande', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 2);
+		$result = $extrafields->addExtraField('d4d_contract_number', $langs->trans('ChorusContractNumber'), 'varchar', 95046, '50', 'commande', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 2);
+		$result = $extrafields->addExtraField('d4d_promise_code', $langs->trans('ChorusPromiseCode'), 'varchar', 95048, '50', 'commande', 0, 0, '', '', 1, '', '1', '0', '', '', 'einvoicing@einvoicing', 'getDolGlobalInt("EINVOICING_USE_CHORUS")', 0, 2);
 
 		// Fix condition of extrafields for old installations
 		$sql = array_merge(
@@ -660,17 +633,15 @@ class modEInvoicing extends DolibarrModules
 				"UPDATE " . MAIN_DB_PREFIX . "extrafields SET enabled='getDolGlobalInt(\"EINVOICING_USE_CHORUS\")' WHERE enabled = '\$conf->global->EINVOICING_USE_CHORUS'",
 				// Drop the stale computed formula on d4d_chorus_id: it targets options_chorus_id (openDSI),
 				// which raises a PHP warning on every invoice render and makes the field read-only.
-				"UPDATE " . MAIN_DB_PREFIX . "extrafields SET fieldcomputed = '' WHERE name = 'd4d_chorus_id' AND fieldcomputed LIKE '%options_chorus_id%'"
+				"UPDATE " . MAIN_DB_PREFIX . "extrafields SET fieldcomputed = '' WHERE name = 'd4d_chorus_id' AND fieldcomputed LIKE '%options_chorus_id%'",
 			)
 		);
 
 		// Update extrafield par rapport au module openDSI, il faut pouvoir éditer le champ ChorusId
-		// The $param below is '' and not array(): the empty array is only tolerated from Dolibarr 18,
-		// which added an "elseif (is_array($param))" branch to ExtraFields::update_label(). On 17 an
-		// empty array falls through to strlen($param) and kills the whole module installation on PHP 8.
-		// Both forms store exactly the same thing - an empty parameter string - on every version, and
-		// the parameter was itself declared as '' up to 19 before becoming array() in 20, which is the
-		// signature the phan stub carries and the reason for the suppression.
+		// The $param below is '' and not array(): before Dolibarr 18, ExtraFields::update_label() lets an
+		// empty array fall through to strlen($param), which kills the module installation on PHP 8. Both
+		// forms store the same empty string, and the parameter was declared '' up to 19, hence the phan
+		// annotation below.
 		$result = $extrafields->update(
 			'd4d_chorus_id', //$attrname	// @phan-suppress-current-line PhanTypeMismatchArgumentProbablyReal
 			$langs->trans('ChorusId'), //$label
@@ -695,96 +666,11 @@ class modEInvoicing extends DolibarrModules
 			array() //$moreparams
 		);
 
-		/*
-		CREATE TABLE llx_einvoicing_call(
-			-- BEGIN MODULEBUILDER FIELDS
-			rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
-			date_creation datetime NOT NULL,
-			tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-			fk_user_creat integer NOT NULL,
-			fk_user_modif integer,
-			status integer NOT NULL, 			-- Status of the call
-			call_type varchar(50) NOT NULL, 	-- Type of API call
-			method varchar(10), 				-- HTTP method
-			endpoint varchar(255) NOT NULL, 	-- API endpoint URL
-			request_body text, 					-- Request body content (JSON)
-			response text, 						-- Response content (JSON)
-			entity integer DEFAULT 1, 			-- Entity
-			fk_provider integer NOT NULL 		-- Foreign key to provider (EsaLink...)
-			-- END MODULEBUILDER FIELDS
-		) ENGINE=innodb;
-
-		CREATE TABLE llx_einvoicing_document(
-			-- BEGIN MODULEBUILDER FIELDS
-			rowid integer AUTO_INCREMENT PRIMARY KEY NOT NULL,
-			date_creation datetime NOT NULL,
-			tms timestamp DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-			fk_user_creat integer NOT NULL,
-			fk_user_modif integer,
-			fk_element_id integer,
-			fk_element_type varchar(50),
-			status integer NOT NULL, 			-- Status of the document
-			fk_call integer,		 			-- Reference to the original call
-			flow_id integer, 					-- PDP Flow identifier
-			tracking_id integer, 				-- Document tracking identifier
-			flow_type varchar(255), 			-- Type of flow (CustomerInvoice, etc.)
-			flow_direction varchar(10), 		-- Direction of flow (In/Out)
-			flow_syntax varchar(50), 			-- Document syntax (Factur-X, CII, UBL, etc.)
-			flow_profile varchar(50), 			-- Profile used (Basic, Cius, etc.)
-			ack_status varchar(50), 			-- Acknowledgment status (Success, Error, Pending)
-			ack_reason_code varchar(255), 		-- Reason code for acknowledgment
-			ack_info text, 						-- Additional acknowledgment information
-			document_body text, 				-- Full document content XML
-			entity integer DEFAULT 1 			-- Entity identifier
-			-- END MODULEBUILDER FIELDS
-		) ENGINE=innodb;
-
-		*/
-
-		//$result0=$extrafields->addExtraField('einvoicing_separator1', "Separator 1", 'separator', 1,  0, 'thirdparty',   0, 0, '', array('options'=>array(1=>1)), 1, '', 1, 0, '', '', 'einvoicing@einvoicing', 'isModEnabled("einvoicing")');
-		//$result1=$extrafields->addExtraField('einvoicing_myattr1', "New Attr 1 label", 'boolean', 1,  3, 'thirdparty',   0, 0, '', '', 1, '', -1, 0, '', '', 'einvoicing@einvoicing', 'isModEnabled("einvoicing")');
-		//$result2=$extrafields->addExtraField('einvoicing_myattr2', "New Attr 2 label", 'varchar', 1, 10, 'project',      0, 0, '', '', 1, '', -1, 0, '', '', 'einvoicing@einvoicing', 'isModEnabled("einvoicing")');
-		//$result3=$extrafields->addExtraField('einvoicing_myattr3', "New Attr 3 label", 'varchar', 1, 10, 'bank_account', 0, 0, '', '', 1, '', -1, 0, '', '', 'einvoicing@einvoicing', 'isModEnabled("einvoicing")');
-		//$result4=$extrafields->addExtraField('einvoicing_myattr4', "New Attr 4 label", 'select',  1,  3, 'thirdparty',   0, 1, '', array('options'=>array('code1'=>'Val1','code2'=>'Val2','code3'=>'Val3')), 1,'', -1, 0, '', '', 'einvoicing@einvoicing', 'isModEnabled("einvoicing")');
-		//$result5=$extrafields->addExtraField('einvoicing_myattr5', "New Attr 5 label", 'text',    1, 10, 'user',         0, 0, '', '', 1, '', -1, 0, '', '', 'einvoicing@einvoicing', 'isModEnabled("einvoicing")');
-
 		// Permissions
 		$this->remove($options);
 
-
-		// Document templates
-		// $moduledir = dol_sanitizeFileName('einvoicing');
-		// $myTmpObjects = array();
-		// $myTmpObjects['Call'] = array('includerefgeneration' => 0, 'includedocgeneration' => 0);
-
-		// foreach ($myTmpObjects as $myTmpObjectKey => $myTmpObjectArray) {
-		// 	if ($myTmpObjectArray['includerefgeneration']) {
-		// 		$src = DOL_DOCUMENT_ROOT.'/install/doctemplates/'.$moduledir.'/template_calls.odt';
-		// 		$dirodt = DOL_DATA_ROOT.($conf->entity > 1 ? '/'.$conf->entity : '').'/doctemplates/'.$moduledir;
-		// 		$dest = $dirodt.'/template_calls.odt';
-
-		// 		if (file_exists($src) && !file_exists($dest)) {
-		// 			require_once DOL_DOCUMENT_ROOT.'/core/lib/files.lib.php';
-		// 			dol_mkdir($dirodt);
-		// 			$result = dol_copy($src, $dest, '0', 0);
-		// 			if ($result < 0) {
-		// 				$langs->load("errors");
-		// 				$this->error = $langs->trans('ErrorFailToCopyFile', $src, $dest);
-		// 				return 0;
-		// 			}
-		// 		}
-
-		// 		$sql = array_merge($sql, array(
-		// 			"DELETE FROM ".$this->db->prefix()."document_model WHERE nom = 'standard_".strtolower($myTmpObjectKey)."' AND type = '".$this->db->escape(strtolower($myTmpObjectKey))."' AND entity = ".((int) $conf->entity),
-		// 			"INSERT INTO ".$this->db->prefix()."document_model (nom, type, entity) VALUES('standard_".strtolower($myTmpObjectKey)."', '".$this->db->escape(strtolower($myTmpObjectKey))."', ".((int) $conf->entity).")",
-		// 			"DELETE FROM ".$this->db->prefix()."document_model WHERE nom = 'generic_".strtolower($myTmpObjectKey)."_odt' AND type = '".$this->db->escape(strtolower($myTmpObjectKey))."' AND entity = ".((int) $conf->entity),
-		// 			"INSERT INTO ".$this->db->prefix()."document_model (nom, type, entity) VALUES('generic_".strtolower($myTmpObjectKey)."_odt', '".$this->db->escape(strtolower($myTmpObjectKey))."', ".((int) $conf->entity).")"
-		// 		));
-		// 	}
-		// }
-
+		// Set the live mode to on by default, but only if it is the first time we enable the module
 		if (!getDolGlobalString('EINVOICING_PDP')) {
-			// Set the live mode to on, but only if it is the first time we enable the module
 			$sqltmp = "INSERT INTO ".MAIN_DB_PREFIX."const (name, value, visible, entity, note) VALUES";
 			$sqltmp .= " ('EINVOICING_LIVE'";
 			$sqltmp .= ", ".$this->db->encrypt('1');
@@ -793,7 +679,13 @@ class modEInvoicing extends DolibarrModules
 			$this->db->query($sqltmp);
 		}
 
-		return $this->_init($sql, $options);
+		$result = $this->_init($sql, $options);
+
+		// Disabled, the _init contains already the launch of update_x.y.z.sql sorted by name.
+		//$updatesql = file_get_contents(dol_buildpath('/einvoicing/sql/update_v1.1.0.sql'));
+		//run_sql($updatesql);	// The run_sql is a SQL error tolerant function.
+
+		return $result;
 	}
 
 	/**

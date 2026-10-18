@@ -488,7 +488,9 @@ foreach ($myTmpObjects as $myTmpObjectKey => $myTmpObjectArray) {
 			$num_rows = $db->num_rows($resql);
 			while ($i < $num_rows) {
 				$array = $db->fetch_array($resql);
-				array_push($def, $array[0]);
+				if (is_array($array)) {
+					array_push($def, $array[0]);
+				}
 				$i++;
 			}
 		} else {
@@ -644,7 +646,7 @@ if ((float) DOL_VERSION >= 21) {
 		dol_htmloutput_mesg($langs->trans('YouAreCurrentlyInSandboxMode', 'HelloAsso'), [], 'warning');
 	}
 }
-print dolGetButtonAction('', $titlebutton, 'default', $_SERVER["PHP_SELF"].'?action=testconnect', '', 1, array('attr' => array('class' => 'reposition')));
+print dolGetButtonAction('', $titlebutton, 'default', $_SERVER["PHP_SELF"].'?action=testconnect&token='.newToken(), '', 1, array('attr' => array('class' => 'reposition')));
 
 
 $storage = new DoliStorage($db, $conf);

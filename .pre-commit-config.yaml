@@ -137,7 +137,7 @@ repos:
         args: [--standard=dev/setup/codesniffer/ruleset.xml]
       - id: php-cs
         exclude: |
-          (?x)^(htdocs/includes/.*)$
+          (?x)^(.*/includes/.*)$
         files: \.(php)$
         args:
           [

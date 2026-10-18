@@ -94,7 +94,7 @@ dol_include_once('/einvoicing/class/document.class.php');
 dol_include_once('/einvoicing/lib/einvoicing_document.lib.php');
 
 // Load translation files required by the page
-$langs->loadLangs(array("einvoicing@einvoicing", "other"));
+$langs->loadLangs(array("einvoicing@einvoicing", "other", "agenda", "commercial"));
 
 // Get parameters
 $id = GETPOSTINT('id');
@@ -253,7 +253,7 @@ if ($object->id > 0) {
 	$morehtmlref .= '</div>';
 
 
-	dol_banner_tab($object, 'ref', $linkback, 1, 'ref', 'ref', $morehtmlref);
+	dol_banner_tab($object, 'id', $linkback, 1, 'rowid', 'ref', $morehtmlref);
 
 	print '<div class="fichecenter">';
 	print '<div class="underbanner clearboth"></div>';
@@ -331,7 +331,7 @@ if ($object->id > 0) {
 		$filters['search_agenda_label'] = $search_agenda_label;
 		$filters['search_rowid'] = $search_rowid;
 
-		// TODO Replace this with same code than into list.php
+		// List of actions
 		show_actions_done($conf, $langs, $db, $object, null, 0, $actioncode, '', $filters, $sortfield, $sortorder, property_exists($object, 'module') ? $object->module : '');
 	}
 }

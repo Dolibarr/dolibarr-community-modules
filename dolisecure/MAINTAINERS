@@ -1,0 +1,13 @@
+Maintainer of this module
+==========================
+
+This file lists the maintainer(s) of the DoliSecure module, following the
+format used by the root MAINTAINERS file of the Dolibarr community modules
+repository (https://github.com/Dolibarr/dolibarr-community-modules), where
+this entry must be appended once the module is merged.
+
+DOLISECURE MODULE
+M:	Laurent Bouquet <laurent.bouquet@joliciel.fr> / LaurentBouquet
+S:	Maintained
+F:	dolisecure/
+T:	https://github.com/Dolibarr/dolibarr-community-modules.git

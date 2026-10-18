@@ -13,3 +13,14 @@ source_file = einvoicing/langs/en_US/einvoicing.lang
 source_lang = en_US
 type        = MOZILLAPROPERTIES
 
+[o:dolibarr-association:p:dolibarr-community-modules:r:dolisecure]
+file_filter = dolisecure/langs/<lang>/dolisecure.lang
+source_file = dolisecure/langs/en_US/dolisecure.lang
+source_lang = en_US
+type        = MOZILLAPROPERTIES
+
+[o:dolibarr-association:p:dolibarr-community-modules:r:stancer]
+file_filter = stancer/langs/<lang>/stancer.lang
+source_file = stancer/langs/en_US/stancer.lang
+source_lang = en_US
+type        = MOZILLAPROPERTIES

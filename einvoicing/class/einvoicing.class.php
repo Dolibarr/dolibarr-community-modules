@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
+ * Copyright (C) 2026		Jose Martinez			<jose.martinez@pichinov.com>
  * Copyright (C) 2026		William Mead				<william@m34d.com>
  * Copyright (C) 2026       Frédéric France             <frederic.france@free.fr>
  *
@@ -35,7 +36,8 @@ if ((float) DOL_VERSION < 20) {
 }
 
 require_once DOL_DOCUMENT_ROOT . '/core/lib/geturl.lib.php';
-dol_include_once('einvoicing/lib/einvoicing.lib.php');
+require_once __DIR__ . '/../lib/einvoicing.lib.php';	// removeAllSpaces(), used to normalize an electronic address
+
 
 /**
  * Base class for all functions to manage EINVOICING Module.
@@ -57,18 +59,60 @@ class EInvoicing
 	 */
 	public $errors = array();
 
+	/**
+	 * Ids of the customer invoices whose validation happened during the current request.
+	 *
+	 * afterPDFCreation() runs for every rebuild of the invoice PDF and cannot tell what asked for it;
+	 * the BILL_VALIDATE trigger runs inside Facture::validate() and for no other reason. Marking the
+	 * invoice there is what lets the hook recognise the generation that follows a validation, the only
+	 * one EINVOICING_AUTO_SEND_ON_GENERATION is meant to transmit.
+	 *
+	 * @var int[]
+	 */
+	private static $validatedinthisrequest = array();
+
+	/**
+	 * Invoices whose source PDF the module is rebuilding right now, to embed their e-invoice into it.
+	 *
+	 * Same idea as $validatedinthisrequest, for the opposite purpose: telling the afterPDFCreation hook
+	 * which PDF creations are its business. A rebuild started by generateInvoice() is not - the caller is
+	 * already producing the document, and a hook that produces it a second time also cleans up the
+	 * temporary XML the caller still needs (issue #658).
+	 *
+	 * @var array<int,bool>
+	 */
+	private static $einvoicegenerationinprogress = array();
+
 
 	// Dolibarr internal statuses
-	public const STATUS_UNKNOWN             = 0;		// By default, before the e-invoice has been generated
+	const STATUS_UNKNOWN             = 0;		// By default, before the e-invoice has been generated
 
-	public const STATUS_NOT_GENERATED       = 5;		// To sync
-	public const STATUS_GENERATED           = 10;
-	public const STATUS_AWAITING_VALIDATION = 15;		// Einvoice received but not yet analyzed by your AP
-	public const STATUS_AWAITING_ACK        = 20;		// Einvoice received and analyzed by your AP. Next step happen when doing sync.
-	public const STATUS_ERROR               = 25;
+	const STATUS_NOT_GENERATED       = 5;		// Not yet generated but must be generate then sync
+	const STATUS_GENERATED           = 10;		// To sync
+	const STATUS_AWAITING_VALIDATION = 15;		// Einvoice sent to your AP, but not yet analyzed by your AP
+	const STATUS_AWAITING_ACK        = 20;		// Einvoice sent to your AP. next step happen when doing sync.
 
-	public const STATUS_IGNORE_2            = 98;		// Never sync (for another reason than ereporting, not used yet)
-	public const STATUS_IGNORE              = 99;		// Never sync
+	const STATUS_ERROR               = 25;		// Unknown error, should not happe
+
+	const STATUS_IGNORE_2            = 98;		// Never sync (for another reason than ereporting, not used yet)
+	const STATUS_IGNORE              = 99;		// Never sync (will be processed by ereporting)
+
+	/**
+	 * The two codes above, as a list: they keep an invoice out of the e-invoicing scope, it is never
+	 * generated nor sent (B2C invoices reported by e-reporting, TakePOS tickets synced by the cash
+	 * closing, ...). Grouped here so that adding an "ignore" code is honoured by every caller at
+	 * once, through isIgnoredStatus().
+	 */
+	const STATUS_IGNORE_CODES = [
+		self::STATUS_IGNORE,
+		self::STATUS_IGNORE_2
+	];
+
+	/**
+	 * Processing rule under which a platform files a flow as B2B international: the lifecycle then
+	 * belongs to e-reporting and the platform refuses every status but the payment event (issue #799).
+	 */
+	const PROCESSING_RULE_INTERNATIONAL = 'B2BInt';
 
 	// PDP / PA normalized statuses
 	// public const STATUS_DEPOSITED           = 200;
@@ -91,115 +135,117 @@ class EInvoicing
 	 * Invoice deposited
 	 * Status sent only by the PDP/PA
 	 */
-	public const STATUS_DEPOSITED = 200;
+	const STATUS_DEPOSITED = 200;
 
 	/**
 	 * Invoice issued
 	 * Status sent only by the PDP/PA
 	 */
-	public const STATUS_ISSUED = 201;
+	const STATUS_ISSUED = 201;
 
 	/**
 	 * Invoice received
 	 * Status sent only by the PDP/PA
 	 */
-	public const STATUS_RECEIVED = 202;
+	const STATUS_RECEIVED = 202;
 
 	/**
 	 * Invoice made available
 	 * Status sent only by the PDP/PA
 	 */
-	public const STATUS_AVAILABLE = 203;
+	const STATUS_AVAILABLE = 203;
 
 	/**
 	 * Invoice taken over
 	 * - Customer invoice: received from the PDP
 	 * - Supplier invoice: can be sent by Dolibarr (optional)
 	 */
-	public const STATUS_TAKEN_OVER = 204;
+	const STATUS_TAKEN_OVER = 204;
 
 	/**
 	 * Invoice approved
 	 * - Customer invoice: received from the PDP
 	 * - Supplier invoice: can be sent by Dolibarr (optional)
 	 */
-	public const STATUS_APPROVED = 205;
+	const STATUS_APPROVED = 205;
 
 	/**
 	 * Invoice partially approved
 	 * - Customer invoice: received from the PDP
 	 * - Supplier invoice: can be sent by Dolibarr (optional)
 	 */
-	public const STATUS_PARTIALLY_APPROVED = 206;
+	const STATUS_PARTIALLY_APPROVED = 206;
 
 	/**
 	 * Invoice disputed
 	 * - Customer invoice: received from the PDP
 	 * - Supplier invoice: can be sent by Dolibarr (optional)
 	 */
-	public const STATUS_DISPUTED = 207;
+	const STATUS_DISPUTED = 207;
 
 	/**
 	 * Invoice suspended
 	 * - Customer invoice: received from the PDP
 	 * - Supplier invoice: can be sent by Dolibarr (optional)
 	 */
-	public const STATUS_SUSPENDED = 208;
+	const STATUS_SUSPENDED = 208;
 
 	/**
 	 * Invoice refused
 	 * - Customer invoice: received from the PDP
 	 * - Supplier invoice: can be sent by Dolibarr (mandatory)
 	 */
-	public const STATUS_REFUSED = 210;
+	const STATUS_REFUSED = 210;
 
 	/**
 	 * Payment transmitted
 	 * - Customer invoice: received from the PDP
 	 * - Supplier invoice: can be sent by Dolibarr (optional, recommended)
 	 */
-	public const STATUS_PAYMENT_SENT = 211;
+	const STATUS_PAYMENT_SENT = 211;
 
 	/**
 	 * Invoice paid
 	 * - Customer invoice: can be sent by Dolibarr (optional, recommended)
 	 * - Supplier invoice: /
 	 */
-	public const STATUS_PAID = 212;
+	const STATUS_PAID = 212;
 
 	/**
 	 * Invoice completed
 	 * - Customer invoice: /
 	 * - Supplier invoice: /
 	 */
-	public const STATUS_COMPLETED = 209;
+	const STATUS_COMPLETED = 209;
 
 	/**
 	 * Invoice rejected (technical)
-	 * - Customer invoice: received from the PDP
-	 * - Supplier invoice: /
+	 * - Customer invoice: received from the PDP, whichever platform rejected it
+	 * - Supplier invoice: received from the PDP, rejected in reception by OUR platform
 	 */
-	public const STATUS_REJECTED = 213;
+	const STATUS_REJECTED = 213;
 
 	/**
 	 * List of Einvoice status
 	 */
-	public const STATUS_LABEL_KEYS = [
+	const STATUS_LABEL_KEYS = [
 		// Dolibarr
 		self::STATUS_UNKNOWN             => 'EInvStatusUnknown',
 		self::STATUS_IGNORE              => 'EInvStatusDoNotSync',		// To exclude invoice from einvoice sync (ereporting)
 		//self::STATUS_IGNORE_2            => 'EInvStatusDoNotSync2',		// To exclude invoice from einvoice sync (for other reason, not used yet)
 		self::STATUS_NOT_GENERATED       => 'EInvStatusNotGenerated',
-		self::STATUS_ERROR               => 'EInvStatusError',			// Error in generation by Dolibarr
 		self::STATUS_GENERATED           => 'EInvStatusGenerated',
 		self::STATUS_AWAITING_VALIDATION => 'EInvStatusAwaitingValidation',
 		self::STATUS_AWAITING_ACK        => 'EInvStatusAwaitingAck',
 
 		// PDP / PA
-		self::STATUS_DEPOSITED           => 'EInvStatus200Deposited',
-		self::STATUS_ISSUED              => 'EInvStatus201Issued',
+		self::STATUS_DEPOSITED           => 'EInvStatus200Deposited',				// Accepted by seller AP
+		self::STATUS_REJECTED            => 'EInvStatus213Rejected',				// Rejected by an AP, see getStatusLabel()
+
+		self::STATUS_ISSUED              => 'EInvStatus201Issued',					// Issued by seller AP to customer AP
 		self::STATUS_RECEIVED            => 'EInvStatus202Received',
-		self::STATUS_AVAILABLE           => 'EInvStatus203Available',
+		self::STATUS_AVAILABLE           => 'EInvStatus203Available',				// Available to customer
+		self::STATUS_REFUSED             => 'EInvStatus210Refused',					// Refused by customer
 		self::STATUS_TAKEN_OVER          => 'EInvStatus204TakenOver',
 		self::STATUS_APPROVED            => 'EInvStatus205Approved',
 		self::STATUS_PARTIALLY_APPROVED  => 'EInvStatus206PartiallyApproved',
@@ -207,14 +253,14 @@ class EInvoicing
 		self::STATUS_SUSPENDED           => 'EInvStatus208Suspended',
 		self::STATUS_COMPLETED           => 'EInvStatus209Completed',
 		self::STATUS_PAYMENT_SENT        => 'EInvStatus211PaymentTransmitted',
-		self::STATUS_PAID                => 'EInvStatus212Paid',
-		self::STATUS_REFUSED             => 'EInvStatus210Refused',
-		self::STATUS_REJECTED            => 'EInvStatus213Rejected',
+		self::STATUS_PAID                => 'EInvStatus212PaymentReceived',
+
+		self::STATUS_ERROR               => 'EInvStatusError',			// Error in generation by Dolibarr
 	];
 
 
 	// All reasons with their details (Used when sending supplier invoices status: Refused, Disputed, Suspended, Partially Approved)
-	private const REASONS = [
+	const REASONS = [
 		"NON_TRANSMISE" => [
 			"label" => "ReasonRecipientNotConnected",
 			"desc" => "This reason is used ONLY with the \"DEPOSITED\" status to indicate that the invoice could not be transmitted because the recipient (BUYER), although present in the PPF Directory, has no active invoice reception address (i.e., connected to an Approved Platform for reception)."
@@ -398,7 +444,7 @@ class EInvoicing
 	];
 
 	// Codes reasons by status
-	private const REASONS_CODE_FOR_STATUS = [
+	const REASONS_CODE_FOR_STATUS = [
 		self::STATUS_DISPUTED => [
 			"AUTRE",
 			"COORD_BANC_ERR",
@@ -456,15 +502,132 @@ class EInvoicing
 			"JUSTIF_ABS",
 			"ROUTAGE_ERR",
 			"CMD_ERR"
+		],
+
+		// Read-only, unlike the four above: a rejection is posted by a platform, never sent by us. The
+		// union of the two columns XP Z12-012 annex A gives it ("REJETÉE à l'Emission" and "REJETÉE (en
+		// Réception)"), which differ by "DEST_INC" alone - the seller's AP is the only one that can find
+		// the recipient missing from the directory. Kept here so a received reason gets translated.
+		self::STATUS_REJECTED => [
+			"MONTANTTOTAL_ERR",
+			"CALCUL_ERR",
+			"DOUBLON",
+			"DEST_INC",
+			"ADR_ERR",
+			"REJ_SEMAN",
+			"REJ_UNI",
+			"REJ_COH",
+			"REJ_ADR",
+			"REJ_CONT_B2G",
+			"REJ_REF_PJ",
+			"REJ_ASS_PJ"
 		]
 	];
 
-	public const STATUS_REQUIRING_REASONS = [
+	/**
+	 * Reason code a platform gives a rejection it raised because it already holds the invoice
+	 * (XP Z12-012 annex A, "Facture en doublon (déjà émise / réçue)").
+	 */
+	const REASON_DUPLICATE = 'DOUBLON';
+
+	/**
+	 * Lifecycle statuses that prove a platform took the document into the circuit. Their presence is
+	 * what tells a duplicate rejection of a NEW transmission from the rejection of a document that
+	 * never got through - see isTransmissionOnlyRejection().
+	 */
+	const STATUSES_PROVING_TRANSMISSION = [
+		self::STATUS_DEPOSITED,
+		self::STATUS_ISSUED,
+		self::STATUS_RECEIVED,
+		self::STATUS_AVAILABLE,
+		self::STATUS_TAKEN_OVER,
+		self::STATUS_APPROVED,
+		self::STATUS_PARTIALLY_APPROVED,
+		self::STATUS_COMPLETED,
+		self::STATUS_PAYMENT_SENT,
+		self::STATUS_PAID
+	];
+
+	/**
+	 * RoleCode of the buyer among the recipients a CDAR addresses a status to (CdarHandler::ROLE_BY).
+	 * Its presence on a rejection is what says the buyer's platform posted it - see getStatusLabel().
+	 */
+	const CDAR_ROLE_BUYER = 'BY';
+
+	const STATUS_REQUIRING_REASONS = [
 		self::STATUS_REFUSED,
 		self::STATUS_DISPUTED,
 		self::STATUS_PARTIALLY_APPROVED,
 		self::STATUS_SUSPENDED
 	];
+
+	/**
+	 * The statuses by which a buyer accepts a received document, in whole or in part, and commits to
+	 * settling it. "Disputed", "Suspended" and "Refused" are deliberately not here: none of them
+	 * accepts anything.
+	 */
+	const STATUSES_ACCEPTING_A_DOCUMENT = [
+		self::STATUS_APPROVED,
+		self::STATUS_PARTIALLY_APPROVED
+	];
+
+	/**
+	 * Name, into llx_einvoicing_extrafields, of the mark left on a supplier invoice the import could
+	 * not make total what the received document announces. Holds the announced BT-110 and BT-112, so
+	 * the block it carries can be lifted the moment the invoice totals them (issue #861).
+	 */
+	const EXTRAFIELD_TOTALS_MISMATCH = 'import_totals_mismatch';
+
+	/**
+	 * Name, into llx_einvoicing_extrafields, of the note left on a supplier invoice whose EXTENDED document
+	 * announces its VAT rounded per rate while its totals add up the VAT rounded per line. Holds both VAT
+	 * totals, so the card can tell why the invoice differs from BT-110 (issue #1166).
+	 */
+	const EXTRAFIELD_VAT_ROUNDED_PER_LINE = 'import_vat_rounded_per_line';
+
+	/**
+	 * Name, into llx_einvoicing_extrafields, of the order reference the supplier declared on the
+	 * invoice it sent (BT-13). Kept whether or not it matched a purchase order of Dolibarr.
+	 */
+	const EXTRAFIELD_BUYER_ORDER_REFERENCE = 'buyer_order_reference';
+
+	/**
+	 * Name, into llx_einvoicing_extrafields, of the discounts the import created for the document level
+	 * allowances (BG-20) of a received invoice, comma separated. An import made again deletes them before
+	 * creating them anew: only freed, they would stay available as credit on the vendor.
+	 */
+	const EXTRAFIELD_IMPORTED_DISCOUNTS = 'import_discount_ids';
+
+	/**
+	 * Name, into llx_einvoicing_extrafields, of the buyer reference (BT-10): a reference owned by the
+	 * buyer, used to route the invoice inside its own organisation (business unit, service reference,
+	 * internal mailbox...). A plain EN 16931 core term, unrelated to the public sector, so it is kept
+	 * per invoice and offered whatever the Chorus Pro option (issue #678).
+	 */
+	const EXTRAFIELD_BUYER_REFERENCE = 'buyer_reference';
+
+	/**
+	 * Name, into llx_einvoicing_extrafields (element_type 'societe'), of the per-supplier override of
+	 * EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION. '1' forces the behaviour on for that supplier, '0'
+	 * forces it off, no row inherits the global default. See shouldMergeLineChargesIntoDescription().
+	 */
+	const EXTRAFIELD_MERGE_LINE_CHARGES = 'merge_line_charges';
+
+	/**
+	 * ISO/IEC 6523 scheme identifier of the French routing code ("code de routage"), the scheme the
+	 * Chorus Pro "code service exécutant" is declared under as BT-46 by BR-FR-CPRO-11 and
+	 * BR-FR-CPRO-13 of XP Z12-012. Not to be confused with 0225 (e-invoice address) nor with 0002 /
+	 * 0009 (SIREN / SIRET), which identify the legal entity itself.
+	 */
+	const SCHEME_FR_ROUTING_CODE = '0224';
+
+	/**
+	 * @var string ISO 6523 scheme of a French SIRET, the identifier of an establishment.
+	 *
+	 * BR-FR-CPRO-10 of XP Z12-012 makes it mandatory as a private identifier of the buyer (BT-46) on a
+	 * B2G invoice: Chorus Pro routes on the establishment, where 0002 identifies the legal entity (SIREN).
+	 */
+	const SCHEME_FR_SIRET = '0009';
 
 
 	/**
@@ -475,6 +638,66 @@ class EInvoicing
 	public function __construct($db)
 	{
 		$this->db = $db;
+	}
+
+	/**
+	 * Record that a customer invoice has just been validated, from the BILL_VALIDATE trigger.
+	 *
+	 * @param  int	$invoiceid	Id of the validated invoice
+	 * @return void
+	 */
+	public static function setInvoiceValidatedInThisRequest($invoiceid)
+	{
+		if ($invoiceid > 0 && !in_array((int) $invoiceid, self::$validatedinthisrequest, true)) {
+			self::$validatedinthisrequest[] = (int) $invoiceid;
+		}
+	}
+
+	/**
+	 * Tell whether this customer invoice has been validated during the current request.
+	 *
+	 * @param  int	$invoiceid	Id of the invoice
+	 * @return bool				True if the invoice went through BILL_VALIDATE in this very request
+	 */
+	public static function isInvoiceValidatedInThisRequest($invoiceid)
+	{
+		return in_array((int) $invoiceid, self::$validatedinthisrequest, true);
+	}
+
+	/**
+	 * Record that the module is rebuilding the source PDF of an invoice to embed its e-invoice into it.
+	 *
+	 * That rebuild goes through generateDocument(), which fires the afterPDFCreation hook - whose job is
+	 * to produce the e-invoice, which is exactly what the caller is already doing. Left alone, the hook
+	 * re-enters the generation, produces the document a second time and deletes the temporary XML the
+	 * outer call still holds a path to (issue #658).
+	 *
+	 * @param  int	$invoiceid	Id of the invoice whose source PDF is being rebuilt
+	 * @param  bool	$inprogress	True when the rebuild starts, false when it is over
+	 * @return void
+	 */
+	public static function setEInvoiceGenerationInProgress($invoiceid, $inprogress)
+	{
+		$invoiceid = (int) $invoiceid;
+		if ($invoiceid <= 0) {
+			return;
+		}
+		if ($inprogress) {
+			self::$einvoicegenerationinprogress[$invoiceid] = true;
+		} else {
+			unset(self::$einvoicegenerationinprogress[$invoiceid]);
+		}
+	}
+
+	/**
+	 * Tell whether the module is itself rebuilding the source PDF of this invoice right now.
+	 *
+	 * @param  int	$invoiceid	Id of the invoice
+	 * @return bool				True while generateInvoice() is rebuilding the PDF it needs
+	 */
+	public static function isEInvoiceGenerationInProgress($invoiceid)
+	{
+		return !empty(self::$einvoicegenerationinprogress[(int) $invoiceid]);
 	}
 
 
@@ -583,18 +806,86 @@ class EInvoicing
 	/**
 	 * Return label for an e-invoice status code
 	 *
-	 * @param int|string 	$code		Code
-	 * @return string					Label
+	 * "Rejected" (213) is the only code XP Z12-012 lets two different platforms issue (annex A, sheet
+	 * "Acteurs CDV", where it has one row per issuer): the seller's AP rejects at emission, the buyer's
+	 * AP at reception. Two things tell them apart, and neither is the code (issue #973):
+	 *
+	 * - the element. XP Z12-014 annex A 2.2 forbids transmitting an emission rejection to the
+	 *   recipient, so a 213 carried by a supplier invoice is necessarily the buyer's AP;
+	 * - who the status was addressed to. The same sheet gives the reception rejection two recipients,
+	 *   the seller AND the buyer, and the emission one only the seller. Read from the CDAR and stored
+	 *   as lc_recipient_roles; absent on a message recorded before that column existed, and the label
+	 *   then names neither AP rather than guess.
+	 *
+	 * @param int|string 	$code				Code
+	 * @param string	 	$elementType		Element the status is carried by ('facture', 'invoice_supplier'), when known
+	 * @param string		$recipientRoles		RoleCodes the status was addressed to ('SE', 'SE,BY'), when known
+	 * @return string							Label
 	 */
-	public function getStatusLabel($code)
+	public function getStatusLabel($code, $elementType = '', $recipientRoles = '')
 	{
 		global $langs;
 
 		$code = (int) $code;
 
+		if ($code === self::STATUS_REJECTED) {
+			$key = $this->rejectionLabelKey($elementType, $recipientRoles);
+			if ($key !== '') {
+				return $langs->transnoentitiesnoconv($key);
+			}
+		}
+
 		return $langs->transnoentitiesnoconv(
 			self::STATUS_LABEL_KEYS[$code] ?? 'EInvStatusUnknown'
 		);
+	}
+
+	/**
+	 * Which of the two rejections a 213 is, as a translation key, or '' when it cannot be told.
+	 *
+	 * @param string	$elementType		Element the status is carried by
+	 * @param string	$recipientRoles		RoleCodes the status was addressed to
+	 * @return string						Translation key, '' to fall back on the neutral label
+	 */
+	private function rejectionLabelKey($elementType, $recipientRoles)
+	{
+		if ($elementType === 'invoice_supplier') {
+			return 'EInvStatus213RejectedByBuyerAP';
+		}
+
+		$roles = array_filter(array_map('trim', explode(',', strtoupper((string) $recipientRoles))));
+		if (empty($roles)) {
+			return '';
+		}
+
+		return in_array(self::CDAR_ROLE_BUYER, $roles, true) ? 'EInvStatus213RejectedByBuyerAP' : 'EInvStatus213RejectedBySellerAP';
+	}
+
+	/**
+	 * Translated label of a lifecycle reason code (MDT-108), for a status that carries one.
+	 *
+	 * Falls back on the raw code so a reason the module does not know - a platform extension, or a code
+	 * added to XP Z12-012 after this release - is still shown rather than swallowed.
+	 *
+	 * @param int|string	$status			Lifecycle status the reason was given with
+	 * @param string		$reasonCode		Reason code read from the CDAR (lc_reason_code)
+	 * @return string						Translated label, the raw code when unknown, '' when there is none
+	 */
+	public function getReasonLabel($status, $reasonCode)
+	{
+		global $langs;
+
+		$reasonCode = (string) $reasonCode;
+		if ($reasonCode === '') {
+			return '';
+		}
+
+		$reasons = $this->getReasonsByStatus($status, 0);
+		if (!is_array($reasons) || !isset($reasons[$reasonCode]['label'])) {
+			return $reasonCode;
+		}
+
+		return $langs->transnoentitiesnoconv($reasons[$reasonCode]['label']);
 	}
 
 	/**
@@ -617,6 +908,58 @@ class EInvoicing
 		}
 
 		return $einvoicefilepath;
+	}
+
+	/**
+	 * Get the path of the CII XML file of an invoice, if the invoice has one to read.
+	 *
+	 * Not getEInvoiceFilePath(): that one names the file of the protocol currently configured, so it
+	 * answers a PDF under Factur-X. Only the XML is concerned here, because it is the only one of the
+	 * two Dolibarr cannot show - a PDF it previews on its own. An invoice generated before the setup
+	 * was changed keeps its XML, which stays readable whatever the protocol says today.
+	 *
+	 * @param 	?string 	$invoiceRef 	The reference of the invoice.
+	 * @return 	string						Full path of the XML, empty string if the invoice has none.
+	 */
+	public function getEInvoiceXmlFilePath($invoiceRef)
+	{
+		global $conf;
+
+		$filename = dol_sanitizeFileName($invoiceRef);
+		$path = $conf->invoice->multidir_output[$conf->entity] . '/' . $filename . '/' . $filename . '_cii.xml';
+
+		return is_readable($path) ? $path : '';
+	}
+
+	/**
+	 * Get the path of the CII XML received for a supplier invoice, if there is one to read.
+	 *
+	 * The file is the one the reception saved beside the supplier invoice, so the naming is the one of
+	 * CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment(): the reference of the supplier names
+	 * the file, and the reference of the invoice names its directory. A document received in Factur-X
+	 * is a PDF, which Dolibarr previews on its own and which is not concerned here.
+	 *
+	 * @param 	FactureFournisseur 	$supplierInvoice 	Supplier invoice the document was received for.
+	 * @return 	string									Full path of the XML, empty string if there is none.
+	 */
+	public function getSupplierEInvoiceXmlFilePath($supplierInvoice)
+	{
+		global $conf;
+
+		if (!is_object($supplierInvoice) || empty($supplierInvoice->ref) || empty($supplierInvoice->ref_supplier)) {
+			return '';
+		}
+
+		$base = $conf->fournisseur->dir_output . '/facture/';
+		$ref = dol_sanitizeFileName($supplierInvoice->ref);
+		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . '_einvoice.xml');
+
+		$path = $base . get_exdir($supplierInvoice->id, 2, 0, 0, $supplierInvoice, 'invoice_supplier') . $ref . '/' . $filename;
+		if (is_readable($path)) {
+			return $path;
+		}
+
+		return '';
 	}
 
 	/**
@@ -653,8 +996,11 @@ class EInvoicing
 	 */
 	public function getEinvoiceStatusOptions($includeCodesInLabel = 0, $onlyPdpStatuses = 0, $onlySendable = 0, $onlyCreate = 0, $onlyOut = 0, $disableUnknownStatus = 1, $addseparator = 0)
 	{
-		global $langs;
+		global $langs, $mysoc;
+
 		$options = [];
+
+		// Add separators
 		foreach (self::STATUS_LABEL_KEYS as $code => $labelKey) {
 			if ($code == self::STATUS_GENERATED && $addseparator) {
 				$options['separator1'] = array('label' => '--------------------', 'disabled' => 1);
@@ -666,8 +1012,12 @@ class EInvoicing
 			}
 			$options[$code] = $value;
 
-			if ($code == self::STATUS_PAID && $addseparator) {
+			if ($code == self::STATUS_AWAITING_ACK && $addseparator) {
 				$options['separator2'] = array('label' => '--------------------', 'disabled' => 1);
+			}
+
+			if ($code == self::STATUS_PAID && $addseparator) {
+				$options['separator3'] = array('label' => '--------------------', 'disabled' => 1);
 			}
 		}
 
@@ -679,6 +1029,9 @@ class EInvoicing
 			// Remove Dolibarr internal statuses
 			unset($options[self::STATUS_UNKNOWN]);
 			unset($options[self::STATUS_IGNORE]);
+			// STATUS_IGNORE_2 is commented out of STATUS_LABEL_KEYS, so the key is never there to
+			// begin with. The line stays for the day that entry is turned on again.
+			// @phpstan-ignore unset.offset
 			unset($options[self::STATUS_IGNORE_2]);
 			unset($options[self::STATUS_NOT_GENERATED]);
 		}
@@ -721,20 +1074,99 @@ class EInvoicing
 			unset($options[self::STATUS_REFUSED]);
 		}
 
-		// TODO : remove statuses that cannot be chronologically be sent (for example, it doesn't make sense to send "Taken over" if invoice is refused), PDP may accept them and ignore them without returning an error.
+		// TODO : remove statuses that cannot be chronologically be sent (for example, it doesn't make sense to send "Taken over" if invoice is refused), AP may accept them and ignore them without returning an error.
+
+		// Convert array into array for combo list
+		foreach ($options as $key => $val) {
+			if (! is_array($val)) {
+				$options[$key] = array('label' => $val, 'data-html' => $val);
+			}
+		}
+
+		// Complete label if using an AP in France
+		if ($mysoc->country_code == 'FR') {
+			$mandatorystatus = array(200, 210, 212, 213);
+			foreach ($options as $key => $val) {
+				if ($key >= 200 && $key < 300) {
+					$options[$key]['data-html'] .= (in_array($key, $mandatorystatus) ? '  <span class="small opacitymedium">('.$key.' - '.$langs->trans("Mandatory").')</span>' : '  <span class="small opacitymedium">('.$key.')</span>');
+				}
+			}
+		}
+
+		// Dolibarr 17 prints the data-* values of a combo option as they are (Form::selectarray()), while
+		// 18 and later escape them. The HTML added just above would close the attribute on its first quote
+		// there and leave an invalid <option>, so escape it for those cores only: doing it on the others
+		// would escape it twice and show the tags as text.
+		if ((float) DOL_VERSION < 18) {
+			foreach ($options as $key => $val) {
+				if (isset($val['data-html'])) {
+					$options[$key]['data-html'] = dol_escape_htmltag($val['data-html']);
+				}
+			}
+		}
+
+		// TODO
+		// Make some status disabled by setting 'disabled
 
 
 		return $options;
 	}
 
 	/**
+	 * Processing rule the platform computed for the flow that brought an invoice in ('B2B', 'B2BInt',
+	 * 'NotApplicable', ...). Read from the invoice flow, never from its lifecycle flows; a row synchronized
+	 * before the column existed falls back on the raw metadata kept in debug mode.
+	 *
+	 * @param	int		$elementId		Id of the invoice
+	 * @param	string	$elementType	Element type ('invoice_supplier')
+	 * @return	string					The rule, empty when unknown
+	 */
+	public function getFlowProcessingRule($elementId, $elementType)
+	{
+		$sql = "SELECT processing_rule, response_for_debug FROM " . $this->db->prefix() . "einvoicing_document";
+		$sql .= " WHERE fk_element_type = '" . $this->db->escape($elementType) . "'";
+		$sql .= " AND fk_element_id = " . (int) $elementId;
+		$sql .= " AND COALESCE(flow_syntax, '') <> 'CDAR'";
+		$sql .= " ORDER BY rowid DESC";
+		$sql .= $this->db->plimit(1);
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' ' . $this->db->lasterror(), LOG_ERR);
+			return '';
+		}
+		$obj = $this->db->fetch_object($resql);
+		$this->db->free($resql);
+		if (!$obj) {
+			return '';
+		}
+		if (!empty($obj->processing_rule)) {
+			return (string) $obj->processing_rule;
+		}
+		$metadata = empty($obj->response_for_debug) ? null : json_decode($obj->response_for_debug, true);
+
+		return (is_array($metadata) && !empty($metadata['processingRule'])) ? (string) $metadata['processingRule'] : '';
+	}
+
+	/**
+	 * Whether the platform filed the invoice under B2B international (see PROCESSING_RULE_INTERNATIONAL).
+	 *
+	 * @param	int		$elementId		Id of the invoice
+	 * @param	string	$elementType	Element type ('invoice_supplier')
+	 * @return	bool					True when no lifecycle status will be accepted on it
+	 */
+	public function isInternationalFlow($elementId, $elementType)
+	{
+		return $this->getFlowProcessingRule($elementId, $elementType) === self::PROCESSING_RULE_INTERNATIONAL;
+	}
+
+	/**
 	 * Statuses a user may still send by hand on an invoice received through the platform.
 	 *
-	 * The sendable list is narrowed by what the platform already accepted for that invoice. A status
-	 * it accepted is not proposed again. "Refused" (210) ends the exchange - an invoice sent back to
-	 * its vendor is not going to be paid, so nothing else is owed on it. "Approved" (205) ends nothing:
-	 * the normal order of things is to approve an invoice and then pay it, and "Payment transmitted"
-	 * (211) is precisely what is sent afterwards. An approved invoice can no longer be refused either.
+	 * A status already accepted is not proposed again, and "Refused" (210) ends the exchange. The
+	 * processing statuses are otherwise independent of one another (XP Z12-014 annex A, 2.1), so
+	 * "Payment transmitted" (211) needs no prior approval; only a draft, which cannot have been paid,
+	 * hides it. A credit note correcting an invoice we refused cannot be accepted either (issue #594).
 	 *
 	 * @param	int		$elementId		Id of the invoice
 	 * @param	string	$elementType	Element type ('invoice_supplier')
@@ -744,17 +1176,52 @@ class EInvoicing
 	 */
 	public function getSendableStatusesForReceivedInvoice($elementId, $elementType)
 	{
+		// An accepted refusal closes the exchange: nothing more is sendable on that invoice, 211 included.
 		if ($this->hasSentStatusMessage($elementId, $elementType, self::STATUS_REFUSED, 1)) {
+			return array();
+		}
+		// Filed as B2B international by the platform: no lifecycle answer will be accepted (issue #799).
+		if ($this->isInternationalFlow($elementId, $elementType)) {
 			return array();
 		}
 
 		$statuses = $this->getEinvoiceStatusOptions(1, 1, 1);
-		if ($this->hasSentStatusMessage($elementId, $elementType, self::STATUS_APPROVED, 1)) {
+		$approved = $this->hasSentStatusMessage($elementId, $elementType, self::STATUS_APPROVED, 1)
+			|| $this->hasSentStatusMessage($elementId, $elementType, self::STATUS_PARTIALLY_APPROVED, 1);
+		if ($approved) {
 			unset($statuses[self::STATUS_REFUSED]);
 		}
 		foreach (array_keys($statuses) as $code) {
 			if ($this->hasSentStatusMessage($elementId, $elementType, (int) $code, 1)) {
 				unset($statuses[$code]);
+			}
+		}
+
+		if ($elementType === 'invoice_supplier') {
+			dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
+			dol_include_once('fourn/class/fournisseur.facture.class.php');
+			if (SupplierInvoiceHelper::refusedSourceOfCreditNote((int) $elementId) > 0) {
+				foreach (self::STATUSES_ACCEPTING_A_DOCUMENT as $code) {
+					unset($statuses[$code]);
+				}
+			}
+
+			// An invoice the import could not make total what the document announces is not one to
+			// approve: approving it commits to paying a figure the vendor did not bill (issue #861).
+			// Refusing it stays offered, which is the answer such a document deserves.
+			if (SupplierInvoiceHelper::totalsMismatchBlocks((int) $elementId)) {
+				foreach (self::STATUSES_ACCEPTING_A_DOCUMENT as $code) {
+					unset($statuses[$code]);
+				}
+			}
+
+			// A draft owes nothing yet: it is not in the accounts, cannot be paid, and validating it is
+			// precisely the act of accepting it. Telling the vendor that its payment has been transmitted
+			// at that point describes something that cannot have happened. The state comes from the
+			// invoice itself, which is the core's own answer to the question.
+			$supplierInvoice = new FactureFournisseur($this->db);
+			if ($supplierInvoice->fetch((int) $elementId) > 0 && (int) $supplierInvoice->status === FactureFournisseur::STATUS_DRAFT) {
+				unset($statuses[self::STATUS_PAYMENT_SENT]);
 			}
 		}
 
@@ -823,7 +1290,7 @@ class EInvoicing
 						$einvoiceid = getDolGlobalString($uriConf);
 
 						//EINVOICING_LIVE
-						if (!preg_match('/^' . preg_replace('/\s+/', '', $mysoc->idprof1) . '/', $this->removeSpaces($einvoiceid))) {
+						if (!preg_match('/^' . removeAllSpaces($mysoc->idprof1) . '/', removeAllSpaces($einvoiceid))) {
 							//if (!empty($provider)) {
 								$baseWarnings[] = $langs->trans("FxCheckErrorRoutingIDFR", $einvoiceid);	// Your company profid must match the routing ID
 							//}
@@ -840,7 +1307,7 @@ class EInvoicing
 		if (empty($mysoc->tva_intra) && (!empty($mysoc->tva_assuj) && $mysoc->tva_assuj != 'franchise')) {
 			$baseWarnings[] = $langs->trans("FxCheckErrorVATnumber");
 		}
-		if (!empty($mysoc->tva_intra) && !preg_match('/^[A-Z]{2}[A-Z0-9]{2,12}$/', $this->removeSpaces($mysoc->tva_intra))) { // Check VAT number format: 2-letter country code + 2 to 12 alphanumeric characters
+		if (!empty($mysoc->tva_intra) && !preg_match('/^[A-Z]{2}[A-Z0-9]{2,12}$/', removeAllSpaces($mysoc->tva_intra))) { // Check VAT number format: 2-letter country code + 2 to 12 alphanumeric characters
 			$baseErrors[] = $langs->trans("FxCheckErrorVATnumberFormat");
 		}
 		if (empty($mysoc->address)) {
@@ -862,6 +1329,9 @@ class EInvoicing
 		}
 		if (!empty($baseErrors)) {
 			$res = -1;
+			if ($message) {
+				$message .= '<br>';
+			}
 			$message .= '<b>' . $langs->trans("Error") . '</b>: ' . implode('<br><b>' . $langs->trans("Error") . '</b>: ', $baseErrors);
 		}
 		if (empty($baseErrors) && empty($baseWarnings)) {
@@ -874,7 +1344,7 @@ class EInvoicing
 	/**
 	 * Validate thirdparty configuration
 	 *
-	 * @param Societe $thirdparty   Thirdparty object
+	 * @param ?Societe $thirdparty  Thirdparty object, null when the invoice carries no loaded thirdparty
 	 * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on error and 0 on warning) and info 'message'
 	 */
 	public function validatethirdpartyConfiguration($thirdparty)
@@ -886,14 +1356,26 @@ class EInvoicing
 		$baseErrors = [];
 		$baseWarnings = [];
 
+		// A private individual has no professional id, and when EINVOICING_SKIP_B2C is on that third party is
+		// out of the e-invoicing scope anyway (B2C is reported by e-reporting, not transmitted as an e-invoice):
+		// its missing SIREN must not be reported as a blocking configuration error. Detection is delegated to
+		// Societe::isACompany(), the same way needEInvoiceManagement() does, so both ends of the chain agree.
+		$isB2C = getDolGlobalInt('EINVOICING_SKIP_B2C') && is_object($thirdparty) && !$thirdparty->isACompany();
+
+		// Retrieve the SIREN/SIRET using idprof(). It can retrieve the SIREN from idprof1
+		// or derive it from idprof2 (SIRET).
+		$idprof = is_object($thirdparty) ? idprof($thirdparty) : '';
+
 		if (empty($thirdparty->name)) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerName");
 		}
-		if (empty($thirdparty->idprof1)) {
-			$baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
+		if (empty($idprof)) { // Use Idprof to retrieve SIREN that may be in idprof1 or derived from idprof2
+			if (!$isB2C) {
+				$baseErrors[] = $langs->trans("FxCheckErrorCustomerIDPROF1");
+			}
 		} elseif (!empty($thirdparty->country_code) && $thirdparty->country_code === 'FR') {
 			// Validate SIREN/SIRET format based on length (French companies only)
-			$idprof1 = preg_replace('/\s+/', '', (string) $thirdparty->idprof1);
+			$idprof1 = removeAllSpaces((string) $thirdparty->idprof1);
 			if (strlen($idprof1) === 14) {
 				if (!isValidSiret($idprof1)) {
 					$baseWarnings[] = $langs->trans("FxCheckErrorCustomerSIRETFormat");
@@ -921,24 +1403,27 @@ class EInvoicing
 		if (empty($thirdparty->country_code)) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerCountry");
 		}
-		// Check routing_id
-		$routing_id = $this->getBuyerCommunicationURI($thirdparty);
+		// Check routing_id. Without a loaded thirdparty there is no routing to read, and the missing
+		// name and professional id are already reported above.
+		$routing_id = is_object($thirdparty) ? $this->getBuyerCommunicationURI($thirdparty) : '';
 		// If EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID is off, we use the profid as einvoice id and we already have the previous error message of
 		// profid missing. But if on, we also add a message dedicated to einvoice ID.
-		if (getDolGlobalString('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID') && empty($routing_id)) {
+		// Same reason as for the professional id above: a B2C third party is not addressed on the network, so
+		// having no routing id is expected and must not block.
+		if (getDolGlobalString('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID') && empty($routing_id) && !$isB2C) {
 			$baseErrors[] = $langs->trans("FxCheckErrorCustomerRoutingID");
 		}
-		if ($thirdparty->tva_assuj && empty($thirdparty->tva_intra)) {
+		if (!empty($thirdparty->tva_assuj) && empty($thirdparty->tva_intra)) {
 			// Test VAT code only if thirdparty is subject to VAT
 			$baseWarnings[] = $langs->trans("FxCheckErrorCustomerVAT");
-		} elseif ($thirdparty->tva_assuj && !empty($thirdparty->tva_intra) && !empty($thirdparty->country_code) && $thirdparty->country_code === 'FR') {
+		} elseif (!empty($thirdparty->tva_assuj) && !empty($thirdparty->tva_intra) && !empty($thirdparty->country_code) && $thirdparty->country_code === 'FR') {
 			// Validate French intra-community VAT number format: FR + 2 alphanumeric characters + 9 digits (SIREN)
-			$vatNormalized = strtoupper(preg_replace('/\s+/', '', $thirdparty->tva_intra));
+			$vatNormalized = strtoupper(removeAllSpaces($thirdparty->tva_intra));
 			if (!preg_match('/^FR[0-9A-Z]{2}[0-9]{9}$/', $vatNormalized)) {
 				$baseWarnings[] = $langs->trans("FxCheckErrorCustomerVATFormat");
-			} elseif (!empty($thirdparty->idprof1)) {
+			} elseif (!empty(idprof($thirdparty))) {
 				// Cross-check VAT against SIREN: French VAT key is deterministic (formula: (12 + 3 * (SIREN % 97)) % 97)
-				$siren9 = substr(preg_replace('/\s+/', '', $thirdparty->idprof1), 0, 9);
+				$siren9 = substr(removeAllSpaces(idprof($thirdparty)), 0, 9);
 				if (ctype_digit($siren9) && strlen($siren9) === 9) {
 					$expectedKey = (12 + 3 * ((int) $siren9 % 97)) % 97;
 					$expectedVAT = 'FR' . str_pad((string) $expectedKey, 2, '0', STR_PAD_LEFT) . $siren9;
@@ -1016,15 +1501,29 @@ class EInvoicing
 	}
 
 	/**
+	 * Tell whether a value returned by the French National Business Registry API is masked.
+	 *
+	 * A unit under "partial diffusion" (art. A123-96 of the French commercial code) is still returned by
+	 * the API, but each protected field holds the literal string "[NON-DIFFUSIBLE]": cross-checking that
+	 * against the third party record can only ever mismatch, so the field is skipped instead of being
+	 * reported. The fields that stay public (SIREN, commune, administrative status) keep being checked.
+	 *
+	 * @param  string|null $value   Value read from the API response
+	 * @return bool                 True when the field is masked and must not be cross-checked
+	 */
+	private function _isRegistryValueMasked($value)
+	{
+		return is_string($value) && strtoupper(trim($value)) === '[NON-DIFFUSIBLE]';
+	}
+
+	/**
 	 * Check the thirdparty existence and active status via the French National Business Registry API (data.gouv.fr).
 	 * Search is performed by company name; the returned SIREN is then cross-checked against idprof1.
 	 * No authentication required. API rate limit: 7 req/s.
-	 *
-	 * This check is optional and non-blocking: an API timeout or unavailability is
-	 * silently ignored (warning logged, no error raised to the user).
+	 * Optional and non-blocking: an API timeout or unavailability is silently ignored (warning logged).
 	 * Only runs when EINVOICING_ENABLE_API_VALIDATION constant is set to 1.
 	 *
-	 * @param Societe $thirdparty   Thirdparty object to check
+	 * @param ?Societe $thirdparty  Thirdparty object to check, null when the invoice carries no loaded thirdparty
 	 * @return array{res:int, message:string} res=1 OK, res=0 warning, res=-1 blocking error (never returned by this method)
 	 */
 	private function _checkThirdpartyViaExternalAPIs($thirdparty)
@@ -1039,9 +1538,9 @@ class EInvoicing
 		// or a trade name (a third party named after its brand rather than its legal name).
 		if (
 			!empty($thirdparty->country_code) && $thirdparty->country_code === 'FR'
-			&& !empty($thirdparty->name) && !empty($thirdparty->idprof1)
+			&& !empty($thirdparty->name) && !empty(idprof($thirdparty))
 		) {
-			$siren = substr(preg_replace('/\s+/', '', $thirdparty->idprof1), 0, 9);
+			$siren = substr(removeAllSpaces(idprof($thirdparty)), 0, 9);
 			$apiUrl = 'https://recherche-entreprises.api.gouv.fr/search?q=' . urlencode($siren) . '&per_page=5';
 
 			$response = getURLContent($apiUrl, 'GET', '', 1, ['Accept: application/json']);
@@ -1075,10 +1574,12 @@ class EInvoicing
 					}
 
 					// Cross-check company name (partial match to handle legal form suffixes and abbreviations)
-					$nomApi      = strtolower(preg_replace('/[^a-z0-9]/i', '', $matchedCompany['nom_complet'] ?? ''));
+					$nameApiRaw  = $matchedCompany['nom_complet'] ?? '';
+					$nomApi      = strtolower(preg_replace('/[^a-z0-9]/i', '', $nameApiRaw));
 					$nomDolibarr = strtolower(preg_replace('/[^a-z0-9]/i', '', $thirdparty->name));
 					if (
-						!empty($nomApi) && !empty($nomDolibarr)
+						!$this->_isRegistryValueMasked($nameApiRaw)
+						&& !empty($nomApi) && !empty($nomDolibarr)
 						&& strpos($nomApi, $nomDolibarr) === false
 						&& strpos($nomDolibarr, $nomApi) === false
 					) {
@@ -1088,14 +1589,21 @@ class EInvoicing
 					// Cross-check ZIP code (objective field, no formatting ambiguity)
 					$zipApi      = trim($matchedCompany['siege']['code_postal'] ?? '');
 					$zipDolibarr = trim($thirdparty->zip ?? '');
-					if (!empty($zipApi) && !empty($zipDolibarr) && $zipApi !== $zipDolibarr) {
+					if (
+						!$this->_isRegistryValueMasked($zipApi)
+						&& !empty($zipApi) && !empty($zipDolibarr) && $zipApi !== $zipDolibarr
+					) {
 						$warnings[] = $langs->trans("FxCheckWarnZIPMismatch", $zipDolibarr, $zipApi);
 					}
 
 					// Cross-check town (case-insensitive, strip accents for robustness)
-					$townApi      = strtolower(trim($matchedCompany['siege']['libelle_commune'] ?? ''));
+					$townApiRaw   = $matchedCompany['siege']['libelle_commune'] ?? '';
+					$townApi      = strtolower(trim($townApiRaw));
 					$townDolibarr = strtolower(trim($thirdparty->town ?? ''));
-					if (!empty($townApi) && !empty($townDolibarr) && $townApi !== $townDolibarr) {
+					if (
+						!$this->_isRegistryValueMasked($townApiRaw)
+						&& !empty($townApi) && !empty($townDolibarr) && $townApi !== $townDolibarr
+					) {
 						$warnings[] = $langs->trans("FxCheckWarnTownMismatch", $thirdparty->town, $matchedCompany['siege']['libelle_commune']);
 					}
 				}
@@ -1131,6 +1639,34 @@ class EInvoicing
 			}
 		}
 
+		// BR-25: every line names what it invoices (BT-153), from the product label or the first line of
+		// the description, so a line holding neither is refused by the platform after transmission - listed
+		// here instead, before anything is sent. Title and subtotal pseudo-lines never reach the document
+		// and a discount line is named from the piece it deducts (see einvoicingDiscountLabel()). Customer
+		// invoices only: FactureFournisseurLigne fills ->description and not ->desc before 20.0.
+		$linesWithNoName = [];
+		if (!empty($invoice->lines) && is_array($invoice->lines)) {
+			foreach ($invoice->lines as $line) {
+				if ((int) $line->product_type == 9 || !empty($line->fk_remise_except)) {
+					continue;
+				}
+				$hasLabel = trim((string) ($line->product_label ?? '')) !== '';
+				$hasDesc = trim(dol_string_nohtmltag((string) ($line->desc ?? ''), 0)) !== '';
+				if (!$hasLabel && !$hasDesc) {
+					// The rank places the line on the paper, the rowid is what a correction is addressed to.
+					// Naming both is what lets whoever reads this go straight to the line and fix it.
+					// FactureLigne and FactureFournisseurLigne both hold the rank, their common parent
+					// does not declare it, and this reads whichever of the two the invoice carries.
+					// @phan-suppress-next-line PhanUndeclaredProperty
+					$rank = (int) ($line->rang ?? 0);
+					$linesWithNoName[] = ($rank ? '#'.$rank : '').' (id '.((int) $line->id).')';
+				}
+			}
+		}
+		if (!empty($linesWithNoName)) {
+			$baseErrors[] = $langs->trans("FxCheckErrorLinesWithNoName", implode(', ', $linesWithNoName));
+		}
+
 		if (!empty($baseErrors)) {
 			$res = -1;
 			$message .= '<br> Error: ' . implode('<br> Error: ', $baseErrors);
@@ -1142,14 +1678,9 @@ class EInvoicing
 	/**
 	 * Check that the setup of the instance can produce a conformant carrier for the selected format.
 	 *
-	 * Only Factur-X is concerned: a Factur-X file is a PDF/A-3 file carrying the XML (ISO 19005-3), and
-	 * the module can only embed the XML into the PDF the core produced - it cannot repair its pages. At
-	 * the default PDF_USE_A = 0 that PDF is drawn with the Standard 14 fonts, which are not embedded,
-	 * while 6.2.11.4.1 requires every font used for rendering to be: the result is rejected by any PDF/A
-	 * validator (veraPDF), whatever the container of the module does right, and the invoice is not a
-	 * conformant Factur-X. The setting belongs to the core and is only read here, never written: the
-	 * user is told to raise it, in "Home - Setup - PDF", or to use CII - which is the recommended format
-	 * and needs no PDF at all.
+	 * Only Factur-X is concerned: at the core default PDF_USE_A = 0 the Standard 14 fonts are not
+	 * embedded, while ISO 19005-3 6.2.11.4.1 requires every rendering font to be, so veraPDF rejects the
+	 * file. The setting belongs to the core, so the user is told to raise it, or to use CII.
 	 *
 	 * @return array{res:int, message:string} Returns array with 'res' (1 when nothing to report, 0 on warning) and info 'message'
 	 */
@@ -1170,8 +1701,8 @@ class EInvoicing
 	/**
 	 * Check required information for E-Invoicing
 	 *
-	 * @param Facture 	$invoice   Invoice object
-	 * @return array{res:int, message:string} Returns array with 'res' (1 on success, -1 on failure and 0 on warning) and info 'message'
+	 * @param 	Facture 	$invoice   			Invoice object
+	 * @return 	array{res:int, message:string} 	Returns array with 'message' and 'res' (1 on success, -1 on failure, 0 on warning)
 	 */
 	public function checkRequiredinformations($invoice)
 	{
@@ -1230,6 +1761,8 @@ class EInvoicing
 
 		$message = implode('<br>', $messages);
 
+		dol_syslog("checkRequiredinformations return res=" . $res, LOG_DEBUG, 0, "einvoicing");
+
 		return ['res' => $res, 'message' => $message];
 	}
 
@@ -1255,18 +1788,22 @@ class EInvoicing
 		// e-invoicing for eligible (FR) invoices. Preselect the qualified default instead: "To generate / STATUS_NOT_GENERATED" for invoices that must be managed,
 		// "Do not manage" otherwise.
 		if ($mode == 'create' || $action == 'create') {
-			// At creation the hook receives a blank Facture object: its socid is NOT set yet (the
-			// selected thirdparty lives in a local var of card.php and is passed via $parameters['socid'],
-			// with GETPOST('socid') as fallback). Resolve it so we can load the thirdparty and decide.
-			if (!is_object($object->thirdparty ?? null)) {
-				$socid = !empty($object->socid) ? (int) $object->socid : (int) ($parameters['socid'] ?? GETPOSTINT('socid'));
-				if ($socid > 0) {
-					$object->socid = $socid;
-					$object->fetch_thirdparty();
+			if (GETPOSTISSET('seteinvoicestatus')) {
+				$currentStatusInfo['code'] = GETPOSTINT('seteinvoicestatus');
+			} else {
+				// At creation the hook receives a blank Facture object: its socid is NOT set yet (the
+				// selected thirdparty lives in a local var of card.php and is passed via $parameters['socid'],
+				// with GETPOST('socid') as fallback). Resolve it so we can load the thirdparty and decide.
+				if (!is_object($object->thirdparty ?? null)) {
+					$socid = !empty($object->socid) ? (int) $object->socid : (int) ($parameters['socid'] ?? GETPOSTINT('socid'));
+					if ($socid > 0) {
+						$object->socid = $socid;
+						$object->fetch_thirdparty();
+					}
 				}
+				$need = is_object($object->thirdparty ?? null) ? $this->needEInvoiceManagement($object) : 0;
+				$currentStatusInfo['code'] = $need ? $need : self::STATUS_IGNORE;
 			}
-			$need = is_object($object->thirdparty ?? null) ? $this->needEInvoiceManagement($object) : 0;
-			$currentStatusInfo['code'] = $need ? $need : self::STATUS_IGNORE;
 		}
 
 		$resprints = '';
@@ -1319,17 +1856,15 @@ class EInvoicing
 		$langs->load("suppliers");
 		$resprints .= '<td>';
 		if ($action != 'create') {
-			$resprints .= '<a href="' . $url . '">' . $langs->trans("History") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
+			$resprints .= '<a href="' . $url . '" title="'.$langs->trans("History").'"><i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
 		}
 		$resprints .= '</td>';
 		$resprints .= '</tr>';
 
 		$info = $currentStatusInfo['info'] ?? '';
 
+		// Not tied to isEditable(): these fields are still set once the invoice is locked (a 212 after payment).
 		$editenable = $user->hasRight('facture', 'creer');
-		if (method_exists($object, 'isEditable') && !$object->isEditable()) {
-			$editenable = false;
-		}
 		if ($action == 'create') {
 			$editenable = false;
 		}
@@ -1343,6 +1878,7 @@ class EInvoicing
 		$resprints .= $langs->trans("einvoiceStatusFieldHelp") . '"></i>';*/
 		$resprints .= '</td>';
 		$resprints .= '<td>';
+		$resprints .= '<!-- data from llx_einvoicing_extlinks -->';
 		if ($action == 'editeinvoicestatus' || $action == 'create') {
 			if ($action != 'create') {
 				$resprints .=  '<form name="seteinvoicestatus" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
@@ -1356,6 +1892,18 @@ class EInvoicing
 			// Also status we can't modify manually must be greyed/disabled
 			$arrayofeinvoicestatus = $this->getEinvoiceStatusOptions(0, 0, 0, ($action == 'create' ? 1 : 0), 0, ((empty($currentStatusInfo['code']) && $action != 'create') ? 0 : 1), ($action != 'create' ? 1 : 0));
 
+			// If we create a credit note from another invoice, if original invoice has a status to ignore einvoicing, we propagate it by default to the new credit note to create
+			if (!GETPOSTISSET('seteinvoicestatus') && $action == 'create' && GETPOSTINT('fac_avoir') > 0 && GETPOSTINT('type') == Facture::TYPE_CREDIT_NOTE) {
+				$tmpinvoicesrc = new Facture($this->db);
+				// A source we cannot read tells us nothing: leave the default the qualification rules just computed.
+				if ($tmpinvoicesrc->fetch(GETPOSTINT('fac_avoir')) > 0) {
+					$tmpinvoicesrcstatus = $this->fetchLastknownInvoiceStatus($tmpinvoicesrc->id, $tmpinvoicesrc->ref);
+					if (self::isIgnoredStatus($tmpinvoicesrcstatus['code'])) {
+						$currentStatusInfo['code'] = $tmpinvoicesrcstatus['code'];
+					}
+				}
+			}
+
 			$resprints .=  $form->selectarray("seteinvoicestatus", $arrayofeinvoicestatus, $currentStatusInfo['code'], 0, 0, 0, '', 1);
 			if ($action != 'create') {
 				$resprints .=  '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
@@ -1365,17 +1913,30 @@ class EInvoicing
 			if (!empty($currentStatusInfo['otherprovider'])) {
 				$resprints .=  '<span class="small">'.img_warning().' '.$langs->trans("WarningEinvoicingInvoiceStatusDifferentProvider", $currentStatusInfo['otherprovider']).'</span><br>';
 			}
-			$resprints .= '<span id="einvoice-status">';
+			$resprints .= '<span id="einvoice-status" class="valignmiddle">';
 			if ($currentStatusInfo['code'] == self::STATUS_NOT_GENERATED) {
 				$resprints .= '<span class="opacitymedium">' . $currentStatusInfo['status'] . '</span>';
 			} else {
 				$resprints .= $currentStatusInfo['status'];
 			}
-			$resprints .= '</span><br>';
-			$resprints .= '<span id="einvoice-info" class="clearboth small opacitymedium">' . dolPrintHTML($info) . '</span>';
+			$resprints .= '</span> ';
+			$resprints .= '<div id="einvoice-info" class="clearboth small opacitymedium valignmiddle inline-block" style="max-width:100%;max-height:6em;overflow:auto;overflow-wrap:anywhere;word-break:break-word;">';
+			$resprints .= $form->textwithpicto('', $info);
+			$resprints .= '</div>';
 		}
 		$resprints .= '</td>';
 		$resprints .= '</tr>';
+
+		// For STATUS_IGNORE invoices (in view mode), replace operational fields with a single
+		// explanatory line. The status field above stays editable so the user can override manually.
+		if ($action != 'create' && (int) ($currentStatusInfo['code'] ?? 0) === self::STATUS_IGNORE) {
+			$reason = $this->getIgnoreReason($object) ?? $langs->trans('EInvoiceIgnoreReasonUserChoice');
+			$resprints .= '<tr class="treinvoicing_collapseseparator">';
+			$resprints .= '<td>' . $form->textwithpicto($langs->trans('EInvoiceIgnoreReasonLabel'), $langs->transnoentitiesnoconv('EInvoiceIgnoreReasonLabelHelp')) . '</td>';
+			$resprints .= '<td>' . dol_escape_htmltag((string) $reason) . '</td>';
+			$resprints .= '</tr>';
+			return $resprints;
+		}
 
 		// Display precheck result if errors or warnings
 		if (!empty($currentStatusInfo['ap_precheck_result'])) {
@@ -1414,19 +1975,20 @@ class EInvoicing
 		// an e-invoice, instead of discovering a routing rejection (fr:213) only after transmission.
 		// Only for live mode, not for test mode (no directory check in test mode)
 		// Only for invoices not yet transmitted
-		if (($object->element == 'facture' || $object->element == 'invoice') && $action != 'create' && getDolGlobalInt('EINVOICING_PRECHECK_DIRECTORY', 1) && !empty(getDolGlobalString('EINVOICING_LIVE')) && empty($currentStatusInfo['transmitted'])) {
+		if (($object->element == 'facture' || $object->element == 'invoice') && $action != 'create' && getDolGlobalInt('EINVOICING_PRECHECK_DIRECTORY') && !empty(getDolGlobalString('EINVOICING_LIVE')) && empty($currentStatusInfo['transmitted']) && !einvoicingIsSendDisabled()) {
 			if (!is_object($object->thirdparty ?? null) && !empty($object->socid)) {
 				$object->fetch_thirdparty();
 			}
-			$directorySiren = is_object($object->thirdparty ?? null) ? preg_replace('/[^0-9]/', '', (string) $object->thirdparty->idprof1) : '';
+			$thirdparty = $object->thirdparty;
+			$directorySiren = $thirdparty instanceof Societe ? preg_replace('/[^0-9]/', '', (string) idprof($thirdparty)) : '';
 			if ($directorySiren !== '') {
 				$urlajaxdir = dol_buildpath('einvoicing/ajax/checkdirectory.php', 1);
 				// Auto-run once in the pre-send window (validated, not yet really transmitted to the AP).
 				$autorun = ((int) $object->status === Facture::STATUS_VALIDATED && empty($currentStatusInfo['everTransmitted'])) ? 1 : 0;
 				$resprints .= '<tr class="treinvoicing_collapseseparator">';
 				$resprints .= '<td>' . $form->textwithpicto($langs->trans("EInvoicingDirectoryCheck"), $langs->trans("EInvoicingDirectoryCheckHelp")) . '</td>';
-				$resprints .= '<td><span id="einvoice-directory" class="opacitymedium">' . ($autorun ? dol_escape_htmltag($langs->trans("EInvoicingDirectoryChecking")) : '-') . '</span>';
-				$resprints .= ' <a href="#" id="einvoice-directory-check" class="paddingleft">' . img_picto('', 'refresh', 'class="paddingright"') . $langs->trans("EInvoicingDirectoryCheckButton") . '</a>';
+				$resprints .= '<td><span id="einvoice-directory" class="opacitymedium">' . ($autorun ? dol_escape_htmltag($langs->trans("EInvoicingDirectoryChecking")) . ' - ' : '') . '</span>';
+				$resprints .= '<a href="#" id="einvoice-directory-check" class="paddingleft">' . img_picto('', 'refresh', 'class="paddingright"') . $langs->trans("EInvoicingDirectoryCheckButton") . '</a>';
 				$resprints .= '</td></tr>';
 				$resprints .= '<script type="text/javascript">
 				(function(){
@@ -1482,7 +2044,18 @@ class EInvoicing
 					if (!empty($currentOverrideRouting)) {
 						$resprints .= dol_escape_htmltag($selectOptions[$currentOverrideRouting]);
 					} else {
-						$resprints .= '<span class="opacitymedium">' . $langs->trans("InvoiceRoutingOverrideDefault") . '</span>';
+						// Show the address the invoice will really be sent to, as getBuyerCommunicationURI() resolves it.
+						$buyer = $object->thirdparty ?? null;
+						if (!($buyer instanceof Societe) && !empty($object->socid)) {
+							$object->fetch_thirdparty();
+							$buyer = $object->thirdparty;
+						}
+						$defaultTarget = ($buyer instanceof Societe) ? $this->getBuyerCommunicationURI($buyer) : '';
+						$resprints .= '<span class="opacitymedium">' . $langs->trans("InvoiceRoutingOverrideDefault");
+						if ($defaultTarget !== '') {
+							$resprints .= ' (' . dol_escape_htmltag($defaultTarget) . ')';
+						}
+						$resprints .= '</span>';
 					}
 				}
 				$resprints .= '</td>';
@@ -1490,9 +2063,39 @@ class EInvoicing
 			}
 		}
 
+		// Buyer reference (BT-10): the reference the buyer uses to route the invoice inside its own
+		// organisation (business unit, service reference, internal mailbox...). A core EN 16931 term,
+		// so it is offered on every invoice, with no dependency on the Chorus Pro option (issue #678).
+		// Stored into llx_einvoicing_extrafields rather than a core extrafield, which an admin or a
+		// user could rename, empty or delete.
+		if (($object->element == 'facture' || $object->element == 'invoice') && $object->id > 0) {
+			$currentBuyerReference = (string) $this->getExtraFieldValue($object->id, $object->element, self::EXTRAFIELD_BUYER_REFERENCE);
+			$resprints .= '<tr class="treinvoicing_collapseseparator">';
+			$resprints .= '<td>';
+			$resprints .= $form->editfieldkey($form->textwithpicto($langs->trans("EInvoiceBuyerReference"), $langs->trans("EInvoiceBuyerReferenceHelp")), 'einvoice_buyer_reference', '', $object, (int) $editenable);
+			$resprints .= '</td>';
+			$resprints .= '<td>';
+			if ($action == 'editeinvoice_buyer_reference' && $editenable) {
+				$resprints .= '<form name="setbuyerreference" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
+				$resprints .= '<input type="hidden" name="token" value="' . newToken() . '">';
+				$resprints .= '<input type="hidden" name="action" value="setbuyerreference">';
+				$resprints .= '<input type="hidden" name="page_y" value="page_y">';
+				$resprints .= '<input type="text" name="einvoice_buyer_reference" class="minwidth200" maxlength="255" value="' . dol_escape_htmltag($currentBuyerReference) . '">';
+				$resprints .= '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
+				$resprints .= '</form>';
+			} elseif ($currentBuyerReference !== '') {
+				$resprints .= dol_escape_htmltag($currentBuyerReference);
+			} else {
+				//$resprints .= '<span class="opacitymedium">' . $langs->trans("NotDefined") . '</span>';
+			}
+			$resprints .= '</td>';
+			$resprints .= '</tr>';
+		}
+
 		// If current status requires a reason, display it
 		if (!empty($currentStatusInfo['reasonCode'])) {
-			$reasonLabel = self::REASONS[$currentStatusInfo['reasonCode']]['label'] ?? $currentStatusInfo['reasonCode'];
+			// Translated, and escaped for the fallback: what used to be printed was the translation KEY.
+			$reasonLabel = dol_escape_htmltag($this->getReasonLabel($currentStatusInfo['code'] ?? 0, $currentStatusInfo['reasonCode']));
 			$resprints .= '<tr class="treinvoicing_collapseseparator" id="treinvoicing_reason">';
 			$resprints .= '<td class="">' . $langs->trans("einvoicingInvoiceReason") . '</td>';
 			$resprints .= '<td><span id="einvoice-reason">' . $reasonLabel . '</span></td>';
@@ -1509,9 +2112,10 @@ class EInvoicing
             <script type="text/javascript">
             (function() {
 				var countCheckInvoiceStatus = 1;
+
                 function checkInvoiceStatus() {
-					console.log(\'checkInvoiceStatus Checking invoice status (try \'+countCheckInvoiceStatus+\') to url '.dol_escape_js($urlajax).'...\');
-                    // alert("Checking invoice status...");
+					console.log(\'checkInvoiceStatus Last LC message for invoice is STATUS_AWAITING_VALIDATION, so we check invoice status (try \'+countCheckInvoiceStatus+\') to url '.dol_escape_js($urlajax).'...\');
+
                     $.get("' . $urlajax . '", {
                         token: "' . currentToken() . '",
                         ref: "' . dol_escape_js($object->ref) . '"
@@ -1536,9 +2140,9 @@ class EInvoicing
                         // Retry only if still awaiting validation
                         if (parseInt(data.code) === ' . self::STATUS_AWAITING_VALIDATION . ') {
 							countCheckInvoiceStatus++;
-							if (countCheckInvoiceStatus <= 5) {
+							if (countCheckInvoiceStatus <= 3) {
                             	setTimeout(checkInvoiceStatus, 5000);
-							} else if (countCheckInvoiceStatus <= 10) {
+							} else if (countCheckInvoiceStatus <= 5) {
                             	setTimeout(checkInvoiceStatus, 10000);
 							}
                         }
@@ -1594,7 +2198,7 @@ class EInvoicing
 	 */
 	public function supplierInvoiceCardBlock($object, $mode = '', $parameters = array())
 	{
-		global $langs;
+		global $langs, $form;
 		global $action;
 
 		$resprints = '';
@@ -1666,7 +2270,7 @@ class EInvoicing
 				$url = DOL_URL_ROOT . '/fourn/facture/agenda.php?id=' . ((int) $object->id) . '&search_agenda_label=EINVOICING';
 			}
 
-			$resprints .= '<a href="' . $url . '">' . $langs->trans("History") . '<i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
+			$resprints .= '<a href="' . $url . '" title="'.$langs->trans("History").'"><i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
 		}
 
 		$resprints .= '</td>';
@@ -1678,41 +2282,66 @@ class EInvoicing
 		$resprints .= '<td>' . ($provider ? dolPrintHTML($provider) : '<span class="opacitymedium">' . $langs->trans("CreatedManually") . '</span>') . '</td>';
 		$resprints .= '</tr>';
 
+		// Order reference declared by the supplier (BT-13), kept at import whether or not it matched an
+		// order of Dolibarr. Only shown when the received invoice carried one.
+		$buyerOrderReference = $this->getExtraFieldValue($object->id, $object->element, self::EXTRAFIELD_BUYER_ORDER_REFERENCE);
+		if (!empty($buyerOrderReference)) {
+			$resprints .= '<tr class="treinvoicing_collapseseparator">';
+			$resprints .= '<td>' . $form->textwithpicto($langs->trans("EInvoiceBuyerOrderReference"), $langs->trans("EInvoiceBuyerOrderReferenceHelp")) . '</td>';
+			$resprints .= '<td>' . dolPrintHTML($buyerOrderReference) . '</td>';
+			$resprints .= '</tr>';
+		}
+
 		if ($provider) {
 			// Get current status
 			$currentStatus = '-';
-			$sql = "SELECT lc_status, lc_reason_code FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
+			$sql = "SELECT lc_status, lc_reason_code, lc_status_message, lc_recipient_roles FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 			$sql .= " WHERE element_type = '" . $this->db->escape($object->element) . "'";
 			$sql .= " AND element_id = " . (int) $object->id;
 			$sql .= " AND lc_validation_status = 'Ok'";
 			$sql .= " ORDER BY rowid DESC LIMIT 1";
 			$resql = $this->db->query($sql);
+			$obj = null;
 			if ($resql && $this->db->num_rows($resql) > 0) {
 				$obj = $this->db->fetch_object($resql);
-				$currentStatus = $this->getStatusLabel($obj->lc_status);
+				$currentStatus = $this->getStatusLabel($obj->lc_status, $object->element, $obj->lc_recipient_roles ?? '');
 			}
 			$this->db->free($resql);
 			// Current status
 			$resprints .= '<tr class="treinvoicing_collapseseparator">';
 			$resprints .= '<td class="">' . $langs->trans("einvoicingInvoiceStatus") . '</td>';
-			$resprints .= '<td><span id="einvoice-status">' . $currentStatus . '</span>';
+			$resprints .= '<td><span id="einvoice-status" title="'.($obj ? $obj->lc_status : '').'">' . $currentStatus;
+			if ($obj) {
+				$resprints .= ($obj->lc_status > 200 ? ' <span class="opacitymedium small">('.$langs->trans("EInvoiceCodeShort").' '.$obj->lc_status.')</span>' : '');
+			}
+			$resprints .= '</span>';
 
 			// If current status requires a reason, display it
 			$reasonLabel = '';
 			$displayReasonLabel = 'style="display:none;"';
 			if (!empty($obj->lc_reason_code)) {
-				$reasonLabel = $langs->trans($this->getReasonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code);
+				// Through the helper: getReasonsByStatus() returns null for a status with no reason list of
+				// its own, and indexing that null fell back on the bare code - "REJ_SEMAN" for a rejection.
+				$reasonLabel = dol_escape_htmltag($this->getReasonLabel($obj->lc_status, $obj->lc_reason_code));
 				$displayReasonLabel = '';
 			}
 
 			$resprints .= '&nbsp;<span id="einvoice-reason"' . ($displayReasonLabel ? $displayReasonLabel : '') . '>' . $reasonLabel . '</span>';
+
+			// The free text the platform gave with the status (MDT-110). Mandatory alongside the reason of
+			// a rejection (XP Z12-014 annex A 2.2 and 2.4) and often the only thing that says what to fix,
+			// but it was stored and never shown: the card only displayed it for a status WE sent.
+			if (!empty($obj->lc_status_message)) {
+				$resprints .= '<div id="einvoice-status-message" class="clearboth small opacitymedium" style="overflow-wrap:anywhere;">' . dol_escape_htmltag($obj->lc_status_message) . '</div>';
+			}
 
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
 
 			// Get last sent status to know if we need to add the JavaScript for real time update of status and to display last sent status validation if it is pending or in error
 			$lastSentStatus = array();
-			$sql = "SELECT lc_status, lc_status_message, lc_validation_status, lc_validation_message FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
+			$sql = "SELECT lc_status, lc_status_message, lc_validation_status, lc_validation_message";
+			$sql .= " FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 			$sql .= " WHERE element_type = '" . $this->db->escape($object->element) . "'";
 			$sql .= " AND element_id = " . (int) $object->id;
 			$sql .= " ORDER BY rowid DESC LIMIT 1";
@@ -1729,7 +2358,7 @@ class EInvoicing
 			$this->db->free($resql);
 
 			if (!empty($lastSentStatus) && ($lastSentStatus['lc_validation_status'] == 'Pending' || $lastSentStatus['lc_validation_status'] == 'Error')) {
-				$statusLabel = $this->getStatusLabel($lastSentStatus['lc_status']);
+				$statusLabel = $this->getStatusLabel($lastSentStatus['lc_status'], $object->element);
 				$statusvalidationLabel = $this->getStatusLabel($this->getDolibarrStatusCodeFromPdpLabel($lastSentStatus['lc_validation_status']));
 				$picto = '';
 				if ($lastSentStatus['lc_validation_status'] === 'Pending') {
@@ -1755,8 +2384,11 @@ class EInvoicing
 					$resprints .= '
                     <script type="text/javascript">
                     (function() {
+						var countCheckInvoiceStatus = 1;
+
                         function checkSupplierInvoiceStatus() {
-                            console.log("checkSupplierInvoiceStatus Checking invoice status...");
+                            console.log("checkSupplierInvoiceStatus Last LC message for invoice is STATUS_AWAITING_VALIDATION, so we check invoice status (try " + countCheckInvoiceStatus + ") to url '.dol_escape_js($urlajax).'...");
+
                             $.get("' . $urlajax . '", {
                                 token: "' . currentToken() . '",
                                 id: "' . dol_escape_js($object->id) . '"
@@ -1785,13 +2417,18 @@ class EInvoicing
 
                                 // Retry only if still awaiting validation
                                 if (data.statusvalidationlabel === "Pending") {
-                                    setTimeout(checkSupplierInvoiceStatus, 5000);
+									countCheckInvoiceStatus++;
+									if (countCheckInvoiceStatus <= 3) {
+		                            	setTimeout(checkSupplierInvoiceStatus, 5000);
+									} else if (countCheckInvoiceStatus <= 5) {
+		                            	setTimeout(checkSupplierInvoiceStatus, 10000);
+									}
                                 }
                             }, "json");
                         }
 
                         // First call
-                        console.log("checkSupplierInvoiceStatus Invoice has status pending, so we add a timer to run checkInvoiceStatus in few seconds...");
+                        console.log("checkSupplierInvoiceStatus Invoice has status pending, so we add a timer to run checkInvoiceStatus in 2.5 seconds...");
                         setTimeout(checkSupplierInvoiceStatus, 2500);
 
                     })();
@@ -1829,6 +2466,9 @@ class EInvoicing
 			$disabledcookiewrite = 1; 	// We keep status of group unchanged into the cookie
 		}
 		if (empty($conf->use_javascript_ajax)) {
+			$expand_display = true;		// We force group to be shown expanded
+		}
+		if (GETPOST('highlight')) {
 			$expand_display = true;		// We force group to be shown expanded
 		}
 
@@ -1890,10 +2530,16 @@ class EInvoicing
 		if (!empty($resFetchP) && $resFetchP != '-1') {
 			$product_id = (string) $resFetchP;		// Can be 'idprod_123' (product id) or '456' (supplier ref id)
 		}
+		$service_id = '';
+		$resFetchS = $this->fetchDefaultRouting($object->id, 'service');
+		if (!empty($resFetchS) && $resFetchS != '-1') {
+			$service_id = (string) $resFetchS;
+		}
 
 		// In create mode only : we show a text input (the thirdparty is not yet in database, no routing line exists)
 		// In edit mode, we show the routing array
 		if ($mode == 'create') {
+			// Skip out-of-scope detection during creation: country and VAT status are not yet finalised.
 			$resprints .= '<tr class="treinvoicing_collapseseparator trrouting_id '.($expand_display ? '' : 'hidden').'">';
 			$resprints .= '<td class="">' . $form->textwithpicto($langs->trans("RoutingIdFieldShort"), $langs->trans("SpecificRoutingFieldHelp")) . '</td>';
 			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
@@ -1904,14 +2550,60 @@ class EInvoicing
 			$resprints .= '</tr>';
 
 			// Add a line for the Default product for thirdparty (to use when importing vendor invoice and no product found)
-			$resprints .= '<tr class="treinvoicing_collapseseparator trrouting_product_id '.($expand_display ? '' : 'hidden').'">';
-			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
-			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
-			$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
-			$resprints .= '</td>';
-			$resprints .= '</tr>';
+			// Vendors only, like in edit mode: the core sets fournisseur when the creation starts from the vendor area
+			// Reception only: meaningless once nothing is ever imported.
+			if ($object->fournisseur > 0 && !einvoicingReceptionDisabled()) {
+				$resprints .= '<tr class="treinvoicing_collapseseparator trrouting_product_id '.($expand_display ? '' : 'hidden').'">';
+				$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
+				$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
+				$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
+				$resprints .= '</td>';
+				$resprints .= '</tr>';
+
+				$resprints .= '<tr class="treinvoicing_collapseseparator trrouting_service_id '.($expand_display ? '' : 'hidden').'">';
+				$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultServiceEBilling"), $langs->trans("DefaultServiceEBillingHelp")) . '</td>';
+				$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
+				$resprints .= $this->selectVendorProduct($form, $object->id, $service_id, 'routing_service_id', '1');
+				$resprints .= '</td>';
+				$resprints .= '</tr>';
+
+				// Whether this supplier's line charges (BG-28) are folded into the product line's
+				// description instead of imported as a line of their own. Defaults to "use the global
+				// default": a new supplier has no override of its own.
+				$resprints .= '<tr class="treinvoicing_collapseseparator trmerge_line_charges '.($expand_display ? '' : 'hidden').'">';
+				$resprints .= '<td>' . $form->textwithpicto($langs->trans("EInvoicingMergeLineChargesField"), $langs->trans("EInvoicingMergeLineChargesHelp")) . '</td>';
+				$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
+				$resprints .= $this->mergeLineChargesSelectHtml($form, '');
+				$resprints .= '</td>';
+				$resprints .= '</tr>';
+			}
 
 			return $resprints;
+		}
+
+		// Detect thirdparties that are structurally outside the e-invoicing scope (view/edit mode only).
+		// B2C is an invoice-level check and is intentionally omitted here.
+		$langs->loadLangs(array("admin", "einvoicing@einvoicing"));
+		$outOfScopeReason = null;
+		if ($object->country_code != 'FR') {
+			$outOfScopeReason = $langs->trans('EInvoiceIgnoreReasonNotFR');
+		} elseif (getDolGlobalInt('EINVOICING_SKIP_B2C') && !$object->isACompany()) {
+			$outOfScopeReason = $langs->trans('EInvoiceIgnoreReasonB2C');
+		} elseif (isset($object->tva_assuj) && !$object->tva_assuj) {
+			$outOfScopeReason = $langs->trans('EInvoiceIgnoreReasonNotVATRegistered');
+		}
+		if ($outOfScopeReason !== null) {
+			$resprints .= '<tr class="treinvoicing_collapseseparator ' . ($expand_display ? '' : 'hidden') . '">';
+			$resprints .= '<td>' . $langs->trans('EInvoiceIgnoreReasonLabel') . '</td>';
+			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
+			$resprints .= dol_escape_htmltag($outOfScopeReason);
+			$resprints .= '</td>';
+			$resprints .= '</tr>';
+			// In view mode, routing and product fields are irrelevant — stop here.
+			// In edit mode, continue rendering them so the user can correct everything in one pass.
+			if ($mode != 'edit') {
+				return $resprints;
+			}
 		}
 
 		// Check if this thirdparty is present into einvoicing_extlinks table to know if it is an imported object
@@ -1970,7 +2662,7 @@ class EInvoicing
 			}
 			$resprints .= '</table>';
 		} else {
-			$resprints .= '<span class="opacitymedium">' . $langs->trans("Automatic") . '</span>';
+			$resprints .= '<span class="opacitymedium">' . $langs->trans("EInvAutomatic") . '</span>';
 		}
 
 		// Add new routing — use a JS-submitted form appended to body to avoid nested form issue
@@ -2005,24 +2697,53 @@ class EInvoicing
 		$resprints .= '</td>';
 		$resprints .= '</tr>';
 
-		// Default product for import (upstream addition)
-		if ($object->fournisseur > 0) {
-			$resprints .= '<tr class="treinvoicing_collapseseparator '.($expand_display ? '' : 'hidden').'">';
-			$resprints .= '<td>' . $form->textwithpicto($langs->trans("DefaultProductEBilling"), $langs->trans("DefaultProductEBillingHelp")) . '</td>';
-			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
-			if ($mode == 'edit') {
-				$resprints .= $this->selectVendorProduct($form, $object->id, $product_id, 'routing_product_id');
-			} else {
-				if ($product_id != '' && $product_id != '-1') {
-					if (preg_match('/^idprod/', $product_id)) {
-						$new_product_id = (int) str_replace('idprod_', '', $product_id);
-						$tmpproduct = new Product($this->db);
-						$tmpproduct->fetch($new_product_id);
+		// Default product and default service for import. Reception only: meaningless once nothing is ever imported.
+		if ($object->fournisseur > 0 && !einvoicingReceptionDisabled()) {
+			$defaults = array(
+				array('routing_product_id', $product_id, '', 'DefaultProductEBilling'),
+				array('routing_service_id', $service_id, '1', 'DefaultServiceEBilling'),
+			);
+			foreach ($defaults as $default) {
+				list($htmlname, $selected, $filtertype, $labelkey) = $default;
+				$resprints .= '<tr class="treinvoicing_collapseseparator tr'.$htmlname.' '.($expand_display ? '' : 'hidden').'">';
+				$resprints .= '<td>' . $form->textwithpicto($langs->trans($labelkey), $langs->trans($labelkey.'Help')) . '</td>';
+				$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
+				if ($mode == 'edit') {
+					$resprints .= $this->selectVendorProduct($form, $object->id, $selected, $htmlname, $filtertype);
+
+					if (GETPOST('highlight') == $htmlname && (float) DOL_VERSION >= 25) {
+						if (getDolGlobalString('PRODUIT_USE_SEARCH_TO_SELECT')) {
+							$resprints .= dol_set_focus('#search_'.$htmlname, 1);	// @phpstan-ignore arguments.count, function.void (the second parameter and the return value exist from Dolibarr 25)
+						} else {
+							$resprints .= dol_set_focus('#'.$htmlname, 1);	// @phpstan-ignore arguments.count, function.void (the second parameter and the return value exist from Dolibarr 25)
+						}
+					}
+				} elseif (preg_match('/^idprod_([0-9]+)$/', $selected, $reg)) {
+					$tmpproduct = new Product($this->db);
+					if ($tmpproduct->fetch((int) $reg[1]) > 0) {
 						$resprints .= $tmpproduct->getNomUrl(1);
-					} else {
-						// TODO Show ref of product price
 					}
 				}
+				// TODO Show ref of product price when the default is a supplier price id
+				$resprints .= '</td>';
+				$resprints .= '</tr>';
+			}
+		}
+
+		// Whether this supplier's line charges (BG-28) are folded into the product line's description
+		// instead of imported as a line of their own. Reception only, like the block above.
+		if ($object->fournisseur > 0 && !einvoicingReceptionDisabled()) {
+			$mergeOverride = $this->getExtraFieldValue($object->id, 'societe', self::EXTRAFIELD_MERGE_LINE_CHARGES);
+
+			$resprints .= '<tr class="treinvoicing_collapseseparator '.($expand_display ? '' : 'hidden').'">';
+			$resprints .= '<td>' . $form->textwithpicto($langs->trans("EInvoicingMergeLineChargesField"), $langs->trans("EInvoicingMergeLineChargesHelp")) . '</td>';
+			$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
+			if ($mode == 'edit') {
+				$resprints .= $this->mergeLineChargesSelectHtml($form, $mergeOverride ?? '');
+			} else {
+				$effective = $this->shouldMergeLineChargesIntoDescription($object->id) ? $langs->trans("Yes") : $langs->trans("No");
+				$resprints .= dol_escape_htmltag($effective);
+				$resprints .= ' <span class="opacitymedium small">— ' . $langs->trans($mergeOverride === '0' || $mergeOverride === '1' ? "EInvoicingMergeLineChargesOverridden" : "EInvoicingMergeLineChargesInherited") . '</span>';
 			}
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
@@ -2032,39 +2753,96 @@ class EInvoicing
 	}
 
 	/**
+	 * Select to choose, for one supplier, whether its line charges override the global default.
+	 *
+	 * @param	Form	$form		Form handler
+	 * @param	string	$current	Value currently stored ('', '0' or '1')
+	 * @return	string				HTML of the select
+	 */
+	private function mergeLineChargesSelectHtml($form, $current)
+	{
+		global $langs;
+
+		$defaultLabel = getDolGlobalInt('EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION') ? $langs->trans("Yes") : $langs->trans("No");
+		$options = array(
+			''  => $langs->trans("EInvoicingMergeLineChargesDefault", $defaultLabel),
+			'1' => $langs->trans("Yes"),
+			'0' => $langs->trans("No"),
+		);
+
+		return $form->selectarray('merge_line_charges', $options, $current, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
+	}
+
+	/**
 	 * Combo of the products of a vendor, to pick the default product of an import.
 	 *
-	 * A product bought from a vendor has to be flagged "to buy"; whether it is on sale is none of our
-	 * business, and a product created by a previous import never is. select_produits_fournisseurs()
-	 * filters on that purchase status, but reads it from the global $status, which the calling page is
-	 * free to have set to anything: force it here, and give it back, so the combo cannot silently come
-	 * back empty.
+	 * select_produits_fournisseurs() filters on the "to buy" status but reads it from the global $status,
+	 * which the calling page is free to have set to anything: it is forced here, and given back, so the
+	 * combo cannot silently come back empty. PRODUIT_USE_SEARCH_TO_SELECT and PRODUIT_LIMIT_SIZE are
+	 * honoured as the core does for its own product combos.
 	 *
 	 * @param	Form	$form		Form handler
 	 * @param	int		$socid		Vendor id
 	 * @param	string	$selected	Product currently selected
 	 * @param	string	$htmlname	Name of the html field
+	 * @param	string	$filtertype	'' for products and services, '1' for services only
 	 * @return	string				HTML content of the combo
 	 */
-	private function selectVendorProduct($form, $socid, $selected, $htmlname)
+	private function selectVendorProduct($form, $socid, $selected, $htmlname, $filtertype = '')
 	{
-		global $status;
+		global $conf, $status;
 
 		$savstatus = isset($status) ? $status : null;
 		$status = 1; // Products to buy
 
-		if (version_compare(DOL_VERSION, '22.0.0', '<')) {
-			// Before v22, select_produits_fournisseurs() uses print instead of return
-			ob_start();
-			$form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1);
-			$out = ob_get_clean();
+		if (!empty($conf->use_javascript_ajax) && getDolGlobalString('PRODUIT_USE_SEARCH_TO_SELECT')) {
+			// Search form: product/ajax/products.php answers with PRODUIT_LIMIT_SIZE products at most
+			if (version_compare(DOL_VERSION, '22.0.0', '<')) {
+				// Before v22, select_produits_fournisseurs() uses print instead of return
+				ob_start();
+				$form->select_produits_fournisseurs($socid, $selected, $htmlname, $filtertype, '', array(), 0, 1, 'maxwidth300');
+				$out = ob_get_clean();
+			} else {
+				$out = $form->select_produits_fournisseurs($socid, $selected, $htmlname, $filtertype, '', array(), 0, 1, 'maxwidth300', '', 1);
+			}
 		} else {
-			$out = $form->select_produits_fournisseurs($socid, $selected, $htmlname, '', '', array(), 0, 1, '', '', 1);
+			// Combo: select_produits_fournisseurs() asks the list without any limit, so it loads every
+			// product of the database. Call the list the way the core calls it for its own combos, with
+			// the number of products the user allowed in a select.
+			$out = $form->select_produits_fournisseurs_list($socid, $selected, $htmlname, $filtertype, '', '', $status, 0, getDolGlobalInt('PRODUIT_LIMIT_SIZE', 1000), 1, 'maxwidth300', getDolGlobalInt('SUPPLIER_SHOW_STOCK_IN_PRODUCTS_COMBO'));
 		}
 
 		$status = $savstatus;
 
-		return (string) $out;
+		$out = (string) $out;
+
+		// Cores before 22 only compare the selected value to the id of a supplier price: an 'idprod_ID'
+		// value - what a product with no supplier price of its own is worth - is never marked selected,
+		// so the combo shows its empty entry although the vendor does have a default product. Mark the
+		// option ourselves when the core did not: a field that contradicts the value it holds is read
+		// as an empty one by the save that follows.
+		$optstart = '<option value="' . $selected . '"';
+		if (preg_match('/^idprod_[0-9]+$/', (string) $selected) && strpos($out, $optstart . ' selected') === false) {
+			$pos = strpos($out, $optstart);
+			if ($pos !== false) {
+				$out = substr_replace($out, $optstart . ' selected', $pos, strlen($optstart));
+				$out = str_replace('<option value="-1" selected>', '<option value="-1">', $out);
+			}
+		}
+
+		// Tell the save what the field shows, that is the value it posts back when nobody touches it.
+		// An empty value posted against a filled field is a removal asked by the user; an empty value
+		// posted against an empty field is a save that had nothing to show in the first place - the
+		// combo only lists PRODUIT_LIMIT_SIZE products, and the default one of the vendor may not be
+		// among them.
+		if (preg_match('/<option value="([^"]*)" selected/', $out, $reg)) {
+			$shown = $reg[1];
+		} else {
+			$shown = (string) $selected;		// Ajax variant: its hidden input carries the current value
+		}
+		$out .= '<input type="hidden" name="' . $htmlname . '_shown" value="' . dolPrintHTMLForAttribute($shown) . '">';
+
+		return $out;
 	}
 
 	/**
@@ -2105,18 +2883,23 @@ class EInvoicing
 	/**
 	 * fetchLastknownInvoiceStatus
 	 *
+	 * 'code' is the status to SHOW: it is corrected from what is on disk, so a document generated
+	 * before the module wrote its status still reads as generated. 'storedcode' is the status the
+	 * table really holds, untouched by that correction - what a caller deciding whether to persist
+	 * a new status has to look at, otherwise the correction hides the very row it should update
+	 * (issue #998).
+	 *
 	 * @param int			$invoiceId		Invoice ID
 	 * @param ?string		$invoiceRef		Invoice ref
 	 * @return array<string,int|string>
 	 */
 	public function fetchLastknownInvoiceStatus($invoiceId = 0, $invoiceRef = null)
 	{
-		global $conf;
-
 		// Default status is unknown until invoice is validated
 		$status = array(
 			'rowid' => 0,
 			'code' => self::STATUS_UNKNOWN,
+			'storedcode' => self::STATUS_UNKNOWN,
 			'status' => $this->getStatusLabel(self::STATUS_UNKNOWN),
 			'info' => '',
 			'file' => '0',
@@ -2126,7 +2909,8 @@ class EInvoicing
 			'override_routing_id' => '',
 			'otherprovider' => '',
 			'ap_precheck_status' => '',
-			'ap_precheck_result' => ''
+			'ap_precheck_result' => '',
+			'recipientRoles' => ''
 		);
 
 		$provider = getDolGlobalString('EINVOICING_PDP');
@@ -2157,6 +2941,7 @@ class EInvoicing
 					if (empty($tmpstatus)) {	// If not found yet
 						$tmpstatus['rowid'] = (int) $obj->rowid;
 						$tmpstatus['code'] = (int) $obj->syncstatus;
+						$tmpstatus['storedcode'] = (int) $obj->syncstatus;
 						$tmpstatus['status'] = $this->getStatusLabel((int) $obj->syncstatus);
 						$tmpstatus['info'] = $obj->synccomment ?? '';
 						$tmpstatus['flow_id'] = $obj->flow_id ?? '';
@@ -2180,6 +2965,7 @@ class EInvoicing
 
 				$tmpstatus['rowid'] = (int) $obj->rowid;
 				$tmpstatus['code'] = (int) $obj->syncstatus;
+				$tmpstatus['storedcode'] = (int) $obj->syncstatus;
 				$tmpstatus['status'] = $this->getStatusLabel((int) $obj->syncstatus);
 				$tmpstatus['info'] = $obj->synccomment ?? '';
 				$tmpstatus['flow_id'] = $obj->flow_id ?? '';
@@ -2201,7 +2987,10 @@ class EInvoicing
 			}
 
 			if (!empty($tmpstatus)) {
-				$status = $tmpstatus;
+				// Merged, not replaced: the row read from the table does not carry every key of the default
+				// answer - 'file' in particular is set further down - and a caller reading a key the row does
+				// not define would get an "Undefined array key" warning.
+				$status = array_merge($status, $tmpstatus);
 			}
 
 			if (empty($foundforanotherprovider) && empty($foundforcurrentprovider)) {
@@ -2213,7 +3002,7 @@ class EInvoicing
 		$this->db->free($resql);
 
 		// Fetch last status message from einvoicing_lifecycle_msg table to get more details on current status of the invoice into the PDP system
-		$sql = "SELECT lc_status, lc_reason_code FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
+		$sql = "SELECT lc_status, lc_reason_code, lc_recipient_roles FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 		$sql .= " WHERE element_type = 'facture'";
 		$sql .= " AND element_id = " . (int) $invoiceId;
 		$sql .= " ORDER BY rowid DESC LIMIT 1";
@@ -2223,13 +3012,20 @@ class EInvoicing
 			if ($this->db->num_rows($resql) > 0) {
 				$obj = $this->db->fetch_object($resql);
 				$status['reasonCode'] = $obj->lc_reason_code ?? '';
+				$status['recipientRoles'] = $obj->lc_recipient_roles ?? '';
+				// The label above was built from the extlinks code alone, which cannot tell the two
+				// rejections apart; redo it now that the message the code came from has been read.
+				if ((int) $status['code'] === self::STATUS_REJECTED && (int) $obj->lc_status === self::STATUS_REJECTED) {
+					$status['status'] = $this->getStatusLabel(self::STATUS_REJECTED, 'facture', $status['recipientRoles']);
+				}
 			}
 		} else {
 			dol_print_error($this->db);
 		}
 		$this->db->free($resql);
 
-		// Check if there is an e-invoice file generated on disk
+		// Check if there is an e-invoice file generated on disk.
+		// What follows corrects 'code' for display only: 'storedcode' keeps the value of the table.
 
 		$einvoicefilepath = $this->getEInvoiceFilePath($invoiceRef);
 		if ($einvoicefilepath && is_readable($einvoicefilepath)) {
@@ -2238,6 +3034,15 @@ class EInvoicing
 				$status['code'] = self::STATUS_GENERATED;
 				$status['status'] = $this->getStatusLabel(self::STATUS_GENERATED);
 			}
+		} elseif (!empty($einvoicefilepath) && $status['code'] == self::STATUS_GENERATED && empty($status['everTransmitted'])) {
+			// Symmetrical to the promotion above. "Generated (ready to send)" is written in the table when the
+			// invoice carried no status row at generation time - an invoice that predates the module on the
+			// base - and nothing ever cleared it, so deleting the e-invoice file left the card announcing a
+			// document that does not exist any more. An invoice that already reached the Access Point keeps
+			// its status: the document it announces exists there, whatever is left on disk.
+			$status['code'] = self::STATUS_NOT_GENERATED;
+			$status['status'] = $this->getStatusLabel(self::STATUS_NOT_GENERATED);
+			$status['info'] = '';	// The stored comment explains the status we just stopped reporting
 		}
 
 		return $status;
@@ -2246,11 +3051,10 @@ class EInvoicing
 	/**
 	 * Whether an invoice is locked because it was already transmitted to the Access Point.
 	 *
-	 * Based on the REAL PA state (a flow_id was assigned on the first successful submission and is never
-	 * cleared), not on the Dolibarr syncstatus which is reset to GENERATED when the e-invoice is
-	 * regenerated. A transmitted invoice is immutable (you correct it with a credit note / corrective
-	 * invoice), so by default we block re-sending, regenerating and re-editing it. The operator can opt
-	 * out (e.g. to test PA retry behaviour) by setting EINVOICING_ALLOW_RESEND_TRANSMITTED.
+	 * Based on the real PA state (a flow_id, assigned on the first successful submission and never
+	 * cleared), not on the Dolibarr syncstatus which is reset to GENERATED on every regeneration. A
+	 * transmitted invoice is immutable, so re-sending, regenerating and re-editing are blocked unless
+	 * EINVOICING_ALLOW_RESEND_TRANSMITTED is set.
 	 *
 	 * @param 	int 	$invoiceId 	Invoice id
 	 * @param 	?string $invoiceRef Invoice ref (fallback if id is 0)
@@ -2266,17 +3070,69 @@ class EInvoicing
 	}
 
 	/**
+	 * Whether regenerating and sending the e-invoice are refused because it was already transmitted.
+	 *
+	 * The transmitted lock, less the invoice the seller's AP only ever rejected at emission: no copy of it
+	 * exists at the AP, so it may be regenerated and sent again. The invoice itself stays locked.
+	 *
+	 * @param 	int 	$invoiceId 	Invoice id
+	 * @param 	?string $invoiceRef Invoice ref (fallback if id is 0)
+	 * @return 	bool 				True if regenerating and sending must be refused
+	 */
+	public function isSendLocked($invoiceId = 0, $invoiceRef = null)
+	{
+		return $this->isTransmittedLockActive($invoiceId, $invoiceRef) && !$this->isOnlyRejectedAtEmission((int) $invoiceId);
+	}
+
+	/**
+	 * Whether every status an AP gave a customer invoice is a rejection at emission (213 by the seller's AP).
+	 *
+	 * Such an invoice was never deposited (XP Z12-014 annex A 2.2), so its number is still free at the AP: the
+	 * corrected document is accepted under the same BT-1. A DOUBLON, a rejection addressed to the buyer (2.4)
+	 * or any other status means the AP holds a copy, and sending again would only be refused as a duplicate.
+	 *
+	 * @param	int		$invoiceId	Customer invoice id
+	 * @return	bool				True when the invoice may be sent again
+	 */
+	public function isOnlyRejectedAtEmission($invoiceId)
+	{
+		if ($invoiceId <= 0) {
+			return false;
+		}
+
+		$sql = "SELECT lc_status, lc_reason_code, lc_recipient_roles FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
+		$sql .= " WHERE element_type = 'facture' AND element_id = " . ((int) $invoiceId);
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' SQL error: ' . $this->db->lasterror(), LOG_ERR);
+			return false;
+		}
+
+		$rejected = 0;
+		while ($obj = $this->db->fetch_object($resql)) {
+			$roles = array_map('trim', explode(',', strtoupper((string) $obj->lc_recipient_roles)));
+			if ((int) $obj->lc_status !== self::STATUS_REJECTED
+				|| strtoupper(trim((string) $obj->lc_reason_code)) === self::REASON_DUPLICATE
+				|| in_array(self::CDAR_ROLE_BUYER, $roles, true)) {
+				$this->db->free($resql);
+				return false;
+			}
+			$rejected++;
+		}
+		$this->db->free($resql);
+
+		return $rejected > 0;
+	}
+
+	/**
 	 * Gate generation/transmission on the recipient being reachable in the Approved Platforms directory.
 	 *
 	 * Only enforced when EINVOICING_REQUIRE_ROUTABLE_RECIPIENT is on (off by default, opt-in). A recipient
-	 * that is absent from the directory, or present without an active routing line, would be rejected by the
-	 * platform with a routing error (fr:213): blocking generation/sending avoids reaching that error state.
-	 * That option has a second, stricter, value (2) that also blocks a non-conclusive directory answer.
+	 * the directory does not route to the BT-49 of the document (getBuyerCommunicationURI()) is a fr:213.
 	 *
 	 * Fails open (ok=1) whenever the check cannot be trusted, so it never blocks unexpectedly: option off,
-	 * provider without a directory lookup (status unsupported), directory call error, a directory answer that
-	 * does not report the line status (status undetermined, unless the option is set to its strict value), or
-	 * a recipient with no SIREN (handled by the standard required-information checks).
+	 * lookup unsupported, call error, or an undetermined answer unless the option is at its strict value 2.
 	 *
 	 * @param 	Facture 	$object 	Invoice
 	 * @return 	array{ok:int,status:string,message:string}	ok=0 only when the recipient is confirmed not routable.
@@ -2288,14 +3144,18 @@ class EInvoicing
 		$res = array('ok' => 1, 'status' => '', 'message' => '');
 
 		$require = getDolGlobalInt('EINVOICING_REQUIRE_ROUTABLE_RECIPIENT');
-		if (!$require) {
-			return $res;	// opt-in, off by default
+		if (!$require || einvoicingIsSendDisabled()) {
+			return $res;	// opt-in, off by default, and meaningless once nothing is ever sent
 		}
 
 		if (!is_object($object->thirdparty ?? null)) {
 			$object->fetch_thirdparty();
 		}
-		$siren = is_object($object->thirdparty ?? null) ? preg_replace('/[^0-9]/', '', (string) $object->thirdparty->idprof1) : '';
+		$thirdparty = $object->thirdparty;
+		if (!is_object($thirdparty)) {
+			return $res;	// no recipient loaded: nothing to look up
+		}
+		$siren = preg_replace('/[^0-9]/', '', (string) idprof($thirdparty));
 		if ($siren === '') {
 			return $res;	// no SIREN: the standard required-information checks handle this
 		}
@@ -2307,9 +3167,21 @@ class EInvoicing
 			return $res;
 		}
 
-		$dir = $provider->checkRecipientDirectory($siren);
+		// Check the address this very invoice is sent to (BT-49), not merely the SIREN: a recipient can
+		// declare several reception addresses, only the one written into the document decides whether
+		// the transmission is accepted. Same call as getBuyerCommunicationURI() makes at generation, so
+		// what is checked and what is emitted can never drift apart.
+		$routingid = $this->getBuyerCommunicationURI($thirdparty, $object);
+
+		$dir = $provider->checkRecipientDirectory($siren, $routingid);
 		$res['status'] = isset($dir['status']) ? $dir['status'] : 'error';
-		if ($res['status'] === 'absent') {
+		if ($res['status'] === 'unknownaddress') {
+			// The address the invoice carries is not declared in the directory for that SIREN. Falling
+			// back on another line that happens to be open would send to an address nobody chose, so
+			// this is a hard stop: whoever recorded the routing identifier owns that decision.
+			$res['ok'] = 0;
+			$res['message'] = $langs->trans('EInvoicingDirectoryAddressNotDeclared', $routingid, $siren);
+		} elseif ($res['status'] === 'absent') {
 			$res['ok'] = 0;
 			$res['message'] = $langs->trans('EInvoicingDirectoryAbsent', $siren);
 		} elseif ($res['status'] === 'inactive') {
@@ -2327,6 +3199,85 @@ class EInvoicing
 		// option is set to its strict value.
 
 		return $res;
+	}
+
+	/**
+	 * Whether a lifecycle status rejects the transmission rather than the document, and so must not
+	 * replace the status the element already carries.
+	 *
+	 * A platform raises a 213 with the reason DOUBLON to say it already holds the invoice: what it
+	 * refuses is the new delivery, and the copy it holds is the valid one - which is exactly the
+	 * invoice this status quotes, since both carry the same IssuerAssignedID. Demoting it would
+	 * announce a rejection the seller is expected to answer by cancelling the invoice in its accounts
+	 * (XP Z12-014 annex A 2.4). The status is recorded in the lifecycle history either way.
+	 *
+	 * The guard only holds when the element already carries a status proving a platform took the
+	 * document: without one there is nothing to protect, and the rejection is recorded as before.
+	 *
+	 * @param	int		$elementId		Id of the invoice the status refers to
+	 * @param	string	$elementType	'facture' or 'invoice_supplier'
+	 * @param	int		$statusCode		Lifecycle status received
+	 * @param	string	$reasonCode		Reason code received with it
+	 * @return	bool					True to keep the status the element already carries
+	 */
+	public function isTransmissionOnlyRejection($elementId, $elementType, $statusCode, $reasonCode)
+	{
+		if ((int) $statusCode !== self::STATUS_REJECTED || strtoupper(trim((string) $reasonCode)) !== self::REASON_DUPLICATE) {
+			return false;
+		}
+
+		$provider = getDolGlobalString('EINVOICING_PDP');
+		$providershort = preg_replace('/ViaPartner$/', '', $provider);
+
+		$sql = "SELECT syncstatus FROM " . $this->db->prefix() . "einvoicing_extlinks";
+		$sql .= " WHERE element_id = " . (int) $elementId;
+		$sql .= " AND element_type = '" . $this->db->escape($elementType) . "'";
+		$sql .= " AND provider = '" . $this->db->escape($providershort) . "'";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' SQL error: ' . $this->db->lasterror(), LOG_ERR);
+			return false;
+		}
+
+		$current = 0;
+		if ($this->db->num_rows($resql) > 0) {
+			$obj = $this->db->fetch_object($resql);
+			$current = (int) $obj->syncstatus;
+		}
+		$this->db->free($resql);
+
+		return in_array($current, self::STATUSES_PROVING_TRANSMISSION, true);
+	}
+
+	/**
+	 * Id of the external link record of an object on the current access point
+	 *
+	 * @param int       $elementId      	Linked Element ID
+	 * @param string    $elementType    	Linked Element type
+	 * @return int 							-1 on error, 0 if the object has no record, rowid otherwise
+	 */
+	public function fetchExtLinkId($elementId, $elementType)
+	{
+		global $db;
+
+		$providershort = preg_replace('/ViaPartner/', '', getDolGlobalString('EINVOICING_PDP'));
+
+		$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_extlinks";
+		$sql .= " WHERE element_id = " . (int) $elementId;
+		$sql .= " AND element_type = '" . $db->escape($elementType) . "'";
+		$sql .= " AND provider = '" . $db->escape($providershort) . "'";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			$this->errors[] = $db->lasterror();
+			return -1;
+		}
+
+		$obj = $db->fetch_object($resql);
+		$db->free($resql);
+
+		return $obj ? (int) $obj->rowid : 0;
 	}
 
 	/**
@@ -2355,20 +3306,12 @@ class EInvoicing
 			return 0;
 		}
 
-		// Check if record exists
-		$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_extlinks";
-		$sql .= " WHERE element_id = " . (int) $elementId;
-		$sql .= " AND element_type = '" . $db->escape($elementType) . "'";
-		$sql .= " AND provider = '" . $db->escape($providershort) . "'";
-
-		$resql = $db->query($sql);
-		if (!$resql) {
-			$this->errors[] = $db->lasterror();
+		$linkId = $this->fetchExtLinkId($elementId, $elementType);
+		if ($linkId < 0) {
 			return -1;
 		}
 
-		$exists = $db->num_rows($resql) > 0;
-		$db->free($resql);
+		$exists = $linkId > 0;
 		if ($exists) {
 			// Update existing record
 			$sql = "UPDATE " . $db->prefix() . "einvoicing_extlinks SET";
@@ -2421,18 +3364,143 @@ class EInvoicing
 		return $exists ? 1 : $db->last_insert_id($db->prefix() . "einvoicing_extlinks");
 	}
 
+	/**
+	 * Store a property of a Dolibarr object into the table of the module.
+	 *
+	 * The module does not use the extrafields of the core for the data it needs to keep on an object:
+	 * an admin or a user can rename, empty or delete an extrafield, and the module would lose data it
+	 * is accountable for. The properties are stored into llx_einvoicing_extrafields instead, one row
+	 * per (object, property name), so a new property needs no schema change.
+	 *
+	 * @param int		$elementId		ID of the element (or of the element line) the property belongs to
+	 * @param string	$elementType	Type of element (property object->element: 'facture', 'invoice_supplier', 'societe', ...)
+	 * @param string	$name			Name of the property ('buyer_order_reference', ...)
+	 * @param string	$value			Value to store (Value '' delete the row)
+	 * @return int						-1 on error, 0 if the value is empty and no row exists, 1 if an existing row was updated or deleted, rowid of the new row otherwise
+	 */
+	public function insertOrUpdateExtraField($elementId, $elementType, $name, $value)
+	{
+		global $user;
+
+		if ((int) $elementId <= 0 || $elementType === '' || $name === '') {
+			$this->errors[] = 'insertOrUpdateExtraField called without element or property name';
+			return -1;
+		}
+
+		// Check if the property is already stored for this object
+		$sql = "SELECT rowid FROM " . $this->db->prefix() . "einvoicing_extrafields";
+		$sql .= " WHERE element_id = " . (int) $elementId;
+		$sql .= " AND element_type = '" . $this->db->escape($elementType) . "'";
+		$sql .= " AND name = '" . $this->db->escape($name) . "'";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->errors[] = $this->db->lasterror();
+			return -1;
+		}
+
+		$exists = $this->db->num_rows($resql) > 0;
+		$this->db->free($resql);
+
+		if ($exists) {
+			if ($value !== null && $value !== '') {
+				$sql = "UPDATE " . $this->db->prefix() . "einvoicing_extrafields SET";
+				$sql .= " value = '" . $this->db->escape($value) . "'";
+				$sql .= ", fk_user_modif = " . (int) $user->id;
+				$sql .= " WHERE element_id = " . (int) $elementId;
+				$sql .= " AND element_type = '" . $this->db->escape($elementType) . "'";
+				$sql .= " AND name = '" . $this->db->escape($name) . "'";
+			} else {
+				$sql = "DELETE FROM " . $this->db->prefix() . "einvoicing_extrafields";
+				$sql .= " WHERE element_id = " . (int) $elementId;
+				$sql .= " AND element_type = '" . $this->db->escape($elementType) . "'";
+				$sql .= " AND name = '" . $this->db->escape($name) . "'";
+			}
+		} else {
+			if ($value !== null && $value !== '') {
+				$sql = "INSERT INTO " . $this->db->prefix() . "einvoicing_extrafields";
+				$sql .= " (element_id, element_type, name, value, date_creation, fk_user_creat)";
+				$sql .= " VALUES (" . (int) $elementId . ", '" . $this->db->escape($elementType) . "'";
+				$sql .= ", '" . $this->db->escape($name) . "'";
+				$sql .= ", '" . $this->db->escape($value) . "'";
+				$sql .= ", '" . $this->db->idate(dol_now()) . "', " . (int) $user->id . ")";
+			} else {
+				return 0;
+			}
+		}
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->errors[] = $this->db->lasterror();
+			return -1;
+		}
+
+		return $exists ? 1 : $this->db->last_insert_id($this->db->prefix() . "einvoicing_extrafields");
+	}
+
+	/**
+	 * Read a property stored by the module on a Dolibarr object.
+	 *
+	 * @param int		$elementId		ID of the element (or of the element line) the property belongs to
+	 * @param string	$elementType	Type of element (property object->element)
+	 * @param string	$name			Name of the property
+	 * @return ?string					Value stored, or null when nothing is stored for that object and name
+	 */
+	public function getExtraFieldValue($elementId, $elementType, $name)
+	{
+		if ((int) $elementId <= 0 || $elementType === '' || $name === '') {
+			return null;
+		}
+
+		$sql = "SELECT value FROM " . $this->db->prefix() . "einvoicing_extrafields";
+		$sql .= " WHERE element_id = " . (int) $elementId;
+		$sql .= " AND element_type = '" . $this->db->escape($elementType) . "'";
+		$sql .= " AND name = '" . $this->db->escape($name) . "'";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->errors[] = $this->db->lasterror();
+			return null;
+		}
+
+		$value = null;
+		if ($this->db->num_rows($resql) > 0) {
+			$obj = $this->db->fetch_object($resql);
+			$value = (string) $obj->value;
+		}
+		$this->db->free($resql);
+
+		return $value;
+	}
+
+	/**
+	 * Whether the charges of a received invoice line (BG-28) must be folded into the description of the
+	 * product line they belong to, instead of being imported as a Dolibarr line of their own.
+	 *
+	 * The supplier can override the global default (EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION) with
+	 * its own EXTRAFIELD_MERGE_LINE_CHARGES on element_type 'societe'; no override (and no row at all)
+	 * falls back to the global setting.
+	 *
+	 * @param	int		$socid		Id of the supplier thirdparty
+	 * @return	bool				True when line charges must be folded into the line description
+	 */
+	public function shouldMergeLineChargesIntoDescription($socid)
+	{
+		$override = $this->getExtraFieldValue((int) $socid, 'societe', self::EXTRAFIELD_MERGE_LINE_CHARGES);
+		if ($override === '0' || $override === '1') {
+			return $override === '1';
+		}
+
+		return (bool) getDolGlobalInt('EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION');
+	}
+
 
 	/**
 	 * Create or replace the default routing for a thirdparty.
 	 *
 	 * This method enforces a 1 → 1 relationship between a thirdparty and its active default routing:
-	 * - Only one active default routing can exist per thirdparty at any given time
 	 * - Any existing routing(s) for this thirdparty are automatically deleted before insertion
 	 * - The new routing is marked as active (active = 1) and default (is_default = 1)
-	 *
-	 * Note: Future versions may support true 1 → N routing management with:
-	 * - Multiple concurrent routings per thirdparty
-	 * - Switching default routing without deletion
 	 *
 	 * @param 	int    $fk_soc   		Thirdparty ID
 	 * @param 	string $routing_id		Routing ID
@@ -2572,8 +3640,8 @@ class EInvoicing
 
 		$db->begin();
 
-		// Check if this entry was the default
-		$sql = "SELECT is_default FROM " . $db->prefix() . "einvoicing_routing";
+		// Check if this entry was the default, and for which type of routing
+		$sql = "SELECT is_default, routing_type FROM " . $db->prefix() . "einvoicing_routing";
 		$sql .= " WHERE rowid = " . (int) $rowid;
 		$resql = $db->query($sql);
 		if (!$resql) {
@@ -2583,6 +3651,7 @@ class EInvoicing
 		}
 		$obj = $db->fetch_object($resql);
 		$wasDefault = $obj ? (int) $obj->is_default : 0;
+		$routingtype = $obj ? $obj->routing_type : '';
 		$db->free($resql);
 
 		$sql = "DELETE FROM " . $db->prefix() . "einvoicing_routing";
@@ -2593,11 +3662,15 @@ class EInvoicing
 			return -1;
 		}
 
-		// Reassign default to oldest remaining entry if needed
+		// Reassign default to oldest remaining entry of the same type if needed. Without the filter on
+		// routing_type, a routing of the other type could take the default and leave the remaining entries
+		// of the deleted type without any, so fetchDefaultRouting() would answer nothing for a thirdparty
+		// that still holds an active routing identifier.
 		if ($wasDefault) {
 			$sql = "UPDATE " . $db->prefix() . "einvoicing_routing";
 			$sql .= " SET is_default = 1";
 			$sql .= " WHERE fk_soc = " . (int) $fk_soc . " AND active = 1";
+			$sql .= " AND routing_type = '" . $db->escape($routingtype) . "'";
 			$sql .= " ORDER BY rowid ASC LIMIT 1";
 			$db->query($sql); // Non-blocking: if no rows remain, nothing to reassign
 		}
@@ -2654,7 +3727,7 @@ class EInvoicing
 	 * Fetch default routing for a thirdparty
 	 *
 	 * @param 	int 		$fk_soc   		Thirdparty ID
-	 * @param 	'thirdparty'|'product' 		$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
+	 * @param 	'thirdparty'|'product'|'service' 		$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' or 'service' to get internal ID of product to use as default product or default service on invoice import)
 	 * @return 	string|int<-1,0>   				Routing ID string if found, 0 if not found, -1 if error
 	 */
 	public function fetchDefaultRouting($fk_soc, $routing_type = 'thirdparty')
@@ -2692,7 +3765,7 @@ class EInvoicing
 	 * Fetch all active routings for a thirdparty
 	 *
 	 * @param  	int    	$fk_soc   		Thirdparty ID
-	 * @param 	'thirdparty'|'product' 	$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' to get internal ID of product to use as default product on invoice import)
+	 * @param 	'thirdparty'|'product'|'service' 	$routing_type	Routing type ('thirdparty' to get the routing ID for a thirdparty when exporting invoice, 'product' or 'service' to get internal ID of product to use as default product or default service on invoice import)
 	 * @param	int<0,1>	$active			1=only active routings
 	 * @return 	-1|array<array{rowid:int,routing_id:string,source:string,info:?string,is_default:int}>            		Array of routing rows (assoc), empty array if none, -1 if error
 	 */
@@ -2749,11 +3822,12 @@ class EInvoicing
 	 * @param string 		$flowId                	PDP flow identifier (UUID), if available
 	 * @param string 		$validationStatus      	Validation status: OK, PENDING or ERROR, if status is sent by dolibarr to PDP
 	 * @param string 		$validationMessage     	Validation or error message returned by PDP, if status is sent by dolibarr to PDP
-	 * @param string|null 	$date_creation    		Date of the event, if we want to store a past event (for example when importing lifecycle history from PDP), if null current date will be used
+	 * @param int|null 		$date_creation    		Timestamp of the event, if we want to store a past event (for example when importing lifecycle history from PDP), if null current date will be used
 	 * @param string		$reasonCode				Reason code
+	 * @param string		$recipientRoles			RoleCodes the CDAR addressed the status to ('SE', 'SE,BY'), for a status we received
 	 * @return int  								Rowid inserted or -1 on error
 	 */
-	public function storeStatusMessage($elementId, $elementType, $statusCode, $statusMessage = '', $direction = 'OUT', $flowId = '', $validationStatus = '', $validationMessage = '', $date_creation = null, $reasonCode = '')
+	public function storeStatusMessage($elementId, $elementType, $statusCode, $statusMessage = '', $direction = 'OUT', $flowId = '', $validationStatus = '', $validationMessage = '', $date_creation = null, $reasonCode = '', $recipientRoles = '')
 	{
 		global $db, $user;
 
@@ -2779,7 +3853,8 @@ class EInvoicing
 		$sql .= "lc_validation_message, ";
 		$sql .= "date_creation, ";
 		$sql .= "fk_user_creat, ";
-		$sql .= "lc_reason_code";
+		$sql .= "lc_reason_code, ";
+		$sql .= "lc_recipient_roles";
 		$sql .= ") VALUES (";
 		$sql .= (int) $elementId . ", ";
 		$sql .= "'" . $db->escape($elementType) . "', ";
@@ -2787,12 +3862,13 @@ class EInvoicing
 		$sql .= ($flowId ? "'" . $db->escape($flowId) . "'" : "NULL") . ", ";
 		$sql .= "'" . $db->escape($direction) . "', ";
 		$sql .= (int) $statusCode . ", ";
-		$sql .= "'" . $db->escape($statusMessage) . "', ";
+		$sql .= "'" . $db->escape(dol_substr((string) $statusMessage, 0, 255)) . "', ";
 		$sql .= "'" . $db->escape($validationStatus) . "', ";
 		$sql .= "'" . $db->escape($validationMessage) . "', ";
 		$sql .= "'" . $db->escape($date_creation) . "', ";
 		$sql .= (int) $user->id . ", ";
-		$sql .= "'" . $db->escape($reasonCode) . "'";
+		$sql .= "'" . $db->escape($reasonCode) . "', ";
+		$sql .= "'" . $db->escape($recipientRoles) . "'";
 		$sql .= ")";
 
 		$resql = $db->query($sql);
@@ -2818,15 +3894,44 @@ class EInvoicing
 	 */
 	public function hasSentStatusMessage($elementId, $elementType, $statusCode, $onlyAccepted = 0)
 	{
+		return $this->statusMessageExists($elementId, $elementType, $statusCode, $onlyAccepted ? 'accepted' : 'any');
+	}
+
+	/**
+	 * Tell whether a lifecycle status is already live on the platform for an object: sent and not rejected.
+	 *
+	 * @param	int		$elementId		Id of the invoice
+	 * @param	string	$elementType	Element type ('facture', 'invoice_supplier')
+	 * @param	int		$statusCode		Lifecycle status looked for (200 to 213)
+	 * @return	bool					True if that status is already live on the platform
+	 */
+	public function hasLiveStatusMessage($elementId, $elementType, $statusCode)
+	{
+		return $this->statusMessageExists($elementId, $elementType, $statusCode, 'notrejected');
+	}
+
+	/**
+	 * Tell whether an outbound lifecycle status message exists for an object.
+	 *
+	 * @param	int		$elementId		Id of the invoice
+	 * @param	string	$elementType	Element type ('facture', 'invoice_supplier')
+	 * @param	int		$statusCode		Lifecycle status looked for (200 to 213)
+	 * @param	string	$validation		Sends to count: 'any', 'accepted' (the platform confirmed it) or 'notrejected' (anything it did not refuse)
+	 * @return	bool					True if such a message exists
+	 */
+	private function statusMessageExists($elementId, $elementType, $statusCode, $validation)
+	{
 		$sql = "SELECT rowid FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
 		$sql .= " WHERE element_type = '" . $this->db->escape($elementType) . "'";
 		$sql .= " AND element_id = " . (int) $elementId;
 		$sql .= " AND lc_status = " . (int) $statusCode;
 		$sql .= " AND LOWER(direction) = 'out'";
-		if ($onlyAccepted) {
-			// Stored as 'Ok', but compared lowercased like the direction above: on PostgreSQL an equality
-			// on the stored case is a comparison that silently matches nothing.
+		// Stored as 'Ok' / 'Error', but compared lowercased like the direction above: on PostgreSQL an
+		// equality on the stored case is a comparison that silently matches nothing.
+		if ($validation === 'accepted') {
 			$sql .= " AND LOWER(lc_validation_status) = 'ok'";
+		} elseif ($validation === 'notrejected') {
+			$sql .= " AND LOWER(lc_validation_status) <> 'error'";
 		}
 		$sql .= " LIMIT 1";
 
@@ -2843,16 +3948,173 @@ class EInvoicing
 	}
 
 	/**
+	 * Count the status messages of a code this Dolibarr sent for an element, whatever their answer.
+	 *
+	 * @param	int		$elementId		Id of the element
+	 * @param	string	$elementType	Element type ('facture', 'invoice_supplier')
+	 * @param	int		$statusCode		Lifecycle status code (212, ...)
+	 * @return	int						Number of messages sent, -1 on SQL error
+	 */
+	public function countSentStatusMessages($elementId, $elementType, $statusCode)
+	{
+		$sql = "SELECT COUNT(rowid) as nb FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
+		$sql .= " WHERE element_type = '" . $this->db->escape($elementType) . "'";
+		$sql .= " AND element_id = " . (int) $elementId;
+		$sql .= " AND lc_status = " . (int) $statusCode;
+		$sql .= " AND LOWER(direction) = 'out'";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' SQL error: ' . $this->db->lasterror(), LOG_ERR);
+			return -1;
+		}
+		$obj = $this->db->fetch_object($resql);
+		$this->db->free($resql);
+
+		return (int) $obj->nb;
+	}
+
+	/**
+	 * Tell whether a cash-in on a customer invoice has to be reported with the status 212 (Encaissee).
+	 *
+	 * @param	Facture	$invoice	Customer invoice, transmitted or not
+	 * @return	int					1 to report, 0 nothing to report (out of scope, VAT not due on collection, never
+	 *								transmitted), -1 the platform refused the deposit and holds no invoice to report on
+	 */
+	public function getCashInReportState($invoice)
+	{
+		// needEInvoiceManagement() answers with a status code whose ignore values are truthy: ask the boolean question.
+		if (!$this->mustManageEInvoice($invoice) || !$this->isCashInReportDue($invoice)) {
+			return 0;
+		}
+
+		$currentStatusDetails = $this->fetchLastknownInvoiceStatus($invoice->id, (string) $invoice->ref);
+		if ($currentStatusDetails['transmitted'] != 1) {
+			return 0;
+		}
+
+		// 'transmitted' lets STATUS_ERROR through, which is what an acknowledgement "Error" leaves behind:
+		// the invoice must be corrected and re-sent before its cash-in can be reported.
+		if ((int) $currentStatusDetails['code'] === self::STATUS_ERROR) {
+			return -1;
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Tell whether the VAT of this invoice falls due on collection, i.e. whether its cash-ins are reported (212).
+	 *
+	 * The reform only requires the payment data for the operations whose VAT is due on collection, which is exactly
+	 * what the VAT exigibility scheme of the company says (einvoicingVatDueOnCollection()).
+	 *
+	 * @param	Facture	$invoice	Customer invoice
+	 * @return	bool				True if its cash-ins have to be reported
+	 */
+	public function isCashInReportDue($invoice)
+	{
+		// VAT on a down payment falls due when it is collected, whatever the scheme: the debits option is set aside
+		// by a payment received before the debit, and it may not delay the exigibility anyway (CGI art. 269-2).
+		if ($invoice->type == CommonInvoice::TYPE_DEPOSIT) {
+			return true;
+		}
+
+		if (empty($invoice->lines)) {
+			$invoice->fetch_lines();
+		}
+
+		// Product::TYPE_PRODUCT / TYPE_SERVICE. Anything else is a pseudo-line carrying no VAT (title, subtotal,
+		// page break) and is not a kind of operation: the document builder leaves those out of the same decision.
+		$hasProductLine = false;
+		$hasServiceLine = false;
+		foreach ($invoice->lines as $line) {
+			if ((int) $line->product_type === 1) {
+				$hasServiceLine = true;
+			} elseif ((int) $line->product_type === 0) {
+				$hasProductLine = true;
+			}
+		}
+
+		return einvoicingVatDueOnCollection($hasProductLine, $hasServiceLine);
+	}
+
+	/**
+	 * List the payments that moved money on a customer invoice, oldest first: cash-ins, and refunds (negative).
+	 *
+	 * Not CommonInvoice::getListOfPayments(): it gives no payment id, and mixes in the credit notes and
+	 * down payments used, which move no money.
+	 *
+	 * @param	int		$invoiceId	Id of the customer invoice
+	 * @return	array<int,array{ref:string,date:int,amount:float,note:string}>	Payments by id, empty on error
+	 */
+	public function getCashInPayments($invoiceId)
+	{
+		$payments = array();
+
+		$sql = "SELECT p.rowid, p.ref, p.datep, p.note, pf.amount";
+		$sql .= " FROM " . $this->db->prefix() . "paiement_facture as pf";
+		$sql .= " INNER JOIN " . $this->db->prefix() . "paiement as p ON p.rowid = pf.fk_paiement";
+		$sql .= " WHERE pf.fk_facture = " . (int) $invoiceId;
+		$sql .= " AND pf.amount <> 0";
+		$sql .= " AND p.entity IN (" . getEntity('facture') . ")";
+		$sql .= " ORDER BY p.datep ASC, p.rowid ASC";
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' SQL error: ' . $this->db->lasterror(), LOG_ERR);
+			return $payments;
+		}
+		while ($obj = $this->db->fetch_object($resql)) {
+			$payments[(int) $obj->rowid] = array('ref' => (string) $obj->ref, 'date' => (int) $this->db->jdate($obj->datep), 'amount' => (float) $obj->amount, 'note' => (string) $obj->note);
+		}
+		$this->db->free($resql);
+
+		return $payments;
+	}
+
+	/**
+	 * Report a cash-in or a refund of a customer invoice to the Approved Platform with the status 212 (Encaissee).
+	 *
+	 * Shared by the payment trigger and the manual action of the invoice card, so both apply the same gates.
+	 *
+	 * @param	Facture	$invoice	Invoice, or credit note, the money moved on
+	 * @param	float	$amount		Amount (TTC) of the payment, reported as the MEN blocks: negative for a refund
+	 * @param	string	$reason		Reason of the cancellation (MDT-126), on a refund only (rule P1.17)
+	 * @return	array{res:int,message:string}	res 1 sent, 0 nothing to report, -2 deposit refused, -1 error
+	 */
+	public function reportCashIn($invoice, $amount, $reason = '')
+	{
+		$state = $this->getCashInReportState($invoice);
+		if ($state === 0) {
+			return array('res' => 0, 'message' => '');
+		}
+		if ($state < 0) {
+			return array('res' => -2, 'message' => '');
+		}
+
+		require_once __DIR__ . '/providers/PDPProviderManager.class.php';
+		$PDPManager = new PDPProviderManager($this->db);
+		$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+		if (!is_object($provider)) {
+			return array('res' => -1, 'message' => 'No Approved Platform configured');
+		}
+
+		$result = $provider->sendStatusMessage($invoice, 212, '', array('amount' => (float) $amount, 'reason' => (string) $reason));
+
+		return array('res' => ($result['res'] > 0 ? 1 : -1), 'message' => (string) $result['message']);
+	}
+
+	/**
 	 * Fetch lifecycle status messages linked to a given flow ID.
 	 *
 	 * @param	string		$flowId		Flow ID (UUID)
-	 * @return	-1|array{rowid?:int,element_id?:int,element_type?:string,provider?:string,flow_id?:string,direction?:string,lc_status?:int,lc_status_message?:string,lc_validation_status?:string,lc_validation_message?:string,date_creation?:int}					Return
+	 * @return	-1|array{rowid?:int,element_id?:int,element_type?:string,provider?:string,flow_id?:string,direction?:string,lc_status?:int,lc_status_message?:string,lc_validation_status?:string,lc_validation_message?:string,lc_reason_code?:string,date_creation?:int}					Return
 	 */
 	public function fetchStatusMessages($flowId)
 	{
 		global $db;
 
-		$sql = "SELECT rowid, element_id, element_type, provider, flow_id, direction, lc_status, lc_status_message, lc_validation_status, lc_validation_message, date_creation";
+		$sql = "SELECT rowid, element_id, element_type, provider, flow_id, direction, lc_status, lc_status_message, lc_validation_status, lc_validation_message, lc_reason_code, date_creation";
 		$sql .= " FROM " . $db->prefix() . "einvoicing_lifecycle_msg";
 		$sql .= " WHERE flow_id = '" . $db->escape($flowId) . "'";
 
@@ -2889,6 +4151,7 @@ class EInvoicing
 				'lc_status_message' => (string) $obj->lc_status_message,
 				'lc_validation_status' => (string) $obj->lc_validation_status,
 				'lc_validation_message' => (string) $obj->lc_validation_message,
+				'lc_reason_code' => (string) $obj->lc_reason_code,
 				'date_creation' => (int) $db->jdate($obj->date_creation),
 			];
 		}
@@ -2897,16 +4160,60 @@ class EInvoicing
 		return $messages;
 	}
 
+	/**
+	 * Fetch the ordered lifecycle event history of a given element (all providers, all flows combined).
+	 *
+	 * Kept agnostic of the element type so the same reader serves customer invoices today and can serve
+	 * supplier invoices later without a rewrite: both write to this table under their own 'element_type'.
+	 *
+	 * @param	string	$elementType	Element type as stored in the table ('facture', 'invoice_supplier', ...)
+	 * @param	int		$elementId		Element id
+	 * @return	array{rowid:int,provider:string,flow_id:string,direction:string,lc_status:int,lc_status_message:string,lc_validation_status:string,lc_validation_message:string,lc_reason_code:string,lc_recipient_roles:string,date_creation:int}[]	Ordered events (oldest first), empty array if none or on SQL error
+	 */
+	public function fetchLifecycleEvents($elementType, $elementId)
+	{
+		global $db;
 
+		$sql = "SELECT rowid, provider, flow_id, direction, lc_status, lc_status_message, lc_validation_status, lc_validation_message, lc_reason_code, lc_recipient_roles, date_creation";
+		$sql .= " FROM " . $db->prefix() . "einvoicing_lifecycle_msg";
+		$sql .= " WHERE element_type = '" . $db->escape($elementType) . "'";
+		$sql .= " AND element_id = " . (int) $elementId;
+		$sql .= " ORDER BY date_creation ASC, rowid ASC";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' SQL error: ' . $db->lasterror(), LOG_ERR);
+			return [];
+		}
+
+		$events = [];
+		while ($obj = $db->fetch_object($resql)) {
+			$events[] = [
+				'rowid' => (int) $obj->rowid,
+				'provider' => (string) $obj->provider,
+				'flow_id' => (string) $obj->flow_id,
+				'direction' => (string) $obj->direction,
+				'lc_status' => (int) $obj->lc_status,
+				'lc_status_message' => (string) $obj->lc_status_message,
+				'lc_validation_status' => (string) $obj->lc_validation_status,
+				'lc_validation_message' => (string) $obj->lc_validation_message,
+				'lc_reason_code' => (string) $obj->lc_reason_code,
+				'lc_recipient_roles' => (string) ($obj->lc_recipient_roles ?? ''),
+				'date_creation' => (int) $db->jdate($obj->date_creation),
+			];
+		}
+		$db->free($resql);
+
+		return $events;
+	}
 
 	/**
 	 * Update validation information of an existing lifecycle status message.
 	 *
-	 * If the message being validated is an outbound "Refused" status message for a supplier
-	 * invoice, confirmed as accepted ('Ok') by the platform, this also triggers the abandon of
-	 * the related Dolibarr supplier invoice (see SupplierInvoiceHelper::onOutboundStatusMessageValidated()).
-	 * This side effect is best-effort: any failure in it is logged but never changes the return
-	 * value of this method, whose only responsibility is to persist the validation information.
+	 * An outbound "Refused" status message for a supplier invoice, confirmed as accepted ('Ok') by the
+	 * platform, also triggers the abandon of the related Dolibarr supplier invoice
+	 * (see SupplierInvoiceHelper::onOutboundStatusMessageValidated()). This side effect is best-effort:
+	 * any failure in it is logged but never changes the return value of this method.
 	 *
 	 * @param int    $rowid					ID
 	 * @param string $statusMessage         Optional detailed status message or comment
@@ -2947,7 +4254,7 @@ class EInvoicing
 		}
 
 		if ($lcMessageRow && $lcMessageRow->element_type === 'invoice_supplier') {
-			dol_include_once('einvoicing/class/helpers/SupplierInvoiceHelper.class.php');
+			dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 			SupplierInvoiceHelper::onOutboundStatusMessageValidated(
 				$db,
 				$user,
@@ -2963,7 +4270,9 @@ class EInvoicing
 
 
 	/**
-	 * Return if an invoice need EInvoicing management.
+	 * Return the e-invoicing status an invoice qualifies for. This is the status to store, not an
+	 * answer to "must this invoice be e-invoiced?": the codes meaning "out of scope" are truthy, so
+	 * never test this answer for truth alone, call mustManageEInvoice() for that question.
 	 *
 	 * @param 	Facture|FactureRec		$object		Object
 	 * @return 	int 								self::STATUS_NOT_GENERATED if the invoice object need management of EInvoicing, self::STATUS_IGNORE or self::self::STATUS_IGNORE_2 if not.
@@ -2974,6 +4283,8 @@ class EInvoicing
 		$return = 0;	// By default, no einvoicing.
 
 		if (getDolGlobalInt('EINVOICING_USE_BILLING_CONTACT_AS_BUYER')) {
+			// Critical feature to NEVER use !!! VERY BAD PRACTICE (and probably not legal, an invoiced organization MUST be an official thirdparty with prof ID).
+			// WILL NEVER BE SUPPORTED.
 			$billingContactIds = $object->getIdContact('external', 'BILLING');
 			if (!empty($billingContactIds) && $object->fetch_contact($billingContactIds[0]) > 0 && is_object($object->contact)) {
 				$billingContact = $object->contact;
@@ -2993,7 +4304,7 @@ class EInvoicing
 			$object->fetch_thirdparty();
 		}
 
-		if ($object->thirdparty->country_code == 'FR') {	// We need to sync invoice if for french customer
+		if ($object->thirdparty->country_code === 'FR') {	// We need to sync invoice if for french customer
 			$return = self::STATUS_NOT_GENERATED;
 		}
 
@@ -3009,16 +4320,93 @@ class EInvoicing
 			}
 		}
 
-		if ($object->module_source == 'takepos') {			// Force to ignore for all invoices generated from TakePOS
-			// If invoice is generated from TakePOS, we must not make any e-invoice sync.
-			// We will do a Z sync instead from the cash closing feature.
-			$return = getDolGlobalInt('EINVOICING_DEFAULT_EINVOICE_STATUS_FOR_TAKEPOS', self::STATUS_IGNORE);
+		// Force status to "Ignore" for all invoices generated from a POS
+		// If invoice is generated from a POS, we must not make any e-invoice sync.
+		// We will do a Z sync instead from the cash closing feature.
+		$listOfPOSModuleSource = array();
+		if (getDolGlobalString("EINVOICING_NAME_OF_MODULESOURCE_THAT_ARE_POS", "takepos")) {
+			$arrayofposmodules = array_map('trim', explode(',', getDolGlobalString("EINVOICING_NAME_OF_MODULESOURCE_THAT_ARE_POS", "takepos")));
+			$listOfPOSModuleSource = array_merge($listOfPOSModuleSource, $arrayofposmodules);
+		}
+		if (in_array($object->module_source, $listOfPOSModuleSource)) {			// Force status to "Ignore" for all invoices generated from a POS
+			$return = getDolGlobalInt('EINVOICING_DEFAULT_EINVOICE_STATUS_FOR_POS', self::STATUS_IGNORE);
+		}
+
+
+		// Associations and non-VAT-registered entities (tva_assuj = 0) are outside the mandatory
+		// e-invoicing scope per DGFIP guidance: only VAT-registered entities (assujettis) are in scope.
+		// tva_assuj defaults to 1 in Dolibarr (both in the DB schema and the Societe class), so a value
+		// of 0 is an explicit, intentional flag — not an absent/unknown one.
+		// Placed after TakePOS so that EINVOICING_DEFAULT_EINVOICE_STATUS_FOR_TAKEPOS is always honoured.
+		if ($return == self::STATUS_NOT_GENERATED && isset($object->thirdparty->tva_assuj) && !$object->thirdparty->tva_assuj) {
+			$return = self::STATUS_IGNORE;
 		}
 
 		// TODO More tests to do...
 		// TODO Add hook
 
 		return $return;
+	}
+
+
+	/**
+	 * Return if an invoice must be managed by EInvoicing (analysing the thirdparty, the POS used, the option EINVOICING_SKIP_B2C, ...).
+	 * Boolean counterpart of needEInvoiceManagement() + test if einvoicing status is IGNORE*.
+	 *
+	 * @param 	Facture|FactureRec		$object		Object
+	 * @return 	bool								True if the invoice is in the e-invoicing scope
+	 */
+	public function mustManageEInvoice($object)
+	{
+		$status = $this->needEInvoiceManagement($object);
+
+		return !empty($status) && !self::isIgnoredStatus($status);		// If there is an einvoicing status and it is not IGNOR*
+	}
+
+
+	/**
+	 * Return a translated string explaining why e-invoicing is not managed for this invoice,
+	 * based on the same conditions as needEInvoiceManagement(). Returns null when no automatic
+	 * exclusion applies (the ignore status was set manually by the user).
+	 *
+	 * @param	Facture|FactureRec		$object		Invoice object (thirdparty must be loadable)
+	 * @return	string|null							Translated reason, or null if exclusion is a manual choice
+	 */
+	public function getIgnoreReason($object)
+	{
+		global $langs;
+		$langs->load("einvoicing@einvoicing");
+
+		if (empty($object->thirdparty->country_code)) {
+			$object->fetch_thirdparty();
+		}
+
+		if ($object->thirdparty->country_code != 'FR') {
+			return $langs->trans('EInvoiceIgnoreReasonNotFR');
+		}
+
+		if (getDolGlobalInt('EINVOICING_SKIP_B2C') && !$object->thirdparty->isACompany()) {
+			return $langs->trans('EInvoiceIgnoreReasonB2C');
+		}
+
+		if (isset($object->thirdparty->tva_assuj) && !$object->thirdparty->tva_assuj) {
+			return $langs->trans('EInvoiceIgnoreReasonNotVATRegistered');
+		}
+
+		// No automatic exclusion: the user manually set the status to IGNORE
+		return null;
+	}
+
+
+	/**
+	 * Return if a status code keeps the invoice out of the e-invoicing scope.
+	 *
+	 * @param 	int|string				$status		Status code, a self::STATUS_* value
+	 * @return 	bool								True if the invoice must never be e-invoiced
+	 */
+	public static function isIgnoredStatus($status)
+	{
+		return in_array((int) $status, self::STATUS_IGNORE_CODES, true);
 	}
 
 
@@ -3039,24 +4427,23 @@ class EInvoicing
 	/**
 	 * Calculate TVA intracommunity number for a thirdparty if missing, from the professional ID
 	 *
+	 * Delegates to the core Societe::calculateVATNumberFromProperties() when it exists (Dolibarr 24 on,
+	 * or any release it gets backported into - the presence of the method decides, not a version test),
+	 * and to compat/societe.lib.php otherwise. Kept as the entry point of the module: it is what
+	 * buildinvoicelines.inc.php calls to fill BT-31 and BT-48.
+	 *
 	 * @param mixed $thirdparty		Third party
 	 * @return string
 	 */
 	public function thirdpartyCalcVATIntra($thirdparty)
 	{
-		if ($thirdparty->country_code == 'FR' && empty($thirdparty->tva_intra) && !empty($thirdparty->tva_assuj)) {
-			$siren = trim($thirdparty->idprof1);
-			if (empty($siren)) {
-				$siren = (int) substr(str_replace(' ', '', $thirdparty->idprof2), 0, 9);
-			}
-			if (!empty($siren)) {
-				// [FR + code clé  + numéro SIREN ]
-				//Clé TVA = [12 + 3 × (SIREN modulo 97)] modulo 97
-				$cle = (12 + 3 * $siren % 97) % 97;
-				$tva_intra = 'FR' . $cle . $siren;
-			}
+		if (is_object($thirdparty) && method_exists($thirdparty, 'calculateVATNumberFromProperties')) {
+			return $thirdparty->calculateVATNumberFromProperties($thirdparty);
 		}
-		return $tva_intra ?? '';
+
+		require_once __DIR__ . '/../compat/societe.lib.php';
+
+		return calculateVATNumberFromProperties($thirdparty);
 	}
 
 	/**
@@ -3067,21 +4454,25 @@ class EInvoicing
 	public function cleanUpTemporaryFiles()
 	{
 		global $conf;
+
+		require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
+
 		// Clean up temporary files
 		$tempDir = $conf->einvoicing->dir_temp ?? '';
-		if (!empty($tempDir) && is_dir($tempDir)) {
-			$files = scandir($tempDir);
-			if (is_array($files)) {
-				foreach ($files as $file) {
-					if ($file !== '.' && $file !== '..') {
-						$filePath = "$tempDir/$file";
-						if (is_file($filePath)) {
-							dol_delete_file($filePath);
-						}
-					}
-				}
-			}
+		if (empty($tempDir) || !dol_is_dir($tempDir)) {
+			return;
 		}
+
+		// Files at the root only: everything the module writes there is flat, so a subdirectory found here
+		// is not ours to remove. dol_dir_list() also skips the dot files the core protects, which a raw
+		// scandir() loop happily deleted.
+		$files = dol_dir_list($tempDir, 'files', 0);
+		foreach ($files as $file) {
+			// Exact delete: the name comes from the listing and must not be read back as a glob mask.
+			dol_delete_file($file['fullname'], 1);
+		}
+
+		dol_syslog(__METHOD__ . ' removed ' . count($files) . ' file(s) from ' . $tempDir, LOG_DEBUG, 0, '_einvoicing');
 	}
 
 	/**
@@ -3117,8 +4508,11 @@ class EInvoicing
 		if ($check) {
 			if ($mysoc->country_code == 'FR') {
 				if (!empty($einvoiceid)) {
-					$einvoiceid = $this->removeSpaces($einvoiceid);
-					if (!preg_match('/^' . preg_replace('/\s+/', '', $mysoc->idprof1) . '/', $einvoiceid)) {
+					$einvoiceid = removeAllSpaces($einvoiceid);
+					// Both sides of the comparison must be stripped the same way: idprof() built the routing id
+					// with removeAllSpaces(), so a non-breaking space pasted into idprof1 would otherwise survive
+					// here only, the match would fail and, in live mode, the seller URI would be emptied below.
+					if (!preg_match('/^' . removeAllSpaces($mysoc->idprof1) . '/', $einvoiceid)) {
 						if (getDolGlobalString('EINVOICING_LIVE')) {	// In live mode, we do not allow profid1 not matching routing id
 							dol_syslog("Error: The seller communication URI seems not correct (should be or start with your SIRET number). Value: " . $einvoiceid, LOG_WARNING);
 							$einvoiceid = '';
@@ -3128,7 +4522,63 @@ class EInvoicing
 			}
 		}
 
-		return $this->removeSpaces($einvoiceid);
+		return removeAllSpaces($einvoiceid);
+	}
+
+	/**
+	 * Look up the Peppol Directory (via the public Peppol Lookup API, https://api-lookup.peppol.org/lookup)
+	 * to determine which Access Point (PA) currently serves a given French SIREN on the Peppol network.
+	 *
+	 * France only (iso6523 scheme '0225'): the module does not officially support other countries yet.
+	 *
+	 * @param 	string 	$siren 		French SIREN (9 digits)
+	 * @return 	array{exists: bool, pa_hostname: string|null, pa_label: string|null}|null	Lookup result, or null if the lookup failed or the SIREN is empty/invalid
+	 */
+	public function getPeppolAccessPointBySiren($siren)
+	{
+		$siren = removeAllSpaces((string) $siren);
+		if (empty($siren)) {
+			return null;
+		}
+
+		$response = getURLContent(
+			'https://api-lookup.peppol.org/lookup',
+			'POST',
+			json_encode(array('identifier' => 'iso6523-actorid-upis::0225:' . $siren)),
+			1,
+			array('Content-Type: application/json'),
+			array('http', 'https'),
+			0,
+			-1,
+			0,
+			0,
+			array(),
+			'_einvoicing'
+		);
+
+		if (($response['http_code'] ?? 0) !== 200 || empty($response['content'])) {
+			dol_syslog(__METHOD__ . ' Peppol lookup API unreachable (HTTP ' . ($response['http_code'] ?? 'N/A') . ')', LOG_WARNING);
+			return null;
+		}
+
+		$data = json_decode($response['content'], true);
+		if (!is_array($data) || empty($data['exists'])) {
+			return array('exists' => false, 'pa_hostname' => null, 'pa_label' => null);
+		}
+
+		// Known Peppol SMP hostnames mapped to a human-readable Access Point name. Unknown hostnames are shown as-is: complete this map as new Access Points are identified.
+		$paHostnameMap = array(
+			'api.superpdp.tech' => 'SuperPDP',
+			'smp.pennylane.com' => 'Pennylane',
+		);
+
+		$hostname = parse_url((string) ($data['smpUrl'] ?? ''), PHP_URL_HOST) ?: null;
+
+		return array(
+			'exists' => true,
+			'pa_hostname' => $hostname,
+			'pa_label' => $hostname !== null ? ($paHostnameMap[$hostname] ?? $hostname) : null,
+		);
 	}
 
 	/**
@@ -3146,7 +4596,7 @@ class EInvoicing
 		if ($invoice !== null && !empty($invoice->id)) {
 			$statusInfo = $this->fetchLastknownInvoiceStatus($invoice->id, $invoice->ref);
 			if (!empty($statusInfo['override_routing_id'])) {
-				return $this->removeSpaces($statusInfo['override_routing_id']);
+				return removeAllSpaces($statusInfo['override_routing_id']);
 			}
 		}
 
@@ -3157,10 +4607,10 @@ class EInvoicing
 		}
 
 		if (empty($uri) && !getDolGlobalString('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID')) {	// Fallback on profid1
-			$uri = $thirdparty->idprof1;
+			$uri = idprof($thirdparty);
 		}
 
-		return $this->removeSpaces($uri);
+		return removeAllSpaces($uri);
 	}
 
 	/**
@@ -3169,27 +4619,54 @@ class EInvoicing
 	 *
 	 * @param   string  $str  	String to cleanup
 	 * @return  string  		cleaned up string
+	 * @deprecated			Use the removeAllSpaces() function of einvoicing/lib/einvoicing.lib.php instead. This
+	 *						method only removed the ASCII spaces, so an identifier carrying a non-breaking space
+	 *						came out of it differently than out of idprof(). Kept as a delegation because it is
+	 *						public: another module or a hook may be calling it.
+	 * @see removeAllSpaces()
 	 */
 	public function removeSpaces($str)
 	{
-		// TODO: move this function to class utils
-		return preg_replace('/\\s+/', '', $str);
+		return removeAllSpaces($str);
+	}
+
+	/**
+	 * Split a Dolibarr postal address into the three lines EN 16931 has for it.
+	 *
+	 * Dolibarr keeps the address as one free text field where the norm gives three terms (BT-35/36/162,
+	 * BT-50/51/163, BT-75/76/165): handing the whole field to the first one renders as one run-on line
+	 * (issue #683). A fourth line and beyond join the third, separated by a comma.
+	 *
+	 * @param	string	$address	Address as Dolibarr stores it, lines separated by newlines
+	 * @return	string[]			Exactly three lines, empty strings when the address has fewer
+	 */
+	public function splitAddressLines($address)
+	{
+		$lines = preg_split('/\R/', (string) $address);
+		$lines = array_values(array_filter(array_map('trim', $lines), 'strlen'));
+
+		if (count($lines) > 3) {
+			$lines = array_merge(array_slice($lines, 0, 2), array(implode(', ', array_slice($lines, 2))));
+		}
+
+		return array_pad($lines, 3, '');
 	}
 
 	/**
 	 * Generates the deposit, standard and credit note CII sample-invoice chain and returns the normalized XML of each.
 	 *
-	 * Generates three sample invoices (deposit, standard, and credit note) using fixed specimen
-	 * third parties to ensure consistent, deterministic output across test runs. The XML output
-	 * is normalized to exclude non-deterministic parts like timestamps and dates.
+	 * Uses fixed specimen third parties to ensure consistent, deterministic output across test runs.
+	 * The XML output is normalized to exclude non-deterministic parts like timestamps and dates.
 	 *
 	 * @used-by	regenerate_einvoicing_fixtures.php For fixture generation
 	 * @used-by	EInvoicingSamplesTest.php For comparison and regression testing
 	 *
+	 * @param	array<string,string>	$rawxmls	Filled with the same five documents before normalization,
+	 *												for a caller that hands them to a validator
 	 * @return	array<string, string>	Array with keys 'deposit', 'standard', and 'creditnote',
 	 *                                  each containing normalized XML of the respective invoice type
 	 */
-	public static function generateSampleEInvoicesForTests()
+	public static function generateSampleEInvoicesForTests(&$rawxmls = array())
 	{
 		global $conf, $db, $langs;
 		require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
@@ -3233,20 +4710,27 @@ class EInvoicing
 		$conf->global->TAX_MODE_SELL_PRODUCT = 'invoice';
 		$conf->global->TAX_MODE_SELL_SERVICE = 'payment';
 
-		// Same reason for the language: CommonProtocol::generateSampleInvoice() builds the specimen
-		// with the ambient $langs, so the free text it carries (BT-20 payment terms, BT-22 notes,
-		// line descriptions) follows whatever language the instance runs in. The reference fixtures
-		// would then match only on an instance set to the language of whoever generated them.
-		// Pin en_US here, so the specimen is the same everywhere; the interactive sample generation
-		// keeps following the user language, it does not go through this method.
+		// Same reason for the language: generateSampleInvoice() builds the specimen with the ambient
+		// $langs, so its free text would follow the instance language and the reference fixtures would
+		// only match there. Pinned to en_US; the interactive sample generation does not come through here.
 		$savLangs = $langs;
 		$langs = new Translate('', $conf);
 		$langs->setDefaultLang('en_US');
 		$langs->loadLangs(array('main', 'dict', 'companies', 'bills', 'products', 'einvoicing@einvoicing'));
 
+		// A third specimen party: the same seller, not subject to VAT. get_default_tva() answers 0 for
+		// it and getCategoryRate() reads the regime rather than the rate, so the specimen it sells
+		// comes out exempt (category E) under VATEX-FR-FRANCHISE - the shape of #974, where BT-120 and
+		// BT-121 belong to the VAT breakdown and, below EXTENDED, to nothing else.
+		$exemptSeller = clone $seller;
+		$exemptSeller->tva_assuj = 0;
+
 		$depositXml = '';
 		$standardXml = '';
+		$replacementXml = '';
 		$creditnoteXml = '';
+		$situationXml = '';
+		$exemptXml = '';
 
 		try {
 			$depositXml = self::generateSampleInvoiceXml($seller, $buyer, array(
@@ -3261,10 +4745,28 @@ class EInvoicing
 				'referencedinvoice' => 'FA0000-SPECIMEN-DEPOSIT',
 			));
 
+			$replacementXml = self::generateSampleInvoiceXml($seller, $buyer, array(
+				'invoiceformat' => 'CII',
+				'invoicetype' => Facture::TYPE_REPLACEMENT,
+				'referencedinvoice' => 'FA0000-SPECIMEN-STANDARD',
+			));
+
 			$creditnoteXml = self::generateSampleInvoiceXml($seller, $buyer, array(
 				'invoiceformat' => 'CII',
 				'invoicetype' => Facture::TYPE_CREDIT_NOTE,
 				'referencedinvoice' => 'FA0000-SPECIMEN-STANDARD',
+			));
+
+			$situationXml = self::generateSampleInvoiceXml($seller, $buyer, array(
+				'invoiceformat' => 'CII',
+				'invoicetype' => Facture::TYPE_SITUATION,
+				'referencedinvoice' => '',
+			));
+
+			$exemptXml = self::generateSampleInvoiceXml($exemptSeller, $buyer, array(
+				'invoiceformat' => 'CII',
+				'invoicetype' => Facture::TYPE_STANDARD,
+				'referencedinvoice' => '',
 			));
 		} finally {
 			$conf->global->EINVOICING_PDP = $savEinvoicingPdp;
@@ -3274,10 +4776,26 @@ class EInvoicing
 			$langs = $savLangs;
 		}
 
+		// The same documents before normalization, for a caller that validates them: normalization
+		// flattens every date to one value, which makes the date rules of the French socle -
+		// BR-FR-CO-07, BR-FR-03, G1.07 - true whatever the document says. Handed back apart, so the
+		// returned array keeps holding the specimens and nothing else.
+		$rawxmls = array(
+			'deposit' => $depositXml,
+			'standard' => $standardXml,
+			'replacement' => $replacementXml,
+			'creditnote' => $creditnoteXml,
+			'situation' => $situationXml,
+			'exempt' => $exemptXml,
+		);
+
 		return array(
 			'deposit' => self::normalizeSampleInvoiceXml($depositXml),
 			'standard' => self::normalizeSampleInvoiceXml($standardXml),
+			'replacement' => self::normalizeSampleInvoiceXml($replacementXml),
 			'creditnote' => self::normalizeSampleInvoiceXml($creditnoteXml),
+			'situation' => self::normalizeSampleInvoiceXml($situationXml),
+			'exempt' => self::normalizeSampleInvoiceXml($exemptXml),
 		);
 	}
 

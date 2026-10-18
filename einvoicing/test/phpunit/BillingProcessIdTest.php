@@ -20,23 +20,20 @@
  *      \file       test/phpunit/BillingProcessIdTest.php
  *      \ingroup    test
  *      \brief      PHPUnit test for the billing frame (BT-23).
- *                  BT-23 describes the billing case of the document, not a payment status: in the
- *                  AFNOR nominal use case (XP Z12-012 annexe B, UC1_F202500003) the invoice is
- *                  issued in frame S1 and stays S1 while the CDAR lifecycle reports 211 then 212.
- *                  The "already paid" frames B2/S2/M2 are therefore reserved to an invoice whose
- *                  amount was already received when it was issued, which BR-FR-CO-09 makes
- *                  concrete: BT-113 must equal BT-112 and BT-115 must be 0, both fatal.
+ *                  BT-23 is the billing case, not a payment status: an invoice issued in S1 stays S1
+ *                  whatever the lifecycle reports. The "already paid" frames B2/S2/M2 are reserved to
+ *                  an invoice already paid when issued, which BR-FR-CO-09 makes fatal: BT-113 must
+ *                  equal BT-112 and BT-115 must be 0.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
 global $conf, $user, $langs, $db;
 
-// This module is deployed by symlinking this repository into htdocs/custom/einvoicing of one or
-// several Dolibarr instances. Some test runners resolve the real (non-symlinked) path of this
-// file before including it, which breaks a fixed "../../htdocs/master.inc.php" relative path.
-// DOLIBARR_HTDOCS let's the developer/CI point explicitly at the Dolibarr instance to test
-// against; otherwise we fall back to the standard relative path (valid when this file is reached
-// through the htdocs/custom/einvoicing/test/phpunit symlink without realpath resolution).
+// This module is deployed by symlinking this repository into htdocs/custom/einvoicing. Some test
+// runners resolve the real (non-symlinked) path of this file before including it, which breaks a
+// fixed "../../htdocs/master.inc.php" relative path. DOLIBARR_HTDOCS let's the developer/CI point
+// explicitly at the Dolibarr instance to test against; otherwise we fall back to the relative path
+// (valid when this file is reached through the symlink without realpath resolution).
 $dolibarrHtdocs = getenv('DOLIBARR_HTDOCS');
 if (!$dolibarrHtdocs) {
 	$dolibarrHtdocs = dirname(__FILE__) . '/../../htdocs';

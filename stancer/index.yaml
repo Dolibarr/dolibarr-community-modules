@@ -1,0 +1,33 @@
+# This is the YAML file to describe the location of a module
+
+packages:
+  - modulename: 'Stancer'
+    author: 'CAP-REL'
+    author_url: 'https://cap-rel.fr'
+    maintener_email: 'eric.seigne@cap-rel.fr'
+    label:
+      fr: "Stancer (par CAP-REL)"
+      en: "Stancer (by CAP-REL)"
+    description:
+      fr: "Encaissez vos factures, commandes, propositions commerciales, cotisations et dons par carte bancaire (avec 3D Secure) ou par prélèvement SEPA via la plateforme de paiement Stancer. Gère les mandats SEPA, les rejets de prélèvement avec leurs codes ISO 20022, les remboursements, les litiges, le rapprochement bancaire des virements Stancer et les paiements automatiques par tâche planifiée."
+      en: "Collect payments for your invoices, orders, proposals, memberships and donations by credit card (with 3D Secure) or SEPA direct debit through the Stancer payment platform. Handles SEPA mandates, direct debit rejections with their ISO 20022 codes, refunds, disputes, bank reconciliation of Stancer payouts and automatic payments through a scheduled job."
+    status: 'enabled'
+    created_at: '2023-03-12'
+    last_updated_at: 'auto'
+    category: '68, 67'
+    git: 'https://github.com/Dolibarr/dolibarr-community-modules/tree/main/stancer'
+    git-branch: 'main'
+    git-system: 'github'
+    cover: 'https://raw.githubusercontent.com/Dolibarr/dolibarr-community-modules/main/stancer/cover.png'
+    current_version: 'auto'
+    dolibarrmin: '15'
+    dolibarrmax: 'auto'
+    phpmin: '7.4'
+    phpmax: 'auto'
+    price: 0
+    # direct-download is yes if we can download the module to install it in application
+    direct-download: yes
+    # dolistore-upload is manual if module is also uploaded manually on dolistore.com, auto if sync automatically
+    dolistore-upload: 'manual'
+    # dolistore-download is url of product page for download if module can also be found on dolistore.com
+    dolistore-download: 'https://www.dolistore.com/product.php?id=623'

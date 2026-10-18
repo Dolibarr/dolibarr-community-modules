@@ -71,14 +71,14 @@ if (!$res) {
 // Libraries
 require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
 require_once DOL_DOCUMENT_ROOT.'/core/class/html.formsetup.class.php';
-require_once '../lib/einvoicing.lib.php';
-require_once "../class/providers/PDPProviderManager.class.php";
-require_once "../class/protocols/ProtocolManager.class.php";
-require_once "../class/einvoicing.class.php";
+require_once __DIR__.'/../lib/einvoicing.lib.php';
+require_once __DIR__.'/../class/providers/PDPProviderManager.class.php';
+require_once __DIR__.'/../class/protocols/ProtocolManager.class.php';
+require_once __DIR__.'/../class/einvoicing.class.php';
 
 
 // Translations
-$langs->loadLangs(array("admin", "einvoicing@einvoicing"));
+$langs->loadLangs(array("admin", "agenda", "einvoicing@einvoicing"));
 
 // Initialize a technical object to manage hooks of page. Note that conf->hooks_modules contains an array of hook context
 /** @var HookManager $hookmanager */
@@ -170,6 +170,7 @@ if (GETPOST('code') && GETPOST('state') && $provider instanceof AbstractPDPProvi
 		setEventMessages($langs->trans('EINVOICING_SUPERPDP_OAUTH_STATE_MISMATCH'), null, 'errors');
 	} else {
 		unset($_SESSION['einvoicing_superpdp_oauth_state']);
+		// @phan-suppress-next-line PhanUndeclaredMethod  Guarded by the method_exists() above: only a provider using an authorization code flow declares it.
 		$token = $provider->exchangeAuthorizationCode(GETPOST('code'));
 		if ($token) {
 			setEventMessages("Token generated successfully", null, 'mesgs');
@@ -193,14 +194,17 @@ $item->defaultFieldValue = getDolGlobalString('EINVOICING_PDP');
 $item->helpText = $langs->transnoentities('EINVOICING_PDP_HELP');
 $item->helpText .= '<br>'.$langs->transnoentities('EINVOICING_PDP_HELP2');
 $item->helpText .= '<br>'.$langs->transnoentities('EINVOICING_PDP_HELP3');
-$item->cssClass = 'minwidth500';
+$item->cssClass = 'maxwidth500';
 //var_dump($item);exit;
 
-$item = $formSetup->newItem('EINVOICING_LIVE')->setAsYesNo();
-$item->fieldParams['forcereload'] = 1;
+// Real/test mode has no meaning for the TESTPDP stub, which never talks to any platform.
+if (getDolGlobalString('EINVOICING_PDP') !== 'TESTPDP') {
+	$item = $formSetup->newItem('EINVOICING_LIVE')->setAsYesNo();
+	$item->fieldParams['forcereload'] = 1;
+}
 
 // Setup conf to use the invoice billing contact (external BILLING contact) as the XML buyer instead of the invoice thirdparty
-// This option is very dangerous and a vey bad practice. The invoiced thirdparty should always be the thirdparty (if we invoice a parent company,
+// This option is VERY DANGEROUS and a VARY BAD PRACTICE. DO NOT USE IT ! The invoiced thirdparty should always be the thirdparty (if we invoice a parent company,
 // invoice should be on parent company).
 // If linking an invoice to another thirdparty than the one the is invoiced and using the alternative contact to define the invoiced thirdparty
 // will lead to false accountancy and a lot of other troubles. So this option may be reserved to integrators only and not be suggested to end users.
@@ -231,7 +235,12 @@ $reg = array();
 
 // Setup conf for selection of the PDP provider
 if ($action == 'update' && GETPOSTISSET('EINVOICING_PDP') && GETPOST('EINVOICING_PDP') != getDolGlobalString('EINVOICING_PDP')) {
-	dolibarr_set_const($db, 'EINVOICING_PDP', GETPOST('EINVOICING_PDP'), 'chaine', 0, '', $conf->entity);
+	$newpdp = GETPOST('EINVOICING_PDP');
+	dolibarr_set_const($db, 'EINVOICING_PDP', $newpdp, 'chaine', 0, '', $conf->entity);
+
+	// EINVOICING_ONLY_GENERATE follows the provider choice: selecting the "None" test provider turns
+	// generation-only mode on, selecting any real provider turns it back off. Single source of truth.
+	dolibarr_set_const($db, 'EINVOICING_ONLY_GENERATE', ($newpdp === 'TESTPDP') ? '1' : '0', 'chaine', 0, '', $conf->entity);
 
 	// Set the default protocol when no default value is specified
 	if (getDolGlobalString('EINVOICING_PDP') && !getDolGlobalString('EINVOICING_PROTOCOL')) {
@@ -265,6 +274,14 @@ if ($prefix && preg_match('/call'.$prefix.'HEALTHCHECK/i', $action, $reg)) {
 	}
 }
 
+// Action show remote info
+if ($prefix && preg_match('/call'.$prefix.'REMOTEINFO/i', $action, $reg)) {
+	$remoteInfo = $provider->getRemoteInfo();
+	//$style = ($remoteInfo['status_code'] == 200 ? 'warnings' : 'errors');
+	$style = 'warnings';	// We always use warnings because we need message to be persistent (too long to read).
+	setEventMessages($remoteInfo['message'], null, $style);
+}
+
 // Generate a sample invoice and try to send it
 if ($prefix && preg_match('/make'.$prefix.'sampleinvoice/i', $action, $reg)) {
 	$result = $provider->sendSampleInvoice(1);
@@ -285,7 +302,7 @@ if ($prefix && preg_match('/makesend'.$prefix.'sampleinvoice/i', $action, $reg))
 
 if ($prefix && preg_match('/delete'.$prefix.'TOKEN/i', $action, $reg)) {
 	// Delete token
-	$result = $provider->deleteAccessToken();
+	$result = $provider->deleteAccessToken(getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
 
 	if ($result) {
 		setEventMessages("Token deleted successfully", null, 'mesgs');
@@ -449,7 +466,11 @@ if ($stringwarning) {
 }
 
 if (!empty($formSetup2->items)) {
-	print $pdpRenderFormSetup($formSetup2, $langs->transnoentitiesnoconv('EInvoicingConnectionSetup'));
+	if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
+		print $langs->trans("EInvoicingInfoManagedByMasterSetup", getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
+	} else {
+		print $pdpRenderFormSetup($formSetup2, $langs->transnoentitiesnoconv('EInvoicingConnectionSetup'));
+	}
 	print '<br>';
 }
 

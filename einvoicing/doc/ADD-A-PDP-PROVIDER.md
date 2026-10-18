@@ -9,10 +9,11 @@ provider from the provider itself, the tokens are stored and refreshed by the ba
 calls are logged in the "API calls" list, and the invoices, the status messages and the cron
 synchronization go through the provider exactly like for a native one.
 
-Reference implementation to copy: `einvoicing/class/providers/TestPDPProvider.class.php`. It is the
-`TESTPDP` entry of the provider list, offered in the setup page when the developer tools of the
-module are enabled (`EINVOICING_ALLOW_DEVTOOLS`). It calls nothing over the network, so it can be
-selected and clicked through to check a new integration is correctly wired before writing any HTTP.
+Reference implementation to copy: `einvoicing/class/providers/TestPDPProvider.class.php`. In the
+module it doubles as the `TESTPDP` "None" entry of the provider list: choosing it turns on the
+generation-only mode (`EINVOICING_ONLY_GENERATE`), and nothing is ever sent or synchronized. It calls
+nothing over the network; its credential field is commented out, so it is meant to be read and
+copied rather than clicked through.
 
 ## 1. Declare the provider (hook)
 
@@ -71,7 +72,9 @@ Rules:
 - the provider only shows up while your module is enabled. If the user disables it while it was the
   selected provider, the setup page says so and offers the other providers;
 - the hook runs on every instantiation of `PDPProviderManager`, including in the cron job. Keep it to
-  building the array: no query, no API call.
+  building the array: no query, no API call;
+- an operator setting `EINVOICING_SUPERPDP_VIAPARTNER_ONLY` disables every provider but the
+  via-partner one, hook-provided ones included.
 
 ## 2. Write the provider class
 
@@ -101,13 +104,20 @@ class MyPDPProvider extends AbstractPDPProvider
             'live'           => getDolGlobalInt('EINVOICING_LIVE', 0),
         );
 
-        $this->tokenData = $this->fetchOAuthTokenDB();
-
-        $ProtocolManager = new ProtocolManager($this->db);
-        $this->exchangeProtocol = $ProtocolManager->getProtocol(getDolGlobalString('EINVOICING_PROTOCOL'));
+        $this->tokenData = $this->fetchOAuthTokenDB(getDolGlobalInt('EINVOICING_MULTICOMPANY_USE_MASTER_SETUP'));
     }
 
     // ... the methods below
+}
+```
+
+Do not load the exchange protocol in the constructor: a constructor must never load classes through
+autoload. Load it where it is used (`sendInvoice()`, `sendSampleInvoice()`):
+
+```php
+if (empty($this->exchangeProtocol)) {
+    $ProtocolManager = new ProtocolManager($this->db);
+    $this->exchangeProtocol = $ProtocolManager->getProtocol(getDolGlobalString('EINVOICING_PROTOCOL'));
 }
 ```
 
@@ -121,12 +131,15 @@ method.
 
 - its constants: `EINVOICING_MYPDP_API_KEY`, `EINVOICING_MYPDP_USERNAME`, `EINVOICING_MYPDP_ROUTING_ID`...
 - the actions of the setup page: `setEINVOICING_MYPDP_TOKEN`, `callEINVOICING_MYPDP_HEALTHCHECK`,
-  `deleteEINVOICING_MYPDP_TOKEN`, `makeEINVOICING_MYPDP_sampleinvoice`;
+  `callEINVOICING_MYPDP_REMOTEINFO`, `deleteEINVOICING_MYPDP_TOKEN`,
+  `makeEINVOICING_MYPDP_sampleinvoice`, `makesendEINVOICING_MYPDP_sampleinvoice`;
 - the OAuth token rows stored by `saveOAuthTokenDB()` / read by `fetchOAuthTokenDB()`.
 
 Suffix the credentials with `_PROD` for the production ones (`EINVOICING_MYPDP_API_KEY_PROD`), as the
 native providers do: `EINVOICING_LIVE` then switches the whole set at once, and the sandbox keys are
-never sent to the production platform.
+never sent to the production platform. A `_PROD` suffix hides the name from the automatic encryption
+of Dolibarr: call `$this->storeThisFieldEncrypted($item)` on every secret field (password, client
+secret, API key) so it reaches the database encrypted.
 
 ### Methods to implement
 
@@ -138,39 +151,54 @@ Abstract, so the class does not load without them:
 | `getAccessToken()` | `string|null` — new token, saved with `saveOAuthTokenDB()` | setup page, and on an expired token |
 | `refreshAccessToken()` | `string|null` | when `isTokenExpired()` is true |
 | `checkHealth()` | `array{status_code:int,message:string}` | "Test connection" of the setup page |
+| `getRemoteInfo()` | `array{status_code:int,message:string}` — account details shown to the user | "Show remote info" link of the setup page (`call<prefix>REMOTEINFO`) |
 | `callApi($resource, $method, $options, $extraHeaders, $callType)` | `array{status_code:int,response:mixed,call_id:?string}` | every other method of your class |
 | `sendInvoice($object)` | flow id given by the platform, `false` on failure | validation/transmission of a customer invoice |
 | `sendStatusMessage($object, $statusCode, $reasonCode, $paymentData)` | `array{res:int,message:string}` | lifecycle of the e-invoice (received, rejected, cashed...) |
 | `sendSampleInvoice($onlymake = 0)` | array of messages, `0` on failure | setup page |
 | `validateEInvoiceFile($idinvoice, $filePath)` | `array{res:int,message:string}` | only when `has_validator` is 1 |
-| `syncFlows($syncFromDate = 0, $limit = 0)` | `array{res:int,messages:string[],...}` | cron job and "Synchronize" button |
-| `syncFlow($flowId, $call_id = null)` | `array{res:int,message:string,action:?string}` | one flow of the synchronization |
+| `syncFlows($syncFromDate = 0, $limit = 0)` | `array{res:int,messages:string[],totalFlows:?int,alreadyExist:int,syncedFlows:int,batchlimit:int,actions?:array,details?:string[],errors?:string[]}` | cron job and "Synchronize" button |
+| `syncFlow($flowId, $call_id = null)` | `array{res:int,message:string,action?:?string,actioncode?:string,actionurl?:string,actiondata?:array,allactiondata?:array,businessmessage?:string,postponeflow?:int}` | one flow of the synchronization |
+
+`syncFlows()`: the synchronization page and the cron read all of these keys; `res` ≤ 0 with `actions`
+is shown as a business warning, without it as a technical error. `syncFlow()`: `res` is 1 for done,
+0 for already known, -1 for a failure. On a business failure set `actioncode` / `action` /
+`actiondata`, which feed the manual-action queue; set `postponeflow` to 1 only when nothing was
+stored for the flow, so dropping it loses nothing.
 
 Not abstract but required in practice:
 
 - `initFormSetup(&$formSetup, $prefix, $prefixenv, $providersConfig, $TFieldProtocols, $TFieldProfiles)`
   builds the configuration block of your provider in the setup page (credentials, token, actions).
   Without it the page shows nothing to configure. `$prefix` is your `dol_prefix` followed by `_`, and
-  `$prefixenv` is `prod` or `test`;
-- `deleteAccessToken()` if you display the "remove the connection" link.
+  `$prefixenv` is `prod` or `test`.
+
+Optional: declare `exchangeAuthorizationCode($code)` to have an OAuth authorization-code return
+(`?code&state`) handled on the setup page, and fill `$helpToGetCredentials` (HTML shown above your
+block).
 
 ### What the base class already does for you
 
 - `getApiUrl($mode)` returns the production or sandbox URL of your config depending on
   `EINVOICING_LIVE` — `$mode` being `auth`, `api`, `ap_api` or `afnor_directory`;
-- `saveOAuthTokenDB()` / `fetchOAuthTokenDB()` / `deleteOAuthTokenDB()` / `isTokenExpired()` store and
-  read the tokens of your provider;
+- `saveOAuthTokenDB()` / `fetchOAuthTokenDB()` / `deleteOAuthTokenDB()` / `isTokenExpired()` store
+  (encrypted, on an independent database connection so a refreshed token survives a rollback) and
+  read the tokens of your provider; `deleteAccessToken($forceentity)` backs the "remove the
+  connection" link;
 - `logCall()` records an API call in `llx_einvoicing_call`, on an independent database connection so
   the trace survives a rollback, and redacts the secrets. Call it from your `callApi()` and the whole
-  module gets a complete call log;
-- `checkRecipientDirectory($idprof1)` pre-checks that a recipient is reachable, through the AFNOR
+  module gets a complete call log. It only logs a call given a non-empty `$callType`, so always pass
+  one; payloads above 1 MiB are stored truncated;
+- `checkRecipientDirectory($idprof1, $addressingidentifier = '')` pre-checks that a recipient is reachable, through the AFNOR
   directory service (XP Z12-013) when your config declares `prod_afnor_directory_url` /
   `test_afnor_directory_url`;
-- `fetchFlowData()`, `fetchFlowXml()`, `resolveFlowProfile()`, `addEvent()`, `generateUuidV4()`,
-  `getLastSyncDate()`.
+- `getLastSyncDate($marginHours = 0)`, the last `updatedat` stored for your provider code;
+- `clearIncomingDiagnosticFiles()` (call it first in `syncFlows()`), `fetchImportableFlowDocument()`,
+  `processIncomingSupplierInvoiceStatus()`, `findSupplierInvoiceByFlowId()`;
+- `fetchFlowData()`, `fetchFlowXml()`, `resolveFlowProfile()`, `addEvent()`, `generateUuidV4()`.
 
 The XML itself is **not** the business of the provider: it is built by the exchange protocol chosen by
-the user (CII, Factur-X, UBL), loaded in the constructor above. A provider transports a file, it does
+the user (CII, Factur-X, UBL), loaded on first use. A provider transports a file, it does
 not produce it.
 
 ## 3. Check the integration

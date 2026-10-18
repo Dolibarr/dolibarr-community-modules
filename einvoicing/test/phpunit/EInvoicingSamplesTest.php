@@ -70,17 +70,14 @@ require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 /**
  * Class EInvoicingSamplesTest
  *
- * This test class ensures that the generated XML output for different invoice types remains
- * consistent and matches the committed reference fixtures. It validates three invoice types:
- * - Deposit invoices
- * - Standard invoices
- * - Credit notes
- *
- * Generated XML is compared against the reference fixtures stored in
- * test/phpunit/fixtures/einvoicing_samples/ using semantic XML comparison.
+ * Ensures the generated XML for the three invoice types it validates (deposit invoices, standard
+ * invoices, credit notes) remains consistent with the committed reference fixtures stored in
+ * test/phpunit/fixtures/einvoicing_samples/, using semantic XML comparison. The VAT breakdown
+ * (BG-23) of each document is checked here too, on the chain generated once for the class.
  */
 class EInvoicingSamplesTest extends CommonClassTest
 {
+	const RAM = 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100';
 
 	/**
 	 * Holds the generated sample invoice chain (deposit, standard, credit note) for the whole test class.
@@ -160,6 +157,17 @@ class EInvoicingSamplesTest extends CommonClassTest
 	}
 
 	/**
+	 * The replacement sample invoice must keep producing the same CII XML.
+	 *
+	 * @return void
+	 */
+	public function testReplacementInvoiceMatchesReference()
+	{
+		$generated = $this->getGenerated();
+		$this->assertMatchesFixture('cii_replacement.xml', $generated['replacement']);
+	}
+
+	/**
 	 * The credit note sample invoice must keep producing the same CII XML.
 	 *
 	 * @return void
@@ -168,5 +176,192 @@ class EInvoicingSamplesTest extends CommonClassTest
 	{
 		$generated = $this->getGenerated();
 		$this->assertMatchesFixture('cii_creditnote.xml', $generated['creditnote']);
+	}
+
+	/**
+	 * The situation sample invoice must keep producing the same CII XML.
+	 *
+	 * @return void
+	 */
+	public function testSituationInvoiceMatchesReference()
+	{
+		$generated = $this->getGenerated();
+		$this->assertMatchesFixture('cii_situation.xml', $generated['situation']);
+	}
+
+	/**
+	 * The exempt sample invoice must keep producing the same CII XML.
+	 *
+	 * @return void
+	 */
+	public function testExemptInvoiceMatchesReference()
+	{
+		$generated = $this->getGenerated();
+		$this->assertMatchesFixture('cii_exempt.xml', $generated['exempt']);
+	}
+
+	/**
+	 * The exemption reason of an exempt specimen sits in the VAT breakdown, and nowhere else.
+	 *
+	 * BT-120 and BT-121 belong to BG-23, where BR-E-10 makes one of the two mandatory. On the line
+	 * they are what #974 shipped: the EN 16931 profile Schematron reports them as not used in that
+	 * context and the platform refuses the invoice on REJ_COH. Only an EXTENDED profile wants them
+	 * there, and no specimen declares one.
+	 *
+	 * @return void
+	 */
+	public function testTheExemptionReasonStaysOutOfTheInvoiceLines()
+	{
+		$ram = 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100';
+
+		foreach ($this->getGenerated() as $type => $xml) {
+			$doc = new DOMDocument();
+			$this->assertTrue($doc->loadXML($xml), 'specimen ' . $type . ' is not well-formed XML');
+
+			$xpath = new DOMXPath($doc);
+			$xpath->registerNamespace('ram', $ram);
+
+			$this->assertStringNotContainsString(
+				'extended',
+				(string) $xpath->evaluate('string(//ram:GuidelineSpecifiedDocumentContextParameter/ram:ID)'),
+				'specimen ' . $type . ' declares an EXTENDED profile, where the check below does not hold'
+			);
+
+			$lineTaxes = '//ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax';
+			foreach (array('ram:ExemptionReason', 'ram:ExemptionReasonCode') as $element) {
+				$this->assertSame(
+					0,
+					(int) $xpath->evaluate('count(' . $lineTaxes . '/' . $element . ')'),
+					'specimen ' . $type . ' carries ' . $element . ' on a line, which its profile marks as not used there'
+				);
+			}
+		}
+
+		// The breakdown of the exempt specimen carries it, which is what makes the absence above a
+		// placement and not a loss.
+		$doc = new DOMDocument();
+		$doc->loadXML($this->getGenerated()['exempt']);
+		$xpath = new DOMXPath($doc);
+		$xpath->registerNamespace('ram', $ram);
+
+		$this->assertNotSame(
+			'',
+			(string) $xpath->evaluate('string(//ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/ram:ExemptionReasonCode)'),
+			'the exempt specimen must state BT-121 in its VAT breakdown, which BR-E-10 requires'
+		);
+	}
+
+	/**
+	 * Read the VAT breakdowns (BG-23) of a document.
+	 *
+	 * @param	string	$xml	A CII document
+	 * @return	array<int,array{basis:float,tax:float,rate:float,category:string,exemption:string}>	One entry per ram:ApplicableTradeTax of the settlement
+	 */
+	private function vatBreakdowns($xml)
+	{
+		$doc = new DOMDocument();
+		$this->assertTrue($doc->loadXML($xml), 'the generated document is well formed XML');
+
+		$xpath = new DOMXPath($doc);
+		$xpath->registerNamespace('ram', self::RAM);
+
+		$breakdowns = array();
+		foreach ($xpath->query('//ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax') as $node) {
+			$read = function ($name) use ($xpath, $node) {
+				$found = $xpath->query('ram:' . $name, $node);
+				return ($found->length > 0) ? trim($found->item(0)->textContent) : '';
+			};
+
+			$breakdowns[] = array(
+				'basis' => (float) $read('BasisAmount'),					// BT-116
+				'tax' => (float) $read('CalculatedAmount'),				// BT-117
+				'rate' => (float) $read('RateApplicablePercent'),		// BT-119
+				'category' => $read('CategoryCode'),					// BT-118
+				'exemption' => $read('ExemptionReasonCode') . '|' . $read('ExemptionReason'),	// BT-121, BT-120
+			);
+		}
+
+		return $breakdowns;
+	}
+
+	/**
+	 * A breakdown that announces a tax amount states the rate that produced it.
+	 *
+	 * This is the shape #709 shipped: the rate was read from an array key that had become
+	 * "S|20.0000||", and (float) of that is 0, so every document declared 0.00 % against a non-zero
+	 * VAT amount.
+	 *
+	 * @return void
+	 */
+	public function testABreakdownThatTaxesStatesItsRate()
+	{
+		foreach ($this->getGenerated() as $type => $xml) {
+			$breakdowns = $this->vatBreakdowns($xml);
+			$this->assertNotEmpty($breakdowns, 'the ' . $type . ' specimen has a VAT breakdown');
+
+			foreach ($breakdowns as $index => $breakdown) {
+				$where = 'specimen ' . $type . ', VAT breakdown ' . ($index + 1) . ' (' . $breakdown['category'] . ')';
+
+				if (abs($breakdown['tax']) < 0.005) {
+					continue;		// An exempt or reverse charged breakdown legitimately taxes nothing.
+				}
+
+				$this->assertGreaterThan(
+					0,
+					$breakdown['rate'],
+					$where . ': BT-119 is ' . $breakdown['rate'] . ' % while BT-117 announces ' . $breakdown['tax']
+				);
+			}
+		}
+	}
+
+	/**
+	 * The tax amount of a breakdown follows from its own basis and its own rate (BR-CO-17).
+	 *
+	 * @return void
+	 */
+	public function testTheTaxAmountFollowsFromTheBasisAndTheRate()
+	{
+		foreach ($this->getGenerated() as $type => $xml) {
+			foreach ($this->vatBreakdowns($xml) as $index => $breakdown) {
+				$expected = round($breakdown['basis'] * $breakdown['rate'] / 100, 2);
+				$where = 'specimen ' . $type . ', VAT breakdown ' . ($index + 1) . ' (' . $breakdown['category'] . ')';
+
+				$this->assertEqualsWithDelta(
+					$expected,
+					$breakdown['tax'],
+					0.011,		// The tolerance BR-CO-17 itself grants.
+					$where . ': BT-117 = ' . $breakdown['tax'] . ' where BT-116 ' . $breakdown['basis']
+						. ' x BT-119 ' . $breakdown['rate'] . ' % gives ' . $expected
+				);
+			}
+		}
+	}
+
+	/**
+	 * A document carries one breakdown per category, rate and exemption reason, never two.
+	 *
+	 * That is what #709 was about - a national VAT source code was splitting one 20 % breakdown into
+	 * two, and the access point refused the document - so it is checked here rather than left to the
+	 * reference documents, which would not say why they changed.
+	 *
+	 * @return void
+	 */
+	public function testTwoBreakdownsNeverShareACategoryAndARate()
+	{
+		foreach ($this->getGenerated() as $type => $xml) {
+			$seen = array();
+			foreach ($this->vatBreakdowns($xml) as $breakdown) {
+				$key = $breakdown['category'] . '|' . number_format($breakdown['rate'], 4, '.', '') . '|' . $breakdown['exemption'];
+
+				$this->assertArrayNotHasKey(
+					$key,
+					$seen,
+					'specimen ' . $type . ': two VAT breakdowns for category ' . $breakdown['category']
+						. ' at ' . $breakdown['rate'] . ' %, which BR-S-08 and its siblings refuse'
+				);
+				$seen[$key] = true;
+			}
+		}
 	}
 }

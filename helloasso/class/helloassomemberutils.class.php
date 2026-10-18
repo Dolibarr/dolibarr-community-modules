@@ -375,21 +375,21 @@ class HelloAssoMemberUtils
 						dol_syslog(get_class($this)."::helloassoPostMembersToDolibarr  Subscription creation", LOG_DEBUG);
 						$date_start_subscription = dol_stringtotime($newmember->order->meta->createdAt);
 						$date_end_subscription = dol_time_plus_duree((int) $date_start_subscription, $membertype->duration_value, $membertype->duration_unit);
-						/*if ($jsonmembertype->validityType == "Custom") {
-							$date_start_subscription = dol_stringtotime($jsonmembertype->startDate);
-							$date_end_subscription = dol_stringtotime($jsonmembertype->endDate);
-						} else { */
-						$result = $member->fetch_subscriptions();
-						if ($result <= 0) {
-							$this->error = $member->error;
-							$this->errors = array_merge($member->errors, $this->errors);
-							$error++;
+						if ($helloassoformdata->validityType == "Custom") {
+							$date_start_subscription = dol_stringtotime($helloassoformdata->startDate);
+							$date_end_subscription = dol_stringtotime($helloassoformdata->endDate);
+						} else {
+							$result = $member->fetch_subscriptions();
+							if ($result <= 0) {
+								$this->error = $member->error;
+								$this->errors = array_merge($member->errors, $this->errors);
+								$error++;
+							}
+							if (!empty($member->last_subscription_date_end)) {
+								$date_start_subscription = $member->last_subscription_date_end;
+								$date_end_subscription = dol_time_plus_duree($date_start_subscription, $membertype->duration_value, $membertype->duration_unit);
+							}
 						}
-						if (!empty($member->last_subscription_date_end)) {
-							$date_start_subscription = $member->last_subscription_date_end;
-							$date_end_subscription = dol_time_plus_duree($date_start_subscription, $membertype->duration_value, $membertype->duration_unit);
-						}
-						//}
 						$subscriptionid = $member->subscription((int) $date_start_subscription, $amount, 0, '', '', '', '', '', $date_end_subscription, $dolibarrmembertype);
 						if ($subscriptionid <= 0) {
 							$this->error = $member->error;
@@ -516,7 +516,7 @@ class HelloAssoMemberUtils
 		// Loop to have all pages
 		while ($nbpages < $maxmemberpages) {
 			$urlformemebers = "https://".urlencode($this->helloasso_url)."/v5/organizations/".urlencode($assoslug)."/forms/Membership/".urlencode($formslug).'/items'.$param;
-			dol_syslog("Send Get to url=".$urlformemebers.", to get member list, page=".$nbpages+1, LOG_DEBUG);
+			dol_syslog("Send Get to url=".$urlformemebers.", to get member list, page=".($nbpages + 1), LOG_DEBUG);
 
 			$ret = getURLContent($urlformemebers, 'GET', "", 1, $headers);
 			if ($ret["http_code"] != 200) {

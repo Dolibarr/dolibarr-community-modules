@@ -30,18 +30,10 @@ require_once __DIR__ . '/../../vendor/autoload.php';
 /**
  * ZugferdDocumentPdfMerger that tolerates the EXTENDED-CTC-FR guideline.
  *
- * The parent class embeds the XML into the PDF and writes the Factur-X XMP block. To do so it needs
- * three parameters — the attachment filename, the XMP conformance level and the XMP version — which
- * it looks up by matching the guideline URN found in the XML against ZugferdProfiles::PROFILEDEF.
- * That table has no entry for `urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr`,
- * so a CTC-FR document makes it throw ZugferdUnknownProfileException and no Factur-X file is produced.
- *
- * EXTENDED-CTC-FR is a conformant extension built on top of the Factur-X EXTENDED profile, and the
- * Factur-X XMP `ConformanceLevel` has no CTC-FR value of its own, so the EXTENDED parameters are the
- * ones to use: attachment `factur-x.xml`, conformance level `EXTENDED`, version `1.0`.
- *
- * The lookup is only bypassed when the parent fails, so every profile the library does know keeps its
- * own parameters, and the day horstoeko/zugferd learns about CTC-FR this class becomes a no-op.
+ * ZugferdProfiles::PROFILEDEF has no entry for the CTC-FR guideline URN, so the parent throws
+ * ZugferdUnknownProfileException and embeds nothing. CTC-FR is a conformant extension of the
+ * Factur-X EXTENDED profile, so the EXTENDED parameters apply. The lookup is only bypassed when the
+ * parent fails, so every profile the library knows keeps its own parameters.
  */
 class CtcFrPdfMerger extends ZugferdDocumentPdfMerger
 {

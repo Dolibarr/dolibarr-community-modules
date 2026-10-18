@@ -1,5 +1,6 @@
 <?php
 /* Copyright (C) 2025       Laurent Destailleur         <eldy@users.sourceforge.net>
+ * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
  * Copyright (C) 2025       Mohamed DAOUD               <mdaoud@dolicloud.com>
  * Copyright (C) 2026       Frédéric France             <frederic.france@free.fr>
  *
@@ -84,7 +85,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$this->helpToGetCredentials .= '<br>' . $langs->trans("EINVOICING_ESALINKP_HELP_CREDENTIAL2", '{s1}');
 
 		// Retrieve and complete the OAuth token information from the database
-		$this->tokenData = $this->fetchOAuthTokenDB();
+		$this->tokenData = $this->fetchOAuthTokenDB(getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
 
 		/*
 		$exchangeProtocolConf = getDolGlobalString('EINVOICING_PROTOCOL');
@@ -137,8 +138,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$item->nameText = $langs->transnoentities('EINVOICING_ROUTING_ID');
 		$item->helpText = $langs->transnoentities('EINVOICING_ROUTING_ID_HELP');
 		$item->helpText .= '<br><br>'.img_picto('', 'warning').' '.$langs->trans('WarningIfYouSetAnIDItMustExistsInAnnuary');
+		// @phan-suppress-next-line PhanTypeMismatchArgumentNullable
 		$item->fieldAttr['placeholder'] = idprof($mysoc);
 		$item->fieldParams['isMandatory'] = 0;
+		$item->fieldAttr['autocomplete'] = "new-password";
 		$item->cssClass = 'minwidth300';
 
 		// Setup conf to choose a protocol of exchange
@@ -161,24 +164,27 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$item = $formSetup->newItem($prefix . 'USERNAME'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
 		$item->nameText = $langs->transnoentities('EINVOICING_CLIENT_ID');
 		$item->cssClass = 'minwidth500';
+		$item->fieldAttr['autocomplete'] = "new-password";
 
 		// Client secret
 		$item = $formSetup->newItem($prefix . 'PASSWORD'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
-		if (method_exists('FormSetupItem', 'setAsGenericPassword')) {
+		if (method_exists($item, 'setAsGenericPassword')) {
 			$item->setAsGenericPassword();
 		} else {
 			// Dolibarr 18/19 fallback: setAsGenericPassword() does not exist yet.
 			// Force a masked password input so the secret is not displayed in clear text.
 			$item->fieldAttr['type'] = 'password';
-			$item->fieldAttr['autocomplete'] = 'new-password';
 		}
+		$item->fieldAttr['autocomplete'] = "new-password";
 		$item->nameText = $langs->transnoentities('EINVOICING_CLIENT_SECRET');
 		$item->cssClass = 'minwidth500';
+		$this->storeThisFieldEncrypted($item);
 
 		// API_KEY
 		$item = $formSetup->newItem($prefix . 'API_KEY'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
 		$item->nameText = $langs->transnoentities('EINVOICING_API_KEY');
 		$item->cssClass = 'minwidth500';
+		$this->storeThisFieldEncrypted($item);
 
 		// Token
 		if (getDolGlobalString($prefix . 'API_KEY'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''))) {
@@ -186,14 +192,14 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			$urltogeneratetoken = $_SERVER["PHP_SELF"] . "?action=set" . $prefix . "TOKEN&token=" . newToken();
 
 			$item = $formSetup->newItem($prefix . 'TOKEN'.(getDolGlobalInt('EINVOICING_LIVE') ? '_PROD' : ''));
-			$item->nameText = $langs->trans('AccessToken');
+			$item->nameText = $langs->trans('EInvAccessToken');
 			$item->cssClass = 'maxwidth500 ';
 			$item->fieldOverride = "";
 			if (!empty($tokenData['token'])) {
 				$item->fieldOverride = htmlspecialchars('**************' . substr($tokenData['token'], -4));
 
 				if (!empty($tokenData['token_expires_at'])) {
-					$item->fieldOverride .= ' &nbsp; <span class="opacitymedium hideonsmartphone">(' . $langs->trans("until") . ' ' . dol_print_date($tokenData['token_expires_at'], 'dayhoursec', 'tzuserrel') . ')</span>';
+					$item->fieldOverride .= ' &nbsp; <span class="opacitymedium hideonsmartphone">(' . $langs->trans("Until") . ' ' . dol_print_date($tokenData['token_expires_at'], 'dayhoursec', 'tzuserrel') . ')</span>';
 				}
 				//var_dump($tokenData);
 			}
@@ -228,15 +234,26 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				}
 			}
 
-			$einvoicing = new EInvoicing($this->db);
-			$idtocheck = $einvoicing->getSellerCommunicationURI(0);
-
-			// Check your ID in French E-Invoice Annuary
+			// Check your ID in E-Invoice Annuary
+			$showannuary = 0;
+			$idtocheck = '';
 			if ($mysoc->country_code == 'FR') {
-				$item->fieldOverride .= '<a class="reposition" href="https://facturation.chorus-pro.gouv.fr/annuaire/#/" target="_blank"><i class="fa fa-list-alt pictofixedwidth centerimp"></i>' . $langs->trans('CheckYourIDInFrenchEInvoiceAnnuary') . '</a>';
-				if (!getDolGlobalString('EINVOICING_LIVE')) {
-					$item->fieldOverride .= ' - <a class="reposition" href="https://test-directory.peppol.eu/public/locale-en_US/menuitem-search?q='.urlencode($idtocheck).'&mode=fr&env=sandbox" target="_blank">' . $langs->trans('PeppolTestAnnuary') . '</a>';
+				$showannuary++;
+
+				$item->fieldOverride .= '<i class="fa fa-list-alt pictofixedwidth centerimp"></i>'.$langs->trans('CheckYourIDInEInvoiceAnnuary');
+
+				$einvoicing = new EInvoicing($this->db);
+				$idtocheck = (string) $einvoicing->getSellerCommunicationURI(0);
+
+				if (getDolGlobalString('EINVOICING_LIVE')) {
+					$item->fieldOverride .= ': <a class="reposition" href="https://facturation.chorus-pro.gouv.fr/annuaire/#/" target="_blank">' . $langs->trans('FrenchGovAnnuary') . '</a>';
 				}
+			}
+			if (!getDolGlobalString('EINVOICING_LIVE')) {
+				if ($showannuary) {
+					$item->fieldOverride .= ' - ';
+				}
+				$item->fieldOverride .= '<a class="reposition" href="https://test-directory.peppol.eu/public/locale-en_US/menuitem-search?q='.urlencode($idtocheck).'&mode=fr&env=sandbox" target="_blank">' . $langs->trans('PeppolTestAnnuary') . '</a>';
 			}
 		}
 	}
@@ -285,15 +302,27 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	{
 		global $langs;
 
+		$extraHeaders = [];
+
 		// OAuth2 client_credentials — RFC 6749, application/x-www-form-urlencoded
 		// Replace old POST /v1/token (JSON username/password) disabled since v1.2.6 (2026-07).
-		$param = http_build_query(array(
-			'grant_type'    => 'client_credentials',
-			'client_id'     => $this->config['username'],
-			'client_secret' => $this->config['password'],
-		));
+		// grant_type is REQUIRED by RFC 6749 section 4.4.2 whatever the client authentication method is:
+		// without it the endpoint answers 400 and no token is ever issued. Credentials go in the body, or in
+		// an HTTP Basic header (RFC 6749 section 2.3.1) with ESALINK_AUTHENT_USING_BASIC_AUTH, never in both.
+		if (getDolGlobalString('ESALINK_AUTHENT_USING_BASIC_AUTH')) {
+			$param = http_build_query(array(
+				'grant_type'    => 'client_credentials',
+			));
+			$extraHeaders["Authorization"] = "Basic ".base64_encode(urlencode($this->config['username']).":".urlencode($this->config['password']));
+		} else {
+			$param = http_build_query(array(
+				'grant_type'    => 'client_credentials',
+				'client_id'     => $this->config['username'],
+				'client_secret' => $this->config['password'],
+			));
+		}
 
-		$extraHeaders = array('Content-Type' => 'application/x-www-form-urlencoded');
+		$extraHeaders['Content-Type'] ='application/x-www-form-urlencoded';
 
 		$response = $this->callApi("oauth2/token", "POSTALREADYFORMATED", $param, $extraHeaders, 'get_access_token');
 
@@ -324,17 +353,6 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	}
 
 	/**
-	 * Delete access token.
-	 *
-	 * @return 	bool                	       	True if success, false otherwise
-	 */
-	public function deleteAccessToken()
-	{
-		$result = $this->deleteOAuthTokenDB();
-		return $result;
-	}
-
-	/**
 	 * Perform a health check call for PDP provider.
 	 *
 	 * @return array Contains 'status' (bool) and 'message' (string)
@@ -344,8 +362,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		global $langs;
 
 		$response = $this->callApi("healthcheck", "GET", false, [], 'healthcheck');		// This include the refresh of token
+		$returnarray = array();
 
 		$nameOfAccessPoint = getDolGlobalString('EINVOICING_PDP');
+		$nameOfAccessPoint = preg_replace('/ViaPartner/', '', $nameOfAccessPoint);
 
 		if ($response['status_code'] === 200) {
 			$returnarray['status_code'] = true;
@@ -359,9 +379,23 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	}
 
 	/**
-	 * Validate an electronic invoice file using the Esalink validation service.
+	 * Retrieve and format remote account/company information from the provider and peppol directory, if available,
+	 * for display to the user.
 	 *
-	 * @param 	int 	$idinvoice 	ID of the invoice to check
+	 * @return array{status_code:int,message:string}
+	 */
+	public function getRemoteInfo()
+	{
+		return array(
+			'status_code' => -1,
+			'message' => 'Not yet implemented',
+		);
+	}
+
+	/**
+	 * Validate an electronic invoice file using the provider validation service.
+	 *
+	 * @param 	int 	$idinvoice 	ID of the invoice to validate
 	 * @param 	string 	$filePath 	Path to the invoice file to validate
 	 * @return 	array|string 		Validation result or error message.
 	 */
@@ -373,7 +407,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			return array('res' => -1, 'message' => $langs->trans('NoAvailableValidatorforThisAccessPoint'));
 		}
 
-		return array('res' => 0, 'message' => $langs->trans('skipped'));
+		return array('res' => 0, 'message' => $langs->trans('Skipped'));
 	}
 
 	/**
@@ -382,11 +416,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 * This function send an invoice to PDP
 	 *
 	 * @param	Facture		$object 	Invoice object
-	 * @return 	false|array{res:int<-1,-1>,message:string}|string   flowId if the invoice was successfully sent, false otherwise.
+	 * @return 	false|string|array{res:int<-1,-1>,message:string}   flowId if the invoice was successfully sent, false otherwise.
 	 */
 	public function sendInvoice($object)
 	{
-		global $conf, $langs, $user;
+		global $conf, $langs;
 
 		$outputLog = array(); // Feedback to display
 
@@ -417,19 +451,18 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		$file_info = pathinfo($invoice_path);
 
-		// Format Access Point resource Url
-		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
+		// UUID used to correlate our logs with the ones of the Access Point. The flow API declares
+		// Request-Id as a header, not as a query parameter: put in the URL it is simply ignored, so
+		// the correlation it exists for was never established. callApi() records it in the call log.
+		$uuid = $this->generateUuidV4();
 
 		// Format AP resource Url
 		$resource = 'flows';
-		$urlparams = array(
-			'Request-Id' => $uuid,
-		);
-		$resource .= '?' . http_build_query($urlparams);
 
 		// Extra headers
 		$extraHeaders = [
-			'Content-Type' => 'multipart/form-data'
+			'Content-Type' => 'multipart/form-data',
+			'Request-Id' => $uuid,
 		];
 
 		// Params
@@ -454,22 +487,18 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			'file' => new CURLFile($invoice_path, $mime_type, basename($invoice_path))
 		];
 
-		$response = $this->callApi("flows", "POSTALREADYFORMATED", $params, $extraHeaders, 'send_invoice');
+		$response = $this->callApi($resource, "POSTALREADYFORMATED", $params, $extraHeaders, 'send_invoice');
 
 		if ($response['status_code'] == 200 || $response['status_code'] == 202) {
-			$flowId = $response['response']['flowId'];
+			$flowId = $response['response']['flowId'] ?? '';
 			$callId = $response['id'];
 			$callRef = $response['call_id'];
 
 			/**
-			 * We make an additional call to retrieve the acknowledgment information and update the status.
-			 * However, document validation on the PDP side may take some time.
-			 * Therefore, we initially set the status to "Sent".
-			 *
-			 * We then try to fetch the PDP validation result:
+			 * Document validation on the PDP side may take some time, so we initially set the status to
+			 * "Sent", then make an additional call to retrieve the acknowledgment information:
 			 * - If the validation is successful, we update the status to "Sent (awaiting acknowledgment)".
 			 * - If the PDP validation fails, we set the status to "Error".
-			 *
 			 * If no response is available yet, we wait for the next synchronization.
 			 **/
 
@@ -546,7 +575,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 * Send a sample electronic invoice for testing purposes.
 	 * This function generates a sample invoice and sends it to PDP
 	 *
-	 * @param 	int 			$onlymake		1=to only make the sample
+	 * @param 	int<0,1>		$onlymake		1=to only make the sample
 	 * @return 	string[]|0	 					Array of messages if the invoice was successfully sent, 0 otherwise.
 	 */
 	public function sendSampleInvoice($onlymake = 0)
@@ -640,6 +669,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 
 		if ($response['status_code'] == 200 || $response['status_code'] == 202) {
+			if (!is_array($response['response']) || empty($response['response']['flowId'])) {
+				// Accepted, but the answer is not the JSON body the platform announces. Everything below
+				// is built on that flow id, so stop here rather than call 'flows/' with nothing.
+				$this->errors[] = "Sample invoice sent but the platform returned no flow id.";
+				return 0;
+			}
 			$flowId = $response['response']['flowId'];
 			$outputLog[] = "Sample invoice sent successfully.";
 
@@ -692,7 +727,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 *
 	 * @param string 						$resource 	    Resource relative URL ('token', 'healthcheck', 'Flows', or others)
 	 * @param 'POST'|'GET'|'HEAD'|'PUT'|'PUTALREADYFORMATED'|'POSTALREADYFORMATED'|'DELETE' $method         HTTP method (dolibarr's types)
-	 * @param string|false 	$params 	    Options for the request (JSON encoded)
+	 * @param string|false|array<string,mixed> 	$params 	    Body of the request: a JSON encoded string, or an array carrying a CURLFile for a multipart upload. False when there is none.
 	 * @param array<string, string>         $extraHeaders   Optional additional headers
 	 * @param string|null                   $callType       Functional type of the API call for logging purposes (e.g., 'sync_flows', 'send_invoice')
 	 *
@@ -754,11 +789,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		$response = getURLContent($url, $method, $params, 1, $httpheader, array('http', 'https'), 0, -1, 0, 0, array(), '_einvoicing');
 
-		$status_code = $response['http_code'];
+		$status_code = $response['http_code'] ?? 0;
+		$content = $response['content'] ?? '';
 		$body = 'Error';
 
 		if ($status_code == 200 || $status_code == 202) {
-			$body = $response['content'];
+			$body = $content;
 			if (!isset($extraHeaders['Accept'])) { // Json if default format
 				$body = json_decode($body, true);
 			}
@@ -769,7 +805,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		} else {
 			$returnarray = array(
 				'status_code' => $status_code,
-				'response' => 'Error ' . $status_code . ' - ' . (string) $response['content']
+				'response' => 'Error ' . $status_code . ' - ' . (string) $content
 			);
 			if (!empty($response['curl_error_no'])) {
 				$returnarray['curl_error_no'] = $response['curl_error_no'];
@@ -777,15 +813,25 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			if (!empty($response['curl_error_msg'])) {
 				$returnarray['curl_error_msg'] = $response['curl_error_msg'];
 			}
-			if ($contentarray = json_decode((string) $response['content'], true)) {
-				$returnarray['errorCode'] = (string) $contentarray['errorCode'];
-				$returnarray['errorMessage'] = (string) $contentarray['errorMessage'];
+			// An error body is not always the {errorCode, errorMessage} pair this expects: a plain JSON
+			// string decodes into a string, and indexing that is a fatal on PHP 8, not a warning.
+			// Each key is set only when the body really carries it: callers tell "no message" from
+			// "empty message" with isset(), and would otherwise report an empty error instead of
+			// falling back on the HTTP code.
+			$contentarray = json_decode((string) $content, true);
+			if (is_array($contentarray)) {
+				if (isset($contentarray['errorCode'])) {
+					$returnarray['errorCode'] = (string) $contentarray['errorCode'];
+				}
+				if (isset($contentarray['errorMessage'])) {
+					$returnarray['errorMessage'] = (string) $contentarray['errorMessage'];
+				}
 			}
 		}
 
 		// Log the API call through an independent connection so the trace survives a
 		// rollback of the caller's transaction on error (see logCall(), issue #291).
-		$logged = $this->logCall($callType, $resource, $method, $params, $returnarray['response'], $returnarray['status_code']);
+		$logged = $this->logCall($callType, $resource, $method, $params, $returnarray['response'], $returnarray['status_code'], (string) ($extraHeaders['Request-Id'] ?? ''));
 		if ($logged !== null) {
 			$returnarray['id'] = $logged['id'];
 			$returnarray['call_id'] = $logged['call_id'];
@@ -801,7 +847,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 *
 	 * @param   int   $syncFromDate     Timestamp from which to start synchronization. If 0, begins from epoch (1970-01-01).
 	 * @param   int   $limit            Maximum number of flows to synchronize. 0 means no limit.
-	 * @return 	bool|array{res:int, messages:string[], totalFlows?:?int, alreadyExist?:int, syncedFlows?:int, batchlimit?:int, actions?:array<string,array{actionurl:string,actioncode:string,action:string,businessmessage:string}>, details?:string[]} 	True on success, false on failure along with messages, details for debugging, and suggested optional actions.
+	 * @return 	bool|array{res:int, messages:string[], totalFlows?:?int, alreadyExist?:int, syncedFlows?:int, batchlimit?:int, actions?:array<string,array{actionurl:string,actioncode:string,action:string,businessmessage:string}>, details?:string[], errors?:string[]} 	True on success, false on failure along with messages, details for debugging, the errors that aborted the run, and suggested optional actions.
 	 */
 	public function syncFlows($syncFromDate = 0, $limit = 0)
 	{
@@ -817,14 +863,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$this->clearIncomingDiagnosticFiles();
 
 		$results_messages = array();	// result message (technical error)
+		$error_messages = array();		// subset of the above holding only what made the run fail
 		$actions = array();				// business message (manual action to do)
 
 		$resource = 'flows/search';
-		$uuid = $this->generateUuidV4(); // UUID used to correlate logs between Dolibarr and PDP TODO : Store it somewhere
-		$urlparams = array(
-			'Request-Id' => $uuid,
-		);
-		$resource .= '?' . http_build_query($urlparams);
+		// Correlation id, sent as the Request-Id header of the call below and recorded in the call log.
+		$uuid = $this->generateUuidV4();
 
 		//self::$EINVOICING_LAST_IMPORT_KEY = $uuid;
 		self::$EINVOICING_LAST_IMPORT_KEY = dol_print_date(dol_now(), 'dayhourlog');
@@ -849,13 +893,15 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		// If limit is 0, we first need to get the total number of flows to sync because AP set a default limit of 25 if not specified
 		if ($limit == 0) {
 			$jsonparams = json_encode($params);
-			$response = $this->callApi($resource, "POST", $jsonparams);
+			$response = $this->callApi($resource, "POST", $jsonparams, array('Request-Id' => $uuid));
 
 			$totalFlows = 0;
 			if ($response['status_code'] != 200) {
-				$this->errors[] = "Failed to retrieve flows for synchronization.";
-				$results_messages[] = "Failed to retrieve flows for synchronization.";
-				return array('res' => 0, 'messages' => $results_messages);
+				$errormessage = "Failed to retrieve flows for synchronization.";
+				$this->errors[] = $errormessage;
+				$results_messages[] = $errormessage;
+				$error_messages[] = $errormessage;
+				return array('res' => 0, 'messages' => $results_messages, 'errors' => $error_messages);
 			}
 
 			$totalFlows = $response['response']['total'] ?? 0;
@@ -879,14 +925,16 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			$params['limit'] = $limit;
 		}
 		$jsonparams = json_encode($params);
-		$response = $this->callApi($resource, "POST", $jsonparams, [], "synchronization");	// This will also create the Call entry
+		$response = $this->callApi($resource, "POST", $jsonparams, array('Request-Id' => $uuid), "synchronization");	// This will also create the Call entry
 
 		if ($response['status_code'] != 200) {
-			$this->errors[] = "Failed to retrieve flows for synchronization." . ' (HTTP ' . $response['status_code'] . ')';
-			$results_messages[] = "Failed to retrieve flows for synchronization." . ' (HTTP ' . $response['status_code'] . ')';
+			$errormessage = "Failed to retrieve flows for synchronization." . ' (HTTP ' . $response['status_code'] . ')';
+			$this->errors[] = $errormessage;
+			$results_messages[] = $errormessage;
+			$error_messages[] = $errormessage;
 
 			dol_syslog(__METHOD__ . " Failed to retrieve the list of flows for synchronization.", LOG_DEBUG, 0, "_einvoicing");
-			return array('res' => 0, 'messages' => $results_messages);
+			return array('res' => 0, 'messages' => $results_messages, 'errors' => $error_messages);
 		}
 
 		// Some AP returns nb of lines into "total", others returns into "limit"
@@ -904,15 +952,18 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			return array('res' => 1, 'messages' => $results_messages);
 		}
 
-		// Since AP may not return flows in the order they want (by updatedAt ASC), we sort them here
+		$results = $response['response']['results'] ?? array();
+
+		// Since AP may not return flows in the order they want (by updatedAt ASC), we sort them here.
+		// On the sub-second key, because the cursor moves along it.
 		dol_syslog(__METHOD__ . " Sort the flows per updatedAt", LOG_DEBUG, 0, "_einvoicing");
-		usort($response['response']['results'], function ($a, $b) {
-			return strtotime($a['updatedAt']) <=> strtotime($b['updatedAt']);
+		usort($results, function ($a, $b) {
+			return strcmp(self::updatedAtSortKey($a['updatedAt'] ?? ''), self::updatedAtSortKey($b['updatedAt'] ?? ''));
 		});
 
 		// Clean already processed flows from the list
 		$alreadyProcessedFlowIds = [];
-		$flowIds = array_column($response['response']['results'] ?? [], 'flowId');
+		$flowIds = array_column($results, 'flowId');
 		$sanitizedFlowIds = array();
 		foreach ($flowIds as $flowId) {
 			$sanitizedFlowIds[] = "'" . $db->escape($flowId) . "'";
@@ -926,11 +977,13 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					$alreadyProcessedFlowIds[$obj->flow_id] = $obj->flow_id;
 				}
 			} else {
-				$this->errors[] = "Failed to retrieve from database the list of flows already processed. ".$this->db->lasterror();
-				$results_messages[] = "Failed to retrieve from database the list of flows already processed. ".$this->db->lasterror();
+				$errormessage = "Failed to retrieve from database the list of flows already processed. ".$this->db->lasterror();
+				$this->errors[] = $errormessage;
+				$results_messages[] = $errormessage;
+				$error_messages[] = $errormessage;
 
 				dol_syslog(__METHOD__ . " Failed to retrieve flows already processed among the list of flows received. ".$this->db->lasterror(), LOG_DEBUG, 0, "_einvoicing");
-				return array('res' => 0, 'messages' => $results_messages);
+				return array('res' => 0, 'messages' => $results_messages, 'errors' => $error_messages);
 			}
 		}
 
@@ -939,6 +992,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$error = 0;
 		$alreadyExist = 0;
 		$syncedFlows = 0;
+		$postponedFlows = 0;	// Flows left unread on purpose, retried on the next run (see 'postponeflow')
 
 		// Call ID for logging purposes
 		$call_id = $response['call_id'] ?? null;
@@ -947,7 +1001,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 		// Loop on each flow received in list
 		$i = 0;
-		foreach ($response['response']['results'] ?? [] as $flow) {
+		foreach ($results as $flow) {
 			$i++;
 			if (in_array($flow['flowId'], $alreadyProcessedFlowIds)) {
 				dol_syslog(__METHOD__ . " #" . $i . " Flow " . $flow['flowId'] . " already processed, discard it.", LOG_DEBUG, 0, "_einvoicing");
@@ -966,19 +1020,57 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 				// If res < 0, rollback
 				if ($res['res'] < 0) {
+					if (getDolGlobalInt('EINVOICING_ENABLE_POSTPONE_FLOWS') && !empty($res['postponeflow'])) {
+						// This flow could not be read, but nothing was stored for it: it stays pending and
+						// the next synchronization will try it again, so no invoice is lost. Report it with
+						// the action to do and carry on, instead of stalling this batch - and every flow
+						// behind it - on a problem that has to be fixed on the access point side anyway.
+						$actions[$res['actioncode']] = array(
+							'actionurl' => ($res['actionurl'] ?? ''),
+							'actioncode' => $res['actioncode'],
+							'action' => $res['action'],
+							// A postponed flow says itself what happened when it can: only the caller knows
+							// whether the document was unreadable or referenced an invoice that is missing.
+							'businessmessage' => (empty($res['businessmessage']) ? $langs->trans("CantReadTheDocumentOfTheImportedInvoice", $flow['flowId']) : $res['businessmessage'])
+								. $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help')
+						);
+
+						dol_syslog(__METHOD__ . " Flow " . $flow['flowId'] . " postponed: " . $res['message'], LOG_WARNING, 0, "_einvoicing");
+						$results_messages[] = "Flow " . dol_escape_htmltag((string) $flow['flowId']) . " postponed, it will be retried on the next synchronization: " . $res['message'];
+
+						$postponedFlows++;
+						continue;
+					}
+
 					if (isset($res['action']) && $res['action'] != '') {	// Save business errors if it is
 						$rescode = $res['actioncode'] ?? '0';
 						// Set the result code and label into array $actions.
 						$actions[$rescode] = array(
 							'actionurl' => $res['actionurl'],
 							'actioncode' => ($res['actioncode'] ?? '0'),
-							'action' => $res['action']
+							'action' => $res['action'],
+							'actiondata' => $res['actiondata'] ?? array(),
 						);
+						// Some error return directly the business action to do.
+						if (!empty($res['businessmessage'])) {
+							$actions[$rescode]['businessmessage'] = $res['businessmessage'] . $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
+						}
+
+						// Complete the $actions array with the Business error message for common known cases.
 						if ($rescode == 'THIRDPARTY_NOT_FOUND') {
 							$infostring = '';
 							foreach ($res['actiondata'] ?? [] as $datakey => $dataval) {
-								if ($datakey && $dataval) {
-									$infostring .= ($infostring ? ', ' : '').$datakey.': '.$dataval;
+								if ($datakey && $dataval && in_array($datakey, array('name', 'email', 'vatnumber', 'idprof1'))) {
+									$transdatakey = ucfirst($datakey);
+									if ($transdatakey == 'Vatnumber') {
+										$transdatakey = 'VATIntraShort';
+									}
+									if ($transdatakey == 'Idprof1') {
+										$transdatakey = 'ProfId1';
+									}
+									$infostring .= ($infostring ? ', ' : '');
+									$infostring .= $langs->transnoentitiesnoconv($transdatakey);
+									$infostring .= ': '.$dataval;
 								}
 							}
 							$actions[$rescode]['businessmessage'] = $langs->trans("CantFindThirdpartyFromTheImportedInvoice", $infostring);
@@ -986,10 +1078,26 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 							$actions[$rescode]['businessmessage'] .= $form->textwithpicto('', "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], 1, 'help', '', 0, 2, 'help');
 						}
 						if ($rescode == 'PRODUCT_NOT_FOUND') {
+							$langs->load("products");
 							$infostring = '';
+							if (!empty($res['actiondata']['socid'])) {
+								$socid = $res['actiondata']['socid'];
+								$tmpthirdparty = new Societe($db);
+								$tmpthirdparty->fetch($socid);
+								$infostring .= $langs->transnoentitiesnoconv("Supplier") . ': ' . $tmpthirdparty->name;
+							}
 							foreach ($res['actiondata'] ?? [] as $datakey => $dataval) {
-								if ($datakey && $dataval) {
-									$infostring .= ($infostring ? ', ' : '').$datakey.': '.$dataval;
+								if ($datakey && $dataval && in_array($datakey, array('supplierref', 'label'))) {
+									$transdatakey = ucfirst($datakey);
+									if ($transdatakey == 'Supplierref') {
+										$transdatakey = 'SupplierRef';
+									}
+									if ($transdatakey == 'Label') {
+										$transdatakey = 'ProductLabel';
+									}
+									$infostring .= ($infostring ? ', ' : '');
+									$infostring .= $langs->transnoentitiesnoconv($transdatakey);
+									$infostring .= ': '.$dataval;
 								}
 							}
 							$actions[$rescode]['businessmessage'] = $langs->trans("CantFindProductFromTheImportedInvoice", $infostring);
@@ -998,14 +1106,16 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 						}
 					}
 					dol_syslog(__METHOD__ . " Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'], LOG_DEBUG, 0, "_einvoicing");
-					$results_messages[] = "ERROR_SYNCFLOW - Failed to synchronize flow " . $flow['flowId'] . ": " . $res['message'];
+					$errormessage = "ERROR_SYNCFLOW - Failed to synchronize flow " . dol_escape_htmltag((string) $flow['flowId']) . ": " . $res['message'];
+					$results_messages[] = $errormessage;
+					$error_messages[] = $errormessage;
 
 					$error++;
 				}
 
 				// If res == 0, commit but count it as already existed
 				if ($res['res'] == 0) {
-					$results_messages[] = "<span class=\"opacitylow\">Flow " . $flow['flowId'] . " skipped: " . $res['message'] . "</span>";
+					$results_messages[] = "<span class=\"opacitylow\">Flow " . dol_escape_htmltag((string) $flow['flowId']) . " skipped: " . $res['message'] . "</span>";
 					$alreadyExist++;
 					//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
 				}
@@ -1016,12 +1126,14 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
 				}
 			} catch (Exception $e) {
-				$results_messages[] = "Exception occurred while synchronizing flow " . $flow['flowId'] . ": " . $e->getMessage();
+				$errormessage = "Exception occurred while synchronizing flow " . dol_escape_htmltag((string) $flow['flowId']) . ": " . dol_escape_htmltag($e->getMessage());
+				$results_messages[] = $errormessage;
+				$error_messages[] = $errormessage;
 				$error++;
 			}
 
 			if ($error > 0) {
-				if (in_array($rescode, array('THIRDPARTY_NOT_FOUND','PRODUCT_NOT_FOUND'))) {
+				if (in_array($rescode, array('THIRDPARTY_NOT_FOUND','PRODUCT_NOT_FOUND','DEFAULT_ROUTING_MIXED_UNSET'))) {
 					$results_messages[] = "Aborting synchronization due to a business error. There is a manual action to do.";
 				} else {
 					$results_messages[] = "Aborting synchronization due to errors.";
@@ -1046,6 +1158,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			}
 		}
 		$messages[] = $langs->trans("TotalSkippedSync") . ": <b>" . $alreadyExist . "</b> - " . $langs->trans("TotalNewSync") . ": <b>" . $syncedFlows . "</b>";
+		if ($postponedFlows > 0) {
+			// Counted apart from the skipped ones: those flows were not stored, they come back next run
+			$messages[] = $langs->trans("TotalPostponedSync") . ": <b>" . $postponedFlows . "</b>";
+		}
 
 		// Processing result that will be saved in DB
 		$processingResult = '';
@@ -1054,6 +1170,8 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		}
 		$processingResult .= "<br>----------------------<br>" . implode("<br>", $messages);
 		$processingResult = "Processing result:<br>" . $processingResult;
+		// The recap grows with the number of flows: keep it inside its column, a refused UPDATE loses it whole
+		$processingResult = $this->makeStorableDebugPayload($processingResult);
 
 		// Save sync recap (only when this sync is attached to a Call row; otherwise $sql would be undefined/stale)
 		if ($call_id) {
@@ -1071,6 +1189,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		// Return result
 		// 'actions' contains the action to do (in case of business error)
 		// 'details' will contain all technical error (for Log)
+		// 'errors' holds only what aborted the run, for a caller that has to report a cause
 		return [
 			'res' => $globalres,
 			'messages' => $messages,
@@ -1079,8 +1198,30 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 			'syncedFlows' => $syncedFlows,
 			'batchlimit' => $batchlimit,
 			'actions' => $actions,
-			'details' => $results_messages
+			'details' => $results_messages,
+			'errors' => $error_messages
 		];
+	}
+
+	/**
+	 * Comparable key for the updatedAt of a flow.
+	 *
+	 * The platform does not pad the fractional seconds to a fixed width - '.47288Z' and '.626638Z'
+	 * both occur - so the raw strings cannot be compared to each other, and strtotime() drops the
+	 * fraction entirely, which is precisely what the cursor needs. Padding it to six digits gives a
+	 * key that sorts on the microsecond.
+	 *
+	 * @param	string	$updatedAt	Timestamp as returned by the platform
+	 * @return	string				Key to sort and compare on
+	 */
+	private static function updatedAtSortKey($updatedAt)
+	{
+		$reg = array();
+		if (!preg_match('/^([^.Z]+)(?:\.(\d+))?/', (string) $updatedAt, $reg)) {
+			return (string) $updatedAt;
+		}
+
+		return $reg[1] . '.' . str_pad(substr(isset($reg[2]) ? $reg[2] : '', 0, 6), 6, '0');
 	}
 
 	/**
@@ -1089,11 +1230,11 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 *
 	 * @param string 		$flowId        	FlowId
 	 * @param string|null 	$call_id  		Call ID for logging purposes
-	 * @return array{res:int<-1,1>, message:string, actioncode?:string|null, actionurl?:string|null, action?:string|null} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'.
+	 * @return array{res:int<-1,1>, message:string, postponeflow?:int, actioncode?:string|null, actionurl?:string|null, action?:string|null, actiondata?:array<string,mixed>, businessmessage?:string} Returns array with 'res' (1 on success, 0 if exists or already processed, -1 on failure) with a 'message' and for business errors an optional 'actioncode', 'actionurl' and 'action'. 'postponeflow' marks a failure that stored nothing, so the batch may go on and the flow be retried later.
 	 */
 	public function syncFlow($flowId, $call_id = null)
 	{
-		global $db, $conf, $user;
+		global $db, $conf, $user, $langs;
 
 		dol_include_once('einvoicing/class/document.class.php');
 		$einvoicing = new EInvoicing($db);
@@ -1137,6 +1278,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$document->flow_direction       = $flowData['flowDirection'] ?? null;
 		$document->flow_syntax          = $flowData['flowSyntax'] ?? null;
 		$document->flow_profile         = $flowData['flowProfile'] ?? null;
+		$document->processing_rule      = $flowData['processingRule'] ?? null;
 		$document->ack_status           = $flowData['acknowledgement']['status'] ?? null;
 		// Change this fields to fit with the new api response ===============================================
 		$document->ack_reason_code      = $flowData['acknowledgement']['details'][0]['reasonCode'] ?? null;
@@ -1163,8 +1305,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$document->flow_uiid            = $flowData['uuid'] ?? null;
 
 		if (getDolGlobalString('EINVOICING_DEBUG_MODE')) {
-			$document->response_for_debug = $response['response'];
+			$document->response_for_debug = $this->makeStorableDebugPayload($response['response']);
 		}
+
 
 		$returnRes = 1;
 		$returnMessage = "";
@@ -1199,35 +1342,63 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				// --- Fetch received documents (Einvoice)
 				$document->fk_element_type = 'invoice_supplier';
 
-				// Retrieve the PDF file converted by Access Point
-				$receivedFile = null;
-				$flowResponse = $this->fetchFlowData($flowId, 'Converted');
-
-				if ($flowResponse['status_code'] != 200) {
-					return array('res' => -1, 'message' => "ERROR_FLOW_GETCONV Failed to retrieve 'Converted' document for SupplierInvoice flow (flowId: $flowId)");
-				}
-				$receivedFile = $flowResponse['response'];		// This is a string with PDF file content (with both Original and Converted).
-
-				// Retrieve also PDF file generated by Access Point
-				$ReadableViewFile = null;
-				$flowResponse = $this->fetchFlowData($flowId, 'ReadableView');
-
-				if ($flowResponse['status_code'] != 200) {
-					// We disable this error, getting the readable file is optional.
-					//return array('res' => -1, 'message' => "ERROR_FLOW_GETREADABLE Failed to retrieve ReadableView document for SupplierInvoice flow (flowId: $flowId)");
-				} else {
-					$ReadableViewFile = $flowResponse['response'];	// This is a string with PDF file content.
+				// AFNOR XP Z12-013: a supplier invoice to book is an INCOMING flow (issued by the
+				// platform to us). An outgoing/errored "SupplierInvoice" flow is NOT a received
+				// invoice and must not be imported as a facture fournisseur — otherwise lifecycle
+				// actions (e.g. a refusal) fail on the PDP side with "no matching invoices found".
+				if ($document->flow_direction !== 'In') {
+					$document->fk_element_id = 0;
+					$returnRes = 1;		// mark the flow as processed, just do not create an invoice
+					$returnMessage = "Skipped SupplierInvoice flow " . $flowId . " (flowDirection=" . ($document->flow_direction ?: 'null') . ", not an incoming invoice)";
+					dol_syslog(__METHOD__ . " " . $returnMessage, LOG_WARNING, 0, "_einvoicing");
+					break;
 				}
 
-
-				// Build the $exchangeProtocol factory for the format of supplier invoice
+				// Retrieve the invoice of the flow in whichever shape this module can read: 'Converted' first,
+				// then 'Original', then the readable view. Asking only for 'Converted' makes the import depend
+				// on a setting of the access point account: pointed at UBL, every received invoice is lost.
 				$tmpProtocolManager = new ProtocolManager($this->db);
-				$detectedProtocol = $tmpProtocolManager->detectProtocolFromContent($receivedFile);
-				if (empty($detectedProtocol)) {
-					return array('res' => -1, 'message' => "ERROR_FLOW_DETECTPROTOCOL Failed to detect protocol from received document for flowId: " . $flowId);
+				$importable = $this->fetchImportableFlowDocument($flowId, $tmpProtocolManager);
+
+				if (empty($importable['protocol'])) {
+					// Nothing readable in this flow. Return without storing the document, so the flow stays
+					// pending and a later synchronization imports it once the access point side is fixed:
+					// a received invoice must never be silently dropped.
+					$errorcode = ($importable['fetched'] > 0 ? 'ERROR_FLOW_NOT_SUPPORTED_PROTOCOL' : 'ERROR_FLOW_GETDOC');
+
+					$action = $langs->trans('SetTheAccessPointConversionFormat');
+					if ($importable['client_not_configured']) {
+						$action = $langs->trans('AccessPointConversionFormatNotSet') . ' ' . $action;
+					}
+
+					return array(
+						'res' => -1,
+						'postponeflow' => 1,
+						'message' => $errorcode . " No document this module can read for SupplierInvoice flow (flowId: " . $flowId . ") - " . implode(' | ', $importable['attempts']),
+						'actioncode' => 'CONVERSION_FORMAT_NOT_SUPPORTED',
+						'actionurl' => '',
+						'action' => $action,
+						'actiondata' => array()
+					);
 				}
 
-				$exchangeProtocol = $tmpProtocolManager->getProtocol($detectedProtocol);
+				// All three are set together, the guard above is what guarantees they are there
+				$receivedFile = (string) $importable['file'];
+				$detectedProtocol = $importable['protocol_name'];
+				$exchangeProtocol = $importable['protocol'];
+
+				// Retrieve also einvoice file that is readable generated by Access Point (usually a PDF generated by AP)
+				// Getting it is optional, so a failure does not stop the import - but it is traced: the call
+				// is logged like any other, and the reason is said out loud instead of being dropped (#980).
+				$readableViewFile = null;
+				if ($detectedProtocol != 'FACTURX') {
+					$flowResponse = $this->fetchFlowData($flowId, 'ReadableView', 'get_readable_view_for_invoice');
+					if ($flowResponse['status_code'] != 200) {
+						dol_syslog(__METHOD__ . " No readable view for flowId " . $flowId . ": HTTP " . $flowResponse['status_code'] . (empty($flowResponse['errorMessage']) ? '' : ' - ' . $flowResponse['errorMessage']) . ". The supplier invoice is imported without it.", LOG_WARNING, 0, '_einvoicing');
+					} else {
+						$readableViewFile = $flowResponse['response'];	// This is a string with PDF file content.
+					}
+				}
 
 				$exceptionmessage = '';
 
@@ -1236,7 +1407,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				// error on the invoice (product not found, ...) no longer rolls back the created thirdparty.
 				try {
 					// Try to create the supplier + product + invoice
-					$res = $exchangeProtocol->createSupplierInvoiceFromSource($receivedFile, $ReadableViewFile, $flowId);
+					$res = $exchangeProtocol->createSupplierInvoiceFromSource($receivedFile, $readableViewFile, $flowId);
 					if ($res['res'] < 0) {
 						$retarray = array(
 							'res' => -1,
@@ -1245,7 +1416,21 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 						$retarray['actioncode'] = $res['actioncode'] ?? null;
 						$retarray['actionurl'] = $res['actionurl'] ?? null;
 						$retarray['action'] = $res['action'] ?? null;
-						$retarray['actiondata'] = $res['actiondata'] ?? null;
+						// Set only when the import sent one, the way postponeflow and businessmessage are just
+						// below: the key is declared optional, and carrying it at null instead hands every caller
+						// a null to index into.
+						if (isset($res['actiondata'])) {
+							$retarray['actiondata'] = $res['actiondata'];
+						}
+						// A failure that stored nothing may be retried later: the flag and the message that
+						// goes with it have to reach syncFlows(), which is what decides to carry on. Both are
+						// set only when the import sent them, so the shape stays the one declared above.
+						if (!empty($res['postponeflow'])) {
+							$retarray['postponeflow'] = (int) $res['postponeflow'];
+						}
+						if (!empty($res['businessmessage'])) {
+							$retarray['businessmessage'] = (string) $res['businessmessage'];
+						}
 
 						return $retarray;
 					} else {
@@ -1257,6 +1442,12 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 						$cleanedXmlData = Document::cleanXmlData($res['xml_data'] ?? '');
 						if (!empty($cleanedXmlData) && Document::checkXmlDataMaxSize($cleanedXmlData)) {
 							$document->xml_data = $cleanedXmlData;
+						}
+
+						// Only when this call is what brought the invoice in: a flow read again must not
+						// write a second import event on an invoice that was already there.
+						if (!empty($res['created']) && !empty($supplierInvoiceObj->id)) {
+							$this->addSupplierInvoiceImportEvent($supplierInvoiceObj, $document);
 						}
 
 						//return array('res' => 0, 'message' => "supplier invoice already exists for flowId: " . $flowId . ". " . $res['message']);
@@ -1300,11 +1491,9 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				*/
 
 				// 2. Read CDAR and update status of linked customer invoice
-				// The CDAR is normally read as the "Original" document. Some flows have no original on the
-				// platform, only the converted copy, and the synchronization then stops on that flow and on
-				// every flow behind it with no way to go past it. Both documents carry the same CDAR, so fall
-				// back on the converted one rather than blocking. docType can be 'Metadata', 'Original',
-				// 'Converted' or 'ReadableView'.
+				// Some flows have no 'Original' on the platform, only the converted copy, and the sync then
+				// stops on that flow and on every flow behind it. Both carry the same CDAR, so fall back on
+				// the converted one. docType can be 'Metadata', 'Original', 'Converted' or 'ReadableView'.
 				$flowResponse = $this->fetchFlowData($flowId, 'Original');
 
 				if ($flowResponse['status_code'] != 200) {
@@ -1313,7 +1502,18 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				}
 
 				if ($flowResponse['status_code'] != 200) {
-					return array('res' => -1, 'message' => "Failed to retrieve flow details (neither 'Original' nor 'Converted' document) for flowId: " . $flowId);
+					// Transient, and nothing was stored for this flow: without 'postponeflow' the batch
+					// aborts here and on every run after it, since an unstored flow never leaves the
+					// synchronization window. The #718 convention is meant for exactly this.
+					return array(
+						'res' => -1,
+						'postponeflow' => 1,
+						'message' => "Failed to retrieve flow details (neither 'Original' nor 'Converted' document) for flowId: " . $flowId,
+						'actioncode' => 'CANT_RECORD_SENT_INVOICE_LIFECYCLE_STATUS',
+						'actionurl' => '',
+						'action' => $langs->trans('CheckSyncLogCantRecordSentInvoiceStatus'),
+						'businessmessage' => $langs->trans('CantRecordTheStatusOfTheInvoiceYouSent', $flowId)
+					);
 				}
 				$cdarXml = $flowResponse['response'];
 
@@ -1323,13 +1523,29 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 				try {
 					// Parse the CDAR document (returns an array)
-					$cdarDocument = $cdarHandler->readFromString($cdarXml);
+					try {
+						$cdarDocument = $cdarHandler->readFromString($cdarXml);
+					} catch (Exception $e) {
+						// Malformed XML (a JSON error body, an HTML page): it will not parse any better on
+						// a later run, so it falls into the guard below instead of the catch at the end.
+						dol_syslog(__METHOD__ . " FlowId " . $flowId . " - " . $e->getMessage(), LOG_WARNING);
+						$cdarDocument = array();
+					}
 
 					//var_dump($cdarDocument); exit;
 
-					// Check if parsing was successful
-					if (empty($cdarDocument) || !isset($cdarDocument['AcknowledgementDocument'])) {
-						return array('res' => -1, 'message' => "FlowId: " . $flowId . " - Failed to parse CDAR document");
+					// Check the lifecycle code this case exists to record, not the array: a parsed CDAR
+					// always carries every key, empty or not (CdarHandler::parseReferencedDocument()), so
+					// a non-empty array proves nothing. Left untested, IssuerAssignedID below reads as ''
+					// and Facture::fetch(0, '') returns -1 on its own guard - which aborted the batch on
+					// a message naming an empty reference, and aborted it again on every later run.
+					if (empty($cdarDocument['AcknowledgementDocument']['ReferenceReferencedDocument']['ProcessConditionCode'])) {
+						// Not transient: a document that carries no lifecycle status never will. Stored, so
+						// the next synchronization skips it instead of reading it again.
+						dol_syslog(__METHOD__ . " FlowId " . $flowId . " carries no readable CDAR", LOG_WARNING);
+						$returnRes = 0;
+						$returnMessage = "FlowId: " . $flowId . " - Failed to parse CDAR document";
+						break;
 					}
 
 					$factureObj = new Facture($this->db);
@@ -1340,13 +1556,24 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 					$res = $factureObj->fetch(0, $issuerAssignedID);
 					if ($res < 0) {
+						// A reference matching no invoice returns 0, and is stored below with no invoice
+						// attached: a negative result is an SQL failure only, so it is worth retrying.
 						return array(
 							'res' => -1,
-							'message' => "FlowId " . $flowId . " - Failed to fetch customer invoice using CDAR IssuerAssignedID/ref: " . $issuerAssignedID
+							'postponeflow' => 1,
+							'message' => "FlowId " . $flowId . " - Failed to fetch customer invoice using CDAR IssuerAssignedID/ref: " . $issuerAssignedID,
+							'actioncode' => 'CANT_RECORD_SENT_INVOICE_LIFECYCLE_STATUS',
+							'actionurl' => '',
+							'action' => $langs->trans('CheckSyncLogCantRecordSentInvoiceStatus'),
+							'businessmessage' => $langs->trans('CantRecordTheStatusOfTheInvoiceYouSent', $flowId)
 						);
 					}
 					if ($factureObj->entity && $factureObj->entity != $conf->entity) {
-						return array('res' => -1, 'message' => "Processing flowId: " . $flowId . " - Failed to fetch customer invoice ref " . $document->tracking_idref . " in entity " . $conf->entity);
+						// That invoice belongs to another entity, so this flow is not this one's business:
+						// treated exactly like a reference matching nothing (the flow is stored, with no
+						// invoice attached), instead of aborting the batch and every flow behind it.
+						dol_syslog(__METHOD__ . " FlowId " . $flowId . " refers to customer invoice " . $factureObj->ref . " of entity " . $factureObj->entity . ", not entity " . $conf->entity, LOG_WARNING);
+						$factureObj = new Facture($this->db);
 					}
 
 
@@ -1364,6 +1591,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					$document->cdar_reason_code = isset($refDoc['StatusReasonCode']) ? $refDoc['StatusReasonCode'] : '';
 					$document->cdar_reason_desc = isset($refDoc['StatusReason']) ? $refDoc['StatusReason'] : '';
 					$document->cdar_reason_detail = isset($refDoc['StatusIncludedNoteContent']) ? $refDoc['StatusIncludedNoteContent'] : '';
+					$recipientRoles = CdarHandler::recipientRoles($cdarDocument);
 
 					$exceptionmessage = '';
 					$db->begin();
@@ -1379,9 +1607,29 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 								$syncStatus = $einvoicing::STATUS_ERROR;
 								$syncComment = $document->ack_info;
 							}
-							$einvoicing->insertOrUpdateExtLink($factureObj->id, $factureObj->element, $flowId, $syncStatus, $factureObj->ref, $syncComment);
+							// 0 keeps the status the invoice already carries: a duplicate rejection refuses the
+							// new delivery, not the invoice the platform holds and quotes (issue #985).
+							if ($einvoicing->isTransmissionOnlyRejection($factureObj->id, $factureObj->element, $syncStatus, $document->cdar_reason_code)) {
+								$syncStatus = 0;
+							}
+							// Neither write throws: a SQL failure comes back as -1. Left unread, the commit below ran anyway
+							// and the flow was stored as processed, so the status was never recorded, even on a later run.
+							$resExtLink = $einvoicing->insertOrUpdateExtLink($factureObj->id, $factureObj->element, $flowId, $syncStatus, $factureObj->ref, $syncComment);
 
-							$einvoicing->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code, $syncComment, $document->flow_direction, $flowId, $syncValidationStatus, $syncValidationComment, $document->submittedat, $document->cdar_reason_code);
+							$resStatusMessage = ($resExtLink < 0 ? -1 : $einvoicing->storeStatusMessage($document->fk_element_id, $document->fk_element_type, $document->cdar_lifecycle_code, $syncComment, $document->flow_direction, $flowId, $syncValidationStatus, $syncValidationComment, $document->submittedat, $document->cdar_reason_code, $recipientRoles));
+							if ($resExtLink < 0 || $resStatusMessage < 0) {
+								dol_syslog(__METHOD__ . " FlowId " . $flowId . " - failed to record the status of customer invoice " . $factureObj->ref . ": " . $db->lasterror(), LOG_ERR);
+								$db->rollback();
+								return array(
+									'res' => -1,
+									'postponeflow' => 1,
+									'message' => "FlowId " . $flowId . " - Failed to record the status on customer invoice " . $factureObj->ref,
+									'actioncode' => 'CANT_RECORD_SENT_INVOICE_LIFECYCLE_STATUS',
+									'actionurl' => '',
+									'action' => $langs->trans('CheckSyncLogCantRecordSentInvoiceStatus'),
+									'businessmessage' => $langs->trans('CantRecordTheStatusOfTheInvoiceYouSent', $flowId)
+								);
+							}
 						} else {
 							dol_syslog(__METHOD__ . " Customer invoice not found for flowId: {$flowId}, so we save the flow into document table but we don't create an entry into einvoicing_extlinks table", LOG_WARNING); // This can happen if the invoice was sent from another system using the same PDP account
 						}
@@ -1452,9 +1700,17 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 							break;
 					}
 				} catch (Exception $e) {
+					// Nothing is committed when this is reached: the inner block rolls back before it
+					// rethrows, and what runs after its commit cannot throw. So the flow was not stored
+					// either, and postponing it retries it whole rather than aborting the batch for good.
 					return array(
 						'res' => -1,
-						'message' => "FlowId " . $flowId . " - Error processing CDAR document - " . $e->getMessage()
+						'postponeflow' => 1,
+						'message' => "FlowId " . $flowId . " - Error processing CDAR document - " . $e->getMessage(),
+						'actioncode' => 'CANT_RECORD_SENT_INVOICE_LIFECYCLE_STATUS',
+						'actionurl' => '',
+						'action' => $langs->trans('CheckSyncLogCantRecordSentInvoiceStatus'),
+						'businessmessage' => $langs->trans('CantRecordTheStatusOfTheInvoiceYouSent', $flowId)
 					);
 				}
 
@@ -1468,6 +1724,22 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 				require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
 				$document->fk_element_type = 'invoice_supplier';
+
+				// An incoming one is a status the VENDOR issues about one of its own invoices - "Cashed in"
+				// (212) above all, the answer to the payment we reported with a 211. We never sent it, so it
+				// has no row in einvoicing_lifecycle_msg and the flowId lookup below cannot resolve it.
+				if ($document->flow_direction == 'In') {
+					$resIncoming = $this->processIncomingSupplierInvoiceStatus($flowId, $document, $einvoicing);
+
+					if ($resIncoming['res'] < 0) {
+						// Left unrecorded on purpose: a stored flow is treated as known and never retried.
+						return $resIncoming;
+					}
+
+					$returnRes = $resIncoming['res'];
+					$returnMessage = $resIncoming['message'];
+					break;
+				}
 
 				// Fetch the linked supplier invoice using flowId stored in einvoicing_lifecycle_msg table when the LC message was sent
 				$resFetchStatusMessages = $einvoicing->fetchStatusMessages($flowId);
@@ -1484,6 +1756,17 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					} else {
 						$document->fk_element_id = !empty($supplierInvoiceObj->id) ? $supplierInvoiceObj->id : 0;
 						$document->tracking_idref = !empty($supplierInvoiceObj->ref) ? $supplierInvoiceObj->ref : '(NOTFOUND)'; // Should always be found here
+					}
+
+					// The status we sent is the one recorded when the message left, so the flow row can carry
+					// it like an incoming one does. Without it the list and the card show a lifecycle line
+					// with an empty code, and the two directions cannot be read the same way.
+					if (!empty($resFetchStatusMessages['lc_status'])) {
+						$document->cdar_lifecycle_code = (string) $resFetchStatusMessages['lc_status'];
+						$document->cdar_lifecycle_label = $einvoicing->getStatusLabel($resFetchStatusMessages['lc_status']);
+					}
+					if (empty($document->cdar_reason_code) && !empty($resFetchStatusMessages['lc_reason_code'])) {
+						$document->cdar_reason_code = $resFetchStatusMessages['lc_reason_code'];
 					}
 
 					// Update LC message status in einvoicing_lifecycle_msg table based on validation response
@@ -1626,7 +1909,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 	 * @param mixed $object Invoice object (CustomerInvoice or SupplierInvoice)
 	 * @param int $statusCode   Status code to send (see class constants for available codes)
 	 * @param string $reasonCode Reason code to send (optional)
-	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>} $paymentData Cashed amount (TTC) for status 212 (Encaissee), mandatory content of the CDAR (rule BR-FR-CDV-14)
+	 * @param array{amount?:float,breakdown?:array<array{vatrate:float,amount:float}>,reason?:string} $paymentData Amount (TTC) moved for status 212 (Encaissee), negative on a refund, with the reason of the cancellation (rules BR-FR-CDV-14, P1.17)
 	 *
 	 * @return array{res:int, message:string}       Returns array with 'res' (1 on success, -1 on failure) with a 'message'.
 	 */
@@ -1695,14 +1978,10 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 
 			if ($response['status_code'] == 200 || $response['status_code'] == 202) {
 				/**
-				 * We make an additional call to retrieve the acknowledgment information and update the status.
-				 * However, document validation on the PDP side may take some time.
-				 * Therefore, we initially set the status to "Sent".
-				 *
-				 * We then try to fetch the PDP validation result:
+				 * Document validation on the PDP side may take some time, so we initially set the status to
+				 * "Sent", then make an additional call to retrieve the acknowledgment information:
 				 * - If the validation is successful, we update the status of the electronic invoice accordingly.
 				 * - If the PDP validation fails, we set the status to "Error" and log the reason.
-				 *
 				 * If no response is available yet, we wait for the next synchronization.
 				 **/
 
@@ -1711,7 +1990,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				// Update einvoice status with awaiting validation
 				$einvoicing = new EInvoicing($db);
 				//$einvoicing->insertOrUpdateExtLink($object->id, $object->element, $flowId, EInvoicing::STATUS_AWAITING_VALIDATION, $object->ref);
-				$resStoreStatus = $einvoicing->storeStatusMessage($object->id, $object->element, $statusCode, '', 'out', $flowId, '', '', '', $reasonCode);
+				$resStoreStatus = $einvoicing->storeStatusMessage($object->id, $object->element, $statusCode, '', 'out', $flowId, '', '', null, $reasonCode);
 
 				// Call the API to retrieve flow details and check the validation status.
 				$resource = 'flows/' . $flowId;
@@ -1754,14 +2033,17 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 					//$einvoicing->insertOrUpdateExtLink($object->id, $object->element, $flowId, $syncStatus, $syncRef, $syncComment);
 					$einvoicing->updateStatusMessageValidation($resStoreStatus, '', $ack_statusLabel, $syncComment);
 
-					// Log an event in the invoice timeline
-					$eventLabel = "EINVOICING - Send status " . $statusLabelToSend . " : " . $ack_statusLabel;
-					$eventMessage = "EINVOICING - Send status " . $statusLabelToSend . " : " . $ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "");
+					// Log an event in the invoice timeline if status not pending
+					// We have just POST a new status so we log a rcord here in agenda to remind date (even if message is pending, so not yet fully processed by AP)
+					//if ($ack_statusLabel != 'Pending') {
+						$eventLabel = "EINVOICING - ".$langs->trans("SendingStatus").' ['.$statusLabelToSend.']';
+						$eventMessage = "EINVOICING - ".$langs->trans("SendingStatus")." (From sendStatusMessage) - [Dolibarr: " . $statusLabelToSend . ', '.$langs->trans("ResultOnAP").': '.$ack_statusLabel . (!empty($syncComment) ? " - " . $syncComment : "")."]";
 
-					$resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $object);
+						$resLogEvent = $this->addEvent('STATUS', $eventLabel, $eventMessage, $object);
 					if ($resLogEvent < 0) {
 						dol_syslog(__METHOD__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
 					}
+					//}
 				} else {
 					dol_syslog(__METHOD__ . " Unable to retrieve flow details after sending status message for flowId: {$flowId}. Status code: " . $response['status_code'], LOG_WARNING);
 					$res = 1;
@@ -1769,9 +2051,26 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				}
 			} else {
 				$res = -1;
-				$message = 'Failed to send CDAR file to PDP. Status code: ' . $response['status_code'] . '. Message: ' . (!empty($response['response']['message'])
+				$platformMessage = (string) (!empty($response['response']['message'])
 					? $response['response']['message']
 					: ($response['errorMessage'] ?? 'No message'));
+				// Name the platform that refused: this wording is identical in every provider, so a bug
+				// report quoting it alone never says which platform answered (issue #799).
+				$message = 'Failed to send CDAR file to ' . $this->name . '. Status code: ' . $response['status_code'] . '. Message: ' . $platformMessage;
+				// MDT-73 is the electronic address the status is sent to. The platform refuses the CDAR when
+				// it does not know the vendor under the address the module used, and says nothing about what
+				// to do next - while the received invoice stays impossible to approve or refuse, and so
+				// impossible to delete. Name the third party and the field that fixes it.
+				if (strpos($platformMessage, 'MDT-73') !== false) {
+					if (empty($object->thirdparty)) {
+						$object->fetch_thirdparty();
+					}
+					$vendorName = !empty($object->thirdparty->name) ? $object->thirdparty->name : ('#' . (int) $object->socid);
+					$usedAddress = $cdarHandler->recipientURIID !== '' ? $cdarHandler->recipientURIID : '-';
+					$message .= ' - ' . ($cdarHandler->recipientURIIDOrigin === 'routing'
+						? $langs->trans('CdarAddressRefusedRecordedRouting', $vendorName, $usedAddress)
+						: $langs->trans('CdarAddressRefusedNoRouting', $vendorName, $usedAddress));
+				}
 				return ['res' => $res, 'message' => $message];
 			}
 		} else {

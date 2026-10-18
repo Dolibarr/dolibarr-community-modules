@@ -13,12 +13,13 @@ zar
 # Need as part of some PHP keys for some array variables
 referer
 
+# False positive (should be accepted)
+lets
+
 # Name of contributors
 noe
 udo
 tim
-
-ConfirmActionXxx
 
 # Inside email
 ba
@@ -72,7 +73,7 @@ mor
 uptodate
 reenable
 
-# Function - rename to devalidate ?
+# Function - todo rename to invalidate
 unvalidate
 
 # Some french strings
@@ -102,6 +103,7 @@ alltime
 # other
 blacklists
 confirmactionxxx
+ConfirmActionXxx
 
 # String in french text to keep
 signifiant

@@ -2,6 +2,7 @@
 /* Copyright (C) 2022       Laurent Destailleur     <eldy@users.sourceforge.net>
  * Copyright (C) 2015-2026  Frédéric France         <frederic.france@free.fr>
  * Copyright (C) 2024		MDW						<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2026		Jose Martinez			<jose.martinez@pichinov.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -79,10 +80,10 @@ if (!$res) {
  *
  * @var string $dolibarr_main_url_root
  */
-require_once '../lib/einvoicing.lib.php';
-require_once "../class/providers/PDPProviderManager.class.php";
-require_once "../class/protocols/ProtocolManager.class.php";
-require_once "../class/einvoicing.class.php";
+require_once __DIR__.'/../lib/einvoicing.lib.php';
+require_once __DIR__.'/../class/providers/PDPProviderManager.class.php';
+require_once __DIR__.'/../class/protocols/ProtocolManager.class.php';
+require_once __DIR__.'/../class/einvoicing.class.php';
 
 
 // Define $urlwithroot
@@ -122,7 +123,7 @@ if ($state) { // Used to store scope and anti-csrf value. The scope is stored in
 }
 
 $providertouse = getDolGlobalString('EINVOICING_PDP');
-if (GETPOSt('proxy') && getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy') {	// If using a proxy is requested and we are on a server proxy
+if (GETPOST('proxy') && getDolGlobalString('EINVOICING_SUPERPDP_VIAPARTNER') == 'proxy') {	// If using a proxy is requested and we are on a server proxy
 	$providertouse = strtoupper(GETPOST('proxy', 'aZ09'));
 }
 
@@ -155,10 +156,16 @@ if (!getDolGlobalString($keyforparamsecret)) {
 if (GETPOST('action', 'aZ09') == 'refresh' && GETPOST('grant_type', 'aZ09') == 'refresh_token') {
 	header('Content-Type: application/json; charset=UTF-8');
 
-	$refresh_token = preg_replace('/[^A-Za-z0-9._\-]/', '', (string) GETPOST('refresh_token', 'restricthtml'));
-	if (empty($refresh_token)) {
+	// A refresh_token is an opaque credential we only relay. RFC 6749 (Appendix A.17) allows any
+	// printable ASCII (VSCHAR = %x20-7E), which covers both the base64 (+ / =) and base64url (- _)
+	// alphabets as well as JWT. The value is URL-encoded by http_build_query() below, so the outbound
+	// request needs no character whitelisting: a narrow [A-Za-z0-9._-] strip does not add safety, it
+	// silently mangles standard-base64 tokens and turns them into a permanent, silent invalid_grant for
+	// that client. So pass the token through untouched and reject only genuinely malformed input.
+	$refresh_token = (string) GETPOST('refresh_token', 'restricthtml');
+	if ($refresh_token === '' || preg_match('/[^\x20-\x7E]/', $refresh_token)) {
 		http_response_code(400);
-		echo json_encode(array('error' => 'invalid_request', 'error_description' => 'refresh_token is missing'));
+		echo json_encode(array('error' => 'invalid_request', 'error_description' => 'refresh_token is missing or malformed'));
 		exit;
 	}
 
@@ -181,7 +188,7 @@ if (GETPOST('action', 'aZ09') == 'refresh' && GETPOST('grant_type', 'aZ09') == '
 		// Pass the PA response (access_token, refresh_token, expires_in, ...) straight back to the client.
 		echo $resultget['content'];
 	} else {
-		dol_syslog("proxy_oauthcallback refresh failed http_code=".$httpcode, LOG_WARNING);
+		dol_syslog("proxy_oauthcallback refresh failed http_code=".$httpcode." response=".dol_trunc((string) ($resultget['content'] ?? ''), 500), LOG_WARNING);
 		http_response_code($httpcode ? $httpcode : 502);
 		echo !empty($resultget['content']) ? $resultget['content'] : json_encode(array('error' => 'proxy_refresh_failed'));
 	}
@@ -204,11 +211,17 @@ if ($action != 'delete' && !GETPOST('afteroauthloginreturn') && (empty($statewit
 		// State or permissions are missing - log and redirect with error
 		dol_syslog("state or statewithscopeonly and/or requestedpermissionsarray are empty");
 
-		$backtourl = GETPOST('redirect_uri').(strpos(GETPOST('redirect_uri'), '?') !== false ? '&' : '?').'error=scopeundefined';
+		$requestedredirecturi = GETPOST('redirect_uri');
 
-		// TODO Test that backtourl start with the allowed domain
-		//var_dump($backtourl);exit;
+		// This branch answers before the allowlist test further down in the page, and it exits, so
+		// that test never sees it: the destination has to be checked right here or not at all.
+		if (!einvoicingIsAllowedRedirectUrl($requestedredirecturi)) {
+			http_response_code(400);
+			print 'Error, the redirect_uri ('.dol_escape_htmltag($requestedredirecturi).') is not among the allowed domains.';
+			exit;
+		}
 
+		$backtourl = $requestedredirecturi.(strpos($requestedredirecturi, '?') !== false ? '&' : '?').'error=scopeundefined';
 
 		header('Location: '.$backtourl);
 		exit();
@@ -249,21 +262,14 @@ if ($emailregistration) {
 
 $save_redirect_uri = GETPOST('redirect_uri');
 
-// Test that redirect_uri match an allowed url/domain
-if ($save_redirect_uri && getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN')) {		// Example: domainofproxycompany.com
-	$domainofuser = getDomainFromURL($save_redirect_uri, 2);
-	$alloweddomains = explode(',', getDolGlobalString('EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN'));
-	$allowed = 0;
-	foreach ($alloweddomains as $allowedomain) {
-		if (preg_match('/'.preg_quote($allowedomain, '/').'$/', $domainofuser)) {
-			$allowed = 1;
-			break;
-		}
-	}
-	if (!$allowed) {
-		print 'Error, the domain of the requester ('.$domainofuser.') extracted from redirect_uri ('.$save_redirect_uri.') is not among allowed domains.';
-		exit;
-	}
+// Test that redirect_uri match an allowed url/domain. This address is where the tokens are delivered
+// further down, so it is checked here, on the way in, and in one place for every redirect of the page.
+// An empty EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN still lets everything through for one transition
+// step - see einvoicingIsAllowedRedirectUrl() - but the shape of the URL is checked in every case.
+if ($save_redirect_uri && !einvoicingIsAllowedRedirectUrl($save_redirect_uri)) {		// Example of the option: domainofproxycompany.com
+	http_response_code(400);
+	print 'Error, the redirect_uri ('.dol_escape_htmltag($save_redirect_uri).') is not among allowed domains.';
+	exit;
 }
 
 
@@ -343,8 +349,7 @@ if (empty($code) && !GETPOST('error')) {
 		if (preg_match('/^[a-z0-9]+\-(.*)/', $state, $reg)) {
 			$origin_redirect_uri = urldecode($reg[1]);
 		}
-		if ($origin_redirect_uri) {
-			// TODO Test that origin_redirect_uri start with the allowed domain
+		if ($origin_redirect_uri && einvoicingIsAllowedRedirectUrl($origin_redirect_uri)) {
 			print '<a href="'.dol_escape_htmltag($origin_redirect_uri).'">Go back to setup page...</a>';
 			print '<br>';
 		}
@@ -374,6 +379,23 @@ if (empty($code) && !GETPOST('error')) {
 
 				$redirect_uri = dol_buildpath('einvoicing/public/proxy_oauthcallback.php', 3);
 
+				$reg = array();
+				$origin_redirect_uri = '';
+				if (preg_match('/^[a-z0-9]+\-(.*)/', $state, $reg)) {
+					$origin_redirect_uri = $reg[1];
+				}
+				$origin_redirect_uri = urldecode($origin_redirect_uri);
+
+				// The tokens are about to be appended to this address and handed to the browser, so where
+				// it points is the whole security of the proxy. Decide it before asking the token: an
+				// authorization code we are not going to be able to deliver must not be spent at all.
+				if ($origin_redirect_uri !== '' && !einvoicingIsAllowedRedirectUrl($origin_redirect_uri)) {
+					dol_syslog("Refused origin_redirect_uri, not among allowed domains: ".$origin_redirect_uri, LOG_WARNING);
+					http_response_code(400);
+					print 'Error, the redirect_uri ('.dol_escape_htmltag($origin_redirect_uri).') is not among allowed domains. No token has been asked nor delivered.';
+					exit;
+				}
+
 				$params = [
 					"client_id" => getDolGlobalString($keyforparamid),
 					"client_secret" => getDolGlobalString($keyforparamsecret),
@@ -386,13 +408,6 @@ if (empty($code) && !GETPOST('error')) {
 				// Send as application/x-www-form-urlencoded (the OAuth 2.0 standard for the token endpoint),
 				// not multipart/form-data which an array param would produce.
 				$resultget = getURLContent($oauthserverurl, 'POST', http_build_query($params), 1, array('Content-Type: application/x-www-form-urlencoded'));
-
-				$reg = array();
-				$origin_redirect_uri = '';
-				if (preg_match('/^[a-z0-9]+\-(.*)/', $state, $reg)) {
-					$origin_redirect_uri = $reg[1];
-				}
-				$origin_redirect_uri = urldecode($origin_redirect_uri);
 
 				if (empty($resultget['curl_error_no']) && isset($resultget['http_code']) && $resultget['http_code'] == 200) {
 					dol_syslog("From state, we have origin_redirect_uri=".$origin_redirect_uri);

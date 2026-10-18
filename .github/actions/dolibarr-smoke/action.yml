@@ -1,0 +1,90 @@
+---
+name: Open the pages of the module
+description: >
+  Serves the instance and opens the pages the module adds or hooks into, requiring each one to answer
+  200 and to hold no PHP error. Half of what breaks in this module breaks on a page and not in a
+  computation - the list of flows that died on an older core (#619), a status option rendered as
+  "Array" (#616), the module list turned into a 500 by a package missing a file (#537). None of that
+  is visible to a test that never opens a page.
+
+inputs:
+  htdocs:
+    description: The htdocs directory to serve
+    required: true
+  port:
+    description: Port the built-in server listens on
+    required: false
+    default: "8080"
+
+runs:
+  using: composite
+  steps:
+    - name: Open the pages of the module
+      shell: bash
+      run: |
+        set -uo pipefail
+        htdocs='${{ inputs.htdocs }}'
+        port='${{ inputs.port }}'
+
+        php -S "127.0.0.1:${port}" -t "$htdocs" > "${RUNNER_TEMP}/php-server.log" 2>&1 &
+        server=$!
+        trap 'kill "$server" 2>/dev/null || true' EXIT
+        for _ in $(seq 1 30); do
+          if curl -fsS -o /dev/null "http://127.0.0.1:${port}/index.php"; then break; fi
+          sleep 1
+        done
+
+        # An invoice of the demo database, so the card is opened with the hooks of the module on a
+        # document that has lines.
+        invoice=$(php -r '
+          $htdocs = $argv[1];
+          require $htdocs . "/master.inc.php";
+          $sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture ORDER BY rowid DESC LIMIT 1";
+          $resql = $db->query($sql);
+          $row = $resql ? $db->fetch_object($resql) : null;
+          echo $row ? (int) $row->rowid : 0;
+        ' "$htdocs")
+        echo "Invoice of the demo database: $invoice"
+
+        pages=(
+          "/index.php"
+          "/admin/modules.php"
+          "/custom/einvoicing/einvoicingindex.php"
+          "/custom/einvoicing/document_list.php"
+          "/custom/einvoicing/call_list.php"
+          "/custom/einvoicing/vendorref_list.php"
+          "/custom/einvoicing/admin/setup.php"
+          "/custom/einvoicing/admin/setup_options.php"
+          "/custom/einvoicing/admin/about.php"
+        )
+        if [ "${invoice:-0}" -gt 0 ]; then
+          pages+=("/compta/facture/card.php?id=${invoice}")
+          pages+=("/compta/facture/list.php")
+        fi
+
+        failed=0
+        for page in "${pages[@]}"; do
+          body="${RUNNER_TEMP}/page-$(echo "$page" | tr '/?=&' '____').html"
+          code=$(curl -sS -o "$body" -w '%{http_code}' "http://127.0.0.1:${port}${page}")
+          # The built-in server writes the PHP errors to its own log, and Dolibarr prints them in the
+          # page as well when it is not in production mode: both are read.
+          if [ "$code" != "200" ]; then
+            location=$(curl -sS -o /dev/null -D - "http://127.0.0.1:${port}${page}" | grep -i '^location:' | tr -d '\r')
+            echo "::error::$page answered $code ${location}"
+            failed=1
+          elif grep -qiE '(Fatal error|Parse error|Uncaught [A-Za-z]*(Error|Exception))' "$body"; then
+            echo "::error::$page holds a PHP error"
+            grep -iE -m3 '(Fatal error|Parse error|Uncaught )' "$body" | cut -c1-300
+            failed=1
+          else
+            echo "  200  $page  ($(wc -c < "$body") bytes)"
+          fi
+        done
+
+        if grep -qiE '(PHP Fatal error|PHP Parse error)' "${RUNNER_TEMP}/php-server.log"; then
+          echo "::error::the server log holds a PHP error"
+          grep -iE -m5 '(PHP Fatal error|PHP Parse error)' "${RUNNER_TEMP}/php-server.log" | cut -c1-300
+          failed=1
+        fi
+
+        exit "$failed"

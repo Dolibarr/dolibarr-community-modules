@@ -1,7 +1,7 @@
 <?php
 /* Copyright (C) 2006-2011	Laurent Destailleur		<eldy@users.sourceforge.net>
- * Copyright (C) 2022		Frédéric France			<frederic.france@netlogic.fr>
- * Copyright (C) 2024-2026	MDW							<mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2022-2026  Frédéric France			<frederic.france@free.fr>
+ * Copyright (C) 2024		MDW							<mdeweerd@users.noreply.github.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -25,225 +25,292 @@
 
 // @phan-file-suppress PhanRedefineFunction
 
-/**
- *  Check if a string passes the Luhn algorithm test.
- *  @param		string|int		$str		string to check
- *  @return		bool						True if the string passes the Luhn algorithm check, False otherwise
- *  @since		Dolibarr V20
- */
-function isValidLuhn($str)
-{
-	$str = (string) $str;
-	$len = dol_strlen($str);
-	$parity = $len % 2;
-	$sum = 0;
-	for ($i = $len - 1; $i >= 0; $i--) {
-		$d = (int) $str[$i];
-		if ($i % 2 == $parity) {
-			if (($d *= 2) > 9) {
-				$d -= 9;
+// Copy of the core file, function by function under a function_exists() guard: the module loads it
+// below Dolibarr 20, where the core has no profid.lib.php, and the core version wins everywhere else.
+
+if (!function_exists('isValidLuhn')) {
+	/**
+	 *  Check if a string passes the Luhn algorithm test.
+	 *  @param		string|int		$str		string to check
+	 *  @return		bool						True if the string passes the Luhn algorithm check, False otherwise
+	 *  @since		Dolibarr V20
+	 */
+	function isValidLuhn($str)
+	{
+		$str = (string) $str;
+		$len = dol_strlen($str);
+		$parity = $len % 2;
+		$sum = 0;
+		for ($i = $len - 1; $i >= 0; $i--) {
+			$d = (int) $str[$i];
+			if ($i % 2 == $parity) {
+				if (($d *= 2) > 9) {
+					$d -= 9;
+				}
+			}
+			$sum += $d;
+		}
+		return $sum % 10 == 0;
+	}
+}
+
+if (!function_exists('isValidSiren')) {
+	/**
+	 *  Check the syntax validity of a SIREN.
+	 *
+	 *  @param		string		$siren			SIREN to check
+	 *  @param  	int			$lengthonly		Make surface test only (length, ...)
+	 *  @return		boolean						True if valid, False otherwise
+	 *  @since		Dolibarr V20
+	 */
+	function isValidSiren($siren, $lengthonly = 0)
+	{
+		$siren = trim($siren);
+		$siren = preg_replace('/(\s)/', '', $siren);
+
+		if (!is_numeric($siren) || dol_strlen($siren) != 9) {
+			return false;
+		}
+
+		return ($lengthonly || isValidLuhn($siren));
+	}
+}
+
+if (!function_exists('isValidSiret')) {
+	/**
+	 *  Check the syntax validity of a SIRET.
+	 *
+	 *  @param		string		$siret			SIRET to check
+	 *  @param  	int			$lengthonly		Make surface test only (length, ...)
+	 *  @return		boolean						True if valid, False otherwise
+	 *  @since		Dolibarr V20
+	 */
+	function isValidSiret($siret, $lengthonly = 0)
+	{
+		$siret = trim($siret);
+		$siret = preg_replace('/(\s)/', '', $siret);
+
+		if (!is_numeric($siret) || dol_strlen($siret) != 14) {
+			return false;
+		}
+
+		if ($lengthonly || isValidLuhn($siret)) {
+			return true;
+		} elseif ((substr($siret, 0, 9) == "356000000") && (array_sum(str_split($siret)) % 5 == 0)) {
+			/**
+			 *  Specific case of "La Poste" businesses (SIRET such as "356 000 000 XXXXX"),
+			 *  for which the rule becomes: the sum of the 14 digits must be a multiple of 5.
+			 *  See https://fr.wikipedia.org/wiki/SIRET for details.
+			 */
+			return true;
+		} else {
+			return false;
+		}
+	}
+}
+
+if (!function_exists('isValidTinForPT')) {
+	/**
+	 *  Check the syntax validity of a Portuguese (PT) Tax Identification Number (TIN).
+	 *  (NIF = Numero de Identificacao Fiscal)
+	 *
+	 *  @param		string		$str		NIF to check
+	 *  @return		boolean					True if valid, False otherwise
+	 *  @since		Dolibarr V20
+	 */
+	function isValidTinForPT($str)
+	{
+		$str = trim($str);
+		$str = preg_replace('/(\s)/', '', $str);
+
+		if (preg_match('/(^[0-9]{9}$)/', $str)) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+}
+
+if (!function_exists('isValidTinForDZ')) {
+	/**
+	 *  Check the syntax validity of an Algerian (DZ) Tax Identification Number (TIN).
+	 *  (NIF = Tax Identification Number)
+	 *
+	 *  @param		string		$str		TIN to check
+	 *  @return		boolean					True if valid, False otherwise
+	 *  @since		Dolibarr V20
+	 */
+	function isValidTinForDZ($str)
+	{
+		$str = trim($str);
+		$str = preg_replace('/(\s)/', '', $str);
+
+		if (preg_match('/(^[0-9]{15}$)/', $str)) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+}
+
+if (!function_exists('isValidTinForBE')) {
+	/**
+	 *  Check the syntax validity of a Belgium (BE) Tax Identification Number (TIN).
+	 *  (NN = National Number)
+	 *
+	 *  @param		string		$str		NN to check
+	 *  @return		boolean					True if valid, False otherwise
+	 *  @since		Dolibarr V20
+	 */
+	function isValidTinForBE($str)
+	{
+		// https://economie.fgov.be/fr/themes/entreprises/banque-carrefour-des/actualites/structure-du-numero
+		$str = trim($str);
+		$str = preg_replace('/(\s)/', '', $str);
+
+		if (preg_match('/(^[0-1]{1}[0-9]{3}\.[0-9]{3}\.[0-9]{3}$)/', $str)) {
+			return true;
+		} else {
+			return false;
+		}
+	}
+}
+
+if (!function_exists('isValidTinForES')) {
+	/**
+	 *  Check the syntax validity of a Spanish (ES) Tax Identification Number (TIN), where:
+	 *  - NIF = Numero de Identificacion Fiscal (used for residents only before 2008. Used for both residents and companies since 2008.)
+	 *  - CIF = Codigo de Identificacion Fiscal (used for companies only before 2008. Replaced by NIF since 2008.)
+	 *  - NIE = Numero de Identidad de Extranjero
+	 *
+	 *  @param		string		$str		TIN to check
+	 *  @return		int<-4,3>				1 if NIF ok, 2 if CIF ok, 3 if NIE ok, -1 if NIF bad, -2 if CIF bad, -3 if NIE bad, -4 if unexpected bad
+	 *  @since		Dolibarr V20
+	 */
+	function isValidTinForES($str)
+	{
+		$str = trim($str);
+		$str = preg_replace('/(\s)/', '', $str);
+		$str = strtoupper($str);
+
+		//Check format
+		if (!preg_match('/((^[A-Z]{1}[0-9]{7}[A-Z0-9]{1}$|^[T]{1}[A-Z0-9]{8}$)|^[0-9]{8}[A-Z]{1}$)/', $str)) {
+			return 0;
+		}
+
+		$num = array();
+		for ($i = 0; $i < 9; $i++) {
+			$num[$i] = substr($str, $i, 1);
+		}
+		'@phan-var-force array<int<0,8>,string> $num';
+
+		//Check NIF
+		if (preg_match('/(^[0-9]{8}[A-Z]{1}$)/', $str)) {
+			if ($num[8] == substr('TRWAGMYFPDXBNJZSQVHLCKE', (int) substr($str, 0, 8) % 23, 1)) {
+				return 1;
+			} else {
+				return -1;
 			}
 		}
-		$sum += $d;
-	}
-	return $sum % 10 == 0;
-}
 
+		//algorithm checking type code CIF
+		$sum = (int) $num[2] + (int) $num[4] + (int) $num[6];
+		for ($i = 1; $i < 8; $i += 2) {
+			$sum += intval(substr((string) (2 * (int) $num[$i]), 0, 1)) + intval(substr((string) (2 * (int) $num[$i]), 1, 1));
+		}
+		$n = 10 - (int) substr((string) $sum, strlen((string) $sum) - 1, 1);
 
-/**
- *  Check the syntax validity of a SIREN.
- *
- *  @param		string		$siren		SIREN to check
- *  @return		boolean					True if valid, False otherwise
- *  @since		Dolibarr V20
- */
-function isValidSiren($siren)
-{
-	$siren = trim($siren);
-	$siren = preg_replace('/(\s)/', '', $siren);
+		//Check special NIF
+		if (preg_match('/^[KLM]{1}/', $str)) {
+			if ($num[8] == chr(64 + $n) || $num[8] == substr('TRWAGMYFPDXBNJZSQVHLCKE', (int) substr($str, 1, 8) % 23, 1)) {
+				return 1;
+			} else {
+				return -1;
+			}
+		}
 
-	if (!is_numeric($siren) || dol_strlen($siren) != 9) {
-		return false;
-	}
+		//Check CIF
+		if (preg_match('/^[ABCDEFGHJNPQRSUVW]{1}/', $str)) {
+			if ($num[8] == chr(64 + $n) || $num[8] == substr((string) $n, strlen((string) $n) - 1, 1)) {
+				return 2;
+			} else {
+				return -2;
+			}
+		}
 
-	return isValidLuhn($siren);
-}
+		//Check NIE T
+		if (preg_match('/^[T]{1}/', $str)) {
+			// A NIE starting with T has no control key to check, so the syntax check is enough.
+			if (preg_match('/^[T]{1}[A-Z0-9]{8}$/', $str)) {
+				return 3;
+			} else {
+				return -3;
+			}
+		}
 
+		//Check NIE XYZ
+		if (preg_match('/^[XYZ]{1}/', $str)) {
+			if ($num[8] == substr('TRWAGMYFPDXBNJZSQVHLCKE', (int) substr(str_replace(array('X', 'Y', 'Z'), array('0', '1', '2'), $str), 0, 8) % 23, 1)) {
+				return 3;
+			} else {
+				return -3;
+			}
+		}
 
-/**
- *  Check the syntax validity of a SIRET.
- *
- *  @param		string		$siret		SIRET to check
- *  @return		boolean					True if valid, False otherwise
- *  @since		Dolibarr V20
- */
-function isValidSiret($siret)
-{
-	$siret = trim($siret);
-	$siret = preg_replace('/(\s)/', '', $siret);
-
-	if (!is_numeric($siret) || dol_strlen($siret) != 14) {
-		return false;
-	}
-
-	if (isValidLuhn($siret)) {
-		return true;
-	} elseif ((substr($siret, 0, 9) == "356000000") && (array_sum(str_split($siret)) % 5 == 0)) {
-		/**
-		 *  Specific case of "La Poste" businesses (SIRET such as "356 000 000 XXXXX"),
-		 *  for which the rule becomes: the sum of the 14 digits must be a multiple of 5.
-		 *  See https://fr.wikipedia.org/wiki/SIRET for details.
-		 */
-		return true;
-	} else {
-		return false;
+		//Can not be verified
+		return -4;
 	}
 }
 
+if (!function_exists('isValidProfIds')) {
+	/**
+	 *  Check the validity of a professional identifier according to the properties (country) of the company (siren, siret, ...)
+	 *
+	 *  @param	int			$idprof         1,2,3,4 (Example: 1=siren, 2=siret, 3=naf, 4=rcs/rm)
+	 *  @param  Societe		$thirdparty     Object societe
+	 *  @param  int			$lenghtonly		Make surface test only (length, ...)
+	 *  @return int             			Return integer <=0 if KO, >0 if OK
+	 */
+	function isValidProfIds($idprof, $thirdparty, $lenghtonly = 0)
+	{
+		$ok = 1;
 
-/**
- *  Check the syntax validity of a Portuguese (PT) Tax Identification Number (TIN).
- *  (NIF = Número de Identificação Fiscal)
- *
- *  @param		string		$str		NIF to check
- *  @return		boolean					True if valid, False otherwise
- *  @since		Dolibarr V20
- */
-function isValidTinForPT($str)
-{
-	$str = trim($str);
-	$str = preg_replace('/(\s)/', '', $str);
-
-	if (preg_match('/(^[0-9]{9}$)/', $str)) {
-		return true;
-	} else {
-		return false;
-	}
-}
-
-
-/**
- *  Check the syntax validity of an Algerian (DZ) Tax Identification Number (TIN).
- *  (NIF = Numéro d'Identification Fiscale)
- *
- *  @param		string		$str		TIN to check
- *  @return		boolean					True if valid, False otherwise
- *  @since		Dolibarr V20
- */
-function isValidTinForDZ($str)
-{
-	$str = trim($str);
-	$str = preg_replace('/(\s)/', '', $str);
-
-	if (preg_match('/(^[0-9]{15}$)/', $str)) {
-		return true;
-	} else {
-		return false;
-	}
-}
-
-
-/**
- *  Check the syntax validity of a Belgium (BE) Tax Identification Number (TIN).
- *  (NN = Numéro National)
- *
- *  @param		string		$str		NN to check
- *  @return		boolean					True if valid, False otherwise
- *  @since		Dolibarr V20
- */
-function isValidTinForBE($str)
-{
-	// https://economie.fgov.be/fr/themes/entreprises/banque-carrefour-des/actualites/structure-du-numero
-	$str = trim($str);
-	$str = preg_replace('/(\s)/', '', $str);
-
-	if (preg_match('/(^[0-1]{1}[0-9]{3}\.[0-9]{3}\.[0-9]{3}$)/', $str)) {
-		return true;
-	} else {
-		return false;
-	}
-}
-
-
-/**
- *  Check the syntax validity of a Spanish (ES) Tax Identification Number (TIN), where:
- *  - NIF = Número de Identificación Fiscal (used for residents only before 2008. Used for both residents and companies since 2008.)
- *  - CIF = Código de Identificación Fiscal (used for companies only before 2008. Replaced by NIF since 2008.)
- *  - NIE = Número de Identidad de Extranjero
- *
- *  @param		string		$str		TIN to check
- *  @return		int<-4,3>				1 if NIF ok, 2 if CIF ok, 3 if NIE ok, -1 if NIF bad, -2 if CIF bad, -3 if NIE bad, -4 if unexpected bad
- *  @since		Dolibarr V20
- */
-function isValidTinForES($str)
-{
-	$str = trim($str);
-	$str = preg_replace('/(\s)/', '', $str);
-	$str = strtoupper($str);
-
-	//Check format
-	if (!preg_match('/((^[A-Z]{1}[0-9]{7}[A-Z0-9]{1}$|^[T]{1}[A-Z0-9]{8}$)|^[0-9]{8}[A-Z]{1}$)/', $str)) {
-		return 0;
-	}
-
-	$num = array();
-	for ($i = 0; $i < 9; $i++) {
-		$num[$i] = substr($str, $i, 1);
-	}
-	'@phan-var-force array<int<0,8>,string> $num';
-
-	//Check NIF
-	if (preg_match('/(^[0-9]{8}[A-Z]{1}$)/', $str)) {
-		if ($num[8] == substr('TRWAGMYFPDXBNJZSQVHLCKE', (int) substr($str, 0, 8) % 23, 1)) {
+		if (getDolGlobalString('MAIN_DISABLEPROFIDRULES')) {
 			return 1;
-		} else {
+		}
+
+		// Check SIREN
+		if ($thirdparty->country_code == 'FR') {
+			if ($idprof == 1 && !isValidSiren($thirdparty->idprof1, $lenghtonly)) {
+				return -1;
+			}
+
+			// Check SIRET
+			if ($idprof == 2 && !isValidSiret($thirdparty->idprof2, $lenghtonly)) {
+				return -2;
+			}
+		}
+
+		// Verify CIF/NIF/NIE if pays ES
+		if ($idprof == 1 && $thirdparty->country_code == 'ES') {
+			return isValidTinForES($thirdparty->idprof1);
+		}
+
+		// Verify NIF if country is PT
+		if ($idprof == 1 && $thirdparty->country_code == 'PT' && !isValidTinForPT($thirdparty->idprof1)) {
 			return -1;
 		}
-	}
 
-	//algorithm checking type code CIF
-	$sum = (int) $num[2] + (int) $num[4] + (int) $num[6];
-	for ($i = 1; $i < 8; $i += 2) {
-		$sum += intval(substr((string) (2 * (int) $num[$i]), 0, 1)) + intval(substr((string) (2 * (int) $num[$i]), 1, 1));
-	}
-	$n = 10 - (int) substr((string) $sum, strlen((string) $sum) - 1, 1);
-
-	//Check special NIF
-	if (preg_match('/^[KLM]{1}/', $str)) {
-		if ($num[8] == chr(64 + $n) || $num[8] == substr('TRWAGMYFPDXBNJZSQVHLCKE', (int) substr($str, 1, 8) % 23, 1)) {
-			return 1;
-		} else {
+		// Verify NIF if country is DZ
+		if ($idprof == 1 && $thirdparty->country_code == 'DZ' && !isValidTinForDZ($thirdparty->idprof1)) {
 			return -1;
 		}
-	}
 
-	//Check CIF
-	if (preg_match('/^[ABCDEFGHJNPQRSUVW]{1}/', $str)) {
-		if ($num[8] == chr(64 + $n) || $num[8] == substr((string) $n, strlen((string) $n) - 1, 1)) {
-			return 2;
-		} else {
-			return -2;
+		// Verify ID Prof 1 if country is BE
+		if ($idprof == 1 && $thirdparty->country_code == 'BE' && !isValidTinForBE($thirdparty->idprof1)) {
+			return -1;
 		}
-	}
 
-	//Check NIE T
-	if (preg_match('/^[T]{1}/', $str)) {
-		if ($num[8] == preg_match('/^[T]{1}[A-Z0-9]{8}$/', $str)) {
-			return 3;
-		} else {
-			return -3;
-		}
+		return $ok;
 	}
-
-	//Check NIE XYZ
-	if (preg_match('/^[XYZ]{1}/', $str)) {
-		if ($num[8] == substr('TRWAGMYFPDXBNJZSQVHLCKE', (int) substr(str_replace(array('X', 'Y', 'Z'), array('0', '1', '2'), $str), 0, 8) % 23, 1)) {
-			return 3;
-		} else {
-			return -3;
-		}
-	}
-
-	//Can not be verified
-	return -4;
 }

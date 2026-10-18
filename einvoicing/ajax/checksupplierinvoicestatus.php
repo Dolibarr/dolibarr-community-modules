@@ -35,9 +35,8 @@ if (!defined('NOREQUIREHTML')) {
 if (!defined('NOREQUIREAJAX')) {
 	define('NOREQUIREAJAX', '1');
 }
-if (!defined('NOREQUIRESOC')) {
-	define('NOREQUIRESOC', '1');
-}
+// NOREQUIRESOC is deliberately not defined here: this endpoint builds a PDPProviderManager, which reads
+// $mysoc->country_code to decide the list of providers, so $mysoc must exist.
 if (!defined('NOCSRFCHECK')) {
 	define('NOCSRFCHECK', '1');
 }
@@ -125,34 +124,49 @@ if ($objectID) {
 	}
 
 	// Authorize the fetched invoice with the standard supplier invoice/third-party access rules:
-	// the e-invoicing write right alone must not expose an invoice the user cannot otherwise read.
+	// the e-invoicing write permission alone (tested at begin) must not expose an invoice the user cannot otherwise read.
 	restrictedArea($user, 'fournisseur', $invoice->id, 'facture_fourn', 'facture', 'fk_soc', 'rowid');
 
 	// Get flowId from linked document log
 	$flowId = '';
-	$sql = "SELECT rowid, flow_id, lc_status, lc_reason_code FROM ".MAIN_DB_PREFIX."einvoicing_lifecycle_msg";
+	$sql = "SELECT rowid, flow_id, lc_status, lc_reason_code, lc_recipient_roles, lc_validation_status FROM ".MAIN_DB_PREFIX."einvoicing_lifecycle_msg";
 	$sql .= " WHERE element_type = '".$db->escape($invoice->element)."'";
 	$sql .= " AND element_id = ".(int) $invoice->id;
 	$sql .= " ORDER BY rowid DESC LIMIT 1";
 
+	$lcId = 0;
+	$flowId = 0;
+	$lcStatus = 0;
+	$lcReasonCode = '';
+	$lcValidationStatus = '';
+
 	$resql = $db->query($sql);
-	if ($resql && ($db->num_rows($resql) > 0)) {
+	if ($resql) {
 		$obj = $db->fetch_object($resql);
-		$lcId = $obj->rowid;
-		$flowId = $obj->flow_id;
-		$lcStatus = $obj->lc_status;
-		$lcReasonCode = $obj->lc_reason_code;
+		if ($obj) {
+			$lcId = $obj->rowid;
+			$flowId = $obj->flow_id;
+			$lcStatus = $obj->lc_status;
+			$lcReasonCode = $obj->lc_reason_code;
+			// Validation status known so far, read before updateStatusMessageValidation() overwrites it below.
+			$lcValidationStatus = $obj->lc_validation_status;
+		}
 	} else {
 		print json_encode(['status' => 'error', 'message' => 'Error retrieving flowId for supplier invoice ref '. $invoice->ref]);
 		exit;
 	}
 
+	if (empty($lcId)) {
+		print json_encode(['statuslabel' => 'No flow yet']);
+		exit;
+	}
+
 	// make a call to get validation result from PDP
-	// TODO: Move this code to a method in the provider class to avoid breaking the abstraction principle.
 	require_once "../class/providers/PDPProviderManager.class.php";
 	$PDPManager = new PDPProviderManager($db);
 	$provider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
 
+	// Call API to get the status
 	$resource = 'flows/' . $flowId;
 	$urlparams = array(
 		'docType' => 'Metadata',
@@ -174,14 +188,19 @@ if ($objectID) {
 
 		$einvoicing->updateStatusMessageValidation($lcId, '', $statusvalidationlabel, $statusvalidationinfo);
 
-		// Log an event in the invoice timeline
-		$CurrentLCStatusLabel = $einvoicing->getStatusLabel($obj->lc_status);
-		$currentLCReasonLabel = $langs->trans($einvoicing->getReasonsByStatus($obj->lc_status)[$obj->lc_reason_code]['label'] ?? $obj->lc_reason_code);
-		$eventLabel = "EINVOICING - Send status " . $CurrentLCStatusLabel . " : " . $statusvalidationlabel;
-		$eventMessage = "EINVOICING - Send status " . $CurrentLCStatusLabel . " : " . $statusvalidationlabel . (!empty($statusvalidationinfo) ? " - " . $statusvalidationinfo : "") . (!empty($lcReasonCode) ? " - Reason: " . $currentLCReasonLabel : "");
-		$resLogEvent = $provider->addEvent('STATUS', $eventLabel, $eventMessage, $invoice);
-		if ($resLogEvent < 0) {
-			dol_syslog(__FILE__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+		// Same two sources as EInvoicing::supplierInvoiceCardBlock(), which this answer refreshes in place.
+		$currentLCStatusLabel = $einvoicing->getStatusLabel($obj->lc_status, $invoice->element, $obj->lc_recipient_roles ?? '');
+		$currentLCReasonLabel = $einvoicing->getReasonLabel($obj->lc_status, $obj->lc_reason_code);
+
+		// Log an event in the invoice timeline if status not pending and it has changed
+		if ($statusvalidationlabel != 'Pending' && $statusvalidationlabel !== $lcValidationStatus) {
+			$eventLabel = "EINVOICING - ".$langs->trans("CheckingStatus");
+			$eventMessage = "EINVOICING - ".$langs->trans("CheckingStatus")." (From ajax checksupplierinvoicestatus) - [Dolibarr: " . $currentLCStatusLabel . ', '.$langs->trans("ResultOnAP").': '.$statusvalidationlabel . (!empty($statusvalidationinfo) ? " - " . $statusvalidationinfo : "") . (!empty($lcReasonCode) ? " - Reason: " . $currentLCReasonLabel : "")."]";
+
+			$resLogEvent = $provider->addEvent('STATUS', $eventLabel, $eventMessage, $invoice);
+			if ($resLogEvent < 0) {
+				dol_syslog(__FILE__ . " Failed to log event for flowId: {$flowId}", LOG_WARNING);
+			}
 		}
 
 		// Prepare validation status to be displayed in the supplier invoice card
@@ -195,8 +214,8 @@ if ($objectID) {
 
 		// Return current status of the supplier invoice to update it in the invoice card
 		print json_encode([
-			'statuslabel' => $CurrentLCStatusLabel,
-			'statusreasonlabel' => $currentLCReasonLabel,
+			'statuslabel' => $currentLCStatusLabel,
+			'statusreasonlabel' => dol_escape_htmltag($currentLCReasonLabel),	// Injected with .html() by the card
 			'statusvalidationlabel' => $statusvalidationlabel,
 			'htmlstatusvalidationLabel' => $htmlstatusvalidationLabel,
 			'statusvalidationinfo' => $statusvalidationinfo,

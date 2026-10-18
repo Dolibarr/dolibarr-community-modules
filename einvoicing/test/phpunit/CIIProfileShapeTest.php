@@ -20,22 +20,19 @@
  *      \file       test/phpunit/CIIProfileShapeTest.php
  *      \ingroup    test
  *      \brief      PHPUnit test for the groups a profile is allowed to carry.
- *                  MINIMUM and BASIC WL are header-only Factur-X profiles: neither
- *                  ram:IncludedSupplyChainTradeLineItem (BG-25) nor ram:DefinedTradeContact
- *                  (BG-6 / BG-9) is declared in their XSD, so emitting either makes every
- *                  generated document fail the profile schema. Every profile from BASIC upwards
- *                  expects both.
+ *                  MINIMUM and BASIC WL are header-only Factur-X profiles: their XSD declares
+ *                  neither ram:IncludedSupplyChainTradeLineItem (BG-25) nor ram:DefinedTradeContact
+ *                  (BG-6 / BG-9), while every profile from BASIC upwards expects both.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
 global $conf, $user, $langs, $db;
 
-// This module is deployed by symlinking this repository into htdocs/custom/einvoicing of one or
-// several Dolibarr instances. Some test runners resolve the real (non-symlinked) path of this
-// file before including it, which breaks a fixed "../../htdocs/master.inc.php" relative path.
-// DOLIBARR_HTDOCS let's the developer/CI point explicitly at the Dolibarr instance to test
-// against; otherwise we fall back to the standard relative path (valid when this file is reached
-// through the htdocs/custom/einvoicing/test/phpunit symlink without realpath resolution).
+// This module is deployed by symlinking this repository into htdocs/custom/einvoicing. Some test
+// runners resolve the real (non-symlinked) path of this file before including it, which breaks a
+// fixed "../../htdocs/master.inc.php" relative path. DOLIBARR_HTDOCS let's the developer/CI point
+// explicitly at the Dolibarr instance to test against; otherwise we fall back to the relative path
+// (valid when this file is reached through the symlink without realpath resolution).
 $dolibarrHtdocs = getenv('DOLIBARR_HTDOCS');
 if (!$dolibarrHtdocs) {
 	$dolibarrHtdocs = dirname(__FILE__) . '/../../htdocs';
@@ -401,7 +398,8 @@ class CIIProfileShapeTest extends CommonClassTest
 	}
 
 	/**
-	 * Invoice data carrying the three header references, on top of the base fixture.
+	 * Invoice data carrying the header references, on top of the base fixture: an invoice covering
+	 * three purchase orders, so the first lands on BT-13 and the other two on BT-18.
 	 *
 	 * @return	array<string,mixed>
 	 */
@@ -419,6 +417,9 @@ class CIIProfileShapeTest extends CommonClassTest
 		$data['buyerReference'] = 'SERVICE-EXEC-01';		// BT-10
 		$data['contractReference'] = 'CTR-2026-118';		// BT-12
 		$data['_project'] = $project;						// BT-11
+		$data['orderReference'] = 'BC-2026-0007';			// BT-13
+		// An invoice covering three orders: BT-13 takes the first, the other two go to BT-18
+		$data['_customerOrderReferenceList'] = ['BC-2026-0007', 'BC-2026-0008', 'BC-2026-0009'];
 
 		return $data;
 	}
@@ -461,6 +462,277 @@ class CIIProfileShapeTest extends CommonClassTest
 	}
 
 	/**
+	 * The buyer routing code travels as a second ram:GlobalID of the buyer party, and only the
+	 * EXTENDED profiles may carry it.
+	 *
+	 * Scheme 0224 is where BR-FR-CPRO-11 and BR-FR-CPRO-13 read the Chorus Pro service code, and the
+	 * Factur-X EN16931 Schematron caps ram:GlobalID at one occurrence (FX-SCH-A-000164): a document
+	 * below EXTENDED carrying both is refused (issue #678).
+	 *
+	 * @return void
+	 */
+	public function testBuyerRoutingCodeIsOnlyEmittedByTheExtendedProfiles()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$data = $this->baseInvoiceData();
+		$data['buyerRoutingCode'] = 'CDROUT1';
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$xml = $protocol->buildXML($data, $this->baseLinesData(), $profile);
+			$found = $this->partyGlobalIds($xml, 'BuyerTradeParty');
+
+			if ($profile === 'MINIMUM') {
+				$this->assertSame([], $found, 'MINIMUM declares no identifier for the buyer party');
+			} elseif (in_array($profile, ['EXTENDED', 'EXTENDEDFR'], true)) {
+				$this->assertSame(
+					[['0225', '12345678200019'], ['0224', 'CDROUT1']],
+					$found,
+					$profile . ' must carry the legal identifier and the routing code'
+				);
+			} else {
+				$this->assertSame(
+					[['0225', '12345678200019']],
+					$found,
+					$profile . ' allows a single buyer identifier, the routing code must be left out'
+				);
+			}
+		}
+	}
+
+	/**
+	 * The routing code of the buyer never reaches the deliver-to party.
+	 *
+	 * That party is built from the same data in minimal mode, and its own identifier is BT-71, the
+	 * identifier of a location. Writing the buyer routing code there means the wrong term, and a
+	 * second ram:GlobalID its Schematron rule caps at one as well (FX-SCH-A-000452).
+	 *
+	 * @return void
+	 */
+	public function testBuyerRoutingCodeNeverReachesTheDeliverToParty()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		// No _shipFromContactShip on purpose: that is the path where the deliver-to party is built as
+		// a stripped-down copy of the buyer, hence the one that could carry the routing code along.
+		$data = $this->baseInvoiceData();
+		$data['buyerRoutingCode'] = 'CDROUT1';
+
+		foreach (['EXTENDED', 'EXTENDEDFR'] as $profile) {
+			$xml = $protocol->buildXML($data, $this->baseLinesData(), $profile);
+
+			$this->assertSame(
+				[['0225', '12345678200019'], ['0224', 'CDROUT1']],
+				$this->partyGlobalIds($xml, 'BuyerTradeParty'),
+				$profile . ' must carry the routing code on the buyer'
+			);
+			foreach ($this->partyGlobalIds($xml, 'ShipToTradeParty') as $globalId) {
+				$this->assertNotSame('0224', $globalId[0], $profile . ' must not route-code the deliver-to party');
+			}
+		}
+	}
+
+	/**
+	 * An exempt line repeats its exemption reason only on the profiles that ask for it.
+	 *
+	 * BR-FXEXT-E-08 reconciles the taxable amount of an exempt breakdown (BT-116) with the net amounts
+	 * of the lines it covers, and counts a line only when it repeats the same reason code and text, so
+	 * EXTENDED needs it. Below EXTENDED the profile Schematron reports the element as "not used in the
+	 * given context" and the platform rejects the invoice on REJ_COH (issue #974). The VAT breakdown
+	 * carries the reason whatever the profile, which is what makes the line copy dispensable there.
+	 *
+	 * @return void
+	 */
+	public function testLineExemptionReasonIsOnlyEmittedByTheExtendedProfiles()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$data = $this->exemptInvoiceData();
+		$lines = $this->exemptLinesData();
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$xml = $protocol->buildXML($data, $lines, $profile);
+			$found = $this->lineTaxExemption($xml);
+
+			if (in_array($profile, ['EXTENDED', 'EXTENDEDFR'], true)) {
+				$this->assertSame(
+					[['Tax exempted - TVA en franchise', 'VATEX-FR-FRANCHISE']],
+					$found,
+					$profile . ' must repeat the exemption reason on the line, BR-FXEXT-E-08 counts it there'
+				);
+			} else {
+				$this->assertSame(
+					[],
+					$found,
+					$profile . ' must leave the exemption reason out of the line tax block'
+				);
+			}
+		}
+	}
+
+	/**
+	 * The VAT breakdown keeps the exemption reason on every profile that declares one.
+	 *
+	 * This is the half of issue #974 that must not move: the reason is mandatory there (BR-E-10), and
+	 * it is what makes the line level copy redundant below EXTENDED.
+	 *
+	 * @return void
+	 */
+	public function testBreakdownExemptionReasonSurvivesOnEveryProfile()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$data = $this->exemptInvoiceData();
+		$lines = $this->exemptLinesData();
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			if ($profile === 'MINIMUM') {
+				continue;	// MINIMUM declares totals only, no VAT breakdown (BG-23) to carry a reason
+			}
+			$xml = $protocol->buildXML($data, $lines, $profile);
+
+			$this->assertSame(
+				[['Tax exempted - TVA en franchise', 'VATEX-FR-FRANCHISE']],
+				$this->breakdownExemption($xml),
+				$profile . ' must carry the exemption reason in the VAT breakdown'
+			);
+		}
+	}
+
+	/**
+	 * The base invoice, turned into a VAT exempt one under "franchise en base de TVA".
+	 *
+	 * @return array
+	 */
+	private function exemptInvoiceData()
+	{
+		$data = $this->baseInvoiceData();
+
+		$data['grandTotalAmount'] = 100.0;
+		$data['duePayableAmount'] = 100.0;
+		$data['taxTotalAmount'] = 0.0;
+		$data['taxBreakdown'] = [
+			'0' => [
+				'tva_tx' => 0.0,
+				'vat_src_code' => '',
+				'categoryVAT' => 'E',
+				'ExemptionReasonCode' => 'VATEX-FR-FRANCHISE',
+				'ExemptionReason' => 'Tax exempted - TVA en franchise',
+				'totalHT' => 100.0,
+				'totalTVA' => 0.0,
+			],
+		];
+
+		return $data;
+	}
+
+	/**
+	 * The base line, at 0 % under the same exemption.
+	 *
+	 * @return array
+	 */
+	private function exemptLinesData()
+	{
+		$lines = $this->baseLinesData();
+
+		$lines[0]['tva_tx'] = 0.0;
+		$lines[0]['categoryCode'] = 'E';
+		$lines[0]['rateApplicablePercent'] = '0.00';
+		$lines[0]['ExemptionReason'] = 'Tax exempted - TVA en franchise';
+		$lines[0]['ExemptionReasonCode'] = 'VATEX-FR-FRANCHISE';
+
+		return $lines;
+	}
+
+	/**
+	 * Read the exemption reason and code of each line tax block.
+	 *
+	 * @param	string				$xml	Generated XML
+	 * @return	array<array<string>>		One [reason, code] pair per line that carries either
+	 */
+	private function lineTaxExemption(string $xml)
+	{
+		return $this->exemptionPairs(
+			$xml,
+			'//ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:ApplicableTradeTax'
+		);
+	}
+
+	/**
+	 * Read the exemption reason and code of each VAT breakdown (BG-23).
+	 *
+	 * @param	string				$xml	Generated XML
+	 * @return	array<array<string>>		One [reason, code] pair per breakdown that carries either
+	 */
+	private function breakdownExemption(string $xml)
+	{
+		return $this->exemptionPairs(
+			$xml,
+			'//ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax'
+		);
+	}
+
+	/**
+	 * Read the (reason, code) pairs of the tax blocks an XPath selects.
+	 *
+	 * @param	string				$xml	Generated XML
+	 * @param	string				$path	XPath selecting ram:ApplicableTradeTax elements
+	 * @return	array<array<string>>		One [reason, code] pair per block that carries either
+	 */
+	private function exemptionPairs(string $xml, string $path)
+	{
+		$doc = new DOMDocument();
+		$this->assertTrue($doc->loadXML($xml), 'generated document is not well-formed XML');
+
+		$xpath = new DOMXPath($doc);
+		$xpath->registerNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
+
+		$found = [];
+		foreach ($xpath->query($path) as $tax) {
+			$reason = $xpath->evaluate('string(ram:ExemptionReason)', $tax);
+			$code = $xpath->evaluate('string(ram:ExemptionReasonCode)', $tax);
+			if ($reason !== '' || $code !== '') {
+				$found[] = [$reason, $code];
+			}
+		}
+
+		return $found;
+	}
+
+	/**
+	 * Read the (schemeID, value) pairs of the ram:GlobalID of a party.
+	 *
+	 * @param	string				$xml	Generated XML
+	 * @param	string				$tag	Local name of the party element
+	 * @return	array<array<string>>		One [schemeID, value] pair per identifier, in document order
+	 */
+	private function partyGlobalIds(string $xml, string $tag)
+	{
+		$doc = new DOMDocument();
+		$this->assertTrue($doc->loadXML($xml), 'generated document is not well-formed XML');
+
+		$found = [];
+		$parties = $doc->getElementsByTagName($tag);
+		if ($parties->length > 0) {
+			foreach ($parties->item(0)->childNodes as $child) {
+				if ($child instanceof DOMElement && $child->localName === 'GlobalID') {
+					$found[] = [$child->getAttribute('schemeID'), $child->nodeValue];
+				}
+			}
+		}
+
+		return $found;
+	}
+
+	/**
 	 * The contract reference (BT-12) is absent from the MINIMUM schema and declared everywhere else.
 	 *
 	 * @return void
@@ -486,6 +758,41 @@ class CIIProfileShapeTest extends CommonClassTest
 				$this->assertNotNull($node);
 				$this->assertSame('CTR-2026-118', $node->getElementsByTagName('IssuerAssignedID')->item(0)->nodeValue, $profile . ' BT-12 value');
 			}
+		}
+	}
+
+	/**
+	 * The order references an invoice carries beyond BT-13 are emitted as invoiced object identifiers
+	 * (BT-18), an element ram:AdditionalReferencedDocument only declares from EN16931 up.
+	 *
+	 * @return void
+	 */
+	public function testAdditionalOrderReferencesFollowTheProfileSchema()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$xml = $protocol->buildXML($this->invoiceDataWithReferences(), $this->baseLinesData(), $profile);
+			$count = $this->countTag($xml, 'ram:AdditionalReferencedDocument');
+
+			if (!in_array($profile, ['EN16931', 'EXTENDED', 'EXTENDEDFR'], true)) {
+				$this->assertSame(0, $count, $profile . ' does not declare ram:AdditionalReferencedDocument in the agreement section');
+				continue;
+			}
+
+			$this->assertSame(2, $count, $profile . ' must carry the two order references BT-13 does not hold');
+
+			$doc = new DOMDocument();
+			$doc->loadXML($xml);
+			$found = [];
+			foreach ($doc->getElementsByTagName('AdditionalReferencedDocument') as $node) {
+				$this->assertSame('130', $node->getElementsByTagName('TypeCode')->item(0)->nodeValue, $profile . ' BT-18 type code');
+				$found[] = $node->getElementsByTagName('IssuerAssignedID')->item(0)->nodeValue;
+			}
+			// The reference already emitted as BT-13 must not be repeated here
+			$this->assertSame(['BC-2026-0008', 'BC-2026-0009'], $found, $profile . ' BT-18 values');
 		}
 	}
 
@@ -560,6 +867,7 @@ class CIIProfileShapeTest extends CommonClassTest
 			$this->assertSame(0, $this->countTag($xml, 'ram:BuyerReference'), $profile . ' must not carry an empty BT-10');
 			$this->assertSame(0, $this->countTag($xml, 'ram:ContractReferencedDocument'), $profile . ' must not carry an empty BT-12');
 			$this->assertSame(0, $this->countTag($xml, 'ram:SpecifiedProcuringProject'), $profile . ' must not carry an empty BT-11');
+			$this->assertSame(0, $this->countTag($xml, 'ram:AdditionalReferencedDocument'), $profile . ' must not carry an empty BT-18');
 		}
 	}
 
@@ -745,6 +1053,78 @@ class CIIProfileShapeTest extends CommonClassTest
 			$xml = $protocol->buildXML($this->baseInvoiceData(), $this->baseLinesData(), $profile);
 
 			$this->assertSame(0, $this->countTag($xml, 'ram:BillingSpecifiedPeriod'), $profile . ' must not carry an empty BG-14');
+		}
+	}
+
+	/**
+	 * XP Z12-014 3.2.19, first option - the one this module follows - marks the deposit reprise line
+	 * with EXT-FR-FE-BG-06: a ram:InvoiceReferencedDocument on the line settlement, whose TypeCode
+	 * (EXT-FR-FE-137) is 386. LineTradeSettlementType declares it from EXTENDED up only, so the other
+	 * profiles must carry none (issue #955).
+	 *
+	 * @return void
+	 */
+	public function testDepositLineCarriesItsInvoiceReference()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$lines = $this->baseLinesData();
+		$lines[0]['isDepositLine'] = true;
+		$lines[0]['depositInvoiceRef'] = 'FA2609-0007';
+		$lines[0]['depositInvoiceDate'] = new DateTime('2026-09-01');
+
+		foreach (CIIProtocol::SUPPORTED_XML_PROFILES as $profile) {
+			$xml = $protocol->buildXML($this->baseInvoiceData(), $lines, $profile);
+
+			$doc = new DOMDocument();
+			$this->assertTrue($doc->loadXML($xml), $profile . ' must produce well-formed XML');
+
+			$xpath = new DOMXPath($doc);
+			$xpath->registerNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
+			$xpath->registerNamespace('qdt', 'urn:un:unece:uncefact:data:standard:QualifiedDataType:100');
+			$refs = $xpath->query('//ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeSettlement/ram:InvoiceReferencedDocument');
+			$this->assertNotFalse($refs);
+
+			if (!in_array($profile, ['EXTENDED', 'EXTENDEDFR'], true)) {
+				$this->assertSame(0, $refs->length, $profile . ' does not declare a line level ram:InvoiceReferencedDocument');
+				continue;
+			}
+
+			$this->assertSame(1, $refs->length, $profile . ' must reference the deposit invoice on the line (EXT-FR-FE-BG-06)');
+
+			$ref = $refs->item(0);
+			$this->assertSame('FA2609-0007', $xpath->evaluate('string(ram:IssuerAssignedID)', $ref), $profile . ' EXT-FR-FE-136');
+			$this->assertSame('386', $xpath->evaluate('string(ram:TypeCode)', $ref), $profile . ' EXT-FR-FE-137 must be 386');
+			$this->assertSame('20260901', $xpath->evaluate('string(ram:FormattedIssueDateTime/qdt:DateTimeString)', $ref), $profile . ' EXT-FR-FE-138');
+		}
+	}
+
+	/**
+	 * A line that is not a deposit reprise carries no reference, and neither does one whose deposit
+	 * invoice could not be read: an empty EXT-FR-FE-136 is refused by BR-FR-01 the way an empty BT-25
+	 * is at document level.
+	 *
+	 * @return void
+	 */
+	public function testNoLineInvoiceReferenceWithoutADepositInvoice()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$withoutRef = $this->baseLinesData();
+		$withoutRef[0]['isDepositLine'] = true;
+		$withoutRef[0]['depositInvoiceRef'] = '';
+		$withoutRef[0]['depositInvoiceDate'] = null;
+
+		foreach (array('EXTENDED', 'EXTENDEDFR') as $profile) {
+			$plain = $protocol->buildXML($this->baseInvoiceData(), $this->baseLinesData(), $profile);
+			$this->assertSame(0, $this->countTag($plain, 'ram:InvoiceReferencedDocument'), $profile . ' must not reference anything on an ordinary line');
+
+			$xml = $protocol->buildXML($this->baseInvoiceData(), $withoutRef, $profile);
+			$this->assertSame(0, $this->countTag($xml, 'ram:InvoiceReferencedDocument'), $profile . ' must not emit an empty EXT-FR-FE-136');
 		}
 	}
 }
