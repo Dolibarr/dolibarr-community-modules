@@ -654,6 +654,9 @@ EINVOICING_AP_PRECHECK_MANUEL=Manual validation
 EINVOICING_AP_PRECHECK_AUTO=Automatic remote validation after e-invoice generation
 EINVOICING_AP_PRECHECK_HELP=After an e-invoice is generated, you can request a remote service provided by your Access Point to check if the invoice is valid.
 EInvoiceBusinessRulesViolations=%s EN 16931 business rule violation(s) found in the generated e-invoice
+# Reference of the despatch advice an invoice bills (BT-16)
+EInvoiceDespatchAdviceReference=Despatch advice reference
+EInvoiceDespatchAdviceReferenceHelp=Reference of the delivery note this invoice bills, sent as BT-16. By default the reference of the first validated shipment linked to the invoice, directly or through its order. Fill it only to send another reference.
 # Lock of an already-transmitted invoice
 EInvoiceAlreadyTransmittedLocked=This invoice has already been transmitted to the Access Point (flow %s). A transmitted invoice is immutable: issue a credit note or a corrective invoice to amend it. You can enable re-sending in the module setup to test the platform retry behavior.
 EINVOICING_ALLOW_RESEND_TRANSMITTED=Allow re-sending an already transmitted invoice
