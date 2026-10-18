@@ -111,7 +111,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 							// Check configuration
 							$result = $einvoicing->checkRequiredinformations($invoiceObject);
-							if ($result['res'] < 0) {			// Error case
+							if ($result['res'] < 0) {			// Technical error case
 								$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
 								dol_syslog(__METHOD__ . " " . $message);
 
@@ -161,18 +161,17 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 							$result = $protocol->generateInvoice($invoiceObject, $outputlangs, $pdfPath);		// Generate E-invoice (embed into the real generated file)
 
-							// $result is the path of the file, or -1: under PHP 8 a path compared to 0 is compared as
-							// a string, and "/..." >= "0" is false, so the configuration warning was never shown.
-							if (!is_numeric($result) || $result >= 0) {
-								if (!defined('NOLOGIN')) {	// If in backoffice context
-									setEventMessages($message, array(), $messagecss);
-								}
-							}
+							// $result is the path of the file, or -1
+							// $message is defined if there was a warning in the check.
 
-							if ($result && (!is_numeric($result) || $result > 0)) {
+							if ($result && (!is_numeric($result) || $result > 0)) {		// generation ok
 								if (!defined('NOLOGIN')) {	// If in backoffice context
 									// No error
 									setEventMessages($langs->trans("EInvoiceGenerated"), array(), 'mesgs');
+
+									if ($message !== '') {
+										setEventMessages($message, array(), $messagecss);
+									}
 
 									// Forward non-blocking size warning from the protocol if any
 									if (!empty($protocol->warnings)) {
@@ -228,7 +227,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 										}
 									}
 								}
-							} else {
+							} else {			// generation failed
 								// What the hook hands back reaches the user only sometimes: up to Dolibarr 22
 								// pdf_sponge copies ->error/->errors and then answers "no error", so the core
 								// reports a success; and $object->warnings is displayed by the "Generate document"
@@ -244,24 +243,27 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 									$this->errors = array_merge($this->errors, $protocol->errors);
 									return -1;
 								} else {
-									if ($result < 0) {
-										// Whether the user is told at all is decided by the core: up to 22 pdf_sponge answers
-										// "no error" whatever the hook returned, and $object->warnings is displayed in one
-										// place only, core/actions_builddoc.inc.php, which has it from 24. So up to 23 the
-										// failure is raised as an error - the only channel that reaches the screen there -
-										// with the warnings collected above merged in, so that none of them is dropped.
-										if ((float) DOL_VERSION < 24) {
-											$this->errors = array_merge($this->errors, $this->warnings, $protocol->errors);
-											$this->warnings = array();
-										} else {
-											// Append to the warnings already collected above (configuration, routability, auto-send),
-											// which starting the merge from $this->errors used to drop.
-											$this->warnings = array_merge($this->warnings, $protocol->errors);	// We want to return the error as a warning.
+									if (!defined('NOLOGIN')) {	// If in backoffice context
+										if ($message !== '') {
+											setEventMessages($message, array(), $messagecss);
 										}
-										return -1;
-									} else {
-										return 0;
 									}
+
+									// Whether the user is told at all is decided by the core: up to 22 pdf_sponge answers
+									// "no error" whatever the hook returned, and $object->warnings is displayed in one
+									// place only, core/actions_builddoc.inc.php, which has it from 24. So up to 23 the
+									// failure is raised as an error - the only channel that reaches the screen there -
+									// with the warnings collected above merged in, so that none of them is dropped.
+									if ((float) DOL_VERSION < 24) {
+										$this->errors = array_merge($this->errors, $this->warnings, $protocol->errors);
+										$this->warnings = array();
+									} else {
+										// Append to the warnings already collected above (configuration, routability, auto-send),
+										// which starting the merge from $this->errors used to drop.
+										$this->warnings = array_merge($this->warnings, $protocol->errors);	// We want to return the error as a warning.
+									}
+
+									return 0;	// We are in case where EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS is off, we must not return an error.
 								}
 							}
 						}
