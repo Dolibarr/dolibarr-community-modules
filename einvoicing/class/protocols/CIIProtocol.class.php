@@ -110,6 +110,17 @@ class CIIProtocol extends AbstractProtocol
 	const MAX_DECIMALS_QUANTITY = 4;
 
 	/**
+	 * What a preceding invoice (BG-3) missing from Dolibarr is known to be: see classifyReferencedInvoice().
+	 */
+	const REFERENCE_DOWN_PAYMENT = 'downpayment';
+	const REFERENCE_UNKNOWN = 'unknown';
+
+	/**
+	 * Invoice type codes (BT-3) of the French list (BR-FR-04) that are a down payment.
+	 */
+	const DOWN_PAYMENT_TYPE_CODES = array('386', '500');
+
+	/**
 	 * @var array<string,string>
 	 */
 	protected $invoiceTemplate;
@@ -873,8 +884,6 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	protected function resolveMissingReferencedDocument($refDoc, $parsedHeader, $socId, $relation, &$return_messages, $reportSkip = true)
 	{
-		global $langs;
-
 		$documentno = (string) ($parsedHeader['documentno'] ?? '');
 
 		// A document naming itself as the invoice it follows has nothing to wait for: the reference
@@ -907,12 +916,9 @@ class CIIProtocol extends AbstractProtocol
 
 		// Nothing is stored while the reference is missing: syncFlow() rolls the import back and the
 		// next synchronization takes the flow again, by then with the deposit in place.
-		$langs->load("bills");
-		$action = $langs->trans('CreateTheMissingSupplierInvoiceToImport', $refDoc);
-		$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?action=create&socid=' . (int) $socId . '&ref_supplier=' . urlencode($refDoc) . '" target="_blank">';
-		$action .= '<i class="fas fa-plus-circle"></i> ';
-		$action .= $langs->trans('NewBill');
-		$action .= '</a>';
+		$isReplacement = $this->getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null) === CommonInvoice::TYPE_REPLACEMENT;
+		$downPayment = !$isReplacement && $this->classifyReferencedInvoice((string) $refDoc, $parsedHeader) === self::REFERENCE_DOWN_PAYMENT;
+		$notice = $this->missingReferencedInvoiceNotice((string) $refDoc, (int) $socId, $parsedHeader, $downPayment);
 
 		return [
 			'res' => -1,
@@ -921,9 +927,67 @@ class CIIProtocol extends AbstractProtocol
 			'actioncode' => 'LINKED_INVOICE_NOT_FOUND',
 			'actionurl' => 'none',
 			'actiondata' => array('supplierref' => $refDoc, 'linkedref' => $documentno, 'socid' => (int) $socId),
-			'action' => $action,
-			'businessmessage' => $langs->trans('CantFindLinkedInvoiceOfTheImportedInvoice', $documentno, $refDoc)
+			'action' => $notice['action'],
+			'businessmessage' => $notice['businessmessage']
 		];
+	}
+
+	/**
+	 * What a preceding invoice (BG-3) missing from Dolibarr is known to be: its TypeCode (EXTENDED) settles it,
+	 * else only the lone reference of a final invoice after a down payment (BR-FR-CO-08: B4, S4, M4) is one.
+	 *
+	 * @param	string				$refDoc			Reference of the missing invoice (BT-25)
+	 * @param	array<string,mixed>	$parsedHeader	Parsed header of the received document
+	 * @return	string								One of the REFERENCE_* constants
+	 */
+	protected function classifyReferencedInvoice(string $refDoc, array $parsedHeader): string
+	{
+		$refDocs = is_array($parsedHeader['invoiceRefDocs'] ?? null) ? $parsedHeader['invoiceRefDocs'] : array();
+		foreach ($refDocs as $refDocEntry) {
+			$typeCode = (string) ($refDocEntry['TypeCode'] ?? '');
+			if ($typeCode !== '' && (string) ($refDocEntry['IssuerAssignedID'] ?? '') === $refDoc) {
+				return in_array($typeCode, self::DOWN_PAYMENT_TYPE_CODES, true) ? self::REFERENCE_DOWN_PAYMENT : self::REFERENCE_UNKNOWN;
+			}
+		}
+
+		$finalInvoiceAfterDownPayment = $this->getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null) === CommonInvoice::TYPE_STANDARD
+			&& in_array((string) ($parsedHeader['businessProcessId'] ?? ''), array('B4', 'S4', 'M4'), true);
+
+		return ($finalInvoiceAfterDownPayment && count($refDocs) === 1) ? self::REFERENCE_DOWN_PAYMENT : self::REFERENCE_UNKNOWN;
+	}
+
+	/**
+	 * Recommended action and message of a flow waiting for an invoice it references.
+	 *
+	 * @param	string				$refDoc			Supplier reference of the missing invoice
+	 * @param	int					$socId			Supplier third party
+	 * @param	array<string,mixed>	$parsedHeader	Parsed header of the received document
+	 * @param	bool				$downPayment	True when the missing invoice is known to be a down payment
+	 * @return	array{action:string,businessmessage:string}	Action, with a button opening the supplier invoice form, and message
+	 */
+	protected function missingReferencedInvoiceNotice(string $refDoc, int $socId, array $parsedHeader, bool $downPayment): array
+	{
+		global $langs;
+
+		$langs->loadLangs(array('bills', 'einvoicing@einvoicing'));
+		$documentno = (string) ($parsedHeader['documentno'] ?? '');
+
+		if ($downPayment) {
+			$alreadyPaid = price($this->depositAnnouncedByDocument($parsedHeader), 0, $langs, 1, -1, -1, (string) ($parsedHeader['invoiceCurrency'] ?? ''));
+			$todo = $langs->transnoentities('CreateTheMissingDownPaymentInvoiceToImport', $refDoc);
+			$message = $langs->transnoentities('CantFindDownPaymentInvoiceOfTheImportedInvoice', $documentno, $refDoc, $alreadyPaid);
+			$typeParam = '&type=' . CommonInvoice::TYPE_DEPOSIT;
+		} else {
+			$todo = $langs->transnoentities('CreateTheMissingSupplierInvoiceToImport', $refDoc);
+			$message = $langs->transnoentities('CantFindLinkedInvoiceOfTheImportedInvoice', $documentno, $refDoc);
+			$typeParam = '';
+		}
+
+		$action = dol_escape_htmltag($todo);
+		$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?action=create' . $typeParam . '&socid=' . ((int) $socId) . '&ref_supplier=' . urlencode($refDoc) . '" target="_blank">';
+		$action .= '<i class="fas fa-plus-circle"></i> ' . $langs->trans('NewBill') . '</a>';
+
+		return array('action' => $action, 'businessmessage' => dol_escape_htmltag($message));
 	}
 
 	/**
@@ -1108,6 +1172,16 @@ class CIIProtocol extends AbstractProtocol
 
 			$supplierInvoice = new FactureFournisseur($db);
 			$supplierInvoice->fetch($supplierInvoiceId);
+
+			// An invoice keyed in by hand has no link yet, and its card offers the lifecycle statuses only with one.
+			$linkId = $einvoicing->fetchExtLinkId($supplierInvoiceId, $supplierInvoice->element);
+			if ($linkId === 0) {
+				$linkId = $einvoicing->insertOrUpdateExtLink($supplierInvoiceId, $supplierInvoice->element, $flowId);
+			}
+			if ($linkId < 0) {
+				dol_syslog(__METHOD__ . ' Failed to link supplier invoice id=' . $supplierInvoiceId . ' to flow ' . $flowId . ': ' . implode(', ', $einvoicing->errors), LOG_ERR);
+				$return_messages[] = 'Failed to link the existing supplier invoice to the flow: ' . implode(', ', $einvoicing->errors);
+			}
 
 			// Supplier invoice already found but may be that documents are downloaded or were removed
 			// Save documents in supplier invoice attachments if they do not exists yet.
@@ -1755,14 +1829,8 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	protected function postponeForMissingLineDocument($lineRefDocId, $lineId, $socId, array $parsedHeader): array
 	{
-		global $langs;
-
 		$documentno = (string) ($parsedHeader['documentno'] ?? '');
-		$langs->loadLangs(array('bills', 'einvoicing@einvoicing'));
-
-		$action = $langs->trans('CreateTheMissingSupplierInvoiceToImport', $lineRefDocId);
-		$action .= ' <a class="butAction small smallpaddingimp nomarginleft" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?action=create&socid=' . $socId . '&ref_supplier=' . urlencode($lineRefDocId) . '" target="_blank">';
-		$action .= '<i class="fas fa-plus-circle"></i> ' . $langs->trans('NewBill') . '</a>';
+		$notice = $this->missingReferencedInvoiceNotice((string) $lineRefDocId, (int) $socId, $parsedHeader, false);
 
 		return array(
 			'res' => -1,
@@ -1771,8 +1839,8 @@ class CIIProtocol extends AbstractProtocol
 			'actioncode' => 'LINKED_INVOICE_NOT_FOUND',
 			'actionurl' => 'none',
 			'actiondata' => array('supplierref' => $lineRefDocId, 'linkedref' => $documentno, 'socid' => $socId),
-			'action' => $action,
-			'businessmessage' => $langs->trans('CantFindLinkedInvoiceOfTheImportedInvoice', $documentno, $lineRefDocId),
+			'action' => $notice['action'],
+			'businessmessage' => $notice['businessmessage'],
 		);
 	}
 
@@ -4850,6 +4918,17 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
+	 * The files a received container carries beside the invoice, in the shape of extractEmbeddedAttachments().
+	 *
+	 * @param  string $file The received document, as the access point returned it
+	 * @return array<int,array{filename:string,mimecode:string,extension:string,content:string}>
+	 */
+	public static function extractContainerAttachments(string $file): array
+	{
+		return array();
+	}
+
+	/**
 	 * Store the files the issuer embedded (BT-125) as attached files of the supplier invoice.
 	 *
 	 * This is what makes them reachable at all: the readers of this module only ever look at the
@@ -4883,11 +4962,7 @@ class CIIProtocol extends AbstractProtocol
 				continue;
 			}
 
-			// Same naming as the other imported files: <ref_supplier>_<suffix>.<ext>
-			$suffix = $attachment['filename'];
-			if (in_array($suffix . '.' . $attachment['extension'], $storednames, true)) {
-				$suffix .= '_' . ((int) $rank + 1);
-			}
+			$suffix = $this->embeddedAttachmentSuffix($attachment['filename'], $attachment['extension'], (int) $rank, $storednames);
 
 			$res = $this->saveEInvoiceFileToSupplierInvoiceAttachment($supplierInvoice, $tempPath, $suffix, $attachment['extension']);
 			if ($res['res'] < 0) {
@@ -4902,6 +4977,26 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		return $stored;
+	}
+
+	/**
+	 * Suffix an embedded attachment is stored under, in the <ref_supplier>_<suffix>.<ext> naming of the other imported files.
+	 *
+	 * @param  string   $filename		Name of the attachment, without extension
+	 * @param  string   $extension		Its extension
+	 * @param  int      $rank			Its rank among the attachments
+	 * @param  string[] $storednames	Names already stored by this import, with extension
+	 * @return string					The name itself, or followed by the rank when another attachment, the received document or its readable view has it
+	 */
+	protected function embeddedAttachmentSuffix(string $filename, string $extension, int $rank, array $storednames): string
+	{
+		// The received document and its readable view are stored after, under these names, and would overwrite it.
+		$reserved = in_array(dol_strtolower($filename), array('einvoice', dol_strtolower(getDolGlobalString('EINVOICING_PDP', 'PDP'))), true);
+		if ($reserved || in_array($filename . '.' . $extension, $storednames, true)) {
+			return $filename . '_' . ($rank + 1);
+		}
+
+		return $filename;
 	}
 
 	/**
@@ -5089,6 +5184,15 @@ class CIIProtocol extends AbstractProtocol
 	protected function storeEmbeddedAttachments($supplierInvoice, $sourceXml, $file, $tempFile, array &$return_messages)
 	{
 		$attachments = static::extractEmbeddedAttachments((string) $sourceXml);
+		$hashes = array();
+		foreach ($attachments as $attachment) {
+			$hashes[] = md5($attachment['content']);
+		}
+		foreach (static::extractContainerAttachments((string) $file) as $attachment) {
+			if (!in_array(md5($attachment['content']), $hashes, true)) {
+				$attachments[] = $attachment;
+			}
+		}
 		if (empty($attachments)) {
 			return;
 		}

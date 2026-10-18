@@ -3244,6 +3244,36 @@ class EInvoicing
 	}
 
 	/**
+	 * Id of the external link record of an object on the current access point
+	 *
+	 * @param int       $elementId      	Linked Element ID
+	 * @param string    $elementType    	Linked Element type
+	 * @return int 							-1 on error, 0 if the object has no record, rowid otherwise
+	 */
+	public function fetchExtLinkId($elementId, $elementType)
+	{
+		global $db;
+
+		$providershort = preg_replace('/ViaPartner/', '', getDolGlobalString('EINVOICING_PDP'));
+
+		$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_extlinks";
+		$sql .= " WHERE element_id = " . (int) $elementId;
+		$sql .= " AND element_type = '" . $db->escape($elementType) . "'";
+		$sql .= " AND provider = '" . $db->escape($providershort) . "'";
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			$this->errors[] = $db->lasterror();
+			return -1;
+		}
+
+		$obj = $db->fetch_object($resql);
+		$db->free($resql);
+
+		return $obj ? (int) $obj->rowid : 0;
+	}
+
+	/**
 	 * Insert or update external link record
 	 *
 	 * @param int       $elementId      	Linked Element ID
@@ -3269,20 +3299,12 @@ class EInvoicing
 			return 0;
 		}
 
-		// Check if record exists
-		$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_extlinks";
-		$sql .= " WHERE element_id = " . (int) $elementId;
-		$sql .= " AND element_type = '" . $db->escape($elementType) . "'";
-		$sql .= " AND provider = '" . $db->escape($providershort) . "'";
-
-		$resql = $db->query($sql);
-		if (!$resql) {
-			$this->errors[] = $db->lasterror();
+		$linkId = $this->fetchExtLinkId($elementId, $elementType);
+		if ($linkId < 0) {
 			return -1;
 		}
 
-		$exists = $db->num_rows($resql) > 0;
-		$db->free($resql);
+		$exists = $linkId > 0;
 		if ($exists) {
 			// Update existing record
 			$sql = "UPDATE " . $db->prefix() . "einvoicing_extlinks SET";
