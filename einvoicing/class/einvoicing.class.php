@@ -579,6 +579,13 @@ class EInvoicing
 	const EXTRAFIELD_TOTALS_MISMATCH = 'import_totals_mismatch';
 
 	/**
+	 * Name, into llx_einvoicing_extrafields, of the note left on a supplier invoice whose EXTENDED document
+	 * announces its VAT rounded per rate while its totals add up the VAT rounded per line. Holds both VAT
+	 * totals, so the card can tell why the invoice differs from BT-110 (issue #1166).
+	 */
+	const EXTRAFIELD_VAT_ROUNDED_PER_LINE = 'import_vat_rounded_per_line';
+
+	/**
 	 * Name, into llx_einvoicing_extrafields, of the order reference the supplier declared on the
 	 * invoice it sent (BT-13). Kept whether or not it matched a purchase order of Dolibarr.
 	 */
