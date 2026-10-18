@@ -3367,6 +3367,12 @@ class CIIProtocol extends AbstractProtocol
 				$doc->createElement('ram:SellerAssignedID', einvoicingXmlText((string) $line['prodsellerid']))
 			);
 		}
+		// BT-156, the buyer's own code for the item. Absent from the BASIC schema of the product.
+		if ($this->isEn16931Profile($profile) && trim((string) ($line['prodbuyerid'] ?? '')) !== '') {
+			$prod->appendChild(
+				$doc->createElement('ram:BuyerAssignedID', einvoicingXmlText((string) $line['prodbuyerid']))
+			);
+		}
 		$prod->appendChild($doc->createElement('ram:Name', einvoicingXmlText($line['prodname'])));
 		if (!empty($line['proddesc'])) {
 			$prod->appendChild($doc->createElement('ram:Description', einvoicingXmlText($line['proddesc'])));
