@@ -1501,15 +1501,17 @@ trait CommonProtocol
 		}
 
 		// Text Search using prodname
-		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
-		$sql .= " WHERE label = '" . $db->escape(trim(dol_substr((string) ($lineData['prodname'] ?? ''), 0, 255))) . "'";
-		$sql .= " AND entity IN (" . getEntity('product') . ")";
-		$resql = $db->query($sql);
-		if ($resql) {
-			if ($db->num_rows($resql) === 1) {
-				$obj = $db->fetch_object($resql);
-				dol_syslog(__METHOD__ . ' Found product by text search: ' . $obj->rowid);
-				return array('res' => $obj->rowid, 'message' => 'Product found by text search');
+		if ($searchname !== '') {
+			$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
+			$sql .= " WHERE label = '" . $db->escape(trim(dol_substr((string) ($lineData['prodname'] ?? ''), 0, 255))) . "'";
+			$sql .= " AND entity IN (" . getEntity('product') . ")";
+			$resql = $db->query($sql);
+			if ($resql) {
+				if ($db->num_rows($resql) === 1) {
+					$obj = $db->fetch_object($resql);
+					dol_syslog(__METHOD__ . ' Found product by text search: ' . $obj->rowid);
+					return array('res' => $obj->rowid, 'message' => 'Product found by text search');
+				}
 			}
 		}
 
@@ -1692,8 +1694,11 @@ trait CommonProtocol
 			return $resFind;
 		}
 
+		// A line built from the VAT breakdown has nothing to create a product from: only a default product resolves it.
+		$isVatBreakdownLine = !empty($lineData['vatBreakdownLine']);
+
 		// If no match found after all steps: Create new product
-		if (getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_GENERATION')) {
+		if (!$isVatBreakdownLine && getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_GENERATION')) {
 			// Auto-create product
 			$product = new Product($db);
 			$product->type 		= $this->_detectProductTypeFromEinvoiceLine($lineData);
@@ -1757,7 +1762,7 @@ trait CommonProtocol
 			dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Auto-creation of products is disabled', LOG_ERR);
 
 			// Free line mode: import the line without linking any product (res=0 signals the protocol to set desc from XML)
-			if (getDolGlobalInt('EINVOICING_IMPORT_AS_FREE_LINES')) {
+			if (!$isVatBreakdownLine && getDolGlobalInt('EINVOICING_IMPORT_AS_FREE_LINES')) {
 				dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Free line mode: importing without product link', LOG_DEBUG);
 				return array('res' => 0, 'message' => 'Product not found, line imported as free description line (no product link)');
 			}
@@ -1836,6 +1841,9 @@ trait CommonProtocol
 			$btnStyle = 'display:inline-block;width:auto;';
 
 			$action = '<div class="marginbottomonly opacitymedium">' . $langs->trans('SuggestedActionsIntro') . '</div>';
+			if ($isVatBreakdownLine) {
+				$action .= '<div class="marginbottomonly">' . $langs->trans('EInvoiceNoLineNeedsDefaultProduct') . '</div>';
+			}
 
 
 			// First choice: create a new product manually
