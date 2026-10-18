@@ -576,6 +576,7 @@ function stancerAuditFix($paiementId, $db, $user, $stancerApi)
 	$sqlTarget = "SELECT rowid, ref, fk_soc, fk_statut, paye, total_ttc";
 	$sqlTarget .= " FROM " . MAIN_DB_PREFIX . "facture";
 	$sqlTarget .= " WHERE ref = '" . $db->escape($apiOrderId) . "' AND fk_statut >= 1";
+	$sqlTarget .= " AND entity IN (" . getEntity('invoice') . ")";
 	$sqlTarget .= " ORDER BY rowid LIMIT 1";
 	$resTarget = $db->query($sqlTarget);
 	if (!$resTarget) {

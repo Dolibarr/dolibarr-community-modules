@@ -66,7 +66,12 @@ $user = new User($db);
 $resql = $db->query("SELECT rowid FROM " . MAIN_DB_PREFIX . "user WHERE admin = 1 AND statut = 1 ORDER BY rowid ASC");
 if ($resql && $obj = $db->fetch_object($resql)) {
 	$user->fetch($obj->rowid);
-	$user->getrights();
+	// User::loadRights() only exists from Dolibarr 19 on, older versions name it getrights()
+	if (method_exists($user, 'loadRights')) {
+		$user->loadRights();
+	} else {
+		$user->getrights();
+	}
 } else {
 	fwrite(STDERR, "no active admin user on this instance\n");
 	exit(2);

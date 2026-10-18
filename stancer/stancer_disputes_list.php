@@ -76,7 +76,7 @@ $massaction = (string) GETPOST('massaction', 'alpha');
 $show_files = (int) GETPOST('show_files', 'int');
 $confirm    = (string) GETPOST('confirm', 'alpha');
 $cancel     = (string) GETPOST('cancel', 'alpha');
-$toselect   = (string) GETPOST('toselect', 'array');
+$toselect   = (array) GETPOST('toselect', 'array');
 $contextpage = (string) GETPOST('contextpage', 'aZ') ? GETPOST('contextpage', 'aZ') : str_replace('_', '', basename(dirname(__FILE__)).basename(__FILE__, '.php'));
 $backtopage = (string) GETPOST('backtopage', 'alpha');
 $optioncss  = (string) GETPOST('optioncss', 'aZ');
@@ -229,7 +229,13 @@ if (empty($reshook)) {
 }
 
 if ($action == "refreshall") {
+	stancerCheckWriteActionAllowed($permissiontoadd, 'disputes_list refreshall');
 	$res = stancerRefreshAllDisputes();
+	if (!empty($res->error)) {
+		setEventMessages($res->error, null, 'errors');
+	} elseif (!empty($res->message)) {
+		setEventMessages($res->message, null, 'mesgs');
+	}
 }
 
 

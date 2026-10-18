@@ -612,7 +612,7 @@ function stancerRefreshOneRefund($id)
 
 	// $sp = new Stancer_payouts($db);
 	try {
-		$stancerApi = StancerApi::getInstance();
+		$stancerApi = new StancerApi();
 		// $res = $sp->fetch(null, null, $id);
 		$json = $stancerApi->getRefund($id);
 		if ($json === false) {
@@ -777,6 +777,8 @@ function stancerRefreshAllRefunds($userMessage = true, $lastrun = null)
 
 		foreach ($refunds as $refundData) {
 			$counter++;
+			// Reset per refund: the mail track id must never point at the previous refund's invoice
+			$reopenRes = null;
 			$refundId = isset($refundData['id']) ? $refundData['id'] : '';
 			if (empty($refundId)) {
 				dol_syslog("stancerRefreshAllRefunds skipping entry with no id", LOG_WARNING);
@@ -1051,7 +1053,7 @@ function stancerRefreshAllDisputes($userMessage = true, $lastrun = null)
 						if (is_object($reopenRes)) {
 							$invoiceRef = $reopenRes->ref;
 							$invoiceUrl = getDolGlobalString('MAIN_URL_ROOT', '') . '/compta/facture/card.php?facid=' . $reopenRes->id;
-							$invoiceRefWithLink = '<a href="' . $invoiceUrl . '">' . $invoiceRef . '</a>';
+							$invoiceRefWithLink = '<a href="' . dol_escape_htmltag($invoiceUrl) . '">' . dol_escape_htmltag($invoiceRef) . '</a>';
 						}
 						$sepaCode = !empty($sd->response) ? $sd->response : '-';
 						$disputeTrackid = is_object($reopenRes) ? 'inv' . $reopenRes->id : (!empty($sd->fk_soc) ? 'thi' . $sd->fk_soc : '');
@@ -1060,8 +1062,9 @@ function stancerRefreshAllDisputes($userMessage = true, $lastrun = null)
 							$langs->transnoentitiesnoconv('StancerMailSubjectNewDispute', $sd->dispute_type, $invoiceRef, $clientName, $disputeAmount),
 							// transnoentitiesnoconv() sprintf's over five parameters at most, so the
 							// two remaining fields live in their own key.
-							$langs->transnoentitiesnoconv('StancerMailNewDispute', $clientName, $invoiceRefWithLink, $disputeAmount, $sd->dispute_type, $sd->status)
-								. $langs->transnoentitiesnoconv('StancerMailNewDisputeDetails', $sepaCode, $disputeId),
+							// The body is HTML: every value coming from the API or the database is escaped
+							$langs->transnoentitiesnoconv('StancerMailNewDispute', dol_escape_htmltag($clientName), $invoiceRefWithLink, $disputeAmount, dol_escape_htmltag((string) $sd->dispute_type), dol_escape_htmltag((string) $sd->status))
+								. $langs->transnoentitiesnoconv('StancerMailNewDisputeDetails', dol_escape_htmltag($sepaCode), dol_escape_htmltag((string) $disputeId)),
 							false, '', $disputeTrackid
 						);
 					}
@@ -1191,7 +1194,7 @@ function stancerCreateRefund($paymentStancerId, $amount = null)
 	}
 
 	try {
-		$stancerApi = StancerApi::getInstance();
+		$stancerApi = new StancerApi();
 
 		// Get the payment from Stancer
 		$paymentData = $stancerApi->getPayment($paymentStancerId);

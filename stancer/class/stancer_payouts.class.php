@@ -664,7 +664,8 @@ class Stancer_payouts extends CommonObject
 		$label .= '<br>';
 		$label .= '<b>'.$langs->trans('Ref').':</b> '.$this->ref;
 
-		$url = dol_buildpath('/stancer/stancer_payouts_card.php', 1).'?id='.$this->id;
+		// No card page in the module: link to the list filtered on this record
+		$url = dol_buildpath('/stancer/stancer_payouts_list.php', 1).'?search_payout_id='.urlencode((string) $this->payout_id);
 
 		if ($option != 'nolink') {
 			// Add param to save lastsearch_values or not
@@ -882,9 +883,8 @@ class Stancer_payouts extends CommonObject
 	 */
 	public function info($id)
 	{
-		$sql = "SELECT rowid,";
-		$sql .= " date_creation as datec, tms as datem,";
-		$sql .= " fk_user_creat, fk_user_modif";
+		// The payouts table only carries tms: no creation date nor author columns
+		$sql = "SELECT rowid, tms as datem";
 		$sql .= " FROM ".MAIN_DB_PREFIX.$this->table_element." as t";
 		$sql .= " WHERE t.rowid = ".((int) $id);
 
@@ -894,21 +894,12 @@ class Stancer_payouts extends CommonObject
 				$obj = $this->db->fetch_object($result);
 
 				$this->id = $obj->rowid;
-
-				$this->user_creation_id = $obj->fk_user_creat;
-				$this->user_modification_id = $obj->fk_user_modif;
-				if (!empty($obj->fk_user_valid)) {
-					$this->user_validation_id = $obj->fk_user_valid;
-				}
-				$this->date_creation     = $this->db->jdate($obj->datec);
 				$this->date_modification = empty($obj->datem) ? '' : $this->db->jdate($obj->datem);
-				if (!empty($obj->datev)) {
-					$this->date_validation   = empty($obj->datev) ? '' : $this->db->jdate($obj->datev);
-				}
 			}
 
 			$this->db->free($result);
 		} else {
+			dol_syslog(__METHOD__ . " " . $this->db->lasterror(), LOG_ERR);
 			dol_print_error($this->db);
 		}
 	}
@@ -1012,83 +1003,6 @@ class Stancer_payouts extends CommonObject
 	}
 
 	/**
-	 * Action executed by scheduler
-	 * CAN BE A CRON TASK. In such a case, parameters come from the schedule job setup field 'Parameters'
-	 * Use public function doScheduledJob($param1, $param2, ...) to get parameters
-	 *
-	 * @return	int			0 if OK, <>0 if KO (this function is used also by cron so only 0 is OK)
-	 */
-	public function doScheduledJob()
-	{
-		global $conf, $langs;
-
-		//$conf->global->SYSLOG_FILE = 'DOL_DATA_ROOT/dolibarr_mydedicatedlofile.log';
-
-		$error = 0;
-		$this->output = '';
-		$this->error = '';
-
-		dol_syslog(__METHOD__, LOG_DEBUG);
-
-		$now = dol_now();
-
-		$this->db->begin();
-
-		// ...
-
-		$this->db->commit();
-
-		return $error;
-	}
-
-	/**
-	 * fill object data from Stancer Payout
-	 *
-	 * @deprecated Use fillDataFromApi() instead
-	 * @param   mixed $payout Stancer Payout object (deprecated)
-	 * @return  void
-	 */
-	public function fillData($payout)
-	{
-		global $conf;
-		$this->entity = $conf->entity;
-		$data = null;
-
-		//joel astuce
-		$res = $payout->populate()->get();
-		// if($payout->getId() == "pout_W1PpmCVl8CUfiRty3BbHRCVl") {
-		// print "<p>RES = " . json_encode($payout->getFees()) . "</p>";
-		// print json_encode($payout);exit;
-		// }
-		try {
-			$data = [
-				'payout_id' => $payout->getId(),
-				'amount' => $res['payments']['amount'] ?? $res['total'], //en attendant d'avoir $payout->getAmount(),
-				'currency' => $payout->getCurrency(),
-				'status' => $payout->getStatus(),
-				'date_creation' => $payout->getCreated(),
-				'date_bank' => $payout->getDateBank(),
-				'live_mode' => getDolGlobalString('STANCER_IS_PROD', '0'),
-				'date_paym' => $payout->getDatePaym(),
-				'details' => $payout->getDetails(),
-				// 'payments' => $payout->getPayments(),
-				// 'refunds' => $payout->getRefunds(),
-				// 'disputes' => $payout->getDisputes(),
-				'statement_description' => $payout->getStatementDescription(),
-				'fees' => $payout->getFees(),
-				//champ calculé
-				'amount_net' => $res['payments']['amount'] - $payout->getFees()
-			];
-		} catch (Exception $e) {
-			$message = $e->getMessage();
-			dol_syslog("StancerPayout::fillData exception occurs for payout " . json_encode($payout), LOG_ERR);
-		}
-		// print "<p>" . json_encode($data) . "</p>";
-
-		$this->fillDataArray($data);
-	}
-
-	/**
 	 * Copy an associative array of Stancer values into the object properties
 	 *
 	 * @param	array	$array	Key/value pairs coming from the Stancer API or from the local table
@@ -1180,9 +1094,7 @@ class Stancer_payouts extends CommonObject
 			'amount' => $grossAmount,
 			'currency' => isset($apiData['currency']) ? $apiData['currency'] : '',
 			'status' => isset($apiData['status']) ? $apiData['status'] : '',
-			'date_creation' => isset($apiData['created']) ? $apiData['created'] : (isset($apiData['date']) ? $apiData['date'] : null),
 			'date_bank' => isset($apiData['date_bank']) ? $apiData['date_bank'] : null,
-			'live_mode' => getDolGlobalString('STANCER_IS_PROD', '0'),
 			'date_paym' => isset($apiData['date_paym']) ? $apiData['date_paym'] : null,
 			'details' => isset($apiData['details']) ? $apiData['details'] : null,
 			'payments' => isset($apiData['payments']) ? $apiData['payments'] : null,
@@ -1227,7 +1139,7 @@ class Stancer_payouts extends CommonObject
 			return price((float) $object / 100);
 		}
 		if ($key == 'payout_id') {
-				$linkExternal = "<a href='https://manage.stancer.com/fr/details-du-reversement?id=" . $object . "' target='_stancer'>" . img_picto($langs->trans('ShowInStancer'), 'globe') . " " . $object . "</a>";
+				$linkExternal = "<a href='https://manage.stancer.com/fr/details-du-reversement?id=" . urlencode((string) $object) . "' target='_stancer' rel='noopener noreferrer'>" . img_picto($langs->trans('ShowInStancer'), 'globe') . " " . dol_escape_htmltag((string) $object) . "</a>";
 				$linkRaw = '';
 			if (getDolGlobalString('STANCER_SHOW_RAW_API_PICTO', '0') == '1') {
 				$linkRaw = " <a href='#' class='stancer-raw-link' data-stancer-type='payout' data-stancer-id='" . dol_escape_htmltag($object) . "' title='" . dol_escape_htmltag($langs->trans('ShowRawApiResponse')) . "'>" . img_picto($langs->trans('ShowRawApiResponse'), 'search') . "</a>";

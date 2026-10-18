@@ -23,6 +23,73 @@
  */
 
 /**
+ * Convert a date received from the Stancer API (unix timestamp or date string)
+ * into a DateTime, without ever throwing.
+ *
+ * @param   int|string|null  $value  Date from the API
+ * @return  DateTime|null            Null when empty or not parsable
+ */
+function stancerApiDate($value)
+{
+	if ($value === null || $value === '') {
+		return null;
+	}
+	try {
+		return is_numeric($value) ? new DateTime('@' . $value) : new DateTime((string) $value);
+	} catch (Exception $e) {
+		dol_syslog("stancerApiDate: unparsable date from the API: " . $value, LOG_WARNING);
+		return null;
+	}
+}
+
+/**
+ * Net amount of a payout in EUR: API v2 'amount' (refunds, disputes and fees
+ * already deducted), API v1 'total' as fallback.
+ *
+ * @param   array  $payout  Payout as returned by the API
+ * @return  float           Amount, 0 when absent or not positive
+ */
+function stancerPayoutNetAmount($payout)
+{
+	$netCents = 0;
+	if (isset($payout['amount'])) {
+		$netCents = (int) $payout['amount'];
+	} elseif (isset($payout['total'])) {
+		$netCents = (int) $payout['total'];
+	}
+
+	return $netCents > 0 ? $netCents / 100.0 : 0.0;
+}
+
+/**
+ * Validate a draft object before recording a payment on it. Facture has
+ * validate(), Commande and Propal only valid() on the supported versions.
+ *
+ * @param   object  $obj   Invoice, order or proposal
+ * @param   User    $user  User validating
+ * @return  int            >0 when validated, <0 on error
+ */
+function stancerValidateDraftForPayment($obj, $user)
+{
+	if ($obj instanceof Facture && method_exists($obj, 'validate')) {
+		$res = $obj->validate($user);
+	} elseif (method_exists($obj, 'valid')) {
+		$res = $obj->valid($user);
+	} elseif (method_exists($obj, 'validate')) {
+		$res = $obj->validate($user);
+	} else {
+		dol_syslog("stancerValidateDraftForPayment: " . get_class($obj) . " " . ($obj->ref ?? '') . " cannot be validated", LOG_ERR);
+		return -1;
+	}
+	if ($res <= 0) {
+		dol_syslog("stancerValidateDraftForPayment: validation of " . get_class($obj) . " " . ($obj->ref ?? '') . " failed: " . ($obj->error ?? ''), LOG_ERR);
+		return -1;
+	}
+
+	return 1;
+}
+
+/**
  * les vieux paiements brouillons de plus de 1 mois -> supprimer de la base locale
  *
  * @return  stdClass  Report object, ->error is set when a write failed
@@ -229,10 +296,10 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 
 			$datebank = null;
 			if (isset($paymentData['date_bank']) && $paymentData['date_bank'] !== '') {
-				$datebank = is_numeric($paymentData['date_bank']) ? new DateTime('@' . $paymentData['date_bank']) : new DateTime($paymentData['date_bank']);
+				$datebank = stancerApiDate($paymentData['date_bank']);
 			}
 			if (empty($datebank) && !empty($paymentData['date_paym'])) {
-				$datebank = is_numeric($paymentData['date_paym']) ? new DateTime('@' . $paymentData['date_paym']) : new DateTime($paymentData['date_paym']);
+				$datebank = stancerApiDate($paymentData['date_paym']);
 			}
 
 			$listOfPaidStatus = array('captured', 'capture_sent');
@@ -492,13 +559,13 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 		$json = $paymentData;
 		$datebank = null;
 		if (isset($paymentData['date_bank']) && $paymentData['date_bank'] !== '') {
-			$datebank = is_numeric($paymentData['date_bank']) ? new DateTime('@' . $paymentData['date_bank']) : new DateTime($paymentData['date_bank']);
+			$datebank = stancerApiDate($paymentData['date_bank']);
 		}
 
 		// May be something else than invoices (a membership for instance)
 		$label = stancerChangeBankLabel($obj);
 		if (empty($datebank) && !empty($json['date_paym'])) {
-			$datebank = is_numeric($json['date_paym']) ? new DateTime('@' . $json['date_paym']) : new DateTime($json['date_paym']);
+			$datebank = stancerApiDate($json['date_paym']);
 		}
 		//exclure les refused etc. -> isDefinitivePaid
 		//UPDATE llx_stancer_stancer_payments SET stancer_id='paym_WtVIw1BeAIpxgpqSyvQn3Qvz', amount=1000, fee=14, currency='eur', description='Paiement de la commande ou facture FA2304-1134', order_id='FA2304-1134', unique_id='INV=1408.CUS=', method='sepa', card='', sepa='sepa\
@@ -520,8 +587,8 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 		if ($datebank && ($amount > 0) && in_array($paymentStatus, $listOfPaidStatus)) {
 			//warning, payment only on validated object !
 			//status = 0 -- draft
-			if ($obj->status == 0 && $obj->validate($user) < 0) {
-				dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId validate failed on $objRef: " . $obj->error, LOG_ERR);
+			if ($obj->status == 0 && stancerValidateDraftForPayment($obj, $user) < 0) {
+				dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId validate failed on $objRef", LOG_ERR);
 			}
 
 			$date = (string) $datebank->format("Y-m-d");
@@ -728,7 +795,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 			$existingSummary = $actioncommCheckSummary->getActions($obj->socid, $obj->id, $obj->element, " AND code='AC_" . $db->escape($cronSummaryCode) . "'");
 
 			if (empty($existingSummary)) {
-				$urlPayment = "<a href='https://manage.stancer.com/fr/details-de-paiement?id=" . $paymentId . "'>" . $paymentId . "</a>";
+				$urlPayment = stancerBuildManagerLink($paymentId, $paymentId);
 				$amountEur = price($amount / 100);
 				$urlObj = stancerObjectUrlForMail($obj);
 
@@ -736,7 +803,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 				// $datebank can legitimately be null when the Stancer API returns no date_bank / date_paym
 				// (typical for failed / refused payments). Use a placeholder rather than crashing.
 				$datebankStr = ($datebank instanceof DateTime) ? $datebank->format('Y-m-d H:i:s') : '';
-				$output->error .= $urlPayment . ";" . $urlObj . ";" . $amountEur . "€;" . $paymentStatus . ";" . $datebankStr . ";\n";
+				$output->error .= $urlPayment . ";" . $urlObj . ";" . $amountEur . "€;" . dol_escape_htmltag($paymentStatus) . ";" . $datebankStr . ";\n";
 				$output->data[$obj->ref] = [
 					'amount' => $amount,
 					'errorMessage' => "do not insert paiement",
@@ -1071,7 +1138,7 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 			$dateBankTimestamp = isset($payment['date_bank']) ? $payment['date_bank'] : (isset($payment['date_paym']) ? $payment['date_paym'] : null);
 			$datebank = null;
 			if ($dateBankTimestamp) {
-				$datebank = is_numeric($dateBankTimestamp) ? new DateTime('@' . $dateBankTimestamp) : new DateTime($dateBankTimestamp);
+				$datebank = stancerApiDate($dateBankTimestamp);
 			}
 
 			$label = stancerChangeBankLabel($obj);
@@ -1195,10 +1262,10 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 						stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''), $langs->transnoentitiesnoconv('StancerMailSubjectPaymentError', (string) $obj->ref, price($amount / 100)), $langs->transnoentitiesnoconv('StancerMailPaymentError', price($amount / 100), $refUrl, $customerName, $statusUrl), false, '', $objTrackid);
 					}
 					dol_syslog("stancerRefreshAllPayments do not insert paiement : status=" . $paymentStatus . ", amount=$amount, date=" . json_encode($datebank), LOG_WARNING);
-					$urlPayment = "<a href='https://manage.stancer.com/fr/details-de-paiement?id=" . $paymentId . "'>" . $paymentId . "</a>";
+					$urlPayment = stancerBuildManagerLink($paymentId, $paymentId);
 					$amountEur = price($amount / 100);
 					$urlObj = stancerObjectUrlForMail($obj);
-					$output->error .= $urlPayment . ";" . $urlObj . ";" . $amountEur . ";" . $paymentStatus . ";" . ($datebank ? $datebank->format('Y-m-d H:i:s') : '') . ";\n";
+					$output->error .= $urlPayment . ";" . $urlObj . ";" . $amountEur . ";" . dol_escape_htmltag($paymentStatus) . ";" . ($datebank ? $datebank->format('Y-m-d H:i:s') : '') . ";\n";
 
 					stancerAddActionComm($obj, $cronSummaryCode, $langs->transnoentitiesnoconv('StancerCronSummaryReported', (string) $obj->ref, $paymentStatus, price($amount / 100)), $langs->transnoentitiesnoconv('StancerCronSummaryReportedDesc', $paymentId, $paymentStatus, price($amount / 100)), array(), '');
 				} else {
@@ -1373,13 +1440,7 @@ function stancerRefreshAllPayoutsFromStancer($userMessage = true, $lastrun = nul
 			// Get real net amount received on bank account from API v2 response.
 			// v2 uses 'amount' (already nets refunds, disputes, fees, fees_vat).
 			// v1 used 'total'. Fallback keeps backwards compat.
-			$netCents = 0;
-			if (isset($payout['amount'])) {
-				$netCents = (int) $payout['amount'];
-			} elseif (isset($payout['total'])) {
-				$netCents = (int) $payout['total'];
-			}
-			$amount = $netCents > 0 ? $netCents / 100 : 0;
+			$amount = stancerPayoutNetAmount($payout);
 
 			// Get dates from API response. v2 exposes 'date' (unix ts), v1 exposed 'created'.
 			$dateo = null;
@@ -1537,13 +1598,7 @@ function stancerRefreshOnePayout($payoutID, $userMessage = true, $lastrun = null
 	// Get real net amount received on bank account from API v2 response.
 	// v2 uses 'amount' (already nets refunds, disputes, fees, fees_vat).
 	// v1 used 'total'. Fallback keeps backwards compat.
-	$netCents = 0;
-	if (isset($payout['amount'])) {
-		$netCents = (int) $payout['amount'];
-	} elseif (isset($payout['total'])) {
-		$netCents = (int) $payout['total'];
-	}
-	$amount = $netCents > 0 ? $netCents / 100 : 0;
+	$amount = stancerPayoutNetAmount($payout);
 
 	// Get dates from API response. v2 exposes 'date' (unix ts), v1 exposed 'created'.
 	$dateo = null;
@@ -1683,10 +1738,7 @@ function stancerRefreshAllPayoutsFromDolibarr($userMessage = true, $lastrun = nu
 				$label = "(BankTransfer)";
 				//Ajout des virements de compte à compte ...
 
-				$amount = 0;
-				if (isset($payoutData['total']) && $payoutData['total'] > 0) {
-					$amount = $payoutData['total'] / 100;
-				}
+				$amount = stancerPayoutNetAmount($payoutData);
 
 				$dateo = isset($payoutData['created']) ? (string) $payoutData['created'] : '';
 				// Empty string and not null: the consumers (stancerAddTransfertFromAccountToAccount,

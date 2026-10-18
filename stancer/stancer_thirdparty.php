@@ -64,7 +64,7 @@ if (!$res) {
 dol_include_once('/stancer/lib/stancer.lib.php');
 
 // Load translation files required by the page
-$langs->loadLangs(array("stancer@stancer"));
+$langs->loadLangs(array("errors", "stancer@stancer"));
 
 $action = GETPOST('action', 'aZ09');
 
@@ -81,6 +81,10 @@ if (isset($user->socid) && $user->socid > 0) {
 
 $societe = new Societe($db);
 $socresult = $societe->fetch($socid);
+if ($socresult <= 0) {
+	dol_syslog("stancer_thirdparty: thirdparty " . $socid . " not found (fetch returned " . $socresult . ")", LOG_WARNING);
+	accessforbidden($langs->trans('ErrorRecordNotFound'), 0);
+}
 
 if (empty($action) && empty($objid)) {
 	$action = 'view';
@@ -113,14 +117,22 @@ if (!isModEnabled("stancer")) {
 if (!$permissiontoread) {
 	accessforbidden();
 }
+// The tab shows IBAN, BIC and RUM: the thirdparty access rules of the user apply
+restrictedArea($user, 'societe', $socid, '&societe');
 
 // M4: every write action (create/delete SEPA mandate, push a RIB to Stancer,
 // take a payment, refresh/delete the Stancer account) must require the write
 // permission. Guard them centrally so a read-only user or a forged request
 // cannot elevate read -> write. Log the refusal (no silent failure).
-$stancerWriteActions = array('stancertakepayment', 'add', 'addsepa', 'deletesepa', 'refreshStancerAccount', 'deleteStancerAccount');
+$stancerWriteActions = array('stancertakepayment', 'add', 'addsepa', 'deletesepa', 'refreshStancerAccount', 'deleteStancerAccount', 'syncsepa');
 if (in_array($action, $stancerWriteActions, true) && !$permissiontoadd) {
 	dol_syslog("stancer_thirdparty: write action '" . $action . "' denied for user " . (int) $user->id . " without write permission", LOG_WARNING);
+	accessforbidden();
+}
+// The core does not enforce the token on these action names, and stancertakepayment
+// charges the customer on a GET: check it here.
+if (in_array($action, $stancerWriteActions, true) && (GETPOST('token', 'alpha') === '' || GETPOST('token', 'alpha') !== currentToken())) {
+	dol_syslog("stancer_thirdparty: write action '" . $action . "' denied for user " . (int) $user->id . ", missing or invalid token", LOG_WARNING);
 	accessforbidden();
 }
 
@@ -143,8 +155,8 @@ if ($action == "stancertakepayment") {
 	$companypaymentmode = new CompanyPaymentModeStancer($db);
 	$res = $companypaymentmode->fetch((int) GETPOST('companymodeid', 'int'));     // Read into llx_societe_rib
 
-	if ($companypaymentmode->id > 0) {
-		$result = $stancer->doTakePaymentStancer(0, 0, $socid);
+	if ($companypaymentmode->id > 0 && (int) $companypaymentmode->fk_soc === $socid) {
+		$result = $stancer->doTakePaymentStancer(0, 0, $socid, true, (int) $companypaymentmode->id);
 		if ($result > 0) {
 			$error = $stancer->error . "::" . $stancer->output;
 			$errors = $stancer->errors;
@@ -154,6 +166,7 @@ if ($action == "stancertakepayment") {
 		}
 	} else {
 		$error = 'Failed to fetch company payment mode for id '.GETPOST('companymodeid', 'int');
+		dol_syslog("stancer_thirdparty: " . $error . " of thirdparty " . $socid, LOG_ERR);
 		setEventMessages($error, [], 'errors');
 	}
 }
@@ -259,10 +272,11 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 	if ($res > 0) {
 		$stancerAccountOk = true;
 		print "<ul>\n";
-		print "  <li>" . $langs->trans("Name") . ": " . $companypaymentmode->proprio . "</li>\n";
+		print "  <li>" . $langs->trans("Name") . ": " . dol_escape_htmltag($companypaymentmode->proprio) . "</li>\n";
 		print "  <li>" . $langs->trans("DateCreation") . ": " . dol_print_date($companypaymentmode->datec) . "</li>\n";
-		print "  <li>" . $langs->trans("StancerAccountID") . ": <a href='https://manage.stancer.com/fr/details-du-clients?id=" . trim($companypaymentmode->stancer_account, '"') . "' target='_blank'>" . trim($companypaymentmode->stancer_account, '"') . "</a></li>\n";
-		print "  <li><a href='".$_SERVER["PHP_SELF"]."?socid=$socid&action=deleteStancerAccount&stancerid=" . trim($companypaymentmode->stancer_account, '"') . "&token=" . newToken()."'>" . $langs->trans("StancerAccountDeleteLink") ."</a></li>\n";
+		$stancerAccountId = trim($companypaymentmode->stancer_account, '"');
+		print "  <li>" . $langs->trans("StancerAccountID") . ': <a href="https://manage.stancer.com/fr/details-du-clients?id=' . urlencode($stancerAccountId) . '" target="_blank" rel="noopener noreferrer">' . dol_escape_htmltag($stancerAccountId) . "</a></li>\n";
+		print '  <li><a href="' . $_SERVER["PHP_SELF"] . '?socid=' . $socid . '&action=deleteStancerAccount&stancerid=' . urlencode($stancerAccountId) . '&token=' . newToken() . '">' . $langs->trans("StancerAccountDeleteLink") . "</a></li>\n";
 		// print "  <li><a href='".$_SERVER["PHP_SELF"]."?socid=$socid&action=refreshStancerAccount&stancerid=" . trim($companypaymentmode->stancer_account, '"') . "'>" . $langs->trans("StancerForceRefreshAccount") ."</a></li>\n";
 		// print "  <li>" . $companypaymentmode-> . "</li>\n";
 		// print "  <li>" . $companypaymentmode-> . "</li>\n";
@@ -297,7 +311,6 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 		// if ($res) {
 		//     print "<ul>\n";
 		//     // print "  <li>" . $companypaymentmode->label . "</li>\n";
-		//     print "  <li>" . $langs->trans("StancerSEPAID") . ": <a href=https://manage.stancer.com/fr/details-du-clients?id=" . trim($companypaymentmode->stancer_account, '"') . " target='_blank'>" . trim($companypaymentmode->stancer_account, '"') . "</a></li>\n";
 		//     // print "  <li>" . $companypaymentmode-> . "</li>\n";
 		//     // print "  <li>" . $companypaymentmode-> . "</li>\n";
 		//     // print "  <li><a href='https://payment.stancer.com/" . stancer_get_public_key() . "/" . $pid . "15?lang=fr'>PayLink</a></li>\n";
@@ -307,6 +320,9 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 
 		// print json_encode($rib_list); exit;
 		if (is_array($rib_list)) {
+			if ($permissiontoadd) {
+				print '<div class="tabsAction"><a class="butAction" href="' . $_SERVER["PHP_SELF"] . '?socid=' . $socid . '&action=syncsepa&token=' . newToken() . '">' . $langs->trans("StancerSyncSepa") . '</a></div>';
+			}
 			print '<div class="div-table-responsive-no-min">'; // You can use div-table-responsive-no-min if you don't need reserved height for your table
 			print '<table class="liste centpercent">';
 
@@ -331,7 +347,7 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 					$iban = $rib->iban;
 				}
 				$companypaymentmode = new CompanyPaymentModeStancer($db);
-				$resRib = $companypaymentmode->fetch(0, '', 0, '', " AND type = 'ban' AND iban_prefix = '".$iban."' ORDER BY datec DESC");
+				$resRib = $companypaymentmode->fetch(0, '', 0, '', " AND type = 'ban' AND iban_prefix = '" . $db->escape($iban) . "' ORDER BY datec DESC");
 
 				//afficher uniquement les sepa stancer (prefixe du label)
 				$stancerSEPAisPresent = false;
@@ -351,11 +367,12 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 				}
 				// print json_encode($rib);exit;
 				$companypaymentmode = new CompanyPaymentModeStancer($db);
-				$resStancer = $companypaymentmode->fetch(0, '', 0, '', " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND iban_prefix = '".$iban."'");
+				$resStancer = $companypaymentmode->fetch(0, '', 0, '', " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND iban_prefix = '" . $db->escape($iban) . "'");
 
+				// Writes to the database and to Stancer only on the explicit, guarded syncsepa action
 				//petite verif, s'il manque le bic *et* que c'est un stancer on peut actualiser l'information
-				if (substr($rib->label, 0, 12) == 'stancer-sepa' && empty($rib->bic) && $resStancer) {
-					$stancerApi = StancerApi::getInstance();
+				if ($action == 'syncsepa' && substr($rib->label, 0, 12) == 'stancer-sepa' && empty($rib->bic) && $resStancer) {
+					$stancerApi = new StancerApi();
 					$sepaData = $stancerApi->getSepa($companypaymentmode->stancer_object_ref);
 					if ($sepaData !== false) {
 						$bic = isset($sepaData['bic']) ? $sepaData['bic'] : '';
@@ -366,7 +383,7 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 						}
 					}
 				}
-				$link = $companypaymentmode->stancer_object_ref;
+				$link = dol_escape_htmltag($companypaymentmode->stancer_object_ref);
 				if ($resStancer && !empty($companypaymentmode->stancer_account)) {
 					//check if sepa exists on stancer
 					$data = [
@@ -382,35 +399,37 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 						'date_mandate' => $companypaymentmode->date_rum ?? dol_now(),
 						'stancer_object_ref' => $companypaymentmode->stancer_object_ref,
 					];
-					stancerAddSEPAIfNeeded($socid, $data);
+					if ($action == 'syncsepa') {
+						stancerAddSEPAIfNeeded($socid, $data);
+					}
 
 					//juste le lien vers le compte stancer
-					$link = "<a href='https://manage.stancer.com/fr/details-du-clients?id=" . trim($companypaymentmode->stancer_account, '"') . "' target='_blank'>" . $companypaymentmode->stancer_object_ref . "</a>";
+					$link = '<a href="https://manage.stancer.com/fr/details-du-clients?id=' . urlencode(trim($companypaymentmode->stancer_account, '"')) . '" target="_blank" rel="noopener noreferrer">' . dol_escape_htmltag($companypaymentmode->stancer_object_ref) . "</a>";
 				}
 
 				print '<tr class="oddeven">';
 
 				// Label
-				print '<td>' . $rib->label .'</td>';
+				print '<td>' . dol_escape_htmltag($rib->label) . '</td>';
 
 				// Bank name
-				print '<td>'.$rib->bank.'</td>';
+				print '<td>' . dol_escape_htmltag($rib->bank) . '</td>';
 				// IBAN
-				print '<td>'.$rib->iban.'</td>';
+				print '<td>' . dol_escape_htmltag($rib->iban) . '</td>';
 				// BIC
-				print '<td>'.$rib->bic.'</td>';
+				print '<td>' . dol_escape_htmltag($rib->bic) . '</td>';
 				// ID Stancer
 				print '<td>'.$link.'</td>';
 
 				if (!empty($conf->prelevement->enabled)) {
 					// RUM
 					//print '<td>'.$prelevement->buildRumNumber($object->code_client, $rib->datec, $rib->id).'</td>';
-					print '<td>'.$rib->rum.'</td>';
+					print '<td>' . dol_escape_htmltag($rib->rum) . '</td>';
 
 					print '<td>'.dol_print_date($rib->date_rum, 'day').'</td>';
 
 					// FRSTRECUR
-					print '<td>'.$rib->frstrecur.'</td>';
+					print '<td>' . dol_escape_htmltag($rib->frstrecur) . '</td>';
 				}
 
 				//stancer
@@ -419,13 +438,13 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 				if ($resStancer && !empty($companypaymentmode->stancer_object_ref)) {
 					//delete sepa
 					$stancer_object_ref = $companypaymentmode->stancer_object_ref;
-					print '<form name="deletestancersepa_' . $stancer_object_ref . '" id="deletestancersepa_' . $stancer_object_ref . '" action="'.$_SERVER["PHP_SELF"].'?socid='.$socid.'" method="POST">';
+					print '<form name="deletestancersepa_' . dol_escape_htmltag($stancer_object_ref) . '" id="deletestancersepa_' . dol_escape_htmltag($stancer_object_ref) . '" action="'.$_SERVER["PHP_SELF"].'?socid='.$socid.'" method="POST">';
 					print '<input type="hidden" name="token" value="'.newToken().'">';
 					print '<input type="hidden" name="action" value="deletesepa">';
-					print '<input type="hidden" name="companyPaymentModeID" value="'.$companypaymentmode->id.'">';
-					print '<input type="hidden" name="stancer_object_ref" value="'.$stancer_object_ref.'">';
+					print '<input type="hidden" name="companyPaymentModeID" value="' . ((int) $companypaymentmode->id) . '">';
+					print '<input type="hidden" name="stancer_object_ref" value="' . dol_escape_htmltag($stancer_object_ref) . '">';
 					// Button
-					$genbutton = '<input class="button" id="deletebutton" name="'.$stancer_object_ref.'_deleteebutton"';
+					$genbutton = '<input class="button" id="deletebutton" name="' . dol_escape_htmltag($stancer_object_ref) . '_deleteebutton"';
 					$genbutton .= ' type="submit" value="'.$langs->trans("DeleteSEPAOnStancer").'"';
 					$genbutton .= '>';
 					print $genbutton;
@@ -435,10 +454,10 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 					print '<form name="addstancersepa" id="addstancersepa" action="'.$_SERVER["PHP_SELF"].'?socid='.$socid.'" method="POST">';
 					print '<input type="hidden" name="token" value="'.newToken().'">';
 					print '<input type="hidden" name="action" value="addsepa">';
-					print '<input type="hidden" name="iban" value="'.$rib->iban.'">';
-					print '<input type="hidden" name="bic" value="'.$rib->bic.'">';
-					print '<input type="hidden" name="mandate" value="'.$rib->rum.'">';
-					print '<input type="hidden" name="date_mandate" value="'.$rib->date_rum.'">';
+					print '<input type="hidden" name="iban" value="' . dol_escape_htmltag($rib->iban) . '">';
+					print '<input type="hidden" name="bic" value="' . dol_escape_htmltag($rib->bic) . '">';
+					print '<input type="hidden" name="mandate" value="' . dol_escape_htmltag($rib->rum) . '">';
+					print '<input type="hidden" name="date_mandate" value="' . dol_escape_htmltag((string) $rib->date_rum) . '">';
 					$forname = 'builddocrib'.$rib->id;
 					// Button
 					$genbutton = '<input class="button buttongen" id="'.$forname.'_generatebutton" name="'.$forname.'_generatebutton"';
@@ -480,7 +499,7 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 						//TODO
 						// $outstandingOpened = stancerGetOutstandingBills($socid, 0, "PRE");
 						// $companypaymentmode = new CompanyPaymentModeStancer($db);
-						// $resStancer = $companypaymentmode->fetch(0, '', 0, '', " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND iban_prefix = '".$iban."'");
+						// $resStancer = $companypaymentmode->fetch(0, '', 0, '', " AND type = 'ban' AND label LIKE 'stancer-sepa%' AND iban_prefix = '" . $db->escape($iban) . "'");
 
 						// $amount = price($outstandingOpened, 1, $langs, 1, -1, -1, $conf->currency);
 						// print '<p>DueAmount : ' . $amount . ", ";
@@ -490,7 +509,7 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 					print stancerShowOnlineIBANLinkForCustomer($societe->id, $societe->name);
 					print '</p>';
 				} else {
-					print '<div class="warning"><span class="fa fa-warning"> </span> <span class="clear"> ' . $langs->transnoentities("StancerPublicIBANPageDisabled", "<a href='./admin/setup.php' target='_blank'>", "</a>") . '</span></div>';
+					print '<div class="warning"><span class="fa fa-warning"> </span> <span class="clear"> ' . $langs->transnoentities("StancerPublicIBANPageDisabled", "<a href='./admin/setup.php' target='_blank' rel='noopener noreferrer'>", "</a>") . '</span></div>';
 				}
 
 				if (getDolGlobalString('STANCER_MANDATE_AUTO_UPTOSIGN', '') != '') {
@@ -552,19 +571,19 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 			//L'objectif est de ne pas afficher les autres rib si celui qui est specifique stancer existe
 			print '<tr class="oddeven">';
 			// Label
-			print '<td>'.$cb->label.'</td>';
+			print '<td>' . dol_escape_htmltag($cb->label) . '</td>';
 			// Bank name
-			print '<td>'.$cb->bank.'</td>';
+			print '<td>' . dol_escape_htmltag($cb->bank) . '</td>';
 
-			print '<td> **** **** **** '.$cb->last_four.'</td>';
+			print '<td> **** **** **** ' . dol_escape_htmltag($cb->last_four) . '</td>';
 
-			print '<td>'.$cb->proprio.'</td>';
+			print '<td>' . dol_escape_htmltag($cb->proprio) . '</td>';
 
-			print '<td>'.$cb->exp_date_month . '/' . $cb->exp_date_year .'</td>';
+			print '<td>' . ((int) $cb->exp_date_month) . '/' . ((int) $cb->exp_date_year) . '</td>';
 
-			print '<td>'.$cb->card_type.'</td>';
+			print '<td>' . dol_escape_htmltag($cb->card_type) . '</td>';
 
-			print '<td>'.$cb->country_code.'</td>';
+			print '<td>' . dol_escape_htmltag($cb->country_code) . '</td>';
 
 			//fix #6 add a link to pay all waiting invoices ?
 			//Si encours > 0
@@ -578,7 +597,7 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 			// Stancer - vérifier si un compte n'existe pas déjà
 			if ($resStancer && !empty($companypaymentmode->stancer_account)) {
 				//juste le lien vers le compte stancer
-				print "<a href=https://manage.stancer.com/fr/details-du-clients?id=" . trim($companypaymentmode->stancer_account, '"') . "&token=".newToken()." target='_blank'>" . $langs->trans("StancerAccountID") . "</a>";
+				print '<a href="https://manage.stancer.com/fr/details-du-clients?id=' . urlencode(trim($companypaymentmode->stancer_account, '"')) . '" target="_blank" rel="noopener noreferrer">' . $langs->trans("StancerAccountID") . "</a>";
 			}
 			print '</td>';
 
@@ -601,7 +620,6 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 			// print json_encode($companypaymentmode);
 			// print "<ul>\n";
 			// print "  <li>" . $companypaymentmode->label . "</li>\n";
-			// print "  <li>" . $langs->trans("StancerSEPAID") . ": <a href=https://manage.stancer.com/fr/details-du-clients?id=" . trim($companypaymentmode->stancer_account, '"') . " target='_blank'>" . trim($companypaymentmode->stancer_account, '"') . "</a></li>\n";
 			// // print "  <li>" . $companypaymentmode-> . "</li>\n";
 			// // print "  <li>" . $companypaymentmode-> . "</li>\n";
 			// // print "  <li><a href='https://payment.stancer.com/" . stancer_get_public_key() . "/" . $pid . "15?lang=fr'>PayLink</a></li>\n";
@@ -616,7 +634,7 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 			if (getDolGlobalString('STANCER_PUBLIC_CB_PAGE', '') != '' && getDolGlobalString('STANCER_ENABLE_CB')) {
 				print "<p>" . stancerShowOnlineCBLinkForCustomer($societe->id, $societe->name) . "</p>";
 			} else {
-				print '<div class="warning"><span class="fa fa-warning"> </span> <span class="clear"> ' . $langs->transnoentities("StancerPublicCBpageDisabled", "<a href='./admin/setup.php' target='_blank'>", "</a>") . '</span></div>';
+				print '<div class="warning"><span class="fa fa-warning"> </span> <span class="clear"> ' . $langs->transnoentities("StancerPublicCBpageDisabled", "<a href='./admin/setup.php' target='_blank' rel='noopener noreferrer'>", "</a>") . '</span></div>';
 			}
 		}
 	}

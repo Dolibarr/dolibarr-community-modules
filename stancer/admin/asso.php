@@ -97,15 +97,12 @@ if ( versioncompare(explode('.', DOL_VERSION), array(15)) < 0 && $action == 'upd
 }
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
-if (getDolGlobalString('STANCER_ASSO_ACTIVE', '') != '') {
-	include_once DOL_DOCUMENT_ROOT.'/core/class/extrafields.class.php';
-	$extrafields = new ExtraFields($db);
-	// $size, $list and $help are declared as string by ExtraFields::addExtraField().
-	// '32' is the column length, '0' hides the field from lists, '' means no tooltip
-	// (the previous 0 was stored as the literal help text "0").
-	$result1=$extrafields->addExtraField('stancer_sepa_ref', "StancerSEPAstart", 'varchar', 1, '32', 'adherent', 0, 0, '', '', 1, '', '0', '', '', '', 'stancer@stancer', '$conf->stancer->enabled');
-	$result2=$extrafields->addExtraField('stancer_cb_ref', "StancerCardStart", 'varchar', 2, '32', 'adherent', 0, 0, '', '', 1, '', '0', '', '', '', 'stancer@stancer', '$conf->stancer->enabled');
-	$result3=$extrafields->addExtraField('stancer_account', "StancerAccount", 'varchar', 3, '32', 'adherent', 1, 0, '', '', 1, '', '0', '', '', '', 'stancer@stancer', '$conf->stancer->enabled');
+// The member extra fields are created when the association mode is saved
+// (and at module activation), never on a plain display of this page
+if ($action == 'update' && getDolGlobalString('STANCER_ASSO_ACTIVE', '') != '') {
+	if (stancerEnsureMemberExtrafields($db) > 0) {
+		setEventMessages($langs->trans('Error'), null, 'errors');
+	}
 }
 
 /*

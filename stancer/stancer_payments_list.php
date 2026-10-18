@@ -825,7 +825,10 @@ while ($i < $imaxinloop) {
 		dol_syslog("stancer stancer_payments_list: fk_soc divergence on rowid=" . $object->id
 			. " (db=" . (int) $object->fk_soc . ", CUS=tag=" . $socidFromTag . "), fixing", LOG_WARNING);
 		$object->fk_soc = $socidFromTag;
-		$object->update($user);
+		// The corrected value is shown in any case, it is only saved for users allowed to write
+		if ($permissiontoadd && $object->update($user) < 0) {
+			dol_syslog("stancer stancer_payments_list: cannot save fk_soc of rowid=" . $object->id . ": " . $object->error, LOG_ERR);
+		}
 	}
 
 	//check if company is empty and TAG exists => update row
@@ -855,7 +858,9 @@ while ($i < $imaxinloop) {
 		}
 		if ($update && !empty($objectFromTAG) && !empty($objectFromTAG->socid)) {
 			$object->fk_soc = $objectFromTAG->socid;
-			$object->update($user);
+			if ($permissiontoadd && $object->update($user) < 0) {
+				dol_syslog("stancer stancer_payments_list: cannot save fk_soc of rowid=" . $object->id . ": " . $object->error, LOG_ERR);
+			}
 		} elseif ($update) {
 			dol_syslog("stancer stancer_payments_list: update=true but objectFromTAG is null or has no socid for tag=" . $tag, LOG_WARNING);
 		}
@@ -928,17 +933,6 @@ while ($i < $imaxinloop) {
 					$keyU = 'unique_id';
 					$valU = $object->fields[$keyU];
 					$resU = $object->showOutputFieldSpecialOrder($val, $key, $object->$key, '', $valU, $keyU, $object->$keyU);
-					// DEBUG: trace grouped SEPA payments (GRP=) rendering and their grouped invoices
-					if (strpos((string) $object->unique_id, 'GRP=') === 0 || strpos((string) $object->order_id, 'GRP=') === 0) {
-						dol_syslog("stancer grouped-link-debug rowid=" . $object->id
-							. " stancer_id=" . $object->stancer_id
-							. " status=" . $object->status
-							. " unique_id=" . $object->unique_id
-							. " order_id=" . $object->order_id
-							. " grouped_invoice_ids=" . $object->grouped_invoice_ids
-							. " resU_has_href=" . (strpos($resU, 'href') !== false ? '1' : '0')
-							. " resU=" . $resU, LOG_WARNING);
-					}
 					if (strpos($resU, 'href')) {
 						print $resU;
 					} elseif (strpos((string) $object->unique_id, 'GRP=') === 0 && !empty($object->grouped_invoice_ids)) {

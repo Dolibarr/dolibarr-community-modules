@@ -107,20 +107,16 @@ if (!$permissiontoread) {
  */
 $html = "";
 if ($action == "fix") {
-	$code_frais = GETPOST('accountingaccount_number');
+	stancerCheckWriteActionAllowed($permissiontoadd, 'bookkeeping fix');
+	$code_frais = GETPOST('accountingaccount_number', 'alpha');
 	if (!empty($code_frais)) {
-		$html .= "<h2>Application du code $code_frais</h2>";
+		$html .= "<h2>Application du code " . dol_escape_htmltag($code_frais) . "</h2>";
 
-		//verification inverse: y a t il des ecritures qui ne sont pas dans la liste ...
-		$sql = "UPDATE ".MAIN_DB_PREFIX."accounting_bookkeeping SET numero_compte='" . $db->escape($code_frais) . "' WHERE rowid IN(";
-		$sql .= "  SELECT rowid FROM ".MAIN_DB_PREFIX."accounting_bookkeeping WHERE numero_compte LIKE '471%' AND doc_type='bank' AND (doc_ref LIKE '%Stancer%' OR label_operation LIKE '%Stancer%')";
-		$sql .= ")";
-		$resql = $db->query($sql);
-		// $html .= "<p>" . $sql ." </p>";
-		if ($resql) {
-			$html .= "<p>Update terminée</p>";
+		$nbFixed = stancerBookkeepingFixFeeAccount($code_frais);
+		if ($nbFixed >= 0) {
+			$html .= "<p>Update terminée (" . $nbFixed . ")</p>";
 		} else {
-			$html .= "<p>Erreur sql ! $sql</p>";
+			setEventMessages($langs->trans('ErrorSQL'), null, 'errors');
 		}
 
 		$html .= "<p>Retour <a href='index.php'>à l'index</a></p>";

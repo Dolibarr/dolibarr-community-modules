@@ -94,27 +94,19 @@ $langs->loadLangs(array("main", "other", "dict", "bills", "companies", "paybox",
 parse_str(base64_decode(GETPOST('s', 'alpha')), $args);
 // dol_syslog("stancer sepa-iban (args) is " . json_encode($args), LOG_DEBUG);
 
-$tst = '';
-if (isset($args['socid'])) {
-	$societe = new Societe($db);
-	$societe->fetch($args['socid']);
-	$tst = "CB-" . $args['socid'] . "-" . $societe->name . "-" . getDolGlobalString('PAYMENT_SECURITY_TOKEN');
-	$_SESSION['cb'] = 'new';
-	$_SESSION['s'] = GETPOST('s', 'alpha');
-} else {
+if (!isset($args['socid'])) {
 	print "<p class=''>" . $langs->transnoentitiesnoconv("StancerThereIsNoSocID") . "</p>";
 	exit;
 }
-// dol_syslog("stancer check securekey is from $tst");
-// dol_syslog("stancer securekey is " . json_encode($args['securekey'] . " compare with " . dol_hash($tst,'1')), LOG_DEBUG);
-if (dol_hash($tst, '1') != $args['securekey']) {
-	dol_syslog("stancer CB form error, securekey no confirmed !", LOG_ERR);
+$societe = null;
+if (!stancerCheckPublicCustomerKey('CB', $args, $societe)) {
 	accessforbidden($langs->trans('StancerIBANCBinpoutSecurekeyError'), 0, 0, 1);
 }
+$_SESSION['s'] = GETPOST('s', 'alpha');
 
-if (isset($_SESSION['cb']) && $_SESSION['cb'] == 'done') {
-	$errmsg = 'stancer detect page reload';
-	dol_syslog($errmsg);
+// A reload of the result page re-posts the form: never create a second card
+if (stancerPublicFormAlreadyDone('cb', $societe->id) && GETPOST('action', 'aZ09') == "stancerGetCustomerCB") {
+	dol_syslog("stancer public CB page: reload detected for thirdparty " . $societe->id);
 	print "<p class=''>" . $langs->transnoentitiesnoconv("StancerPublicIBANCBPageReload", dol_print_url($mysoc->url, '_blank', 0, 1)) . "</p>";
 	exit;
 }
@@ -127,35 +119,10 @@ $success = '';
 $signLink = $signer = '';
 
 //note : public page, user is not set, so we use user who create that company
-$user = new User($db);
-$res = $user->fetch(getDolGlobalInt('STANCER_USER_ACCOUNT_FOR_ACTIONS'));
-if ($res < 0) {
-	// Fallback on the user who last modified the thirdparty, then on its creator.
-	// Societe::fetch() fills user_modification/user_creation up to Dolibarr 18, and
-	// user_modification_id/user_creation_id from Dolibarr 19, so the four spellings
-	// are probed, modification before creation. The *_id properties are not declared
-	// at all on Dolibarr 15, so they are only ever reached through empty(): a direct
-	// read would raise a PHP 8 "Undefined property" warning on that version.
-	$uid = 0;
-	if (!empty($societe->user_modification_id)) {
-		$uid = $societe->user_modification_id;
-	}
-	if (empty($uid)) {
-		// @phan-suppress-next-line PhanDeprecatedProperty  only source up to Dolibarr 18
-		$uid = $societe->user_modification;
-	}
-	if (empty($uid) && !empty($societe->user_creation_id)) {
-		$uid = $societe->user_creation_id;
-	}
-	if (empty($uid)) {
-		// @phan-suppress-next-line PhanDeprecatedProperty  only source up to Dolibarr 18
-		$uid = $societe->user_creation;
-	}
-	if (empty($uid)) {
-		dol_syslog("stancer cb.php: no fallback user found on thirdparty ".$societe->id, LOG_ERR);
-	} elseif ($user->fetch((int) $uid) <= 0) {
-		dol_syslog("stancer cb.php: cannot load fallback user ".((int) $uid)." for thirdparty ".$societe->id.": ".$user->error, LOG_ERR);
-	}
+$user = stancerLoadPublicActionUser($societe);
+if (!is_object($user)) {
+	dol_syslog("stancer public cb.php: no user to act as, page stopped", LOG_ERR);
+	accessforbidden('', 0, 0, 1);
 }
 // loadRights() only exists from Dolibarr 20; getrights() is the only call valid on 15..21.
 // @phan-suppress-next-line PhanDeprecatedFunction
@@ -188,15 +155,26 @@ if ($action == "stancerGetCustomerCB") {
 		'cbexp_year'	=> $cbexp_year,
 		'cbccv'			=> $cbccv
 	];
-	$cbID = stancerAddCBIfNeeded((int) $args['socid'], $data);
+	$redirect3ds = '';
+	$cbID = stancerAddCBIfNeeded((int) $args['socid'], $data, $redirect3ds);
 	dol_syslog("stancer cb.php call stancerAddCBIfNeeded ...");
-	if (substr($cbID, 0, 4) == "card") {
+	if ($redirect3ds !== '') {
+		$db->commit();
+		dol_syslog("stancer cb.php redirect to 3DS authentication");
+		header("Location: " . $redirect3ds);
+		exit;
+	}
+	if (substr((string) $cbID, 0, 4) == "card") {
 		$success = 1;
+		stancerPublicFormMarkDone('cb', $societe->id);
 		$db->commit();
 
 		if (getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_ON_NEW_CB_AND_SEPA', '') != '') {
 			stancerSendMail(getDolGlobalString('STANCER_AUTO_MAIL_NOTIFICATIONS_PAYMENT', ''), $langs->trans('StancerMailSubjectCB'), $langs->trans('StancerMailCB', $societe->name), false, '', 'thi' . $societe->id);
 		}
+	} else {
+		dol_syslog("stancer cb.php card not stored for thirdparty " . $societe->id . " (" . (is_scalar($cbID) ? $cbID : gettype($cbID)) . "), rollback", LOG_ERR);
+		$db->rollback();
 	}
 	dol_syslog("stancer cb.php returned from stancerAddCBIfNeeded ...");
 } elseif ($action == 'preauth') {

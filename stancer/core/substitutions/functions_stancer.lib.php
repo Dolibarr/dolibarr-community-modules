@@ -36,15 +36,32 @@ dol_include_once('/stancer/lib/stancer.lib.php');
  */
 function stancer_completesubstitutionarray(&$substitutionarray, $outlangs, $object)
 {
-	global $conf, $object;
+	global $conf;
 
 	$substitutionarray['__STANCER_SEPA_DELAIS__'] = getDolGlobalString('STANCER_DELAY_SEPA');
 
-	//TODO
-	if (is_object($object) && ($object->id > 0 || $object->specimen)) {	// We do not add substitution entries if object is not instantiated (->id not > 0)
-		$substitutionarray['__STANCER_SEPA_RUM__'] = 0000000;
-		$substitutionarray['__STANCER_SEPA_URL__'] = stancerShowOnlineIBANLinkForEntity($object->thirdparty->id, $object->thirdparty->name);
-		//$substitutionarray['__STANCER_SEPA_URL__']=stancerShowOnlineCBLinkForCustomer($substitutionarray['__THIRDPARTY_ID__'], $substitutionarray['__THIRDPARTY_NAME__']);
+	if (is_object($object) && ((!empty($object->id) && $object->id > 0) || !empty($object->specimen))) {	// We do not add substitution entries if object is not instantiated (->id not > 0)
+		// The object received from make_substitutions() is the reference, never the
+		// global $object of the page, and its thirdparty may not be loaded yet.
+		$thirdparty = null;
+		if ($object instanceof Societe) {
+			$thirdparty = $object;
+		} else {
+			if (empty($object->thirdparty) && !empty($object->socid) && method_exists($object, 'fetch_thirdparty')) {
+				$object->fetch_thirdparty();
+			}
+			if (!empty($object->thirdparty) && is_object($object->thirdparty)) {
+				$thirdparty = $object->thirdparty;
+			}
+		}
+		if (!empty($thirdparty->id)) {
+			$substitutionarray['__STANCER_SEPA_RUM__'] = stancerGetSepaRum((int) $thirdparty->id);
+			$substitutionarray['__STANCER_SEPA_URL__'] = stancerShowOnlineIBANLinkForEntity($thirdparty->id, $thirdparty->name);
+		} else {
+			dol_syslog("stancer substitutions: no thirdparty for " . get_class($object) . " " . ($object->id ?? ''), LOG_DEBUG);
+			$substitutionarray['__STANCER_SEPA_RUM__'] = '';
+			$substitutionarray['__STANCER_SEPA_URL__'] = '';
+		}
 
 		// Online payment URL for the current object (invoice or order)
 		require_once DOL_DOCUMENT_ROOT . '/core/lib/payments.lib.php';
