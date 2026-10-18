@@ -1016,6 +1016,16 @@ class CIIProtocol extends AbstractProtocol
 	 * The vendor synchronization runs in its own transaction, opened and closed here. The invoice
 	 * import transaction is opened here too, right after, but closed by that same wrapper.
 	 *
+	 * IMPORTANT
+	 * A valid einvoice document can have 2 total amount of vat different in the same document :
+	 * the Amount calculated from sum of (ttc - ht) of each declared line = rounding of lines as expected by accountancy
+	 * the rounding on group of vat found in BT112 field as expected by einvoicing rules).
+	 * Dolibarr will import the document matching the first one.
+	 * Rules applied:
+	 * DOL RULE 1 : The final imported invoice must have amount to pay with tax that is same than einvoice (only 1 value can exists in einvoice = BT110, so we can and must match).
+	 * DOL RULE 2: The total without vat should also be the same (only 1 value in einvoice =BT112, so we can and must match too)
+	 * DOL RULE 3: The total vat can differ (because there is 2 different values in einvoice and one amount can t be both equal to 2 different amounts at once, so we must choose one and it should be the sum of ttc - vat of each line. But in this case, we must have a permanent warning.
+	 *
 	 * @param  string			$file                 Raw CII XML content
 	 * @param  string|null		$readableViewFile     Optional readable view (PDP-generated readable PDF)
 	 * @param  string			$flowId               Source flow identifier
