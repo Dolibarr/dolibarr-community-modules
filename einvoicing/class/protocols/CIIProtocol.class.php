@@ -3442,13 +3442,18 @@ class CIIProtocol extends AbstractProtocol
 		// too: on the deliver-to party the term is BT-71, which identifies the place goods are delivered to
 		// and not the buyer company (issue #920).
 		if (!$minimal && !$this->isMinimumProfile($profile)) {
+			// BT-29 without scheme: the identifier the buyer gave to the seller (its vendor code, issue #1151).
+			// TradePartyType declares ram:ID before ram:GlobalID, both repeatable, so the two coexist.
+			if ($type === 'seller' && trim((string) ($data['sellerids'] ?? '')) !== '') {
+				$node->appendChild($doc->createElement('ram:ID', einvoicingXmlText((string) $data['sellerids'])));
+			}
 			if (!empty($data[$prefix . 'GlobalIds'])) {
 				foreach ($data[$prefix . 'GlobalIds'] as $globalId) {
 					$g = $doc->createElement('ram:GlobalID', einvoicingXmlText((string) $globalId['value']));
 					$g->setAttribute('schemeID', $globalId['schemeID']);
 					$node->appendChild($g);
 				}
-			} elseif (!empty($data[$prefix . 'ids'])) {
+			} elseif ($type !== 'seller' && !empty($data[$prefix . 'ids'])) {
 				// The ram:ID variant of the same term. Nothing to write when the party identifier is
 				// deliberately not declared: BT-29 and BT-46 are optional, and an empty element would
 				// be refused by PEPPOL-EN16931-R008.
