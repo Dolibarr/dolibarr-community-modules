@@ -159,6 +159,23 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 							$ProtocolManager = new ProtocolManager($db);
 							$protocol = $ProtocolManager->getProtocol($usedProtocols);
 
+							// No protocol set or enabled (EINVOICING_PROTOCOL): getProtocol() returns null, and calling it
+							// was a fatal error on every PDF generation of an invoice. Same answer as a configuration issue
+							// above: blocking only when EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS is on, else the PDF is kept.
+							if (!is_object($protocol)) {
+								$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $langs->trans("CheckPdpConfiguration");
+								dol_syslog(__METHOD__ . " No e-invoicing protocol for EINVOICING_PROTOCOL='" . $usedProtocols . "'", LOG_WARNING);
+
+								if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+									setEventMessages($message, array(), 'errors');
+									$this->errors[] = $message;
+									return -1;
+								}
+								setEventMessages($message, array(), 'warnings');
+								$this->warnings[] = $message;
+								return 0;
+							}
+
 							$result = $protocol->generateInvoice($invoiceObject, $outputlangs, $pdfPath);		// Generate E-invoice (embed into the real generated file)
 
 							// $result is the path of the file, or -1

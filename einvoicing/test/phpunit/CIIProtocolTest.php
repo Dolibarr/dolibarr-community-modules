@@ -60,6 +60,7 @@ require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
 require_once DOL_DOCUMENT_ROOT . '/ecm/class/ecmfiles.class.php';
+require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 
 if (empty($user->id)) {
@@ -1028,19 +1029,21 @@ class CIIProtocolTest extends CommonClassTest
 	 * A vendor id carrying no vendor price at all, so the fixture is the only row the lookup can see.
 	 * A unique key allows a single price with an empty ref_fourn per vendor, so an existing vendor
 	 * cannot be reused; product_fournisseur_price.fk_soc has no foreign key, so no third party is
-	 * needed to hold the row either.
+	 * needed to hold the row either. No routing either: a default product left on that id by a test
+	 * that did not roll back would be found by the lookup.
 	 *
-	 * @return int	Vendor id free of any vendor price
+	 * @return int	Vendor id free of any vendor price and of any routing
 	 */
 	private function vendorWithoutAnyPrice()
 	{
 		global $db;
 
-		$resql = $db->query("SELECT COALESCE(MAX(fk_soc), 0) + 1 as freesoc FROM " . MAIN_DB_PREFIX . "product_fournisseur_price");
-		$this->assertNotFalse($resql, 'could not read the vendor prices: ' . $db->lasterror());
-		$obj = $db->fetch_object($resql);
+		$sql = "SELECT GREATEST((SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "product_fournisseur_price),";
+		$sql .= " (SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "einvoicing_routing)) + 1 as freesoc";
+		$resql = $db->query($sql);
+		$this->assertNotFalse($resql, 'could not find a free vendor id: ' . $db->lasterror());
 
-		return (int) $obj->freesoc;
+		return (int) $db->fetch_object($resql)->freesoc;
 	}
 
 	/**
@@ -1055,12 +1058,8 @@ class CIIProtocolTest extends CommonClassTest
 	{
 		global $conf, $db;
 
-		// A vendor id free of any price and of any routing, so two vendors of the same test never share one
-		$sql = "SELECT GREATEST((SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "product_fournisseur_price),";
-		$sql .= " (SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "einvoicing_routing)) + 1 as freesoc";
-		$resql = $db->query($sql);
-		$this->assertNotFalse($resql, 'could not find a free vendor id: ' . $db->lasterror());
-		$socid = (int) $db->fetch_object($resql)->freesoc;
+		// Free of any price and of any routing, so two vendors of the same test never share one
+		$socid = $this->vendorWithoutAnyPrice();
 		$ids = array('socid' => $socid, 'product' => 0, 'service' => 0);
 		$einvoicing = new EInvoicing($db);
 		foreach (array('product' => $withProduct, 'service' => $withService) as $type => $wanted) {
@@ -1530,5 +1529,94 @@ class CIIProtocolTest extends CommonClassTest
 		$this->assertEmpty($discount->fk_invoice_supplier_line, 'and freed');
 
 		$this->assertSame($id, SupplierInvoiceHelper::findIdByRef($rebuilt->ref_supplier, $socid), 'and no second invoice carries the document');
+	}
+
+	/**
+	 * Import the BASIC WL fixture, which has no line, for the fixture seller.
+	 *
+	 * @param	int		$autoGeneration		Value of EINVOICING_PRODUCTS_AUTO_GENERATION and EINVOICING_IMPORT_AS_FREE_LINES
+	 * @return	array<string,mixed>			What createSupplierInvoiceFromSource() answers
+	 */
+	private function importDocumentWithoutLines($autoGeneration)
+	{
+		global $conf, $db;
+
+		foreach (array('EINVOICING_IMPORT_AS_FREE_LINES', 'EINVOICING_PRODUCTS_AUTO_GENERATION') as $name) {
+			$this->savedConstants[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
+			$conf->global->$name = $autoGeneration;
+		}
+
+		$xml = str_replace('EINVWL-0001', 'EINVWL-' . strtoupper(bin2hex(random_bytes(4))), (string) file_get_contents(__DIR__ . '/fixtures/received_documents/cii_basicwl_without_lines.xml'));
+		$protocol = new CIIProtocol($db);
+		$result = $protocol->createSupplierInvoiceFromSource($xml, null, 'testbasicwl');
+		if ((int) ($result['res'] ?? 0) > 0) {
+			$this->createdInvoiceIds[] = (int) $result['res'];
+		}
+
+		return $result;
+	}
+
+	/**
+	 * A document without line becomes one line per VAT rate on the default product of the vendor, the
+	 * document level charge and allowance staying lines of their own, so the invoice totals what the document announces.
+	 *
+	 * @return void
+	 */
+	public function testADocumentWithoutLinesIsImportedOnTheDefaultProduct()
+	{
+		global $db, $user;
+
+		$socid = $this->createFixtureSeller();
+		$product = new Product($db);
+		$product->ref = 'PHPUNIT-WL-' . strtoupper(bin2hex(random_bytes(4)));
+		$product->label = 'Default product of the vendor';
+		$product->type = Product::TYPE_SERVICE;
+		$productId = $product->create($user);
+		$this->assertGreaterThan(0, $productId, (string) $product->error);
+		$einvoicing = new EInvoicing($db);
+		$this->assertGreaterThan(0, $einvoicing->setDefaultRouting($socid, 'idprod_' . $productId, '', '', '', 'product'));
+
+		$result = $this->importDocumentWithoutLines(0);
+
+		$id = (int) ($result['res'] ?? 0);
+		$this->assertGreaterThan(0, $id, strip_tags((string) ($result['message'] ?? '')));
+		$invoice = new FactureFournisseur($db);
+		$invoice->fetch($id);
+		$invoice->fetch_lines();
+		$byRate = array();
+		foreach ($invoice->lines as $line) {
+			$byRate[(string) price2num($line->tva_tx)][] = array((int) $line->fk_product, (float) $line->total_ht);
+		}
+		ksort($byRate);
+		$this->assertEquals(array('20' => array(array($productId, 800.00), array(0, 27.23)), '5.5' => array(array(0, -10.00), array($productId, 110.00))), $byRate);
+		$this->assertEquals(170.95, (float) $invoice->total_tva);
+		$this->assertEquals(1098.18, (float) $invoice->total_ttc);
+	}
+
+	/**
+	 * Without a default product the import stops on the actions to take, even when it may create products
+	 * or free lines: a line built from the VAT breakdown names nothing a product could be made of.
+	 *
+	 * @return void
+	 */
+	public function testADocumentWithoutLinesAsksForADefaultProduct()
+	{
+		global $db, $langs;
+
+		$socid = $this->createFixtureSeller();
+		$einvoicing = new EInvoicing($db);
+		foreach (array('product', 'service') as $type) {
+			foreach ((array) $einvoicing->fetchAllRoutings($socid, $type, 0) as $routing) {
+				$einvoicing->deleteRouting((int) $routing['rowid'], $socid);
+			}
+			$this->assertSame('0', (string) $einvoicing->fetchDefaultRouting($socid, $type));
+		}
+
+		$result = $this->importDocumentWithoutLines(1);
+
+		$this->assertSame(-1, (int) $result['res'], strip_tags((string) ($result['message'] ?? '')));
+		$this->assertSame('PRODUCT_NOT_FOUND', $result['actioncode'] ?? '');
+		$this->assertArrayHasKey('setdefaultproduct', $result['allactiondata'] ?? array());
+		$this->assertStringContainsString($langs->trans('EInvoiceNoLineNeedsDefaultProduct'), (string) ($result['action'] ?? ''));
 	}
 }
