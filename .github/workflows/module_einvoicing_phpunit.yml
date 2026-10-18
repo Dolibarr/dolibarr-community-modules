@@ -56,7 +56,7 @@ jobs:
     outputs:
       matrix: ${{ steps.pick.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: What the change touches
         id: changed
@@ -127,7 +127,7 @@ jobs:
 
     steps:
       - name: Checkout the modules repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: A Dolibarr ${{ matrix.dolibarr }} to run against
         id: instance
@@ -511,7 +511,7 @@ jobs:
 
     steps:
       - name: Checkout the modules repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: A Dolibarr to install into
         id: instance
