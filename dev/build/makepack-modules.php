@@ -19,9 +19,24 @@
  */
 
 /**
- * This script searches through all directories for files named 'index.yaml'
- * and combines their contents into a single 'index.yaml' file.
+ * This script searches through all module directories for files named 'index.yaml'
+ * and combines their contents into a single 'index.yaml' file at the root of the repository.
  */
+
+// Name of the directory, relative to the root of the repository, that contains the modules.
+// Keep empty if modules are directly at the root of the repository.
+define('MODULES_DIR_NAME', '');
+
+/**
+ * Return the full path of the directory that contains the modules.
+ *
+ * @param   string  $rootDir    Root directory of the repository.
+ * @return  string              Path of the modules directory.
+ */
+function getModulesDir($rootDir)
+{
+	return (MODULES_DIR_NAME === '' ? $rootDir : $rootDir . DIRECTORY_SEPARATOR . MODULES_DIR_NAME);
+}
 
 /**
  * Recursively searches directories for 'index.yaml' files.
@@ -235,8 +250,7 @@ function completAutoTags($content, $modulePath)
 
 				// If we process tag version and it was not found inside the descriptor file, we try to get it from VERSION file
 				if ($tag == 'current_version' && empty($version)) {
-					$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..'); // We are in dev/build, we want to go to root of repository
-					$versionfile = $directoryToSearch . DIRECTORY_SEPARATOR . strtolower($modulename) . DIRECTORY_SEPARATOR . "VERSION";
+					$versionfile = $modulePath . DIRECTORY_SEPARATOR . "VERSION";
 					print "Try to guess version from VERSION file ".$versionfile."\n";
 					if (file_exists($versionfile)) {
 						$version = file_get_contents($versionfile);
@@ -267,7 +281,7 @@ function completAutoTags($content, $modulePath)
 
 		if (!empty($tagsToExtractFromDescriptor['current_version'])) {
 			$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..'); // We are in dev/build, we want to go to root of repository
-			$outzip = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . DIRECTORY_SEPARATOR . "module_" . strtolower($modulename) . "-" . $version . ".zip";
+			$outzip = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . "module_" . strtolower($modulename) . "-" . $version . ".zip";
 			print "We check if zip file for module ".$modulename.", with name ".$outzip." exists\n";
 			if (file_exists($outzip)) {
 				// File already exists, nothing is done.
@@ -285,8 +299,14 @@ function completAutoTags($content, $modulePath)
 			$value = "";
 			$urltoget = "";
 
-			// TODO Try to guess value from git sources
-			if (empty($gitsystem) || $gitsystem == 'github') {
+			// The module sources are in this repository, so we take the date of the last local commit on the module directory
+			$output = array();
+			$returnCode = 0;
+			exec('git -C ' . escapeshellarg($modulePath) . ' log -1 --format=%cs -- . 2>/dev/null', $output, $returnCode);
+			if ($returnCode === 0 && !empty($output[0])) {
+				$content = preg_replace('/(' . preg_quote($tag) . ':\s*)["\']?auto["\']?/', "$1\"".trim($output[0])."\"", $content);
+				print "Replaced auto for '".$tag."' with value of last local commit: ".trim($output[0])."\n";
+			} elseif (empty($gitsystem) || $gitsystem == 'github') {
 				$urltoget = preg_replace('/https:\/\/github.com/', 'https://api.github.com/repos', $git);
 				$urltoget = preg_replace('/\/tree\/.*$/', '/commits?per_page=1&sha='.$gitbranch, $urltoget);
 				$urltoget = preg_replace('/\.git$/', '/commits?per_page=1&sha='.$gitbranch, $urltoget);
@@ -404,7 +424,7 @@ function checkAndCompleteChangelog($mod, $version, $project, $repo)
 	$prTitles = array();
 	$rawBody = implode("\n", $output);
 	$entries = explode("___CHANGELOG_SEP___", $rawBody);
-	$modulePrefix = $project . '/';
+	$modulePrefix = (MODULES_DIR_NAME === '' ? '' : MODULES_DIR_NAME . '/') . $project . '/';
 	foreach ($entries as $entry) {
 		$entry = trim($entry);
 		if ($entry === '') {
@@ -517,14 +537,21 @@ function buildModulePackages($action, $modulename)
 		'compat',
 		'css',
 		'core',
+		'doctemplates',
+		'icons',
+		'images',
 		'img',
+		'includes',
 		'js',
 		'langs',
 		'lib',
 		'public',
 		'scripts',
 		'sql',
+		'theme',
+		'tools',
 		'tpl',
+		'user',
 		'vendor',
 		'*.md',
 		'*.json',
@@ -538,8 +565,9 @@ function buildModulePackages($action, $modulename)
 
 	// Get path of module dir
 	$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..'); // We are in dev/build, we want to go to root of repository
+	$modulesDir = getModulesDir($directoryToSearch);
 	$outputFile = $directoryToSearch . DIRECTORY_SEPARATOR . 'index.yaml';
-	$yamlFiles = findIndexYamlFiles($directoryToSearch, 2);
+	$yamlFiles = findIndexYamlFiles($modulesDir, 2);
 	$yamlFiles = array_filter($yamlFiles, function ($file) use ($outputFile) {
 		return $file != $outputFile; // Exclude the output file from the list of files to combine
 	});
@@ -568,10 +596,14 @@ function buildModulePackages($action, $modulename)
 
 	// For each module, we generate the zip file
 	foreach ($projects as $project) {
-		print "*** Build package for project: ".$project." in directory ".$directoryToSearch . DIRECTORY_SEPARATOR . $project."\n";
+		print "*** Build package for project: ".$project." in directory ".$modulesDir . DIRECTORY_SEPARATOR . $project."\n";
 
 		// Change current dir to module dir, we will execute all next operations from this dir
-		chdir($directoryToSearch . DIRECTORY_SEPARATOR . $project);
+		if (!is_dir($modulesDir . DIRECTORY_SEPARATOR . $project) || !chdir($modulesDir . DIRECTORY_SEPARATOR . $project)) {
+			print "[fail] Directory ".$modulesDir . DIRECTORY_SEPARATOR . $project." not found, skipped.\n";
+			print "\n";
+			continue;
+		}
 
 		list($mod, $version) = detectModule();
 		if ($mod == "" || $version == "") {
@@ -585,7 +617,7 @@ function buildModulePackages($action, $modulename)
 		// If the entry is missing, it is added from the merged PR titles and the script stops so
 		// the change can be committed before relaunching.
 		if ($action == 'makeziptag') {
-			$repo = $directoryToSearch . DIRECTORY_SEPARATOR . $project;
+			$repo = $modulesDir . DIRECTORY_SEPARATOR . $project;
 			if (checkAndCompleteChangelog($mod, $version, $project, $repo)) {
 				print "\n";
 				print "The ChangeLog.md was updated with a new entry for version " . $version . ".\n";
@@ -596,8 +628,11 @@ function buildModulePackages($action, $modulename)
 		}
 
 		//  Define the name of the output zip file and remove it if already exists
+		if (!is_dir($directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin')) {
+			mkdirAndCheck($directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin');
+		}
 		$outzip = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . "module_" . $mod . "-" . $version . ".zip";
-		$outzipothers = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . DIRECTORY_SEPARATOR . "module_" . $mod . "-*.zip";
+		$outzipothers = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev/build/bin/' . "module_" . $mod . "-*.zip";
 		if (file_exists($outzip)) {
 			print "A zip file already exists with this name/version: $outzip\n";
 
@@ -622,7 +657,7 @@ function buildModulePackages($action, $modulename)
 				if ($action == 'makeziptag') {
 					$output = '';
 					$returnCode = 0;
-					$repo = $directoryToSearch . DIRECTORY_SEPARATOR . $project;
+					$repo = $modulesDir . DIRECTORY_SEPARATOR . $project;
 					$command = sprintf('git -C %s tag %s 2>&1', escapeshellarg($repo), escapeshellarg($tag));
 					$command .= "; git tag push origin ".escapeshellarg($tag);
 					$lastmessagetoshow .= "YOU MUST COMMIT ALL FILES (INCLUDING THE ZIP) AND CREATE A TAG WITH COMMAND:\n";
@@ -953,6 +988,20 @@ function zipDir($folder, &$zip, $root = "")
 
 
 /**
+ * Format a Dolibarr version for the Dolistore min/max extrafields: "24.0" or "24" gives "V24", "24.1" gives "V24.1".
+ *
+ * @param   string  $version    Version found in index.yaml.
+ * @return  string              Version with syntax Vxx.
+ */
+function formatDolistoreVersion($version)
+{
+	$version = preg_replace('/^v/i', '', trim($version));
+	$version = preg_replace('/(\.0)+$/', '', $version);
+	return 'V' . $version;
+}
+
+
+/**
  * Push a module zip package to the Dolistore (remote Dolibarr instance) using the REST API.
  *
  * The product ID is read from the dolistore-download URL found in the root index.yaml file.
@@ -1147,10 +1196,10 @@ function pushModuleToDolistore($apikey, $dolistoreApiUrl, $modulename, $director
 		$arrayOptions['options_marketplace_module_version'] = $moduleVersion;
 	}
 	if (!empty($dolibarrMin)) {
-		$arrayOptions['options_marketplace_min_version'] = $dolibarrMin;
+		$arrayOptions['options_marketplace_min_version'] = formatDolistoreVersion($dolibarrMin);
 	}
 	if (!empty($dolibarrMax)) {
-		$arrayOptions['options_marketplace_max_version'] = $dolibarrMax;
+		$arrayOptions['options_marketplace_max_version'] = formatDolistoreVersion($dolibarrMax);
 	}
 	if (!empty($phpMin)) {
 		$arrayOptions['options_marketplace_php_min_version'] = $phpMin;
@@ -1238,7 +1287,7 @@ if ($argv[1] == 'index') {
 	$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..');
 	$outputFile = $directoryToSearch . DIRECTORY_SEPARATOR . 'index.yaml';
 
-	$yamlFiles = findIndexYamlFiles($directoryToSearch, 2);
+	$yamlFiles = findIndexYamlFiles(getModulesDir($directoryToSearch), 2);
 
 	// Exclude the output file from the list of files to combine
 	$yamlFiles = array_filter($yamlFiles, function ($file) use ($outputFile) {
@@ -1314,7 +1363,7 @@ if ($argv[1] == 'pushdolistore') {
 	print "\n";
 	print "Please type enter to confirm to push zip file on Dolistore (CTR+C to cancel): ";
 	$confirmkey = trim(fgets(STDIN));
-	if (empty($confirmkey)) {
+	if (!empty($confirmkey)) {
 		print "Operation canceled.\n";
 		exit(1);
 	}

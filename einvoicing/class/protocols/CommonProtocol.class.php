@@ -1405,7 +1405,7 @@ trait CommonProtocol
 	 * flow, if the line is already resolved or not, without importing anything.
 	 *
 	 * @param 	array 	$lineData 	Array containing invoice line data extracted from XML
-	 * @return 	array{res:int, message:string, matchtype?:string, routingtype?:string, actioncode?:string, action?:string, actionurl?:string, actiondata?:array<string,mixed>, allactiondata?:array<string,array<string,mixed>>}   'res' = ID of the product found, 0 if no product found, -1 when a mixed invoice needs a default the setup does not choose. 'matchtype' tells how it was resolved ('defaultrouting' when the line fell back on a default of the vendor, 'routingtype' then says which one).
+	 * @return 	array{res:int, message:string, matchtype?:string, routingtype?:string, actioncode?:string, action?:string, actionurl?:string, actiondata?:array<string,mixed>, allactiondata?:array<string,array<string,mixed>>}   'res' = ID of the product found, 0 if no product found, -1 when a mixed invoice needs a default the setup does not choose. 'matchtype' tells how it was resolved ('defaultrouting' when the line fell back on a default of the vendor or on the catch-all product of the setup, 'routingtype' then says which one: 'product', 'service' or 'catchall').
 	 */
 	public function findProductFromEinvoiceLine($lineData)
 	{
@@ -1533,7 +1533,42 @@ trait CommonProtocol
 			}
 		}
 
+		// Last resort, opt-in: the product the setup gives to every line nothing else resolved, whatever its
+		// vendor. It is a catch-all like the default of the vendor, so it is reported the same way. Not with
+		// the automatic product creation, which it would otherwise always pre-empt.
+		if (getDolGlobalInt('EINVOICING_DEFAULT_PRODUCT_CATCHALL') && !getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_GENERATION')) {
+			$productId = $this->resolveCatchallProduct();
+			if ($productId > 0) {
+				dol_syslog(__METHOD__ . ' Catch-all product of the setup used: product=' . $productId);
+				return array('res' => $productId, 'message' => 'Line product not found, the catch-all product of the setup was used', 'matchtype' => 'defaultrouting', 'routingtype' => 'catchall');
+			}
+		}
+
 		return array('res' => 0, 'message' => 'No product found for this e-invoice line');
+	}
+
+	/**
+	 * Product of the setup used for the lines nothing else resolved, if it still exists.
+	 *
+	 * @return 	int 	Product id, 0 if none is set or the product is gone
+	 */
+	private function resolveCatchallProduct()
+	{
+		global $db;
+
+		$productId = getDolGlobalInt('EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID');
+		if ($productId <= 0) {
+			return 0;
+		}
+		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
+		$sql .= " WHERE rowid = " . ((int) $productId);
+		$sql .= " AND entity IN (" . getEntity('product') . ")";
+		$resql = $db->query($sql);
+		if ($resql && ($obj = $db->fetch_object($resql))) {
+			return (int) $obj->rowid;
+		}
+
+		return 0;
 	}
 
 	/**

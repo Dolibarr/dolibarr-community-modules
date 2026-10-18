@@ -83,8 +83,8 @@ class ExportImportRoundTripTest extends CommonClassTest
 	);
 
 	/**
-	 * The invoice and the supplier invoice read back from its document, built once for the class.
-	 * @var array{invoice:Facture,imported:FactureFournisseur}|null
+	 * The invoice, the supplier invoice read back from its document and that document, built once for the class.
+	 * @var array{invoice:Facture,imported:FactureFournisseur,document:string}|null
 	 */
 	private static $roundTrip = null;
 
@@ -215,7 +215,7 @@ class ExportImportRoundTripTest extends CommonClassTest
 	 *
 	 * @param	CIIProtocol	$protocol	The protocol that writes and reads the document
 	 * @param	Facture		$invoice	The invoice to send, lines already added
-	 * @return	array{invoice:Facture,imported:FactureFournisseur}	The invoice read back, and what the import made of it
+	 * @return	array{invoice:Facture,imported:FactureFournisseur,document:string}	The invoice read back, what the import made of it, and the document
 	 */
 	private function sendAndImport($protocol, $invoice)
 	{
@@ -230,7 +230,8 @@ class ExportImportRoundTripTest extends CommonClassTest
 		$this->assertNotEmpty($path, 'the document is generated: ' . $protocol->error . ' ' . implode(', ', (array) $protocol->errors));
 		$this->assertFileExists((string) $path, 'the generated document is written');
 
-		$result = $protocol->createSupplierInvoiceFromSource((string) file_get_contents((string) $path), basename((string) $path));
+		$document = (string) file_get_contents((string) $path);
+		$result = $protocol->createSupplierInvoiceFromSource($document, basename((string) $path));
 		$importedId = is_array($result) ? (int) ($result['res'] ?? 0) : (int) $result;
 		$answer = is_array($result) ? trim(strip_tags((string) ($result['message'] ?? ''))) : '';
 		$this->assertGreaterThan(
@@ -243,13 +244,13 @@ class ExportImportRoundTripTest extends CommonClassTest
 		$this->assertGreaterThan(0, $imported->fetch($importedId), 'the imported invoice is read back');
 		$imported->fetch_lines();
 
-		return array('invoice' => $reloaded, 'imported' => $imported);
+		return array('invoice' => $reloaded, 'imported' => $imported, 'document' => $document);
 	}
 
 	/**
 	 * Generate an invoice, import the document it produces, and return both.
 	 *
-	 * @return array{invoice:Facture,imported:FactureFournisseur}
+	 * @return array{invoice:Facture,imported:FactureFournisseur,document:string}
 	 */
 	private function roundTrip()
 	{
@@ -366,5 +367,75 @@ class ExportImportRoundTripTest extends CommonClassTest
 		$this->assertSame(FactureFournisseur::TYPE_CREDIT_NOTE, (int) $roundTrip['imported']->type, 'it is imported as a credit note');
 		$this->assertCount(count($roundTrip['invoice']->lines), $roundTrip['imported']->lines, 'no deposit line is added to it');
 		$this->assertEqualsWithDelta((float) $roundTrip['invoice']->total_ttc, (float) $roundTrip['imported']->total_ttc, 0.011, 'the gross total');
+	}
+
+	/**
+	 * Receive the document of the round trip again, as a new flow, and read the flow its invoice is linked to.
+	 *
+	 * @param	string		$flowId		Flow the document arrives with
+	 * @return	string|null				Flow of the link of the invoice, null when the invoice has no link
+	 */
+	private function receiveAgainAndReadLinkedFlow($flowId)
+	{
+		global $conf, $db, $user;
+
+		$roundTrip = $this->roundTrip();
+
+		$savUser = $user;
+		$user = new User($db);
+		$user->fetch(1);
+		$savPdp = getDolGlobalString('EINVOICING_PDP');
+		$conf->global->EINVOICING_PDP = 'SPECIMEN';
+
+		try {
+			$protocol = new CIIProtocol($db);
+			$result = $protocol->createSupplierInvoiceFromSource($roundTrip['document'], null, $flowId);
+			$this->assertSame((int) $roundTrip['imported']->id, (int) ($result['res'] ?? 0), 'the document is attached to the invoice it was already imported as');
+		} finally {
+			$user = $savUser;
+			$conf->global->EINVOICING_PDP = $savPdp;
+		}
+
+		$resql = $db->query("SELECT flow_id FROM " . $db->prefix() . "einvoicing_extlinks WHERE element_type = 'invoice_supplier' AND provider = 'SPECIMEN' AND element_id = " . (int) $roundTrip['imported']->id);
+		$obj = $resql ? $db->fetch_object($resql) : null;
+
+		return $obj ? (string) $obj->flow_id : null;
+	}
+
+	/**
+	 * An invoice keyed in by hand, then met by its received document, gets the link its card reads to offer the lifecycle statuses.
+	 *
+	 * @return void
+	 */
+	public function testAnInvoiceKeyedInByHandIsLinkedToTheFlowItIsMetBy()
+	{
+		global $db;
+
+		$roundTrip = $this->roundTrip();
+		$db->query("DELETE FROM " . $db->prefix() . "einvoicing_extlinks WHERE element_type = 'invoice_supplier' AND element_id = " . (int) $roundTrip['imported']->id);
+
+		$this->assertSame('FLOW-KEYED-IN-BY-HAND', $this->receiveAgainAndReadLinkedFlow('FLOW-KEYED-IN-BY-HAND'));
+	}
+
+	/**
+	 * An invoice already linked to a flow keeps it when the same document is received again.
+	 *
+	 * @return void
+	 */
+	public function testAnInvoiceAlreadyLinkedKeepsItsFlow()
+	{
+		global $conf, $db;
+
+		$roundTrip = $this->roundTrip();
+		$savPdp = getDolGlobalString('EINVOICING_PDP');
+		$conf->global->EINVOICING_PDP = 'SPECIMEN';
+		try {
+			$einvoicing = new EInvoicing($db);
+			$this->assertGreaterThan(0, $einvoicing->insertOrUpdateExtLink((int) $roundTrip['imported']->id, 'invoice_supplier', 'FLOW-FIRST-RECEIVED'), 'the invoice is linked to its first flow');
+		} finally {
+			$conf->global->EINVOICING_PDP = $savPdp;
+		}
+
+		$this->assertSame('FLOW-FIRST-RECEIVED', $this->receiveAgainAndReadLinkedFlow('FLOW-RECEIVED-AGAIN'));
 	}
 }

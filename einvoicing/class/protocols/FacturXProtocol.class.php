@@ -628,6 +628,92 @@ class FacturXProtocol extends CIIProtocol
 
 
 	/**
+	 * The files a received Factur-X carries beside its invoice XML, such as the PDF the vendor issued.
+	 *
+	 * A file is kept only when its name gives one of the extensions EN 16931 allows and its content
+	 * starts the way that format does: the name alone never decides what is stored.
+	 *
+	 * @param  string $file Raw content of the received PDF
+	 * @return array<int,array{filename:string,mimecode:string,extension:string,content:string}>
+	 */
+	public static function extractContainerAttachments(string $file): array
+	{
+		$attachments = array();
+		if (strncmp($file, '%PDF-', 5) !== 0) {
+			return $attachments;
+		}
+
+		try {
+			$parser = new PdfAttachmentExtractor($file, md5($file));
+			$embedded = $parser->getEmbeddedFiles();
+			$parser->cleanUp();
+		} catch (Throwable $e) {
+			dol_syslog(__METHOD__ . ' could not read the embedded files: ' . $e->getMessage(), LOG_WARNING, 0, '_einvoicing');
+			return $attachments;
+		}
+
+		$mimecodes = array_flip(self::ATTACHMENT_MIME_EXTENSIONS);
+		$rank = 0;
+		foreach ($embedded as $name => $content) {
+			$rank++;
+			// dol_sanitizeFileName() keeps a NUL, which makes dol_move() throw; not dol_string_nounprintableascii(): its /u drops a non UTF-8 name.
+			$name = (string) preg_replace('/[\x00-\x1F\x7F]/', '', (string) $name);
+			if (in_array($name, PdfAttachmentExtractor::INVOICE_ATTACHMENT_NAMES, true)) {
+				continue;
+			}
+
+			$extension = strtolower((string) pathinfo((string) $name, PATHINFO_EXTENSION));
+			if ($extension === 'jpeg') {
+				$extension = 'jpg';
+			}
+			if (!isset($mimecodes[$extension]) || !self::contentMatchesExtension((string) $content, $extension)) {
+				dol_syslog(__METHOD__ . ' embedded file #' . $rank . ' ignored, its name or content is not one EN 16931 allows', LOG_WARNING, 0, '_einvoicing');
+				continue;
+			}
+
+			$filename = dol_sanitizeFileName((string) pathinfo(basename((string) $name), PATHINFO_FILENAME));
+			if ($filename === '' || $filename === '-') {
+				$filename = 'attachment' . $rank;
+			}
+
+			$attachments[] = array(
+				'filename' => $filename,
+				'mimecode' => $mimecodes[$extension],
+				'extension' => $extension,
+				'content' => (string) $content
+			);
+		}
+
+		return $attachments;
+	}
+
+	/**
+	 * Whether a content starts the way files of that extension do.
+	 *
+	 * @param  string $content		Raw content
+	 * @param  string $extension	One of the values of ATTACHMENT_MIME_EXTENSIONS
+	 * @return bool					True when the content starts with that format's signature, or for csv is non-empty text without NUL byte
+	 */
+	private static function contentMatchesExtension(string $content, string $extension): bool
+	{
+		switch ($extension) {
+			case 'pdf':
+				return strncmp($content, '%PDF-', 5) === 0;
+			case 'png':
+				return strncmp($content, "\x89PNG\r\n\x1a\n", 8) === 0;
+			case 'jpg':
+				return strncmp($content, "\xFF\xD8\xFF", 3) === 0;
+			case 'xlsx':
+			case 'ods':
+				return strncmp($content, "PK\x03\x04", 4) === 0;
+			case 'csv':
+				return $content !== '' && strpos($content, "\0") === false;
+		}
+
+		return false;
+	}
+
+	/**
 	 * Extract XML from an input file content and return it
 	 *
 	 * @param  string $fileContent Raw file content
