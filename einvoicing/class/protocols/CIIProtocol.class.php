@@ -364,6 +364,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param 	CommonInvoice	$invoice 		Invoice object containing all necessary data.
 	 * @param	?Translate		$outputlangs	Output language
 	 * @return 	string 							XML representation of the invoice.
+	 * @throws	Exception						If a beforeEinvoiceXmlBuild hook fails
 	 */
 	public function generateXML($invoice, $outputlangs = null)
 	{
@@ -551,6 +552,14 @@ class CIIProtocol extends AbstractProtocol
 
 		dol_mkdir(dirname($xmlfile), einvoicingDataRoot(dirname($xmlfile)));
 		dol_delete_file($xmlfile);
+
+		global $action, $hookmanager;
+		$hookmanager->initHooks(array('einvoicegeneration'));
+		$parameters = array('protocol' => 'cii', 'invoiceData' => &$invoiceData, 'linesData' => &$linesData, 'object' => $invoice, 'outputlangs' => $outputlangs);
+		$reshook = $hookmanager->executeHooks('beforeEinvoiceXmlBuild', $parameters, $this, $action);
+		if ($reshook < 0) {
+			throw new Exception(implode(', ', array_filter(array_merge(array($hookmanager->error), $hookmanager->errors))));
+		}
 
 		$xmlcontent = $this->buildXML($invoiceData, $linesData, $this->getBuildXmlProfile($object), $outputlangs);
 
