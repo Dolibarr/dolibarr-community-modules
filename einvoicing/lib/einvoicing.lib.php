@@ -1137,6 +1137,19 @@ function einvoicingAmountsEqual(float $amount1, float $amount2): bool
 }
 
 /**
+ * Tell whether an amount is at least one positive cent once written with the 2 decimals of EN 16931.
+ *
+ * Rounded the same way as einvoicingAmountsEqual(); zero and negative amounts are not positive.
+ *
+ * @param	float	$amount		Amount
+ * @return	bool				True when the amount writes a positive cent
+ */
+function einvoicingAmountIsPositive(float $amount): bool
+{
+	return (float) price2num($amount, 2) > 0;
+}
+
+/**
  * Tell whether an URL may be used as the target of a redirect made by the OAuth proxy.
  *
  * public/proxy_oauthcallback.php is reachable without authentication and hands the freshly issued

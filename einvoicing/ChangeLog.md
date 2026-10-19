@@ -8,6 +8,7 @@ IMPORTANT: After each version upgrade, you must disable and enable the module so
 ## 1.4.0
 
 - FIX: [einvoicing] A received line whose price rebuilds its amount (BT-131) one cent off is imported at the amount announced, so the invoice no longer stays blocked at validation
+- QUAL: [einvoicing] Every guard confronting an amount with a received document compares it to the cent through einvoicingAmountsEqual() and einvoicingAmountIsPositive(), instead of thresholds written at each place
 
 ## 1.3.0
 

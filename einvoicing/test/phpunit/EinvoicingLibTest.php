@@ -753,6 +753,42 @@ class EinvoicingLibTest extends CommonClassTest
 	}
 
 	/**
+	 * Amounts and whether they write a positive cent.
+	 *
+	 * @return	array<string,array{0:float,1:bool}>
+	 */
+	public static function signedAmounts(): array
+	{
+		return array(
+			'zero'                          => array(0.0, false),
+			'negative zero'                 => array(-0.0, false),
+			'float noise around zero'       => array(0.1 + 0.2 - 0.3, false),
+			'below half a cent'             => array(0.0049, false),
+			'half a cent'                   => array(0.005, true),
+			'half a cent under float noise' => array(0.004999999999999, true),
+			'one cent'                      => array(0.01, true),
+			'an amount'                     => array(2149.85, true),
+			'minus half a cent'             => array(-0.005, false),
+			'minus one cent'                => array(-0.01, false),
+			'a negative amount'             => array(-5.0, false),
+		);
+	}
+
+	/**
+	 * An amount is positive when it writes at least one positive cent.
+	 *
+	 * @dataProvider signedAmounts
+	 *
+	 * @param	float	$amount		Amount
+	 * @param	bool	$expected	Whether it is positive
+	 * @return	void
+	 */
+	public function testAnAmountIsPositiveFromItsFirstCent($amount, $expected)
+	{
+		$this->assertSame($expected, einvoicingAmountIsPositive($amount));
+	}
+
+	/**
 	 * The precision of the instance does not move the comparison: EN 16931 amounts have 2 decimals.
 	 *
 	 * @return	void
@@ -767,6 +803,8 @@ class EinvoicingLibTest extends CommonClassTest
 				$conf->global->MAIN_MAX_DECIMALS_TOT = $decimals;
 				$this->assertTrue(einvoicingAmountsEqual(358.312, 358.31), 'MAIN_MAX_DECIMALS_TOT=' . $decimals);
 				$this->assertFalse(einvoicingAmountsEqual(358.32, 358.31), 'MAIN_MAX_DECIMALS_TOT=' . $decimals);
+				$this->assertTrue(einvoicingAmountIsPositive(0.005), 'MAIN_MAX_DECIMALS_TOT=' . $decimals);
+				$this->assertFalse(einvoicingAmountIsPositive(0.0049), 'MAIN_MAX_DECIMALS_TOT=' . $decimals);
 			}
 		} finally {
 			if ($saved === null) {
