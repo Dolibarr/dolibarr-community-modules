@@ -926,6 +926,36 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	}
 
 	/**
+	 * A credit note is stored negative: announced positive it is reversed, signed like an invoice it is taken
+	 * as received (issue #1077). Any other type keeps the sign of its document.
+	 *
+	 * @return void
+	 */
+	public function testDocumentSignOfType()
+	{
+		$this->assertSame(-1, SupplierInvoiceHelper::documentSignOfType(FactureFournisseur::TYPE_CREDIT_NOTE, 100.0));
+		$this->assertSame(1, SupplierInvoiceHelper::documentSignOfType(FactureFournisseur::TYPE_CREDIT_NOTE, -100.0));
+		$this->assertSame(-1, SupplierInvoiceHelper::documentSignOfType(FactureFournisseur::TYPE_CREDIT_NOTE, null));
+		$this->assertSame(1, SupplierInvoiceHelper::documentSignOfType(FactureFournisseur::TYPE_STANDARD, 100.0));
+		$this->assertSame(1, SupplierInvoiceHelper::documentSignOfType(FactureFournisseur::TYPE_STANDARD, -100.0));
+	}
+
+	/**
+	 * A line of a credit note owes or credits relative to the sign of the credit note, and has no sign
+	 * without an amount (issue #1077).
+	 *
+	 * @return void
+	 */
+	public function testCreditNoteLineSign()
+	{
+		$line = (object) array('qty' => 1, 'subprice' => 20);
+		$this->assertSame(-1, SupplierInvoiceHelper::creditNoteLineSign($line, -1), 'a refund of a credit note announced positive');
+		$this->assertSame(1, SupplierInvoiceHelper::creditNoteLineSign($line, 1), 'a fee of a credit note signed like an invoice');
+		$this->assertSame(1, SupplierInvoiceHelper::creditNoteLineSign((object) array('qty' => -1, 'subprice' => 20), -1), 'a fee of a credit note announced positive');
+		$this->assertSame(0, SupplierInvoiceHelper::creditNoteLineSign((object) array('qty' => 0, 'subprice' => 20), -1));
+	}
+
+	/**
 	 * The comparison is made on the absolute values: Dolibarr stores a credit note negative while
 	 * BT-110 and BT-112 are always announced positive, the document type carrying the sign.
 	 *
