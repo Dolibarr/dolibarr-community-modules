@@ -698,6 +698,86 @@ class EinvoicingLibTest extends CommonClassTest
 	}
 
 	/**
+	 * Pairs of amounts and whether they are the same amount for a document.
+	 *
+	 * @return	array<string,array{0:float,1:float,2:bool}>
+	 */
+	public static function amountPairs(): array
+	{
+		return array(
+			'same cents'                         => array(2149.85, 2149.85, true),
+			'zero and zero'                      => array(0.0, 0.0, true),
+			'zero and negative zero'             => array(0.0, -0.0, true),
+			'one cent above'                     => array(0.02, 0.01, false),
+			'one cent below'                     => array(2149.83, 2149.84, false),
+			'one cent from zero'                 => array(0.01, 0.0, false),
+			'one cent below zero'                => array(-0.01, 0.0, false),
+			'two cents'                          => array(2149.83, 2149.85, false),
+			'one cent on a credit note'          => array(-1791.55, -1791.54, false),
+			'same credit note'                   => array(-1791.54, -1791.54, true),
+			'opposite signs'                     => array(12.5, -12.5, false),
+			'float noise of a subtraction'       => array(0.03 - 0.02, 0.01, true),
+			'float noise of a sum'               => array(0.1 + 0.2, 0.3, true),
+			'float noise of a quantity'          => array(3 * 0.1, 0.3, true),
+			'large amount, one cent'             => array(10000000.01, 10000000.0, false),
+			'large amount, float noise'          => array(9999999.99 + 0.01, 10000000.0, true),
+			'below the cent, same cent'          => array(358.312, 358.31, true),
+			'below the cent, next cent'          => array(358.306, 358.31, true),
+			'below the cent, other cent'         => array(358.304, 358.31, false),
+			'half a cent rounds away from zero'  => array(10.005, 10.01, true),
+			'negative half a cent'               => array(-0.005, -0.01, true),
+			'half a cent is not zero'            => array(0.005, 0.0, false),
+			'below half a cent is zero'          => array(0.0049, 0.0, true),
+			'half a cent under float noise'      => array(937.8249999999971, 937.83, true),
+			'3 decimals, small amount'           => array(1.015, 1.02, true),
+			'3 decimals, large amount'           => array(18415.785, 18415.79, true),
+			'3 decimals, both sides'             => array(5461.542, 5461.536, true),
+			'3 decimals, across a cent'          => array(5079.835, 5079.831, false),
+		);
+	}
+
+	/**
+	 * Two amounts are the same when they round to the same cent, float noise included.
+	 *
+	 * @dataProvider amountPairs
+	 *
+	 * @param	float	$amount1	First amount
+	 * @param	float	$amount2	Second amount
+	 * @param	bool	$expected	Whether they are the same amount
+	 * @return	void
+	 */
+	public function testAmountsAreComparedToTheCent($amount1, $amount2, $expected)
+	{
+		$this->assertSame($expected, einvoicingAmountsEqual($amount1, $amount2));
+		$this->assertSame($expected, einvoicingAmountsEqual($amount2, $amount1), 'the comparison is symmetric');
+	}
+
+	/**
+	 * The precision of the instance does not move the comparison: EN 16931 amounts have 2 decimals.
+	 *
+	 * @return	void
+	 */
+	public function testAmountsAreComparedToTheCentWhateverTheInstancePrecision()
+	{
+		global $conf;
+
+		$saved = $conf->global->MAIN_MAX_DECIMALS_TOT ?? null;
+		try {
+			foreach (array('0', '3', '4', '8') as $decimals) {
+				$conf->global->MAIN_MAX_DECIMALS_TOT = $decimals;
+				$this->assertTrue(einvoicingAmountsEqual(358.312, 358.31), 'MAIN_MAX_DECIMALS_TOT=' . $decimals);
+				$this->assertFalse(einvoicingAmountsEqual(358.32, 358.31), 'MAIN_MAX_DECIMALS_TOT=' . $decimals);
+			}
+		} finally {
+			if ($saved === null) {
+				unset($conf->global->MAIN_MAX_DECIMALS_TOT);
+			} else {
+				$conf->global->MAIN_MAX_DECIMALS_TOT = $saved;
+			}
+		}
+	}
+
+	/**
 	 * The core puts the URL root in front of a dropdown entry, so the entry must not carry it already.
 	 *
 	 * @return void

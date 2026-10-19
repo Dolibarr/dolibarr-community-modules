@@ -2121,7 +2121,8 @@ class CIIProtocol extends AbstractProtocol
 
 		$warning = '';
 		$refined = false;
-		if ($lineAnnouncesAnAmount && $difference > 0.01 && $divisor != 0.0) {
+		$amountsDiffer = !einvoicingAmountsEqual($rebuilt, $announced);
+		if ($lineAnnouncesAnAmount && $amountsDiffer && $divisor != 0.0) {
 			$subprice = $announced / $divisor;
 			$refined = true;
 
@@ -2136,7 +2137,7 @@ class CIIProtocol extends AbstractProtocol
 				$warning .= 'The document prices that line elsewhere than it bills it: the line was imported at the amount announced, at a unit price of '
 					. $this->spellOutUnitPrice($subprice) . ', so the invoice totals what the document bills.';
 			}
-		} elseif ($difference > 0.01) {
+		} elseif ($amountsDiffer) {
 			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announcedText
 				. ', but its quantity and unit price rebuild ' . $rebuilt . '. The invoice carries the rebuilt amount.';
 		}

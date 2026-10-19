@@ -750,6 +750,73 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 	}
 
 	/**
+	 * A single cent between what the couple rebuilds and BT-131 is a difference the invoice totals.
+	 *
+	 * @return	void
+	 */
+	public function testALineOneCentAwayFromItsPriceTotalsTheAnnouncedAmount()
+	{
+		$amounts = $this->amounts(array('lineid' => '21', 'netpriceamount' => 0.02, 'billedquantity' => 1.0, 'lineTotalAmount' => 0.01), 1.0, 0.02);
+
+		$this->assertEquals(0.01, round($amounts['qty'] * $amounts['subprice'], 2), 'the line totals BT-131, not the 0.02 its price rebuilds');
+		$this->assertStringContainsString('rebuild 0.02', $amounts['warning']);
+	}
+
+	/**
+	 * The same single cent on a credit line, where both amounts are negative.
+	 *
+	 * @return	void
+	 */
+	public function testACreditLineOneCentAwayFromItsPriceTotalsTheAnnouncedAmount()
+	{
+		$amounts = $this->amounts(array('lineid' => '7', 'netpriceamount' => -0.02, 'billedquantity' => 1.0, 'lineTotalAmount' => -0.01), 1.0, -0.02);
+
+		$this->assertEquals(-0.01, round($amounts['qty'] * $amounts['subprice'], 2));
+		$this->assertStringContainsString('rebuild -0.02', $amounts['warning']);
+	}
+
+	/**
+	 * One cent over a large quantity: the price is refined, the quantity kept.
+	 *
+	 * @return	void
+	 */
+	public function testALargeQuantityOneCentAwayIsRefinedNotRewritten()
+	{
+		$amounts = $this->amounts(array('lineid' => '8', 'netpriceamount' => 0.123457, 'billedquantity' => 1000.0, 'lineTotalAmount' => 123.45), 1000.0, 0.123457);
+
+		$this->assertSame(1000.0, $amounts['qty']);
+		$this->assertEquals(123.45, round($amounts['qty'] * $amounts['subprice'], 2), 'the line totals BT-131, not the 123.46 its price rebuilds');
+		$this->assertStringContainsString('rebuild 123.46', $amounts['warning']);
+	}
+
+	/**
+	 * Float noise in quantity times price is no difference: the line stays as the document wrote it.
+	 *
+	 * @return	void
+	 */
+	public function testFloatNoiseInTheRebuiltAmountIsNoDifference()
+	{
+		$amounts = $this->amounts(array('lineid' => '9', 'netpriceamount' => 0.1, 'billedquantity' => 3.0, 'lineTotalAmount' => 0.3), 3.0, 0.1);
+
+		$this->assertSame(3.0, $amounts['qty']);
+		$this->assertSame(0.1, $amounts['subprice']);
+		$this->assertSame('', $amounts['warning']);
+	}
+
+	/**
+	 * A line announcing nothing keeps what its price rebuilds, a single cent away or not.
+	 *
+	 * @return	void
+	 */
+	public function testALineAnnouncingNothingIsNotRefinedForACent()
+	{
+		$amounts = $this->amounts(array('lineid' => '10', 'netpriceamount' => 0.02, 'billedquantity' => 1.0), 1.0, 0.02);
+
+		$this->assertSame(0.02, $amounts['subprice']);
+		$this->assertStringContainsString('The invoice carries the rebuilt amount', $amounts['warning']);
+	}
+
+	/**
 	 * A charge of the line (BG-28) is part of BT-131 but leaves on a line of its own (issue #735), so the
 	 * line itself is worth BT-131 less that charge: the couple the document states rebuilds exactly that,
 	 * and nothing is rewritten or reported. Five units at 100.05 less 10.001 percent, plus a charge of

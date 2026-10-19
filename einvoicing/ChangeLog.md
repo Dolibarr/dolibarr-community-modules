@@ -5,6 +5,10 @@ IMPORTANT: After each version upgrade, you must disable and enable the module so
 
 
 
+## 1.4.0
+
+- FIX: [einvoicing] A received line whose price rebuilds its amount (BT-131) one cent off is imported at the amount announced, so the invoice no longer stays blocked at validation
+
 ## 1.3.0
 
 - FIX: [einvoicing] 'Import again' no longer gives a 404 on a Dolibarr installed in a sub-path
