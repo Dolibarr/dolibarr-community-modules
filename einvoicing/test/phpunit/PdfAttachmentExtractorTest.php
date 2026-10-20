@@ -169,6 +169,62 @@ class PdfAttachmentExtractorTest extends CommonClassTest
 	}
 
 	/**
+	 * A parser that reads one object out of a string, without a PDF around it.
+	 *
+	 * @return	PdfAttachmentExtractor
+	 */
+	private function objectReader()
+	{
+		return new class ('') extends PdfAttachmentExtractor {
+			/**
+			 * @param	string		$data			Unused
+			 */
+			public function __construct($data)
+			{
+			}
+
+			/**
+			 * @param	string		$data			Serialized object
+			 * @return	array						Object, then the offset that follows it
+			 */
+			public function read($data)
+			{
+				return $this->getRawObject(0, $data);
+			}
+		};
+	}
+
+	/**
+	 * A dictionary ending on a hexadecimal string, as iText writes a file specification, is read.
+	 *
+	 * @return	void
+	 */
+	public function testADictionaryEndingOnAHexStringIsRead()
+	{
+		$data = '<</Desc<>/Type/Filespec/UF<6661637475722d782e786d6c>>>';
+
+		list($object, $offset) = $this->objectReader()->read($data);
+
+		$this->assertSame(PDF_TYPE_DICTIONARY, $object[0]);
+		$this->assertSame(array(PDF_TYPE_HEX, ''), $object[1]['/Desc']);
+		$this->assertSame(array(PDF_TYPE_HEX, '6661637475722d782e786d6c'), $object[1]['/UF']);
+		$this->assertSame(strlen($data), $offset);
+	}
+
+	/**
+	 * A dictionary that is never closed is refused instead of being read forever.
+	 *
+	 * @return	void
+	 */
+	public function testAnUnclosedDictionaryIsRefused()
+	{
+		$this->expectException(Exception::class);
+		$this->expectExceptionMessage('dictionary not closed');
+
+		$this->objectReader()->read('<</Type/Filespec/UF<6661>');
+	}
+
+	/**
 	 * What all of the above is for: reading a received Factur-X pulls no composer library, so it
 	 * cannot be stopped by the PHP those libraries ask for.
 	 *
