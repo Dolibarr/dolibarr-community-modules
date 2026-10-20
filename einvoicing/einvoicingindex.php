@@ -141,7 +141,7 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 
 		$tokenData = $provider->getTokenData();
 		// Check if there is a token or credentials configured
-		if ($tokenData['token']) {
+		if (!empty($tokenData['token'])) {
 			$pa_connected = true;
 		}
 	}

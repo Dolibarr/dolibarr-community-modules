@@ -101,11 +101,11 @@ abstract class AbstractPDPProvider
 	/**
 	 * Get current token in memory (loaded by fetchOAuthTokenDB in constructor)
 	 *
-	 * @return array<string,null|int|string>	Token
+	 * @return array<string,null|int|string>	Token, empty when none is stored (fetchOAuthTokenDB() returned false)
 	 */
 	public function getTokenData()
 	{
-		return $this->tokenData;
+		return is_array($this->tokenData) ? $this->tokenData : [];
 	}
 
 	/**
