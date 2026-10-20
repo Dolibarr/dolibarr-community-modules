@@ -165,7 +165,7 @@ class SupplierInvoiceHelper
 		if (isset($parsedHeader['duePayableAmount'])) {
 			$prepaid = isset($parsedHeader['totalPrepaidAmount']) ? (float) $parsedHeader['totalPrepaidAmount'] : 0.0;
 			$due = (float) $parsedHeader['duePayableAmount'] + $prepaid;
-			if (abs($due - $rounded) < 0.005) {
+			if (einvoicingAmountsEqual($due, $rounded)) {
 				return $due;
 			}
 			dol_syslog(__METHOD__ . ' BT-115 (' . $parsedHeader['duePayableAmount'] . ') does not answer BR-CO-16 on BT-112/BT-113/BT-114, the invoice is confronted with BT-112 instead', LOG_WARNING, 0, '_einvoicing');
@@ -716,8 +716,8 @@ class SupplierInvoiceHelper
 		$invoiceTva = $sign * ((float) $invoice->total_tva + $deposits['tva']);
 		$invoiceTtc = $sign * ((float) $invoice->total_ttc + $deposits['ttc']);
 
-		if (abs($invoiceTva - (float) $announcedTva) >= 0.005
-			|| abs($invoiceTtc - (float) $announcedTtc) >= 0.005) {
+		if (!einvoicingAmountsEqual($invoiceTva, (float) $announcedTva)
+			|| !einvoicingAmountsEqual($invoiceTtc, (float) $announcedTtc)) {
 			return false;
 		}
 
@@ -729,7 +729,7 @@ class SupplierInvoiceHelper
 			return true;
 		}
 
-		return abs(self::linkedDepositAmount((int) $invoice->id) - (float) $announcedPrepaid) < 0.005;
+		return einvoicingAmountsEqual(self::linkedDepositAmount((int) $invoice->id), (float) $announcedPrepaid);
 	}
 
 	/**

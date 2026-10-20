@@ -930,7 +930,7 @@ class CIIProtocol extends AbstractProtocol
 	protected function depositAnnouncedByDocument(array $parsedHeader)
 	{
 		$announced = (float) ($parsedHeader['totalPrepaidAmount'] ?? 0);
-		if ($announced < 0.005 || in_array((string) ($parsedHeader['businessProcessId'] ?? ''), array('B2', 'S2', 'M2'), true)) {
+		if (!einvoicingAmountIsPositive($announced) || in_array((string) ($parsedHeader['businessProcessId'] ?? ''), array('B2', 'S2', 'M2'), true)) {
 			return 0.0;
 		}
 
@@ -2184,8 +2184,8 @@ class CIIProtocol extends AbstractProtocol
 
 		$warning = '';
 		$refined = false;
-		// Both sides are rounded to the cent: a single cent is already a difference.
-		if ($lineAnnouncesAnAmount && $difference >= 0.005 && $divisor != 0.0) {
+		$amountsDiffer = !einvoicingAmountsEqual($rebuilt, $announced);
+		if ($lineAnnouncesAnAmount && $amountsDiffer && $divisor != 0.0) {
 			$subprice = $announced / $divisor;
 			$refined = true;
 
@@ -2200,7 +2200,7 @@ class CIIProtocol extends AbstractProtocol
 				$warning .= 'The document prices that line elsewhere than it bills it: the line was imported at the amount announced, at a unit price of '
 					. $this->spellOutUnitPrice($subprice) . ', so the invoice totals what the document bills.';
 			}
-		} elseif ($difference >= 0.005) {
+		} elseif ($amountsDiffer) {
 			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announcedText
 				. ', but its quantity and unit price rebuild ' . $rebuilt . '. The invoice carries the rebuilt amount.';
 		}
@@ -4428,7 +4428,7 @@ class CIIProtocol extends AbstractProtocol
 			// What the import did attach is named, and says nothing when it covers the announced amount:
 			// the deduction is there, and inviting a payment on top of it would settle it twice.
 			$deducted = SupplierInvoiceHelper::linkedDepositAmount($supplierInvoiceId);
-			if ($announcedPrepaid >= 0.005 && abs($deducted - $announcedPrepaid) >= 0.005) {
+			if (einvoicingAmountIsPositive($announcedPrepaid) && !einvoicingAmountsEqual($deducted, $announcedPrepaid)) {
 				$langs->load('einvoicing@einvoicing');
 				$return_messages[] = $langs->trans(
 					'EInvoiceImportPrepaidAlreadySettled',
@@ -4449,7 +4449,7 @@ class CIIProtocol extends AbstractProtocol
 		// The deduction is answered before the totals, and once: no rounding convention explains a deposit
 		// that is not attached, so there is nothing for the conventions below to say about it.
 		if ($announcedPrepaid !== null && $announcedDepositRef !== null
-			&& abs(SupplierInvoiceHelper::linkedDepositAmount($supplierInvoiceId) - $announcedPrepaid) >= 0.005) {
+			&& !einvoicingAmountsEqual(SupplierInvoiceHelper::linkedDepositAmount($supplierInvoiceId), $announcedPrepaid)) {
 			$this->flagPrepaidMismatch($supplierInvoiceId, $parsedHeader, $announcedTva, $announcedTtc, $announcedPrepaid, $announcedDepositRef, $return_messages);
 			return;
 		}
@@ -4550,7 +4550,7 @@ class CIIProtocol extends AbstractProtocol
 		$tva = $sign * ((float) $invoice->total_tva + $deposits['tva']);
 		$ttc = $sign * ((float) $invoice->total_ttc + $deposits['ttc']);
 		$ht = $ttc - $tva - $sign * ((float) $invoice->total_localtax1 + (float) $invoice->total_localtax2);
-		if (abs($ht - $announcedHt) >= 0.005 || abs($ttc - (float) $announcedTtc) >= 0.005 || abs($tva - (float) $announcedTva) > $tolerance + 0.0001) {
+		if (!einvoicingAmountsEqual($ht, (float) $announcedHt) || !einvoicingAmountsEqual($ttc, (float) $announcedTtc) || abs($tva - (float) $announcedTva) > $tolerance + 0.0001) {
 			return false;
 		}
 
@@ -4589,7 +4589,7 @@ class CIIProtocol extends AbstractProtocol
 		// BT-113 is deducted beside the invoice and not from its total, so it is added back on both sides
 		$prepaid = isset($parsedHeader['totalPrepaidAmount']) ? (float) $parsedHeader['totalPrepaidAmount'] : 0.0;
 		$announcedDue = (float) $parsedHeader['duePayableAmount'] + $prepaid;
-		if (abs($announcedDue - (float) $announcedTtc) < 0.005) {
+		if (einvoicingAmountsEqual($announcedDue, (float) $announcedTtc)) {
 			return false;
 		}
 
@@ -4806,7 +4806,7 @@ class CIIProtocol extends AbstractProtocol
 		global $db, $langs;
 
 		$rounding = SupplierInvoiceHelper::documentRoundingAmount($parsedHeader);
-		if (abs($rounding) < 0.005) {
+		if (einvoicingAmountsEqual($rounding, 0.0)) {
 			return null;
 		}
 
@@ -5046,7 +5046,7 @@ class CIIProtocol extends AbstractProtocol
 
 			// The document announces BG-23 with its own sign, which a credit note stored negative reverses.
 			$sign = SupplierInvoiceHelper::documentSign($invoice, SupplierInvoiceHelper::announcedTotalTtc($parsedHeader));
-			if (abs($groups[$rate]['base'] - $sign * (float) ($tax['basisAmount'] ?? 0)) >= 0.005) {
+			if (!einvoicingAmountsEqual($groups[$rate]['base'], $sign * (float) ($tax['basisAmount'] ?? 0))) {
 				return false;
 			}
 
@@ -5057,7 +5057,7 @@ class CIIProtocol extends AbstractProtocol
 			if (abs($difference) > 0.01 * ($groups[$rate]['lines'] + 1)) {
 				return false;
 			}
-			if (abs($difference) >= 0.005) {
+			if (!einvoicingAmountsEqual($difference, 0.0)) {
 				$carry[] = array($groups[$rate]['last'], $difference);
 			}
 		}

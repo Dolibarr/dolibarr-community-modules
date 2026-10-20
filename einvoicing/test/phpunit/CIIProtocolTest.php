@@ -1859,4 +1859,67 @@ class CIIProtocolTest extends CommonClassTest
 		$this->assertArrayHasKey('setdefaultproduct', $result['allactiondata'] ?? array());
 		$this->assertStringContainsString($langs->trans('EInvoiceNoLineNeedsDefaultProduct'), (string) ($result['action'] ?? ''));
 	}
+
+	/**
+	 * Prepaid amounts (BT-113), billing frames (BT-23), and the deposit still to attach.
+	 *
+	 * @return	array<string,array{0:?float,1:string,2:float}>
+	 */
+	public static function prepaidAmounts(): array
+	{
+		return array(
+			'a deposit'                     => array(120.0, 'B1', 120.0),
+			'half a cent under float noise' => array(0.004999999999999, 'B1', 0.004999999999999),
+			'below half a cent'             => array(0.004, 'B1', 0.0),
+			'absent'                        => array(null, 'B1', 0.0),
+			'negative'                      => array(-5.0, 'B1', 0.0),
+			'already paid frame'            => array(120.0, 'B2', 0.0),
+		);
+	}
+
+	/**
+	 * Only a prepaid amount writing a positive cent, outside an already paid frame, is a deposit to attach.
+	 *
+	 * @dataProvider prepaidAmounts
+	 *
+	 * @param	?float	$prepaid	BT-113, null when absent
+	 * @param	string	$frame		BT-23
+	 * @param	float	$expected	Amount still to attach
+	 * @return	void
+	 */
+	public function testOnlyAPositiveCentIsADepositToAttach($prepaid, $frame, $expected)
+	{
+		global $db;
+
+		$method = new ReflectionMethod(CIIProtocol::class, 'depositAnnouncedByDocument');
+		$method->setAccessible(true);
+
+		$header = array('businessProcessId' => $frame);
+		if ($prepaid !== null) {
+			$header['totalPrepaidAmount'] = $prepaid;
+		}
+
+		$this->assertSame($expected, $method->invokeArgs(new CIIProtocol($db), array($header)));
+	}
+
+	/**
+	 * A payable that answers BR-CO-16 to the cent does not mark the invoice.
+	 *
+	 * @return	void
+	 */
+	public function testAPayableAnsweringToTheCentIsNoContradiction()
+	{
+		global $db;
+
+		$method = new ReflectionMethod(CIIProtocol::class, 'flagPayableMismatch');
+		$method->setAccessible(true);
+		$protocol = new CIIProtocol($db);
+
+		foreach (array(array(1.02, 0.0, 1.015), array(1.1, 2.2, 3.3)) as list($due, $prepaid, $announcedTtc)) {
+			$messages = array();
+			$header = array('duePayableAmount' => $due, 'totalPrepaidAmount' => $prepaid, 'documentno' => 'TEST');
+			$this->assertFalse($method->invokeArgs($protocol, array(0, $header, 0.0, $announcedTtc, &$messages)), 'BT-115 ' . $due . ' + BT-113 ' . $prepaid . ' against ' . $announcedTtc);
+			$this->assertCount(0, $messages);
+		}
+	}
 }
