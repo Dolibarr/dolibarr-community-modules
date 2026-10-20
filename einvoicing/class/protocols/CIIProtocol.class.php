@@ -1786,23 +1786,9 @@ class CIIProtocol extends AbstractProtocol
 			}
 			if (!empty($productId)) {
 				$line->fk_product = $productId;
-				if ($productMatchType == 'defaultrouting') {
-					// The default routing product is a catch-all shared by all the unresolved lines of the
-					// vendor: without the wording of the XML, every line of the invoice would show the same
-					// label. Keep the description of the vendor on top of the product link.
-					$line->desc = dol_concatdesc(trim($parsedLine['prodname'] ?? ''), trim($parsedLine['proddesc'] ?? ''));
-				} elseif (!empty($parsedLine['proddesc'])) {
-					// Keep the XML line-level description even when a real product is linked:
-					// it is often project-specific and not carried by the product's own label/description.
-					$line->desc = trim($parsedLine['proddesc']);
-				}
-				// Because we reuse an already existing product without changing its ref and label, we add the label from the supplier invoice into the description
-				if (!empty($parsedLine['prodname']) && trim($line->desc) != trim($parsedLine['prodname'])) {
-					$line->desc = dol_concatdesc($parsedLine['prodname'], $line->desc ?? '');
-				}
+				$line->desc = $this->resolveLineDescription($parsedLine);
 			} elseif (!$is_deposit_line) {
-				// Free line: no product linked, description set from XML data
-				$line->desc = trim($parsedLine['prodname'] ?? '') . (!empty($parsedLine['proddesc']) ? "\n" . trim($parsedLine['proddesc']) : '');
+				$line->desc = $this->resolveLineDescription($parsedLine);
 			}
 			if ($is_deposit_line && !empty($fk_remise)) {
 				$line->fk_remise_except = $fk_remise;
@@ -2293,6 +2279,24 @@ class CIIProtocol extends AbstractProtocol
 		return $reason === '' || strtoupper($reason) === 'DETAIL';
 	}
 
+
+	/**
+	 * Description of a received line: the item name (BT-153), then its description (BT-154) unless it repeats the name.
+	 *
+	 * @param	array<string,mixed>		$parsedLine		One line as parseInvoiceLines() returns it
+	 * @return	string
+	 */
+	private function resolveLineDescription(array $parsedLine)
+	{
+		$name = trim((string) ($parsedLine['prodname'] ?? ''));
+		$description = trim((string) ($parsedLine['proddesc'] ?? ''));
+
+		if ($description === $name) {
+			return $name;
+		}
+
+		return dol_concatdesc($name, $description);
+	}
 
 	/**
 	 * Lines of a received document that has none (MINIMUM and BASIC WL profiles): one per VAT rate of its breakdown (BG-23).

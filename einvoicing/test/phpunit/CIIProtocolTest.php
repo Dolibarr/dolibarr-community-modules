@@ -505,6 +505,25 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
+	 * A received line shows its name once, followed by a description that differs from it.
+	 *
+	 * @return void
+	 */
+	public function testALineDescriptionNeverRepeatsItsName()
+	{
+		global $db;
+
+		$method = new ReflectionMethod(CIIProtocol::class, 'resolveLineDescription');
+		$method->setAccessible(true);
+		$protocol = new CIIProtocol($db);
+
+		$this->assertSame('FRAIS DE DOSSIER', $method->invoke($protocol, array('prodname' => 'FRAIS DE DOSSIER', 'proddesc' => 'FRAIS DE DOSSIER')));
+		$this->assertSame("Fees\nFile 42", $method->invoke($protocol, array('prodname' => 'Fees', 'proddesc' => 'File 42')));
+		$this->assertSame('Fees', $method->invoke($protocol, array('prodname' => 'Fees', 'proddesc' => '')));
+		$this->assertSame('File 42', $method->invoke($protocol, array('prodname' => '', 'proddesc' => 'File 42')));
+	}
+
+	/**
 	 * Save the timezone the tests below move.
 	 *
 	 * @return void
