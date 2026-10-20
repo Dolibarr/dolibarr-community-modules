@@ -614,6 +614,12 @@ class EInvoicing
 	const EXTRAFIELD_MERGE_LINE_CHARGES = 'merge_line_charges';
 
 	/**
+	 * Name, into llx_einvoicing_extrafields (element_type 'societe'), of the identifier this customer
+	 * gave us as its supplier (its vendor code). Sent as BT-29 without scheme on its invoices.
+	 */
+	const EXTRAFIELD_SELLER_ID_BY_BUYER = 'seller_id_by_buyer';
+
+	/**
 	 * ISO/IEC 6523 scheme identifier of the French routing code ("code de routage"), the scheme the
 	 * Chorus Pro "code service exécutant" is declared under as BT-46 by BR-FR-CPRO-11 and
 	 * BR-FR-CPRO-13 of XP Z12-012. Not to be confused with 0225 (e-invoice address) nor with 0002 /
@@ -2578,6 +2584,8 @@ class EInvoicing
 				$resprints .= '</tr>';
 			}
 
+			$resprints .= $this->sellerIdByBuyerRowHtml($object, $mode, $parameters, $expand_display);
+
 			return $resprints;
 		}
 
@@ -2749,7 +2757,42 @@ class EInvoicing
 			$resprints .= '</tr>';
 		}
 
+		$resprints .= $this->sellerIdByBuyerRowHtml($object, $mode, $parameters, $expand_display);
+
 		return $resprints;
+	}
+
+	/**
+	 * Row of the thirdparty card with the identifier this customer gave us as its supplier (BT-29, issue #1151).
+	 *
+	 * @param	Societe					$object				Thirdparty
+	 * @param	string					$mode				'create', 'edit' or view
+	 * @param	array<string,mixed>		$parameters			Hook parameters
+	 * @param	bool					$expand_display		Whether the block is expanded
+	 * @return	string										HTML of the row, '' when the thirdparty is not a customer
+	 */
+	private function sellerIdByBuyerRowHtml($object, $mode, $parameters, $expand_display)
+	{
+		global $langs, $form;
+
+		if (!in_array((int) $object->client, array(1, 3), true)) {
+			return '';
+		}
+
+		$value = ($mode == 'create') ? '' : (string) $this->getExtraFieldValue($object->id, 'societe', self::EXTRAFIELD_SELLER_ID_BY_BUYER);
+
+		$out = '<tr class="treinvoicing_collapseseparator trseller_id_by_buyer '.($expand_display ? '' : 'hidden').'">';
+		$out .= '<td>' . $form->textwithpicto($langs->trans("EInvoicingSellerIdByBuyer"), $langs->trans("EInvoicingSellerIdByBuyerHelp")) . '</td>';
+		$out .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
+		if ($mode == 'create' || $mode == 'edit') {
+			$out .= '<input type="text" name="einvoicing_seller_id_by_buyer" class="flat minwidth300" maxlength="255" spellcheck="false" value="' . dolPrintHTMLForAttribute($value) . '">';
+		} else {
+			$out .= dol_escape_htmltag($value);
+		}
+		$out .= '</td>';
+		$out .= '</tr>';
+
+		return $out;
 	}
 
 	/**

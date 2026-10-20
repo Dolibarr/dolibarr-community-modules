@@ -39,6 +39,7 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 require_once $dolibarrHtdocs . '/master.inc.php';
 require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+dol_include_once('einvoicing/class/protocols/AbstractProtocol.class.php');
 dol_include_once('einvoicing/class/providers/AbstractPDPProvider.class.php');
 // AbstractPDPProvider is abstract: its reference implementation is the one instantiated here.
 dol_include_once('einvoicing/class/providers/TestPDPProvider.class.php');
@@ -100,6 +101,57 @@ class AbstractPDPProviderTest extends CommonClassTest
 
 		$this->assertSame('invoice_supplier', (string) $obj->elementtype);
 		$this->assertSame((int) $invoice->id, (int) $obj->fk_element, 'the event must point at the invoice it is about');
+	}
+
+	/**
+	 * The event of an import says whether the invoice came in for the first time or was rebuilt by a
+	 * re-import: without it, a re-imported draft carried two identical "Import of" events.
+	 *
+	 * @return	void
+	 */
+	public function testAReimportWritesItsOwnEvent()
+	{
+		global $db, $user;
+
+		$supplier = new Societe($db);
+		$supplier->name = 'EINVOICING TEST IMPORT EVENT';
+		$supplier->fournisseur = 1;
+		$supplier->code_fournisseur = 'auto';
+		$this->assertGreaterThan(0, $supplier->create($user), 'the supplier is created: ' . $supplier->error);
+
+		$invoice = new FactureFournisseur($db);
+		$invoice->socid = $supplier->id;
+		$invoice->ref_supplier = 'IMP-' . dol_now();
+		$invoice->date = dol_now();
+		$this->assertGreaterThan(0, $invoice->create($user), 'the supplier invoice is created: ' . $invoice->error);
+
+		$provider = (new ReflectionClass('TestPDPProvider'))->newInstanceWithoutConstructor();
+		$provider->name = 'TEST';
+		$method = new ReflectionMethod('AbstractPDPProvider', 'addSupplierInvoiceImportEvent');
+		$method->setAccessible(true);
+		$document = (object) array('flow_id' => 'flow-of-the-test');
+
+		$labels = array();
+		$notes = array();
+		foreach (array(0, (int) $invoice->id) as $rebuildId) {
+			AbstractProtocol::$rebuildSupplierInvoiceId = $rebuildId;
+			try {
+				$eventid = $method->invoke($provider, $invoice, $document);
+			} finally {
+				AbstractProtocol::$rebuildSupplierInvoiceId = 0;
+			}
+			$this->assertGreaterThan(0, $eventid, 'the event is created');
+			$obj = $db->fetch_object($db->query("SELECT label, note FROM " . MAIN_DB_PREFIX . "actioncomm WHERE id = " . ((int) $eventid)));
+			$db->query("DELETE FROM " . MAIN_DB_PREFIX . "actioncomm WHERE id = " . ((int) $eventid));
+			$labels[] = (string) $obj->label;
+			$notes[] = (string) $obj->note;
+		}
+		$invoice->delete($user);
+		$supplier->delete($supplier->id);
+
+		$this->assertSame('EINVOICING - Import of the received invoice ' . $invoice->ref_supplier, $labels[0]);
+		$this->assertSame('EINVOICING - Import again of the received invoice ' . $invoice->ref_supplier, $labels[1]);
+		$this->assertStringStartsWith('Imported again from the flow flow-of-the-test received from TEST', $notes[1]);
 	}
 
 	/**

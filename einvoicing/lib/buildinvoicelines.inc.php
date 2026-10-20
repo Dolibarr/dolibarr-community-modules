@@ -139,6 +139,8 @@ $mySchemeGlobalIdProf = $this->getIEC6523Code($mysoc->country_code, 1);
 $sellerGlobalIds   = ($mySchemeGlobalIdProf !== '' && $myGlobalIdProf !== '')
 	? array(array('schemeID' => $mySchemeGlobalIdProf, 'value' => $myGlobalIdProf))
 	: array();
+// BT-29 again, without scheme: the identifier this customer gave us as its supplier (issue #1151).
+$sellerIdByBuyer   = trim((string) $einvoicing->getExtraFieldValue($object->socid, 'societe', EInvoicing::EXTRAFIELD_SELLER_ID_BY_BUYER));
 $myUri             = $einvoicing->getSellerCommunicationURI(0);
 $mySchemeUri       = $this->getIEC6523Code($mysoc->country_code, 2);
 // BT-28, the trading name of the seller: "a name by which the seller is known, other than the
@@ -1137,7 +1139,7 @@ $invoiceData = [
 
 	// Seller part
 	'sellername'                => $mysoc->name,
-	'sellerids'                 => (empty($sellerGlobalIds) ? '' : $myidprof),
+	'sellerids'                 => $sellerIdByBuyer,
 
 	'sellerlineone'             => $sellerAddressLines[0],
 	'sellerlinetwo'             => $sellerAddressLines[1],

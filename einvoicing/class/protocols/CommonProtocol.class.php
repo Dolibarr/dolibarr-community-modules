@@ -1501,15 +1501,17 @@ trait CommonProtocol
 		}
 
 		// Text Search using prodname
-		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
-		$sql .= " WHERE label = '" . $db->escape(trim(dol_substr((string) ($lineData['prodname'] ?? ''), 0, 255))) . "'";
-		$sql .= " AND entity IN (" . getEntity('product') . ")";
-		$resql = $db->query($sql);
-		if ($resql) {
-			if ($db->num_rows($resql) === 1) {
-				$obj = $db->fetch_object($resql);
-				dol_syslog(__METHOD__ . ' Found product by text search: ' . $obj->rowid);
-				return array('res' => $obj->rowid, 'message' => 'Product found by text search');
+		if ($searchname !== '') {
+			$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
+			$sql .= " WHERE label = '" . $db->escape(trim(dol_substr((string) ($lineData['prodname'] ?? ''), 0, 255))) . "'";
+			$sql .= " AND entity IN (" . getEntity('product') . ")";
+			$resql = $db->query($sql);
+			if ($resql) {
+				if ($db->num_rows($resql) === 1) {
+					$obj = $db->fetch_object($resql);
+					dol_syslog(__METHOD__ . ' Found product by text search: ' . $obj->rowid);
+					return array('res' => $obj->rowid, 'message' => 'Product found by text search');
+				}
 			}
 		}
 
@@ -1692,8 +1694,11 @@ trait CommonProtocol
 			return $resFind;
 		}
 
+		// A line built from the VAT breakdown has nothing to create a product from: only a default product resolves it.
+		$isVatBreakdownLine = !empty($lineData['vatBreakdownLine']);
+
 		// If no match found after all steps: Create new product
-		if (getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_GENERATION')) {
+		if (!$isVatBreakdownLine && getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_GENERATION')) {
 			// Auto-create product
 			$product = new Product($db);
 			$product->type 		= $this->_detectProductTypeFromEinvoiceLine($lineData);
@@ -1712,12 +1717,15 @@ trait CommonProtocol
 			$product->status_buy = 1; // Status to buy
 			$product->note_private = 'Product created automatically from E-invoice import.';
 			$product->import_key = AbstractPDPProvider::$EINVOICING_LAST_IMPORT_KEY; // It does not work here, so we will update it after creation
-			// Set barcode if global ID is provided and is a GTIN/EAN type
-			if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
-				$product->barcode = $lineData['prodglobalid'];
-				$product->barcode_type = getDolGlobalInt('PRODUIT_DEFAULT_BARCODE_TYPE', 0);
-			} else {
-				$product->barcode = 'auto';
+			// A barcode on request, or when the barcode setup requires one on every product (#1159).
+			if (isModEnabled('barcode')) {
+				if (getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_BARCODE') && !empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
+					$product->barcode = $lineData['prodglobalid'];
+					$product->barcode_type = getDolGlobalInt('PRODUIT_DEFAULT_BARCODE_TYPE', 0);
+				} elseif (getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_BARCODE') || $product->check_barcode('', $product->barcode_type_code) == -2) {
+					// create() takes the next code for 'auto' from Dolibarr 20, for -1 only before.
+					$product->barcode = ((float) DOL_VERSION < 20) ? '-1' : 'auto';
+				}
 			}
 			// Validate before creation
 			$resCheck = $product->check();
@@ -1746,18 +1754,25 @@ trait CommonProtocol
 				];
 			}
 
-			// Error on creation
-			dol_syslog(__METHOD__ . ' Product creation error: ' . $product->error, LOG_ERR);
+			// Error on creation. verify() reports in errors[] only, which left the message empty.
+			$langs->loadLangs(array('errors', 'products'));
+			$creationErrors = array_map(array($langs, 'trans'), array_filter(array_merge(array($product->error), (array) $product->errors)));
+			$creationError = implode(', ', array_unique($creationErrors));
+			if (in_array('ErrorBarCodeRequired', (array) $product->errors)) {
+				$langs->load('einvoicing@einvoicing');
+				$creationError .= '. ' . $langs->trans('ErrorEInvoicingBarcodeRequiredOnImport');
+			}
+			dol_syslog(__METHOD__ . ' Product creation error: ' . $creationError, LOG_ERR);
 			return [
 				'res' => -1,
-				'message' => 'Product creation error: ' . dol_escape_htmltag($product->error),
+				'message' => 'Product creation error: ' . dol_escape_htmltag($creationError),
 			];
 		} else {
 			// Suggest manual creation of product
 			dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Auto-creation of products is disabled', LOG_ERR);
 
 			// Free line mode: import the line without linking any product (res=0 signals the protocol to set desc from XML)
-			if (getDolGlobalInt('EINVOICING_IMPORT_AS_FREE_LINES')) {
+			if (!$isVatBreakdownLine && getDolGlobalInt('EINVOICING_IMPORT_AS_FREE_LINES')) {
 				dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Free line mode: importing without product link', LOG_DEBUG);
 				return array('res' => 0, 'message' => 'Product not found, line imported as free description line (no product link)');
 			}
@@ -1806,11 +1821,9 @@ trait CommonProtocol
 			$createParams['type'] = $prodType;
 			$createParams['tva_tx'] = (float) ($lineData['rateApplicablePercent'] ?? 0);
 			$createParams['status'] = 1; // Active
-			if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
+			if (getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_BARCODE') && !empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
 				$createParams['barcode'] = $lineData['prodglobalid'];
 				$createParams['barcode_type'] = getDolGlobalInt('PRODUIT_DEFAULT_BARCODE_TYPE', 0);
-			} else {
-				$createParams['barcode'] = 'auto';
 			}
 
 			// Create URL to prefill product creation form
@@ -1836,6 +1849,9 @@ trait CommonProtocol
 			$btnStyle = 'display:inline-block;width:auto;';
 
 			$action = '<div class="marginbottomonly opacitymedium">' . $langs->trans('SuggestedActionsIntro') . '</div>';
+			if ($isVatBreakdownLine) {
+				$action .= '<div class="marginbottomonly">' . $langs->trans('EInvoiceNoLineNeedsDefaultProduct') . '</div>';
+			}
 
 
 			// First choice: create a new product manually

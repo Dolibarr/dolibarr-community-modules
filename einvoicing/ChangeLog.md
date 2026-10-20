@@ -687,7 +687,7 @@ FIX: The error raised when a "Standard rated" line has no seller VAT number no l
 customer. The test is on the seller (BR-S-02 requires the Seller VAT identifier, BT-31), but the
 message read "The VAT number of the thirdparty <customer> is mandatory", so the operator went looking
 for the missing number on the customer record while it was missing from their own company.
-  
+
 FIX: The documents generated on the MINIMUM and BASIC profiles now validate against their own Factur-X
 schema, which neither did. BASIC was treated as a full EN 16931 document, so it carried the party
 contacts (BG-6 / BG-9), the payment means label (BT-82), the account holder (BT-85) and the BIC (BT-86),
@@ -775,7 +775,7 @@ the PDF builder happen to load - so generating from the attached files carried t
 regenerating from the e-invoicing menu, which calls the writer directly, silently dropped it. The
 library is now loaded where the comment is written. Nothing changes below Dolibarr 23, where that
 function does not exist yet, and nothing changes on the PDF path (issue #581).
-  
+
 FIX: Approving a received invoice no longer takes away the statuses that come after it. The einvoice
 button group of the supplier invoice card disappeared as soon as an "Approved" (205) or a "Refused"
 (210) status had been accepted by the platform, on the assumption that either of them closes the
