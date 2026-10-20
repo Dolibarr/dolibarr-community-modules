@@ -2177,18 +2177,22 @@ class CIIProtocol extends AbstractProtocol
 		// (issue #850). Only a line announcing nothing keeps what its price rebuilds.
 		$difference = abs($rebuilt - $announced);
 		$divisor = $qty * (1 - ($remisePercent / 100));
-		$fromPriceRounding = (abs($divisor) * 0.5 / pow(10, self::MAX_DECIMALS_UNIT_PRICE)) + 0.01;
+		// What the price precision explains: the unrounded couple against BT-131, half a unit of the last price
+		// decimal per unit plus the half cent BT-131 is rounded to. A wider margin calls a mispriced line consistent.
+		$explainedByPriceDecimals = abs($qty * $subprice * (1 - ($remisePercent / 100)) - $announced)
+			<= abs($divisor) * 0.5 / pow(10, self::MAX_DECIMALS_UNIT_PRICE) + 0.005;
 
 		$warning = '';
 		$refined = false;
-		if ($lineAnnouncesAnAmount && $difference > 0.01 && $divisor != 0.0) {
+		// Both sides are rounded to the cent: a single cent is already a difference.
+		if ($lineAnnouncesAnAmount && $difference >= 0.005 && $divisor != 0.0) {
 			$subprice = $announced / $divisor;
 			$refined = true;
 
 			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announcedText
 				. ', while its quantity (BT-129) and unit price (BT-146) rebuild ' . $rebuilt . '. ';
 
-			if ($difference <= $fromPriceRounding) {
+			if ($explainedByPriceDecimals) {
 				$warning .= 'That difference is within the ' . self::MAX_DECIMALS_UNIT_PRICE
 					. ' decimals a unit price is written with (BR-FR-DEC-03), so the price was refined to '
 					. $this->spellOutUnitPrice($subprice) . ' and the line totals the amount announced.';
@@ -2196,7 +2200,7 @@ class CIIProtocol extends AbstractProtocol
 				$warning .= 'The document prices that line elsewhere than it bills it: the line was imported at the amount announced, at a unit price of '
 					. $this->spellOutUnitPrice($subprice) . ', so the invoice totals what the document bills.';
 			}
-		} elseif ($difference > 0.01) {
+		} elseif ($difference >= 0.005) {
 			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announcedText
 				. ', but its quantity and unit price rebuild ' . $rebuilt . '. The invoice carries the rebuilt amount.';
 		}

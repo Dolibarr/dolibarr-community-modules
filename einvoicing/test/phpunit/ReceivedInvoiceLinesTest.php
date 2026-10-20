@@ -750,6 +750,46 @@ class ReceivedInvoiceLinesTest extends CommonClassTest
 	}
 
 	/**
+	 * One cent off BT-131 is a difference, and 1 x 0.02 cannot write 0.01 whatever its price precision.
+	 *
+	 * @return	void
+	 */
+	public function testALineOneCentOffItsPriceTotalsTheAnnouncedAmount()
+	{
+		$amounts = $this->amounts(array('lineid' => '21', 'netpriceamount' => 0.02, 'billedquantity' => 1.0, 'lineTotalAmount' => 0.01), 1.0, 0.02);
+
+		$this->assertEquals(0.01, round($amounts['qty'] * $amounts['subprice'], 2), 'the line totals BT-131, not the 0.02 its price rebuilds');
+		$this->assertStringContainsString('prices that line elsewhere than it bills it', $amounts['warning']);
+	}
+
+	/**
+	 * A cent no price precision explains is not reported as one.
+	 *
+	 * @return	void
+	 */
+	public function testACentThePricePrecisionCannotExplainIsReportedAsSuch()
+	{
+		$amounts = $this->amounts(array('lineid' => '22', 'netpriceamount' => 3.33, 'billedquantity' => 3.0, 'lineTotalAmount' => 10.00), 3.0, 3.33);
+
+		$this->assertEquals(10.00, round($amounts['qty'] * $amounts['subprice'], 2));
+		$this->assertStringContainsString('prices that line elsewhere than it bills it', $amounts['warning']);
+	}
+
+	/**
+	 * A cent the 6 decimals of the price explain over a large quantity is reported as a price precision.
+	 *
+	 * @return	void
+	 */
+	public function testACentThePricePrecisionExplainsIsReportedAsSuch()
+	{
+		$amounts = $this->amounts(array('lineid' => '23', 'netpriceamount' => 0.123455, 'billedquantity' => 3000.0, 'lineTotalAmount' => 370.36), 3000.0, 0.123455);
+
+		$this->assertSame(3000.0, $amounts['qty']);
+		$this->assertEquals(370.36, round($amounts['qty'] * $amounts['subprice'], 2));
+		$this->assertStringContainsString('within the 6 decimals a unit price is written with', $amounts['warning']);
+	}
+
+	/**
 	 * A charge of the line (BG-28) is part of BT-131 but leaves on a line of its own (issue #735), so the
 	 * line itself is worth BT-131 less that charge: the couple the document states rebuilds exactly that,
 	 * and nothing is rewritten or reported. Five units at 100.05 less 10.001 percent, plus a charge of
