@@ -1162,6 +1162,39 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
+	 * The buyer's order line (BT-132) is the first child of the line trade agreement, before the prices
+	 * the schema puts after it, and carries its LineID only. BASIC has no such element (issue #1192).
+	 *
+	 * @return void
+	 */
+	public function testTheBuyerOrderLineIsWrittenBeforeThePrices()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+		$doc = new DOMDocument('1.0', 'UTF-8');
+		$method = new ReflectionMethod(CIIProtocol::class, 'buildLineItem');
+		$method->setAccessible(true);
+
+		$line = $this->baseLineData();
+		$line['buyerorderlineid'] = '0020';
+		foreach (array('EN16931', 'EXTENDED') as $profile) {
+			$node = $method->invoke($protocol, $doc, $line, $profile);
+			$agreement = $node->getElementsByTagName('ram:SpecifiedLineTradeAgreement')->item(0);
+			$this->assertSame(array('ram:BuyerOrderReferencedDocument', 'ram:NetPriceProductTradePrice'), $this->childElementNames($agreement), $profile);
+			$order = $agreement->getElementsByTagName('ram:BuyerOrderReferencedDocument')->item(0);
+			$this->assertSame(array('ram:LineID'), $this->childElementNames($order), $profile . ': the LineID only');
+			$this->assertSame('0020', $order->getElementsByTagName('ram:LineID')->item(0)->nodeValue, $profile);
+		}
+
+		$node = $method->invoke($protocol, $doc, $line, 'BASIC');
+		$this->assertSame(0, $node->getElementsByTagName('ram:BuyerOrderReferencedDocument')->length, 'no BT-132 in BASIC');
+
+		$node = $method->invoke($protocol, $doc, $this->baseLineData(), 'EN16931');
+		$this->assertSame(0, $node->getElementsByTagName('ram:BuyerOrderReferencedDocument')->length, 'no order line, no BT-132');
+	}
+
+	/**
 	 * A vendor id carrying no vendor price at all, so the fixture is the only row the lookup can see.
 	 * A unique key allows a single price with an empty ref_fourn per vendor, so an existing vendor
 	 * cannot be reused; product_fournisseur_price.fk_soc has no foreign key, so no third party is

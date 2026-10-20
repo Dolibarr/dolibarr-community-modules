@@ -722,6 +722,20 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				}
 			}
 
+			// Action to set the buyer's order line each invoice line bills (BT-132, issue #1192)
+			if ($action == 'setbuyerorderlines' && $permissiontoedit) {
+				foreach ((array) $object->lines as $line) {
+					if ((int) $line->id > 0 && GETPOSTISSET('einvoice_order_line_' . ((int) $line->id))) {
+						$result = $einvoicing->insertOrUpdateExtraField((int) $line->id, 'facturedet', EInvoicing::EXTRAFIELD_BUYER_ORDER_LINE_ID, trim(GETPOST('einvoice_order_line_' . ((int) $line->id), 'alphanohtml')));
+						if ($result < 0) {
+							$error++;
+							$this->errors = array_merge($this->errors, $einvoicing->errors);
+							break;
+						}
+					}
+				}
+			}
+
 			// Action to set an invoice-level routing ID override
 			if ($action == 'setoverriderouting' && $permissiontoedit && is_array($currentStatusDetails)) {
 				$overrideRoutingId = GETPOST('override_routing_id', 'alphanohtml');
