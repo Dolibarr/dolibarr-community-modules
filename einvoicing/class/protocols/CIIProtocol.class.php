@@ -2175,7 +2175,6 @@ class CIIProtocol extends AbstractProtocol
 		// at the one announced, with the unit price that totals it: the six decimals of a price cannot state it
 		// over a large quantity (issue #844), or the issuer simply prices the line elsewhere than it bills it
 		// (issue #850). Only a line announcing nothing keeps what its price rebuilds.
-		$difference = abs($rebuilt - $announced);
 		$divisor = $qty * (1 - ($remisePercent / 100));
 		// What the price precision explains: the unrounded couple against BT-131, half a unit of the last price
 		// decimal per unit plus the half cent BT-131 is rounded to. A wider margin calls a mispriced line consistent.
