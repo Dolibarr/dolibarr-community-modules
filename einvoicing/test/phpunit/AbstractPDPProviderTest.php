@@ -68,6 +68,25 @@ $conf->global->MAIN_DISABLE_ALL_MAILS = 1;
 class AbstractPDPProviderTest extends CommonClassTest
 {
 	/**
+	 * With no token stored, fetchOAuthTokenDB() gives false: getTokenData() still returns an array, so
+	 * the module home page can read its 'token' key without a PHP 8 warning (issue #1191).
+	 *
+	 * @return	void
+	 */
+	public function testNoStoredTokenGivesAnEmptyArray()
+	{
+		$provider = (new ReflectionClass('TestPDPProvider'))->newInstanceWithoutConstructor();
+		$property = new ReflectionProperty('AbstractPDPProvider', 'tokenData');
+		$property->setAccessible(true);
+
+		$property->setValue($provider, false);
+		$this->assertSame(array(), $provider->getTokenData(), 'No stored token gives an empty array, not false');
+
+		$property->setValue($provider, array('token' => 'abc'));
+		$this->assertSame(array('token' => 'abc'), $provider->getTokenData(), 'A stored token is returned as is');
+	}
+
+	/**
 	 * The event written about an object is linked to it, so the agenda tab of that object shows it.
 	 * Dolibarr 18 stores fk_element only and 22 and later elementid only: on 18, every event of the
 	 * module was left with no object, and the agenda tab of the invoice stayed empty (issue #1022).
