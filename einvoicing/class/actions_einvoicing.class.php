@@ -2004,7 +2004,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			$this->resprints .= ' AND EXISTS (SELECT 1 FROM ' . $db->prefix() . 'einvoicing_routing as subrt';
 			$this->resprints .= ' WHERE subrt.fk_soc = s.rowid';	// Alias of the thirdparty in the thirdparty list of the core
 			$this->resprints .= " AND subrt.routing_type = 'thirdparty' AND subrt.active = 1";
-			$this->resprints .= " AND subrt.routing_id = '" . $db->escape(GETPOST('search_routing_id', 'alpha')) . "')";
+			$this->resprints .= natural_search('subrt.routing_id', GETPOST('search_routing_id', 'alpha'));
+			$this->resprints .= ")";
 		}
 
 		if (in_array('invoicelist', $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
@@ -2357,9 +2358,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				$obj = $parameters['obj'];
 
 				print '<td class="tdoverflowmax125">';
-				if ($obj->pdplink_id) {
-					print dolPrintHTML($obj->routing_id);
-				}
+				print dolPrintHTML($obj->routing_id);
 				print '</td>';
 				if (isset($parameters['i']) && empty($parameters['i'])) {
 					$parameters['totalarray']['nbfield']++;
