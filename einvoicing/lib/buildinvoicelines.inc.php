@@ -466,6 +466,7 @@ $billing_period    	= [];
 $numligne          	= 1;
 $hasServiceLine		= false;	// With the VAT mode below, drives the VAT point date code (BT-8)
 $hasProductLine		= false;
+$buyerOrderLineIds	= $einvoicing->getBuyerOrderLineIds($object);	// llx_facturedet.rowid => buyer's order line (BT-132)
 // @phan-suppress-current-line PhanTypeArraySuspiciousNullable
 foreach ($object->lines as $line) {
 	$isDepositLine = 0;
@@ -759,6 +760,7 @@ foreach ($object->lines as $line) {
 		'linestatuscode'            => 'NA',
 		'linestatusreasoncode'      => 'NA',
 		'lineNote'                  => null,
+		'buyerorderlineid'          => $buyerOrderLineIds[(int) $line->id] ?? '',	// BT-132 (issue #1192)
 
 		'prodname'                  => $libelle,			// BT-153
 		'proddesc'                  => $description,		// BT-154

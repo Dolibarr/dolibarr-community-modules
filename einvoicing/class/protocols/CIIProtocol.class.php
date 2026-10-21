@@ -3376,6 +3376,14 @@ class CIIProtocol extends AbstractProtocol
 		$price = $doc->createElement('ram:SpecifiedLineTradeAgreement');
 		$el->appendChild($price);
 
+		// BT-132, the line of the buyer's order (BT-13) this line bills. Absent from the BASIC schema, and
+		// EN 16931 allows its LineID only: the order itself is the one of the header.
+		if ($this->isEn16931Profile($profile) && trim((string) ($line['buyerorderlineid'] ?? '')) !== '') {
+			$orderLine = $doc->createElement('ram:BuyerOrderReferencedDocument');
+			$orderLine->appendChild($doc->createElement('ram:LineID', einvoicingXmlText(trim((string) $line['buyerorderlineid']))));
+			$price->appendChild($orderLine);
+		}
+
 		// This section seems not required.
 		// It can be used if the price base is including tax (TTC) and without discount (= Catalog public unit price for individual customers)
 		if (isset($line['grosspriceamount'])) {
