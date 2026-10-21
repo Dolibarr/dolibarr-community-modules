@@ -670,6 +670,48 @@ class ImportVatCalculationModeTest extends CommonClassTest
 	}
 
 	/**
+	 * Rounding amounts (BT-114) and whether a line carries them.
+	 *
+	 * @return	array<string,array{0:float,1:bool}>
+	 */
+	public static function roundingAmounts(): array
+	{
+		return array(
+			'one cent'                => array(0.01, true),
+			'minus one cent'          => array(-0.01, true),
+			'half a cent'             => array(0.005, true),
+			'below half a cent'       => array(0.0049, false),
+			'float noise around zero' => array(0.1 + 0.2 - 0.3, false),
+		);
+	}
+
+	/**
+	 * A rounding line is added for any amount that is at least one cent once written in the document.
+	 *
+	 * @dataProvider roundingAmounts
+	 *
+	 * @param	float	$rounding	BT-114
+	 * @param	bool	$expected	Whether a line carries it
+	 * @return	void
+	 */
+	public function testARoundingLineIsAddedForAnyCent($rounding, $expected)
+	{
+		global $db;
+
+		$method = new ReflectionMethod(CIIProtocol::class, 'buildRoundingLine');
+		$method->setAccessible(true);
+
+		$line = $method->invokeArgs(new CIIProtocol($db), array($this->roundingHeader($rounding)));
+
+		if (!$expected) {
+			$this->assertNull($line);
+			return;
+		}
+		$this->assertNotNull($line);
+		$this->assertSame($rounding, $line->subprice);
+	}
+
+	/**
 	 * What the invoice is expected to total, on the four shapes the documents take.
 	 *
 	 * @return void
