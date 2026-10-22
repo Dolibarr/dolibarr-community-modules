@@ -1133,6 +1133,9 @@ class CIIProtocol extends AbstractProtocol
 		$parsedDocument = $this->parseReceivedDocument($file, $tempFile);
 		$parsedHeader = $parsedDocument['header'];
 		$parsedLines = $parsedDocument['lines'];
+		// Read on the lines of the document only: the ones rebuilt from BG-23 below sum the taxable bases,
+		// which a document level allowance or charge legitimately sets apart from BT-106 (issue #1198).
+		$lineTotalContradiction = SupplierInvoiceHelper::lineTotalContradiction($parsedHeader, (array) $parsedLines);
 		if (empty($parsedLines)) {
 			$parsedLines = $this->buildLinesFromVatBreakdown($parsedHeader);
 		}
@@ -1548,7 +1551,7 @@ class CIIProtocol extends AbstractProtocol
 
 			// Every line of the invoice exists now, so its totals can be confronted with the ones the
 			// document announces (issue #781).
-			$this->alignInvoiceTotalsWithDocument($supplierInvoiceId, $parsedHeader, $return_messages);
+			$this->alignInvoiceTotalsWithDocument($supplierInvoiceId, $parsedHeader, $return_messages, $lineTotalContradiction);
 
 			// Create or update supplier prices for imported products
 			if (!empty($supplierPriceEntries)) {
@@ -4380,9 +4383,10 @@ class CIIProtocol extends AbstractProtocol
 	 * @param	int					$supplierInvoiceId	Id of the invoice the import has just built
 	 * @param	array<string,mixed>	$parsedHeader		Header data of the received document
 	 * @param	array<int,string>	$return_messages	Messages of the import, completed here
+	 * @param	?array{lines:float,announced:float}	$lineTotalContradiction	What lineTotalContradiction() found on the document, null when its lines add up
 	 * @return	void
 	 */
-	protected function alignInvoiceTotalsWithDocument($supplierInvoiceId, array $parsedHeader, array &$return_messages)
+	protected function alignInvoiceTotalsWithDocument($supplierInvoiceId, array $parsedHeader, array &$return_messages, $lineTotalContradiction = null)
 	{
 		global $db, $langs;
 
@@ -4499,9 +4503,23 @@ class CIIProtocol extends AbstractProtocol
 			return;
 		}
 
-		SupplierInvoiceHelper::flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc);
+		SupplierInvoiceHelper::flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc, null, null, $lineTotalContradiction);
 
 		$langs->load('einvoicing@einvoicing');
+		// A document whose lines do not add up to BT-106 (BR-CO-10) computes its VAT and its totals on a
+		// base its own lines contradict: the invoice, built from the lines, cannot total both. That is
+		// the vendor's document to correct, not a figure the import misread, and saying "the import could
+		// not reproduce it" sent the operator hunting for an error on their side (issue #1198).
+		if ($lineTotalContradiction !== null) {
+			$return_messages[] = $langs->trans(
+				'EInvoiceImportLineTotalMismatch',
+				dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')),
+				price2num($lineTotalContradiction['lines'], 'MT'),
+				price2num($lineTotalContradiction['announced'], 'MT')
+			);
+			dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' comes from a document whose lines add up to ' . $lineTotalContradiction['lines'] . ' while it announces ' . $lineTotalContradiction['announced'] . ' (BR-CO-10): validation and approval blocked', LOG_WARNING);
+			return;
+		}
 		$return_messages[] = $langs->trans(
 			'EInvoiceImportTotalsMismatch',
 			dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')),
@@ -4521,6 +4539,12 @@ class CIIProtocol extends AbstractProtocol
 	 * VAT rounded per line, the two differing within a cent per item (BR-FREXT-CO-15, issue #1166). Both are
 	 * right: the invoice is recalculated per line (mode 1), kept when it then totals BT-109 and BT-112, and
 	 * noted with the two VAT totals so the card can tell why it differs from BT-110.
+	 *
+	 * The same profile tolerates a cent per item between BT-109 and what the lines add up to (BR-FREXT-CO-10
+	 * and BR-FREXT-CO-13 replace BR-CO-10 and BR-CO-13). A vendor billing prices that include VAT lands
+	 * there: two train tickets of 59.00 and 114.00 at 10 % give lines of 53.64 and 103.64, 157.28, while the
+	 * document announces 157.27 + 15.73 = 173.00 (issue #1198). The invoice keeps the amounts of its lines as
+	 * long as it totals BT-112, and the note then carries both net amounts too.
 	 *
 	 * @param	int					$supplierInvoiceId	Id of the invoice the import has just built
 	 * @param	array<string,mixed>	$parsedHeader		Header data of the received document
@@ -4550,14 +4574,26 @@ class CIIProtocol extends AbstractProtocol
 		$tva = $sign * ((float) $invoice->total_tva + $deposits['tva']);
 		$ttc = $sign * ((float) $invoice->total_ttc + $deposits['ttc']);
 		$ht = $ttc - $tva - $sign * ((float) $invoice->total_localtax1 + (float) $invoice->total_localtax2);
-		if (abs($ht - $announcedHt) >= 0.005 || abs($ttc - (float) $announcedTtc) >= 0.005 || abs($tva - (float) $announcedTva) > $tolerance + 0.0001) {
+		if (abs($ht - $announcedHt) > $tolerance + 0.0001 || abs($ttc - (float) $announcedTtc) >= 0.005 || abs($tva - (float) $announcedTva) > $tolerance + 0.0001) {
 			return false;
 		}
 
 		SupplierInvoiceHelper::clearTotalsMismatch($supplierInvoiceId);
-		SupplierInvoiceHelper::noteVatRoundedPerLine($supplierInvoiceId, (float) $announcedTva, $tva);
-
 		$langs->load('einvoicing@einvoicing');
+		if (abs($ht - $announcedHt) >= 0.005) {
+			SupplierInvoiceHelper::noteVatRoundedPerLine($supplierInvoiceId, (float) $announcedTva, $tva, $announcedHt, $ht);
+			$return_messages[] = $langs->trans(
+				'EInvoiceImportLineAmountsKept',
+				price2num($announcedHt, 'MT'),
+				price2num($announcedTva, 'MT'),
+				price2num($ht, 'MT'),
+				price2num($tva, 'MT')
+			);
+			dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' keeps the amounts of its lines (' . $ht . ' + ' . $tva . '), its EXTENDED document announcing ' . $announcedHt . ' + ' . $announcedTva, LOG_DEBUG);
+
+			return true;
+		}
+		SupplierInvoiceHelper::noteVatRoundedPerLine($supplierInvoiceId, (float) $announcedTva, $tva);
 		$return_messages[] = $langs->trans('EInvoiceImportVatRoundedPerLine', price2num($tva, 'MT'), price2num($announcedTva, 'MT'));
 		dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' keeps the VAT rounded per line (' . $tva . '), its EXTENDED document announcing ' . $announcedTva . ' rounded per rate', LOG_DEBUG);
 
