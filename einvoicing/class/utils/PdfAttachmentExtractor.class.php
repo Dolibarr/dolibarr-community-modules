@@ -333,7 +333,7 @@ class PdfAttachmentExtractor extends tcpdi_parser
 				continue;
 			}
 			$filter = $bytes[$offset];
-			$row = array();
+			$row = array_fill(0, $rowLength, 0);
 			for ($i = 0; $i < $rowLength; $i++) {
 				$value = $bytes[$offset + 1 + $i];
 				$left = $i > 0 ? $row[$i - 1] : 0;
