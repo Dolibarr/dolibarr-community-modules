@@ -189,7 +189,11 @@ class PdfAttachmentExtractor extends tcpdi_parser
 			$this->Error('unexpected end of data at offset '.$start);
 		}
 		if ($data[$start] !== '<') {
-			return parent::getRawObject($start, $data);
+			$object = parent::getRawObject($start, $data);
+			if ($object[1] <= $start) {		// the parent stays put on a byte it does not know, its callers would loop forever
+				$this->Error('unexpected data at offset '.$start);
+			}
+			return $object;
 		}
 
 		if (substr($data, $start, 2) !== '<<') {
@@ -223,6 +227,165 @@ class PdfAttachmentExtractor extends tcpdi_parser
 		}
 
 		throw new Exception('PDF cannot be read: dictionary not closed at offset '.$start);
+	}
+
+	/**
+	 * Read a cross-reference stream, in place of the parent which does not count the compressed objects
+	 * and then files every object that follows under the wrong number.
+	 *
+	 * @param	int						$startxref		Offset of the cross-reference stream
+	 * @param	array<string,mixed>		$xref			Entries read from the newer sections
+	 * @return	array<string,mixed>						Entries and trailer
+	 * @throws	Exception								When the stream cannot be read
+	 */
+	protected function decodeXrefStream($startxref, $xref = array())
+	{
+		list($xrefobj) = $this->getRawObject($startxref);
+		$xrefcrs = $this->getIndirectObject($xrefobj[1], $startxref, true);
+		$dict = $this->dictOf($xrefcrs[0]);
+		if ($dict === null || !isset($dict['/Type'][1]) || $dict['/Type'][1] !== 'XRef' || !isset($xrefcrs[1][3][0])) {
+			$this->Error('invalid cross-reference stream at offset '.$startxref);
+		}
+
+		if (!isset($xref['xref_location'])) {
+			$xref['xref_location'] = $startxref;
+			$xref['max_object'] = 0;
+		}
+		if (!isset($xref['xref'])) {
+			$xref['xref'] = array();
+		}
+		if (empty($xref['trailer'])) {		// the newest section holds the trailer
+			$xref['trailer'] = array(PDF_TYPE_DICTIONARY, array());
+			foreach (array('/Size', '/Root', '/Info', '/ID') as $key) {
+				if (isset($dict[$key])) {
+					$xref['trailer'][1][$key] = $dict[$key];
+				}
+			}
+		}
+
+		$widths = array();
+		foreach ($this->arrayOf(isset($dict['/W']) ? $dict['/W'] : null) as $width) {
+			$widths[] = (int) $width[1];
+		}
+		$params = $this->dictOf(isset($dict['/DecodeParms']) ? $dict['/DecodeParms'] : null);
+		$predictor = isset($params['/Predictor'][1]) ? (int) $params['/Predictor'][1] : 1;
+		if (count($widths) != 3 || ($predictor > 1 && $predictor < 10)) {
+			$this->Error('unsupported cross-reference stream at offset '.$startxref);
+		}
+		$rows = self::unpredictRows($xrefcrs[1][3][0], array_sum($widths), $predictor >= 10);
+
+		// Each pair of /Index gives the first number and the count of a subsection, the whole table by default
+		$index = $this->arrayOf(isset($dict['/Index']) ? $dict['/Index'] : null);
+		if (empty($index)) {
+			$index = array(array(PDF_TYPE_NUMERIC, 0), isset($dict['/Size']) ? $dict['/Size'] : array(PDF_TYPE_NUMERIC, count($rows)));
+		}
+		$row = 0;
+		$rowCount = count($rows);
+		$indexCount = count($index);
+		for ($i = 1; $i < $indexCount; $i += 2) {
+			$number = (int) $index[$i - 1][1];
+			$end = $number + (int) $index[$i][1];
+			for (; $number < $end && $row < $rowCount; $number++, $row++) {
+				$fields = array($widths[0] ? 0 : 1, 0, 0);		// the type is 1 when its field is left out
+				$byte = 0;
+				for ($field = 0; $field < 3; $field++) {
+					for ($b = 0; $b < $widths[$field]; $b++) {
+						$fields[$field] = ($fields[$field] << 8) + $rows[$row][$byte++];
+					}
+				}
+				// Only the objects stored uncompressed have an offset, the newest section wins
+				if ($fields[0] == 1 && !isset($xref['xref'][$number][$fields[2]])) {
+					$xref['xref'][$number][$fields[2]] = $fields[1];
+				}
+			}
+			$xref['max_object'] = max($xref['max_object'], $number);
+		}
+
+		if (isset($dict['/Prev'][1])) {
+			$prev = (int) $dict['/Prev'][1];
+			if (!in_array($prev, $this->xref_seen_offsets)) {		// a /Prev chain is not trusted to end
+				$this->xref_seen_offsets[] = $prev;
+				$xref = $this->getXrefData($prev, $xref);
+			}
+		}
+
+		return $xref;
+	}
+
+	/**
+	 * Split a cross-reference stream into rows of bytes, undoing the PNG predictor of each row when it has one.
+	 *
+	 * @param	string		$data			Decoded stream
+	 * @param	int			$rowLength		Bytes in a row, without the predictor byte
+	 * @param	bool		$png			Whether each row starts with a PNG predictor byte
+	 * @return	array<int,array<int,int>>	Rows of bytes
+	 */
+	private static function unpredictRows($data, $rowLength, $png)
+	{
+		$bytes = array_values((array) unpack('C*', $data));
+		$stride = $rowLength + ($png ? 1 : 0);
+		$rows = array();
+		$previous = array_fill(0, $rowLength, 0);
+		$byteCount = count($bytes);
+		for ($offset = 0; $rowLength > 0 && $offset + $stride <= $byteCount; $offset += $stride) {
+			if (!$png) {
+				$rows[] = array_slice($bytes, $offset, $rowLength);
+				continue;
+			}
+			$filter = $bytes[$offset];
+			$row = array();
+			for ($i = 0; $i < $rowLength; $i++) {
+				$value = $bytes[$offset + 1 + $i];
+				$left = $i > 0 ? $row[$i - 1] : 0;
+				$up = $previous[$i];
+				$upLeft = $i > 0 ? $previous[$i - 1] : 0;
+				switch ($filter) {
+					case 1:		// Sub
+						$value += $left;
+						break;
+					case 2:		// Up
+						$value += $up;
+						break;
+					case 3:		// Average
+						$value += intdiv($left + $up, 2);
+						break;
+					case 4:		// Paeth
+						$p = $left + $up - $upLeft;
+						$pa = abs($p - $left);
+						$pb = abs($p - $up);
+						$pc = abs($p - $upLeft);
+						$value += ($pa <= $pb && $pa <= $pc) ? $left : ($pb <= $pc ? $up : $upLeft);
+						break;
+				}
+				$row[$i] = $value & 0xff;
+			}
+			$rows[] = $row;
+			$previous = $row;
+		}
+
+		return $rows;
+	}
+
+	/**
+	 * List the objects an object stream holds, in place of the parent which splits its header on spaces only
+	 * while a PDF may separate the pairs with any white space.
+	 *
+	 * @param	array{0:int|string,1:int|string}	$key	Number and generation of the object stream
+	 * @return	void
+	 */
+	public function extractObjectStream($key)
+	{
+		$object = $this->getObjectVal(array(PDF_TYPE_OBJREF, $key[0], $key[1]));
+		if ($object[0] !== PDF_TYPE_STREAM || !isset($object[1][1]['/First'][1])) {
+			return;		// not an object stream, the parent skips it as well
+		}
+		$stream = $this->decodeStream($object[1][1], $object[2][1]);
+		$first = (int) $object[1][1]['/First'][1];
+		$pairs = preg_split('/\s+/', trim(substr($stream[0], 0, $first)));
+		$pairCount = count($pairs);
+		for ($i = 1; $i < $pairCount; $i += 2) {
+			$this->objstreamobjs[$pairs[$i - 1]] = array($key, (int) $pairs[$i] + $first);
+		}
 	}
 
 	/**
