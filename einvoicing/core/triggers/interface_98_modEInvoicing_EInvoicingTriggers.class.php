@@ -416,7 +416,8 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 						'EInvoiceTotalsMismatchBlocksValidation',
 						price2num($announced['ttc'], 'MT'),
 						price2num($announced['tva'], 'MT'),
-						price2num(abs((float) $object->total_ttc), 'MT')
+						price2num(abs((float) $object->total_ttc), 'MT'),
+						price2num(abs((float) $object->total_tva), 'MT')
 					);
 					return -1;
 				}
