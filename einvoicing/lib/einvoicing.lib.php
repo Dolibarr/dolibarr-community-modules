@@ -1392,3 +1392,140 @@ function einvoicingDiagnosticPreviewLink($fileName)
 
 	return $out;
 }
+
+/**
+ * Read the state of the scheduled job that synchronizes the flows, from the row the scheduler keeps for it.
+ *
+ * @param	DoliDB		$db		Database handler
+ * @return	array{id:int,enabled:bool,running:bool,failed:bool,late:bool,datelastrun:int,datenextrun:int,lastoutput:string}|null	Null when the job is not found
+ */
+function einvoicingSyncJobHealth($db)
+{
+	global $conf;
+
+	$sql = "SELECT rowid, status, processing, frequency, unitfrequency, datelastrun, datenextrun, lastresult, lastoutput";
+	$sql .= " FROM ".MAIN_DB_PREFIX."cronjob";
+	$sql .= " WHERE module_name = 'einvoicing' AND methodename = 'cronSyncFlows'";
+	$sql .= " AND status IN (0, 1) AND entity IN (0, ".((int) $conf->entity).")";
+	$sql .= " ORDER BY status DESC, rowid ASC";
+	$sql .= $db->plimit(1);
+
+	$resql = $db->query($sql);
+	if (!$resql) {
+		dol_syslog(__FUNCTION__." ".$db->lasterror(), LOG_ERR);
+		return null;
+	}
+	$obj = $db->fetch_object($resql);
+	$db->free($resql);
+	if (!$obj) {
+		return null;
+	}
+
+	$enabled = ((int) $obj->status == 1);
+	$running = ((int) $obj->processing > 0);
+	$datenextrun = (int) $db->jdate($obj->datenextrun);
+	// The scheduler reprograms the job after each run, failed or not. A due date left more than one period
+	// behind means nothing runs it any more: the system cron is stopped, or a run died and left it "processing".
+	$period = max((int) $obj->frequency * (int) $obj->unitfrequency, 900);
+
+	return array(
+		'id' => (int) $obj->rowid,
+		'enabled' => $enabled,
+		'running' => $running,
+		'failed' => $enabled && !$running && (string) $obj->lastresult !== '' && (string) $obj->lastresult !== '0',
+		'late' => $enabled && $datenextrun > 0 && $datenextrun + $period < dol_now(),
+		'datelastrun' => (int) $db->jdate($obj->datelastrun),
+		'datenextrun' => $datenextrun,
+		'lastoutput' => (string) $obj->lastoutput,
+	);
+}
+
+/**
+ * Single state of the scheduled synchronization, the most serious one first.
+ *
+ * @param	?array{id:int,enabled:bool,running:bool,failed:bool,late:bool,datelastrun:int,datenextrun:int,lastoutput:string}	$health	As returned by einvoicingSyncJobHealth()
+ * @return	'notfound'|'disabled'|'stuck'|'failed'|'late'|'running'|'neverrun'|'ok'
+ */
+function einvoicingSyncJobState($health)
+{
+	if ($health === null) {
+		return 'notfound';
+	}
+	if (!$health['enabled']) {
+		return 'disabled';
+	}
+	if ($health['running'] && $health['late']) {
+		return 'stuck';
+	}
+	if ($health['failed']) {
+		return 'failed';
+	}
+	if ($health['late']) {
+		return 'late';
+	}
+	if ($health['running']) {
+		return 'running';
+	}
+	return empty($health['datelastrun']) ? 'neverrun' : 'ok';
+}
+
+/**
+ * Label of a state returned by einvoicingSyncJobState()
+ *
+ * @param	string	$code	State
+ * @return	string			Translated label
+ */
+function einvoicingSyncJobStateLabel($code)
+{
+	global $langs;
+
+	$keys = array('notfound' => 'EInvoicingSyncJobNotFound', 'disabled' => 'Disabled', 'stuck' => 'EInvoicingSyncJobStuck', 'failed' => 'EInvoicingSyncJobFailed', 'late' => 'EInvoicingSyncJobLate', 'running' => 'EInvoicingSyncJobRunning', 'neverrun' => 'EInvoicingSyncJobNeverRun', 'ok' => 'EInvoicingSyncJobOk');
+
+	return $langs->trans($keys[$code]);
+}
+
+/**
+ * Lines that describe the scheduled synchronization, shared by the home page of the module and the widget.
+ *
+ * @param	DoliDB		$db			Database handler
+ * @param	?array{id:int,enabled:bool,running:bool,failed:bool,late:bool,datelastrun:int,datenextrun:int,lastoutput:string}	$health	As returned by einvoicingSyncJobHealth()
+ * @return	array<array{0:string,1:string}>		Label and HTML value of each line
+ */
+function einvoicingSyncJobHealthLines($db, $health)
+{
+	global $langs, $user;
+
+	$langs->loadLangs(array('cron', 'einvoicing@einvoicing'));
+
+	$lines = array();
+
+	$code = einvoicingSyncJobState($health);
+	$badges = array('notfound' => 'secondary', 'disabled' => 'secondary', 'stuck' => 'danger', 'failed' => 'danger', 'late' => 'warning', 'running' => 'info', 'neverrun' => 'secondary', 'ok' => 'success');
+	$state = dolGetBadge(einvoicingSyncJobStateLabel($code), '', $badges[$code]);
+	if ($health !== null && !empty($health['datelastrun'])) {
+		$state .= ' <span class="opacitymedium">'.dol_print_date($health['datelastrun'], 'dayhour', 'tzuserrel').'</span>';
+	}
+	if ($health !== null && $user->hasRight('cron', 'read')) {
+		$state .= ' <a href="'.DOL_URL_ROOT.'/cron/card.php?id='.$health['id'].'" title="'.dol_escape_htmltag($langs->trans("CronTask")).'">'.img_picto('', 'cron').'</a>';
+	}
+	$lines[] = array($langs->trans("EInvoicingSyncJob"), $state);
+
+	if ($health !== null && $health['failed']) {
+		// The scheduler stores the output of the job, then the error on a line of its own: the error is the cause
+		$outputlines = explode("\n", trim($health['lastoutput']));
+		$cause = trim(dol_string_nohtmltag(end($outputlines), 1));
+		$full = trim(dol_string_nohtmltag(str_replace("\n", '<br>', $health['lastoutput']), 0));
+		$lines[] = array($langs->trans("Error"), '<span class="small classfortooltip" title="'.dol_escape_htmltag($full).'">'.dol_escape_htmltag(dol_trunc($cause, 90)).'</span>');
+	}
+	if ($health !== null && $health['late']) {
+		$lines[] = array($langs->trans("EInvoicingSyncJobExpectedAt"), '<span class="warning">'.dol_print_date($health['datenextrun'], 'dayhour', 'tzuserrel').'</span>');
+	}
+
+	$sql = "SELECT MAX(date_creation) as lastdoc FROM ".MAIN_DB_PREFIX."einvoicing_document WHERE entity IN (".getEntity('einvoicing').")";
+	$resql = $db->query($sql);
+	$obj = $resql ? $db->fetch_object($resql) : null;
+	$lastdoc = ($obj && !empty($obj->lastdoc)) ? dol_print_date($db->jdate($obj->lastdoc), 'dayhour', 'tzuserrel') : $langs->trans("None");
+	$lines[] = array($langs->trans("EInvoicingLastDocumentRecorded"), $lastdoc);
+
+	return $lines;
+}
