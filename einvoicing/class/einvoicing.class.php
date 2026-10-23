@@ -941,14 +941,16 @@ class EInvoicing
 	 * Get the path of the CII XML received for a supplier invoice, if there is one to read.
 	 *
 	 * The file is the one the reception saved beside the supplier invoice, so the naming is the one of
-	 * CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment(): the reference of the supplier names
-	 * the file, and the reference of the invoice names its directory. A document received in Factur-X
-	 * is a PDF, which Dolibarr previews on its own and which is not concerned here.
+	 * CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment(): <ref supplier>_einvoice.xml for the
+	 * imported document, <ref supplier>_original.xml or _converted.xml for the other formats kept beside
+	 * it on option. A document received in Factur-X is a PDF, which Dolibarr previews on its own and
+	 * which is not concerned here.
 	 *
 	 * @param 	FactureFournisseur 	$supplierInvoice 	Supplier invoice the document was received for.
+	 * @param	string				$suffix				'original' or 'converted' for that other format, '' for the imported document.
 	 * @return 	string									Full path of the XML, empty string if there is none.
 	 */
-	public function getSupplierEInvoiceXmlFilePath($supplierInvoice)
+	public function getSupplierEInvoiceXmlFilePath($supplierInvoice, $suffix = '')
 	{
 		global $conf;
 
@@ -956,9 +958,15 @@ class EInvoicing
 			return '';
 		}
 
+		if ($suffix === '') {
+			$suffix = 'einvoice';
+		} elseif (!in_array($suffix, array('einvoice', 'original', 'converted'), true)) {
+			return '';
+		}
+
 		$base = $conf->fournisseur->dir_output . '/facture/';
 		$ref = dol_sanitizeFileName($supplierInvoice->ref);
-		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . '_einvoice.xml');
+		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . '_' . $suffix . '.xml');
 
 		$path = $base . get_exdir($supplierInvoice->id, 2, 0, 0, $supplierInvoice, 'invoice_supplier') . $ref . '/' . $filename;
 		if (is_readable($path)) {
