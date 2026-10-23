@@ -105,6 +105,54 @@ function einvoicingAdminPrepareHead()
 }
 
 /**
+ * Offer to encrypt the credentials this installation still stores in clear.
+ *
+ * Reading is name-agnostic, so a value in clear keeps working and nothing has to be migrated. It is
+ * in every dump taken since it was saved, though, which is what this says and what the button fixes.
+ *
+ * @param	AbstractPDPProvider	$provider	Provider in use
+ * @param	DoliDB				$db			Database handler
+ * @param	int					$entity		Entity holding the setup
+ * @return	string							Warning block, '' when every credential is encrypted
+ */
+function pdpCredentialsInClearWarning($provider, $db, $entity)
+{
+	global $langs;
+
+	require_once __DIR__.'/../class/utils/CredentialStorage.class.php';
+
+	$storage = new CredentialStorage($db);
+	$inclear = $storage->inClear($storage->inventory($provider, $entity));
+	if (empty($inclear)) {
+		return '';
+	}
+
+	$labels = array();
+	foreach ($inclear as $item) {
+		$labels[] = $item['label'];
+	}
+
+	$ret = '<div class="warning">';
+	$ret .= '<strong>'.$langs->trans('EInvoicingCredentialsInClearTitle').'</strong><br>';
+	$ret .= $langs->trans('EInvoicingCredentialsInClearText', implode(', ', $labels));
+	$ret .= '<br><br>';
+	if (!$storage->canEncrypt()) {
+		$ret .= $langs->trans('EInvoicingCredentialsNoKey');
+		$ret .= '</div>';
+
+		return $ret;
+	}
+	$ret .= $langs->trans('EInvoicingCredentialsEncryptConfirm');
+	$ret .= '<br><br>';
+	$ret .= '<a class="butAction" href="'.$_SERVER["PHP_SELF"].'?action=encryptcredentials&token='.newToken().'">';
+	$ret .= $langs->trans('EInvoicingCredentialsEncryptNow').'<i class="fas fa-lock marginleftonly"></i>';
+	$ret .= '</a>';
+	$ret .= '</div>';
+
+	return $ret;
+}
+
+/**
  * Show a warning if setup not correct.
  *
  * @param 	EInvoicing $einvoicing	Object EInvoicing
