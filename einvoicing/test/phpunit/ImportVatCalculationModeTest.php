@@ -813,4 +813,149 @@ class ImportVatCalculationModeTest extends CommonClassTest
 			'a total that is not the one of the document is still reported'
 		);
 	}
+
+	/**
+	 * The two lines of the document of issue #1198, train tickets of 59.00 and 114.00 at 10 %: they add up to
+	 * 157.28 while the document announces 157.27 + 15.73 = 173.00.
+	 *
+	 * @return	int		Id of the draft supplier invoice built from those lines, in mode 1
+	 */
+	private function createSncfFixtureInvoice()
+	{
+		global $db, $user;
+
+		$this->setInstanceVatMode(1);
+
+		$invoice = new FactureFournisseur($db);
+		$invoice->initAsSpecimen();
+		$invoice->lines = array();
+		$invoice->ref_supplier = 'PR1198' . strtoupper(bin2hex(random_bytes(5)));
+		$invoice->special_code = 0;
+		$id = $invoice->create($user);
+		$this->assertGreaterThan(0, $id, $invoice->errorsToString());
+		$this->createdInvoiceIds[] = $id;
+		foreach (array(53.64, 103.64) as $amount) {
+			$this->assertGreaterThan(0, $invoice->addline('TRANSPORT', $amount, 10.0, 0, 0, 1), $invoice->errorsToString());
+		}
+
+		return $id;
+	}
+
+	/**
+	 * Header of the document of issue #1198, under the profile it declares.
+	 *
+	 * @param	string	$guidelineId	BT-24 of the document
+	 * @return	array<string,mixed>		The parsed header
+	 */
+	private function sncfHeader($guidelineId)
+	{
+		return array(
+			'documentno' => 'EINV1198-SNCF',
+			'guidelineId' => $guidelineId,
+			'lineTotalAmount' => 157.27,
+			'taxBasisTotalAmount' => 157.27,
+			'taxTotalAmount' => 15.73,
+			'grandTotalAmount' => 173.00,
+			'toleranceItemCount' => 2,
+			'toleranceItemCountByRate' => array('10' => 2),
+			'taxBreakdown' => array(array(
+				'typeCode' => 'VAT',
+				'rateApplicablePercent' => 10.0,
+				'basisAmount' => 157.27,
+				'calculatedAmount' => 15.73,
+			)),
+		);
+	}
+
+	/**
+	 * The document of issue #1198 as SNCF sent it, EXTENDED-CTC-FR: BR-CO-10 is disabled there and
+	 * BR-FREXT-CO-10 tolerates a cent per line, so the document is right. The invoice keeps the amounts of
+	 * its lines, totals the 173.00 of the document, and nothing holds it back.
+	 *
+	 * @return void
+	 */
+	public function testAnExtendedDocumentWhoseLinesAreACentOffImports()
+	{
+		global $db;
+
+		$id = $this->createSncfFixtureInvoice();
+		$header = $this->sncfHeader('urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr');
+		$lines = array(array('lineTotalAmount' => 53.64), array('lineTotalAmount' => 103.64));
+		$contradiction = SupplierInvoiceHelper::lineTotalContradiction($header, $lines);
+		$this->assertNull($contradiction, 'BR-CO-10 does not bind an EXTENDED document');
+
+		$messages = array();
+		$method = new ReflectionMethod(CIIProtocol::class, 'alignInvoiceTotalsWithDocument');
+		$method->setAccessible(true);
+		$method->invokeArgs(new CIIProtocol($db), array($id, $header, &$messages, $contradiction));
+
+		$invoice = new FactureFournisseur($db);
+		$invoice->fetch($id);
+		$this->assertEquals(157.28, (float) $invoice->total_ht, 'the amounts of the lines are kept');
+		$this->assertEquals(15.72, (float) $invoice->total_tva, 'with their VAT rounded per line');
+		$this->assertEquals(173.00, (float) $invoice->total_ttc, 'which totals what the document announces');
+		$this->assertNull(SupplierInvoiceHelper::totalsMismatch($id), 'nothing holds the invoice back');
+
+		$note = SupplierInvoiceHelper::vatRoundedPerLine($id);
+		$this->assertNotNull($note, 'the card says why the amounts differ from the document');
+		$this->assertEquals(157.27, $note['announcedht']);
+		$this->assertEquals(157.28, $note['invoiceht']);
+
+		$this->assertCount(1, $messages);
+		$this->assertStringContainsString('157.28', $messages[0]);
+		$this->assertStringContainsString('157.27', $messages[0]);
+	}
+
+	/**
+	 * The same document declaring the EN 16931 profile breaks BR-CO-10, a fatal rule: built from its lines,
+	 * the invoice cannot total it. It is held back, and the operator is told the document contradicts
+	 * itself rather than shown two totals that are both 173.00.
+	 *
+	 * @return void
+	 */
+	public function testAnEn16931DocumentWhoseLinesContradictTheirSumIsHeldBack()
+	{
+		global $db;
+
+		$id = $this->createSncfFixtureInvoice();
+		$header = $this->sncfHeader('urn:cen.eu:en16931:2017');
+		$lines = array(array('lineTotalAmount' => 53.64), array('lineTotalAmount' => 103.64));
+		$contradiction = SupplierInvoiceHelper::lineTotalContradiction($header, $lines);
+		$this->assertSame(array('lines' => 157.28, 'announced' => 157.27), $contradiction, 'BR-CO-10 is read on the lines of the document');
+
+		$messages = array();
+		$method = new ReflectionMethod(CIIProtocol::class, 'alignInvoiceTotalsWithDocument');
+		$method->setAccessible(true);
+		$method->invokeArgs(new CIIProtocol($db), array($id, $header, &$messages, $contradiction));
+
+		$mark = SupplierInvoiceHelper::totalsMismatch($id);
+		$this->assertNotNull($mark, 'the invoice is held back');
+		$this->assertEquals(157.28, $mark['lines'], 'the mark keeps what the lines add up to');
+		$this->assertEquals(157.27, $mark['linetotal'], 'and the sum the document announces of them');
+		$this->assertTrue(SupplierInvoiceHelper::totalsMismatchBlocks($id));
+
+		$this->assertCount(1, $messages, 'one message, naming the contradiction');
+		$this->assertStringContainsString('157.28', $messages[0]);
+		$this->assertStringContainsString('157.27', $messages[0]);
+		$this->assertStringContainsString('BR-CO-10', $messages[0]);
+	}
+
+	/**
+	 * Lines that add up to BT-106 contradict nothing, and neither does a document the sum cannot be
+	 * read on: no BT-106, no line, or a line carrying no BT-131.
+	 *
+	 * @return void
+	 */
+	public function testLinesAddingUpToTheirSumContradictNothing()
+	{
+		$lines = array(array('lineTotalAmount' => 53.64), array('lineTotalAmount' => 103.63));
+
+		$this->assertNull(SupplierInvoiceHelper::lineTotalContradiction(array('lineTotalAmount' => 157.27), $lines));
+		$this->assertNull(SupplierInvoiceHelper::lineTotalContradiction(array(), $lines), 'no BT-106');
+		$this->assertNull(SupplierInvoiceHelper::lineTotalContradiction(array('lineTotalAmount' => 157.27), array()), 'no line');
+		$this->assertNull(
+			SupplierInvoiceHelper::lineTotalContradiction(array('lineTotalAmount' => 1.00), array(array('lineTotalAmount' => 53.64), array())),
+			'a line without BT-131'
+		);
+	}
 }

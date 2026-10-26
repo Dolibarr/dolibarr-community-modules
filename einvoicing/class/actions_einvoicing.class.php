@@ -506,7 +506,10 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			// The EXTENDED document announced two VAT totals and the invoice keeps the one rounded per line (issue #1166)
 			dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 			$vatTotals = SupplierInvoiceHelper::vatRoundedPerLine((int) $object->id);
-			if ($vatTotals !== null) {
+			if ($vatTotals !== null && isset($vatTotals['invoiceht'], $vatTotals['announcedht'])) {
+				// Its lines add up to another net amount than the one it announces, within the same tolerance (issue #1198)
+				print '<div class="warning">' . $langs->trans('EInvoiceLineAmountsKeptNote', price($vatTotals['invoiceht']), price($vatTotals['invoice']), price($vatTotals['announcedht']), price($vatTotals['announced'])) . '</div>';
+			} elseif ($vatTotals !== null) {
 				print '<div class="warning">' . $langs->trans('EInvoiceVatRoundedPerLineNote', price($vatTotals['invoice']), price($vatTotals['announced'])) . '</div>';
 			}
 

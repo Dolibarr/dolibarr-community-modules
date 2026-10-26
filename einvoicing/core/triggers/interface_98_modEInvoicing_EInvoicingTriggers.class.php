@@ -411,6 +411,16 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 						price2num(SupplierInvoiceHelper::linkedDepositAmount((int) $object->id), 'MT')
 					);
 					return -1;
+				} elseif (isset($announced['lines'], $announced['linetotal'])) {
+					// The document contradicts itself (BR-CO-10): pointing at two totals that may well be
+					// equal, as they are on the reported document, told the operator nothing (issue #1198).
+					$this->errors[] = $langs->trans(
+						'EInvoiceLineTotalMismatchBlocksValidation',
+						price2num($announced['lines'], 'MT'),
+						price2num($announced['linetotal'], 'MT'),
+						price2num($announced['tva'], 'MT')
+					);
+					return -1;
 				} else {
 					$this->errors[] = $langs->trans(
 						'EInvoiceTotalsMismatchBlocksValidation',
