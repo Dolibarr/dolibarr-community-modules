@@ -1279,8 +1279,9 @@ if (!extension_loaded('zip')) {
 }
 
 if (empty($argv[1])) {
-	print "Usage:   ".$script_file." index|makezip|makeziptag|pushdolistore\n";
+	print "Usage:   ".$script_file." index|txsync|makezip|makeziptag|pushdolistore\n";
 	print "Example: ".$script_file." index                           to rebuild the index.yaml file (used by Dolibarr to retrieve list of community modules)\n";
+	print "Example: ".$script_file." txsync             [modulename] to pull all languages from Transifex (with dev/translation/txpull.sh)\n";
 	print "Example: ".$script_file." makezip|makeziptag [modulename] to regenerate zip of packages (and set Tag of version)\n";
 	print "Example: ".$script_file." pushdolistore      [modulename] to publish zip of packages on dolistore (ask for API key)\n";
 	print "\n";
@@ -1312,6 +1313,35 @@ if ($argv[1] == 'index') {
 	print "The combined index.yaml file was created at: " . $outputFile;
 	syslog(LOG_INFO, "The combined index.yaml file was created at: " . $outputFile);
 	print "\n";
+}
+
+if ($argv[1] == 'txsync') {
+	$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..');
+	$txpullScript = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev' . DIRECTORY_SEPARATOR . 'translation' . DIRECTORY_SEPARATOR . 'txpull.sh';
+
+	$command = escapeshellarg($txpullScript) . ' all';
+	if (!empty($argv[2])) {
+		// Find the Transifex resource of the module into .tx/config (the one whose file_filter starts with "modulename/")
+		$modulename = strtolower($argv[2]);
+		$txconfig = (string) @file_get_contents($directoryToSearch . DIRECTORY_SEPARATOR . '.tx' . DIRECTORY_SEPARATOR . 'config');
+		$reg = array();
+		if (!preg_match('/^\[([^\]]+)\]\s*\nfile_filter\s*=\s*' . preg_quote($modulename, '/') . '\//m', $txconfig, $reg)) {
+			print "[fail] No Transifex resource found for module " . $modulename . " into .tx/config\n";
+			exit(1);
+		}
+		print "Pull all languages from Transifex for module " . $modulename . " (resource " . $reg[1] . ")\n";
+		$command .= ' -r ' . escapeshellarg($reg[1]);
+	} else {
+		print "Pull all languages from Transifex for all modules\n";
+	}
+
+	$returnCode = 0;
+	passthru($command, $returnCode);
+	if ($returnCode != 0) {
+		print "[fail] Command " . $command . " failed with return code " . $returnCode . "\n";
+		exit(1);
+	}
+	print "All done.\n";
 }
 
 if ($argv[1] == 'pushdolistore') {
