@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
  * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
+ * Copyright (C) 2026       Alexandre Spangaro          <alexandre@inovea-conseil.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -52,9 +53,19 @@ function einvoicingAdminPrepareHead()
 	$head[$h][2] = 'settings';
 	$h++;
 
-	$head[$h][0] = dol_buildpath("/einvoicing/admin/setup_options.php", 1);
-	$head[$h][1] = $langs->trans("Options");
-	$head[$h][2] = 'options';
+	$head[$h][0] = dol_buildpath("/einvoicing/admin/setup_send.php", 1);
+	$head[$h][1] = $langs->trans("OptionsEInvoicingSend");
+	$head[$h][2] = 'send';
+	$h++;
+
+	$head[$h][0] = dol_buildpath("/einvoicing/admin/setup_receive.php", 1);
+	$head[$h][1] = $langs->trans("OptionsEInvoicingReceive");
+	$head[$h][2] = 'receive';
+	$h++;
+
+	$head[$h][0] = dol_buildpath("/einvoicing/admin/setup_advanced.php", 1);
+	$head[$h][1] = $langs->trans("OptionsEInvoicingAdvanced");
+	$head[$h][2] = 'advanced';
 	$h++;
 
 	/*
