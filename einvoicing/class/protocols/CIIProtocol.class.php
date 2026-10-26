@@ -774,10 +774,15 @@ class CIIProtocol extends AbstractProtocol
 	/**
 	 * Create/insert supplier invoice lines in DB using $lines property of the supplier invoice object
 	 * @param FactureFournisseur $supplierInvoice The supplier invoice to add lines
+	 * @param ?float $announcedTtc Total the received document announces, signed, null when not known
 	 * @return bool  True if success
 	 */
-	public function createSupplierInvoiceLinesIntoDatabase(FactureFournisseur $supplierInvoice): bool
+	public function createSupplierInvoiceLinesIntoDatabase(FactureFournisseur $supplierInvoice, $announcedTtc = null): bool
 	{
+		$isCreditNote = ((int) $supplierInvoice->type === FactureFournisseur::TYPE_CREDIT_NOTE);
+		$documentSign = SupplierInvoiceHelper::documentSign($supplierInvoice, $announcedTtc);
+		$lineIdsBySign = array(1 => array(), -1 => array());
+
 		// updateline() below totals each line through calcul_price_total() and looks its VAT rate up with
 		// getLocalTaxesFromRate(), handing both $this->thirdparty - the vendor, seller of this invoice.
 		// Neither create() nor fetch() loads it (fetch() even clears it), so the seller arrived empty and
@@ -831,12 +836,72 @@ class CIIProtocol extends AbstractProtocol
 				if ($res < 0) {
 					return false;
 				}
+
+				// The core forces every line of a credit note negative (issue #1077). Each line gets back
+				// the sign the document gives it, relative to the sign of the credit note itself.
+				$lineSign = SupplierInvoiceHelper::creditNoteLineSign($supplierInvoice->lines[$i], $documentSign);
+				if ($isCreditNote && empty($supplierInvoice->lines[$i]->fk_remise_except) && $lineSign !== 0) {
+					$lineIdsBySign[$lineSign][] = (int) $idligne;
+				}
 			} else {
 				return false;
 			}
 		}
 
+		// updateline() totalled the header before the signs were restored: total it again when one moved
+		$moved = 0;
+		foreach ($lineIdsBySign as $sign => $lineIds) {
+			$res = $this->setCreditNoteLinesSign($lineIds, $sign);
+			if ($res < 0) {
+				return false;
+			}
+			$moved += $res;
+		}
+		if ($moved > 0 && $supplierInvoice->update_price(1, 'auto', 0, $supplierInvoice->thirdparty) < 0) {
+			return false;
+		}
+
 		return true;
+	}
+
+	/**
+	 * Give the amounts of credit note lines the sign the received document gives them.
+	 *
+	 * FactureFournisseur::updateline() stores a credit note line negative whatever it is handed, unless both
+	 * FACTURE_ENABLE_NEGATIVE_LINES and INVOICE_KEEP_DISCOUNT_LINES_AS_IN_ORIGIN are on, and then keeps
+	 * the sign of the quantity instead. A vendor document is recorded as sent: the line is written with the
+	 * sign it carries in the document, whichever options the instance holds (issue #1077). Only the lines
+	 * the core stored with the other sign are written.
+	 *
+	 * @param	int[]	$lineIds	Ids of the lines in facture_fourn_det
+	 * @param	int		$sign		1 for lines the buyer owes, -1 for lines credited to the buyer
+	 * @return	int					Number of lines whose sign changed, -1 on error
+	 */
+	protected function setCreditNoteLinesSign(array $lineIds, $sign)
+	{
+		if (empty($lineIds)) {
+			return 0;
+		}
+		$sign = ($sign > 0) ? 1 : -1;
+		$sql = "UPDATE " . MAIN_DB_PREFIX . "facture_fourn_det SET";
+		$sql .= " pu_ht = " . ((int) $sign) . " * ABS(pu_ht), pu_ttc = " . ((int) $sign) . " * ABS(pu_ttc)";
+		$sql .= ", total_ht = " . ((int) $sign) . " * ABS(total_ht), tva = " . ((int) $sign) . " * ABS(tva), total_ttc = " . ((int) $sign) . " * ABS(total_ttc)";
+		$sql .= ", total_localtax1 = " . ((int) $sign) . " * ABS(total_localtax1), total_localtax2 = " . ((int) $sign) . " * ABS(total_localtax2)";
+		$sql .= ", multicurrency_subprice = " . ((int) $sign) . " * ABS(multicurrency_subprice), multicurrency_total_ht = " . ((int) $sign) . " * ABS(multicurrency_total_ht)";
+		$sql .= ", multicurrency_total_tva = " . ((int) $sign) . " * ABS(multicurrency_total_tva), multicurrency_total_ttc = " . ((int) $sign) . " * ABS(multicurrency_total_ttc)";
+		// Added by Dolibarr 21
+		if (version_compare(DOL_VERSION, '21.0.0', '>=')) {
+			$sql .= ", multicurrency_subprice_ttc = " . ((int) $sign) . " * ABS(multicurrency_subprice_ttc)";
+		}
+		$sql .= " WHERE rowid IN (" . $this->db->sanitize(implode(',', array_map('intval', $lineIds))) . ")";
+		$sql .= " AND (pu_ht * " . ((int) $sign) . " < 0 OR total_ht * " . ((int) $sign) . " < 0 OR total_ttc * " . ((int) $sign) . " < 0)";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' ' . $this->db->lasterror(), LOG_ERR);
+			return -1;
+		}
+
+		return (int) $this->db->affected_rows($resql);
 	}
 
 	/**
@@ -1128,16 +1193,12 @@ class CIIProtocol extends AbstractProtocol
 		// is left out: it is the invoice being imported, not one imported before.
 		$rebuildId = (int) AbstractProtocol::$rebuildSupplierInvoiceId;
 		$announcedTotalTtc = SupplierInvoiceHelper::announcedTotalTtc($parsedHeader) ?? 0.0;
-		// announcedTotalTtc() is unsigned (abs). A refund arrives as a negative document total, or as a
-		// credit-note type code (381/503), and Dolibarr stores the matching document as a negative credit
-		// note. Match on the signed amount, otherwise a credit note looks like a "different amount" against
-		// its own already-imported avoir - a false SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT conflict (a bank
-		// refund booked as a supplier credit note is the real-world case).
-		$signedAnnouncedTtc = $announcedTotalTtc;
-		if ((float) ($parsedHeader['grandTotalAmount'] ?? 0) < 0
-			|| $this->getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null) === CommonInvoice::TYPE_CREDIT_NOTE) {
-			$signedAnnouncedTtc = -$announcedTotalTtc;
-		}
+		// announcedTotalTtc() is the total of the document, signed. Match on what Dolibarr stores for it:
+		// a credit note (381/503) negative, unless signed like an invoice (issue #1077), any other type with
+		// the sign of its document. Otherwise a credit note looks like a "different amount" against its own
+		// already-imported avoir - a false SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT conflict.
+		$dolibarrType = (int) $this->getDolibarrInvoiceType($parsedHeader['documenttypecode'] ?? null);
+		$signedAnnouncedTtc = SupplierInvoiceHelper::documentSignOfType($dolibarrType, $announcedTotalTtc) * $announcedTotalTtc;
 		// The tolerance is BT-114: the same document imported before the rounding line existed totals a
 		// rounding amount more, and it is the invoice this is looking for (issue #994).
 		$supplierInvoiceId = SupplierInvoiceHelper::findIdByRef(
@@ -1473,7 +1534,7 @@ class CIIProtocol extends AbstractProtocol
 
 			// Insert document level charges (BG-21) as lines of this supplier invoice
 			if (!empty($parsedHeader['headerAllowancesCharges'])) {
-				$chargeRes = $this->createHeaderChargeLines($supplierInvoiceId, $parsedHeader['headerAllowancesCharges'], $return_messages);
+				$chargeRes = $this->createHeaderChargeLines($supplierInvoiceId, $parsedHeader['headerAllowancesCharges'], $return_messages, SupplierInvoiceHelper::announcedTotalTtc($parsedHeader));
 				if ($chargeRes['res'] < 0) {
 					return $chargeRes;
 				}
@@ -1584,7 +1645,7 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	public function createSupplierInvoiceLinesFromSource(&$supplierInvoice, $parsedLines, &$remise_already_used_line_level_ids, &$supplierPriceEntries, &$return_messages, $flowId = '', array $parsedHeader = array()): array
 	{
-		global $db;
+		global $db, $langs;
 
 		// Whether this supplier's line charges (BG-28) are folded into the product line's description
 		// instead of imported as a Dolibarr line of their own (community decision, issue #969). Resolved
@@ -1725,23 +1786,9 @@ class CIIProtocol extends AbstractProtocol
 			}
 			if (!empty($productId)) {
 				$line->fk_product = $productId;
-				if ($productMatchType == 'defaultrouting') {
-					// The default routing product is a catch-all shared by all the unresolved lines of the
-					// vendor: without the wording of the XML, every line of the invoice would show the same
-					// label. Keep the description of the vendor on top of the product link.
-					$line->desc = dol_concatdesc(trim($parsedLine['prodname'] ?? ''), trim($parsedLine['proddesc'] ?? ''));
-				} elseif (!empty($parsedLine['proddesc'])) {
-					// Keep the XML line-level description even when a real product is linked:
-					// it is often project-specific and not carried by the product's own label/description.
-					$line->desc = trim($parsedLine['proddesc']);
-				}
-				// Because we reuse an already existing product without changing its ref and label, we add the label from the supplier invoice into the description
-				if (!empty($parsedLine['prodname']) && trim($line->desc) != trim($parsedLine['prodname'])) {
-					$line->desc = dol_concatdesc($parsedLine['prodname'], $line->desc ?? '');
-				}
+				$line->desc = $this->resolveLineDescription($parsedLine);
 			} elseif (!$is_deposit_line) {
-				// Free line: no product linked, description set from XML data
-				$line->desc = trim($parsedLine['prodname'] ?? '') . (!empty($parsedLine['proddesc']) ? "\n" . trim($parsedLine['proddesc']) : '');
+				$line->desc = $this->resolveLineDescription($parsedLine);
 			}
 			if ($is_deposit_line && !empty($fk_remise)) {
 				$line->fk_remise_except = $fk_remise;
@@ -1822,7 +1869,8 @@ class CIIProtocol extends AbstractProtocol
 			}
 		}
 
-		if (!$this->createSupplierInvoiceLinesIntoDatabase($supplierInvoice)) {
+		$announcedTtc = SupplierInvoiceHelper::announcedTotalTtc($parsedHeader);
+		if (!$this->createSupplierInvoiceLinesIntoDatabase($supplierInvoice, $announcedTtc)) {
 			return [
 				'res' => -1,
 				'message' => 'Supplier invoice line creation error',
@@ -1831,6 +1879,18 @@ class CIIProtocol extends AbstractProtocol
 				'action' => $res['action'] ?? null,
 				'actiondata' => $res['actiondata'] ?? ''
 			];
+		}
+
+		// A credit note carrying an amount the buyer owes is one Dolibarr would not build: say it was kept as sent.
+		if ((int) $supplierInvoice->type === FactureFournisseur::TYPE_CREDIT_NOTE) {
+			$documentSign = SupplierInvoiceHelper::documentSign($supplierInvoice, $announcedTtc);
+			foreach ($supplierInvoice->lines as $line) {
+				if (empty($line->fk_remise_except) && SupplierInvoiceHelper::creditNoteLineSign($line, $documentSign) > 0) {
+					$langs->load('einvoicing@einvoicing');
+					$return_messages[] = $langs->trans('EInvoiceImportCreditNoteKeptAsReceived', dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')));
+					break;
+				}
+			}
 		}
 
 		return ['res' => 1];
@@ -2117,18 +2177,22 @@ class CIIProtocol extends AbstractProtocol
 		// (issue #850). Only a line announcing nothing keeps what its price rebuilds.
 		$difference = abs($rebuilt - $announced);
 		$divisor = $qty * (1 - ($remisePercent / 100));
-		$fromPriceRounding = (abs($divisor) * 0.5 / pow(10, self::MAX_DECIMALS_UNIT_PRICE)) + 0.01;
+		// What the price precision explains: the unrounded couple against BT-131, half a unit of the last price
+		// decimal per unit plus the half cent BT-131 is rounded to. A wider margin calls a mispriced line consistent.
+		$explainedByPriceDecimals = abs($qty * $subprice * (1 - ($remisePercent / 100)) - $announced)
+			<= abs($divisor) * 0.5 / pow(10, self::MAX_DECIMALS_UNIT_PRICE) + 0.005;
 
 		$warning = '';
 		$refined = false;
-		if ($lineAnnouncesAnAmount && $difference > 0.01 && $divisor != 0.0) {
+		// Both sides are rounded to the cent: a single cent is already a difference.
+		if ($lineAnnouncesAnAmount && $difference >= 0.005 && $divisor != 0.0) {
 			$subprice = $announced / $divisor;
 			$refined = true;
 
 			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announcedText
 				. ', while its quantity (BT-129) and unit price (BT-146) rebuild ' . $rebuilt . '. ';
 
-			if ($difference <= $fromPriceRounding) {
+			if ($explainedByPriceDecimals) {
 				$warning .= 'That difference is within the ' . self::MAX_DECIMALS_UNIT_PRICE
 					. ' decimals a unit price is written with (BR-FR-DEC-03), so the price was refined to '
 					. $this->spellOutUnitPrice($subprice) . ' and the line totals the amount announced.';
@@ -2136,7 +2200,7 @@ class CIIProtocol extends AbstractProtocol
 				$warning .= 'The document prices that line elsewhere than it bills it: the line was imported at the amount announced, at a unit price of '
 					. $this->spellOutUnitPrice($subprice) . ', so the invoice totals what the document bills.';
 			}
-		} elseif ($difference > 0.01) {
+		} elseif ($difference >= 0.005) {
 			$warning = 'Line ' . $lineid . ' of the received document announces a net amount (BT-131) of ' . $announcedText
 				. ', but its quantity and unit price rebuild ' . $rebuilt . '. The invoice carries the rebuilt amount.';
 		}
@@ -2219,6 +2283,24 @@ class CIIProtocol extends AbstractProtocol
 		return $reason === '' || strtoupper($reason) === 'DETAIL';
 	}
 
+
+	/**
+	 * Description of a received line: the item name (BT-153), then its description (BT-154) unless it repeats the name.
+	 *
+	 * @param	array<string,mixed>		$parsedLine		One line as parseInvoiceLines() returns it
+	 * @return	string
+	 */
+	private function resolveLineDescription(array $parsedLine)
+	{
+		$name = trim((string) ($parsedLine['prodname'] ?? ''));
+		$description = trim((string) ($parsedLine['proddesc'] ?? ''));
+
+		if ($description === $name) {
+			return $name;
+		}
+
+		return dol_concatdesc($name, $description);
+	}
 
 	/**
 	 * Lines of a received document that has none (MINIMUM and BASIC WL profiles): one per VAT rate of its breakdown (BG-23).
@@ -4463,7 +4545,7 @@ class CIIProtocol extends AbstractProtocol
 			return false;
 		}
 
-		$sign = SupplierInvoiceHelper::documentSign($invoice);
+		$sign = SupplierInvoiceHelper::documentSign($invoice, (float) $announcedTtc);
 		$deposits = SupplierInvoiceHelper::linkedDepositTotals((int) $supplierInvoiceId);
 		$tva = $sign * ((float) $invoice->total_tva + $deposits['tva']);
 		$ttc = $sign * ((float) $invoice->total_ttc + $deposits['ttc']);
@@ -4579,9 +4661,10 @@ class CIIProtocol extends AbstractProtocol
 	 * @param	int						$supplierInvoiceId			Id of the invoice being imported
 	 * @param	array<int,array<string,mixed>>	$headerAllowancesCharges	Parsed ram:SpecifiedTradeAllowanceCharge of the header
 	 * @param	array<int,string>		$return_messages			Messages of the import, completed here
+	 * @param	?float					$announcedTtc				Total the received document announces, signed, null when not known
 	 * @return	array{res:int,message?:string}						res 1 on success, -1 on failure
 	 */
-	protected function createHeaderChargeLines($supplierInvoiceId, array $headerAllowancesCharges, &$return_messages): array
+	protected function createHeaderChargeLines($supplierInvoiceId, array $headerAllowancesCharges, &$return_messages, $announcedTtc = null): array
 	{
 		global $db;
 
@@ -4600,7 +4683,7 @@ class CIIProtocol extends AbstractProtocol
 		}
 		$carrier->lines = $chargeLines;
 
-		if (!$this->createSupplierInvoiceLinesIntoDatabase($carrier)) {
+		if (!$this->createSupplierInvoiceLinesIntoDatabase($carrier, $announcedTtc)) {
 			return ['res' => -1, 'message' => 'Failed to add the document level charges of the received document as invoice lines'];
 		}
 
@@ -4698,7 +4781,7 @@ class CIIProtocol extends AbstractProtocol
 		// SupplierInvoiceLine, which extends CommonObjectLine. Same assignment as the charge lines above.
 		$carrier->lines = array($roundingLine);	// @phpstan-ignore assign.propertyType
 
-		if (!$this->createSupplierInvoiceLinesIntoDatabase($carrier)) {
+		if (!$this->createSupplierInvoiceLinesIntoDatabase($carrier, SupplierInvoiceHelper::announcedTotalTtc($parsedHeader))) {
 			return ['res' => -1, 'message' => 'Failed to add the rounding amount of the received document as an invoice line'];
 		}
 
@@ -4962,7 +5045,7 @@ class CIIProtocol extends AbstractProtocol
 			}
 
 			// The document announces BG-23 with its own sign, which a credit note stored negative reverses.
-			$sign = SupplierInvoiceHelper::documentSign($invoice);
+			$sign = SupplierInvoiceHelper::documentSign($invoice, SupplierInvoiceHelper::announcedTotalTtc($parsedHeader));
 			if (abs($groups[$rate]['base'] - $sign * (float) ($tax['basisAmount'] ?? 0)) >= 0.005) {
 				return false;
 			}

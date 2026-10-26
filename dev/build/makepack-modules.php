@@ -1075,8 +1075,12 @@ function pushModuleToDolistore($apikey, $dolistoreApiUrl, $modulename, $director
 	if (preg_match('/phpmin:\s*["\']?([^"\'\n]+)["\']?/', $moduleBlock, $reg)) {
 		$phpMin = trim($reg[1]);
 	}
-	if (preg_match('/phpmax:\s*["\']?([^"\'\n]+)["\']?/', $moduleBlock, $reg)) {
+	$phpMaxFound = false;
+	// Note: the value can be empty (no max PHP version), so we track the tag presence to be able
+	// to reset a previously filled value on Dolistore. [ \t] avoids matching a value on the next yaml line.
+	if (preg_match('/phpmax:[ \t]*["\']?([^"\'\n]*)["\']?/', $moduleBlock, $reg)) {
 		$phpMax = trim($reg[1]);
+		$phpMaxFound = true;
 	}
 	if (preg_match('/last_updated_at:\s*["\']?([^"\'\n]+)["\']?/', $moduleBlock, $reg)) {
 		$lastUpdatedAt = trim($reg[1]);
@@ -1204,7 +1208,8 @@ function pushModuleToDolistore($apikey, $dolistoreApiUrl, $modulename, $director
 	if (!empty($phpMin)) {
 		$arrayOptions['options_marketplace_php_min_version'] = $phpMin;
 	}
-	if (!empty($phpMax)) {
+	if ($phpMaxFound) {
+		// Push the value even if empty, so an old max PHP version is reset on Dolistore
 		$arrayOptions['options_marketplace_php_max_version'] = $phpMax;
 	}
 	if (!empty($lastUpdatedAt)) {

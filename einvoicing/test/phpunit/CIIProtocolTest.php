@@ -505,6 +505,25 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
+	 * A received line shows its name once, followed by a description that differs from it.
+	 *
+	 * @return void
+	 */
+	public function testALineDescriptionNeverRepeatsItsName()
+	{
+		global $db;
+
+		$method = new ReflectionMethod(CIIProtocol::class, 'resolveLineDescription');
+		$method->setAccessible(true);
+		$protocol = new CIIProtocol($db);
+
+		$this->assertSame('FRAIS DE DOSSIER', $method->invoke($protocol, array('prodname' => 'FRAIS DE DOSSIER', 'proddesc' => 'FRAIS DE DOSSIER')));
+		$this->assertSame("Fees\nFile 42", $method->invoke($protocol, array('prodname' => 'Fees', 'proddesc' => 'File 42')));
+		$this->assertSame('Fees', $method->invoke($protocol, array('prodname' => 'Fees', 'proddesc' => '')));
+		$this->assertSame('File 42', $method->invoke($protocol, array('prodname' => '', 'proddesc' => 'File 42')));
+	}
+
+	/**
 	 * Save the timezone the tests below move.
 	 *
 	 * @return void
@@ -1520,6 +1539,106 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
+	 * A credit note its vendor signed like an invoice (issue #1077) is recorded as sent: the fee it charges
+	 * stays positive, the deposit it refunds negative, and the credit note totals BT-115, -72.80. The two
+	 * core options that keep the sign of a credit note line change nothing to it.
+	 *
+	 * @return void
+	 */
+	public function testACreditNoteSignedLikeAnInvoiceIsRecordedAsSent()
+	{
+		global $conf, $db;
+
+		foreach (array('EINVOICING_IMPORT_AS_FREE_LINES', 'EINVOICING_PRODUCTS_AUTO_GENERATION', 'FACTURE_ENABLE_NEGATIVE_LINES', 'INVOICE_KEEP_DISCOUNT_LINES_AS_IN_ORIGIN') as $name) {
+			$this->savedConstants[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
+		}
+		$conf->global->EINVOICING_IMPORT_AS_FREE_LINES = 1;
+		$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 0;
+		$this->createFixtureSeller();
+		$fixture = (string) file_get_contents(__DIR__ . '/fixtures/received_documents/cii_credit_note_signed_as_invoice.xml');
+
+		foreach (array(0, 1) as $keepSign) {
+			$conf->global->FACTURE_ENABLE_NEGATIVE_LINES = $keepSign;
+			$conf->global->INVOICE_KEEP_DISCOUNT_LINES_AS_IN_ORIGIN = $keepSign;
+			$xml = str_replace('EINV1077-0001', 'EINV1077-' . strtoupper(bin2hex(random_bytes(4))), $fixture);
+
+			$res = (new CIIProtocol($db))->createSupplierInvoiceFromSource($xml, null, 'test1077');
+			$id = (int) ($res['res'] ?? 0);
+			$this->assertGreaterThan(0, $id, 'options ' . $keepSign . ': ' . strip_tags((string) ($res['message'] ?? '')));
+			$this->createdInvoiceIds[] = $id;
+			$this->assertStringContainsString('carries amounts with the sign the vendor gave them', (string) $res['message']);
+
+			$invoice = new FactureFournisseur($db);
+			$invoice->fetch($id);
+			$invoice->fetch_lines();
+			$this->assertSame(FactureFournisseur::TYPE_CREDIT_NOTE, (int) $invoice->type);
+			$this->assertEquals(-76.00, (float) $invoice->total_ht, 'options ' . $keepSign);
+			$this->assertEquals(3.20, (float) $invoice->total_tva, 'the VAT of the fee it charges');
+			$this->assertEquals(-72.80, (float) $invoice->total_ttc);
+			$this->assertFalse(SupplierInvoiceHelper::totalsMismatchBlocks($id), 'nothing holds its validation back');
+
+			$byRate = array();
+			foreach ($invoice->lines as $line) {
+				if ((float) $line->total_ht != 0) {
+					$this->assertSame($line->total_ht > 0, $line->subprice > 0, 'a line and its unit price carry the same sign');
+				}
+				$byRate[(string) price2num($line->tva_tx)] = ($byRate[(string) price2num($line->tva_tx)] ?? 0) + (float) $line->total_ht;
+			}
+			$this->assertEquals(array('20' => 16.00, '0' => -92.00), $byRate);
+		}
+	}
+
+	/**
+	 * A received credit note keeps the sign its vendor gave each line, and its header totals them (issue #1077):
+	 * a 381 of 100 with a restocking fee of 20 is a credit of 80, signed like a credit note or like an invoice.
+	 * An EXTENDED one signed like an invoice keeps its VAT rounded per line like an invoice does (#1166).
+	 *
+	 * @return void
+	 */
+	public function testAReceivedCreditNoteKeepsTheSignOfEachLine()
+	{
+		global $conf, $db;
+
+		foreach (array('EINVOICING_IMPORT_AS_FREE_LINES', 'EINVOICING_PRODUCTS_AUTO_GENERATION') as $name) {
+			$this->savedConstants[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
+		}
+		$conf->global->EINVOICING_IMPORT_AS_FREE_LINES = 1;
+		$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 0;
+		$this->createFixtureSeller();
+
+		$en16931 = 'urn:cen.eu:en16931:2017';
+		// label => lines, BT-116, BT-110, BT-112
+		$cases = array(
+			'signed like a credit note' => array(array('100.00', '-20.00'), '80.00', '16.00', '96.00'),
+			'signed like an invoice' => array(array('-100.00', '20.00'), '-80.00', '-16.00', '-96.00'),
+		);
+		foreach ($cases as $label => $case) {
+			list($lines, $basis, $tax, $grandTotal) = $case;
+			$id = $this->importBuiltDocument($en16931, $lines, $basis, $tax, $grandTotal, '381');
+			$invoice = new FactureFournisseur($db);
+			$invoice->fetch($id);
+
+			$this->assertSame(FactureFournisseur::TYPE_CREDIT_NOTE, (int) $invoice->type, $label);
+			$this->assertEqualsWithDelta(array(-100.0, 20.0), array_map(function ($line) {
+				return (float) $line->total_ht;
+			}, $invoice->lines), 0.001, $label . ': each line keeps its sign');
+			$this->assertEqualsWithDelta(-80.0, (float) $invoice->total_ht, 0.001, $label . ': the header totals its lines');
+			$this->assertEqualsWithDelta(-16.0, (float) $invoice->total_tva, 0.001, $label);
+			$this->assertEqualsWithDelta(-96.0, (float) $invoice->total_ttc, 0.001, $label);
+			$this->assertNull(SupplierInvoiceHelper::totalsMismatch($id), $label . ': the credit note is not marked');
+		}
+
+		$extended = 'urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr';
+		$bred = array('-8.70', '-0.28', '-0.28', '-8.70', '-0.28', '-75.00');
+		$id = $this->importBuiltDocument($extended, $bred, '-93.25', '-18.65', '-111.90', '381');
+		$invoice = new FactureFournisseur($db);
+		$invoice->fetch($id);
+		$this->assertNull(SupplierInvoiceHelper::totalsMismatch($id), 'extended, signed like an invoice: not marked');
+		$this->assertEqualsWithDelta(-18.66, (float) $invoice->total_tva, 0.001, 'extended: the VAT rounded per line');
+		$this->assertEqualsWithDelta(-111.90, (float) $invoice->total_ttc, 0.001, 'extended: BT-112');
+	}
+
+	/**
 	 * Import a document built on the rounding fixture: its line repeated at the given amounts, 20 % each.
 	 *
 	 * @param	string				$guideline	BT-24
@@ -1527,9 +1646,10 @@ class CIIProtocolTest extends CommonClassTest
 	 * @param	string				$basis		BT-116
 	 * @param	string				$tax		BT-117 and BT-110
 	 * @param	string				$grandTotal	BT-112 and BT-115
+	 * @param	string				$typeCode	BT-3
 	 * @return	int								Id of the invoice the import built
 	 */
-	private function importBuiltDocument($guideline, array $lines, $basis, $tax, $grandTotal)
+	private function importBuiltDocument($guideline, array $lines, $basis, $tax, $grandTotal, $typeCode = '380')
 	{
 		global $db;
 
@@ -1541,7 +1661,9 @@ class CIIProtocolTest extends CommonClassTest
 		foreach ($lines as $n => $amount) {
 			$copy = $model->parentNode->insertBefore($model->cloneNode(true), $model);
 			$xp->query('.//ram:LineID', $copy)->item(0)->nodeValue = (string) ($n + 1);
-			$xp->query('.//ram:ChargeAmount', $copy)->item(0)->nodeValue = $amount;
+			// A negative line is a negative quantity: BR-27 forbids a negative net price
+			$xp->query('.//ram:ChargeAmount', $copy)->item(0)->nodeValue = ltrim($amount, '-');
+			$xp->query('.//ram:BilledQuantity', $copy)->item(0)->nodeValue = ((float) $amount < 0) ? '-1.0000' : '1.0000';
 			$xp->query('.//ram:LineTotalAmount', $copy)->item(0)->nodeValue = $amount;
 		}
 		$model->parentNode->removeChild($model);
@@ -1551,6 +1673,7 @@ class CIIProtocolTest extends CommonClassTest
 		$values = array(
 			'//ram:GuidelineSpecifiedDocumentContextParameter/ram:ID' => $guideline,
 			'//*[local-name()="ExchangedDocument"]/ram:ID' => 'EINV1166-' . strtoupper(bin2hex(random_bytes(4))),
+			'//*[local-name()="ExchangedDocument"]/ram:TypeCode' => $typeCode,
 			'//ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/ram:BasisAmount' => $basis,
 			'//ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/ram:CalculatedAmount' => $tax,
 			'//ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:LineTotalAmount' => $lineTotal,

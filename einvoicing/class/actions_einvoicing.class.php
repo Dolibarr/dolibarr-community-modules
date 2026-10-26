@@ -570,7 +570,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			// a wrong vendor is noticed, and the vendor of an existing supplier invoice cannot be changed.
 			// The action itself lives on the flow card, which is also where a flow whose draft has already
 			// been deleted is picked up again.
-			// Greyed rather than hidden without the right, so the user reads why it cannot be used.
+			// Greyed rather than hidden when it cannot be used, so the user reads why.
 			if (!empty($object->id)) {
 				$sql = "SELECT rowid FROM " . $db->prefix() . "einvoicing_document";
 				$sql .= " WHERE fk_element_type = 'invoice_supplier'";
@@ -582,18 +582,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 				$resql = $db->query($sql);
 				if ($resql && ($objdoc = $db->fetch_object($resql))) {
-					// The separator line between the lifecycle statuses and the reimport entry: the core dropdown has no divider of its own, so the line travels as the label
-					// of a disabled entry (no translation exists for '<hr>', so trans() returns it as is, and it is rendered as the HTML it is). The tooltip of a disabled
-					// entry is silenced on Dolibarr 22+ only (the 'attr' key, ignored by older cores); the polyfill of einvoicing.lib.php prints the line itself below 18.
-					if (!empty($url_button)) {
-						$dividerentry = array('divider' => 1, 'enabled' => true, 'perm' => 0, 'label' => '-----', 'labelhtml' => '<span class="opacitymedium">-----</span>', 'url' => '#');
-						$dividerentry['attr'] = array('title' => '');
-						$url_button[] = $dividerentry;
-					}
-
-					// The reimport itself, last entry of the list, grayed on the same rule as the flow card shows the button with: only a draft can be imported again
-					// (Document::reimport() refuses anything else). The reason travels as the entry tooltip, which the dropdown of the core cannot hold before
-					// Dolibarr 22 - there it says "not enough permissions" instead.
+					// Only a draft can be imported again (Document::reimport() refuses anything else). The reason travels as the
+					// entry tooltip, which some cores do not show (see the commit message for the versions).
 					$reimportofadraft = ((int) $object->status === FactureFournisseur::STATUS_DRAFT);
 					$reimportallowed = $user->hasRight('einvoicing', 'write');
 					$reimporturl = dol_buildpath('/einvoicing/document_card.php', 1) . '?id=' . ((int) $objdoc->rowid) . '&action=reimport&token=' . newToken();
@@ -604,12 +594,16 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 						'label' => 'EInvoiceReimport',
 						'urlroot' => $reimporturl,
 						// 'url' is defined for backward compatibility with v18 and v19, which ignore 'urlroot'
-						'url' => einvoicingDropdownEntryUrl($reimporturl)
+						'url' => einvoicingDropdownEntryUrl($reimporturl),
+						'attr' => array()
 					);
 					if (!$reimportallowed) {
-						$reimportentry['attr'] = array('title' => $langs->trans('NotEnoughPermissions'));
+						$reimportentry['attr']['title'] = $langs->trans('NotEnoughPermissions');
 					} elseif (!$reimportofadraft) {
-						$reimportentry['attr'] = array('title' => $langs->trans('EInvoiceReimportOnlyOnADraft'));
+						$reimportentry['attr']['title'] = $langs->trans('EInvoiceReimportOnlyOnADraft');
+					}
+					if (!empty($url_button)) {
+						$reimportentry['attr']['style'] = 'border-top: 1px solid #ddd;';
 					}
 					$url_button[] = $reimportentry;
 				}
@@ -619,6 +613,10 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 
 			if (!empty($url_button)) {
+				// A greyed entry keeps the button style of the theme (nowrap !important, centered): it would overflow the narrow dropdown.
+				foreach ($url_button as $key => $entry) {
+					$url_button[$key]['attr']['style'] = 'white-space: normal !important; text-align: start; ' . ($entry['attr']['style'] ?? '');
+				}
 				if ((float) DOL_VERSION < 18) {
 					print einvoicingDolGetButtonActionDropdown($langs->trans('einvoice'), $url_button);
 				} elseif ((float) DOL_VERSION < 22) {

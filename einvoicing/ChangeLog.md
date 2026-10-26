@@ -5,6 +5,50 @@ IMPORTANT: After each version upgrade, you must disable and enable the module so
 
 
 
+## 1.4.0
+
+- FIX: [einvoicing] A received line one cent off its price is imported at its amount
+- FIX: #1191 [einvoicing] The module home page no longer warns when no token is stored
+- FIX: [einvoicing] The supplier invoice e-invoice menu no longer overflows and draws a real separator
+- FIX: [einvoicing] A received Factur-X written by iText no longer hangs the synchronization
+- FIX: [einvoicing] A received line no longer repeats its name in its description
+- FIX: [einvoicing] A received credit note keeps the sign its vendor gave each line
+- FIX: #1159 [einvoicing] A product created at import gets a barcode only when asked or required
+- NEW: #1151 [einvoicing] An invoice sends our supplier code at the customer (BT-29)
+- QUAL: [einvoicing] Two import tests pass on an instance where an earlier run left data behind
+- FIX: [einvoicing] No fatal error on invoice PDF generation when no protocol is set
+- FIX: [einvoicing] Import a received invoice that has no lines
+- NEW: [einvoicing] A re-imported draft says on its timeline that it was imported again
+- NEW: add hook cii protocol
+- FIX: #1166 [einvoicing] An EXTENDED document keeps the VAT its totals add up per line
+- NEW: #1146 [einvoicing] Catch-all product for the received lines nothing else resolves
+- FIX: #1144 [einvoicing] The directory check finds an address beyond the first page of results
+- FIX: [einvoicing] Received CII XML with stacked XML declarations is no longer read as empty
+- FIX: [einvoicing] A token saved on Dolibarr < 23 is no longer used encrypted in the same page
+- FIX: [einvoicing] Thirdparty and invoice lists no longer fail after a comma join of the core
+- FIX: [einvoicing] Files embedded in a received Factur-X are attached
+- FIX: [einvoicing] Clear message and form for a missing down payment
+- FIX: [einvoicing] A supplier invoice keyed in by hand offers Approve and Refuse once its received document is attached
+- FIX: [einvoicing] Received flows are imported in chronological order
+- FIX: einvoicing: BILL_VALIDATE trigger read an undefined $result (main is red)
+- FIX: #1058 [einvoicing] A consolidated credit note (262) and the factored documents (393, 396, 472) are imported
+- FIX: EINVOICING_IMPORT_AS_FREE_LINES must comply with MAIN_DISABLE_FREE_LINES
+- QUAL: [einvoicing] The tests run with the negative line options of the core off
+- FIX: [einvoicing] CredentialStorageEncryptionTest no longer waits on a lock held by its own transaction
+- FIX: [dev] The ChangeLog entry written by makepack-modules.php is a Markdown list
+- FIX: #1022 Import a received invoice again into its draft, instead of deleting it
+- FIX: [einvoicing] A credit note of a deposit is sent as 503, and comes back at its amount
+- NEW: [einvoicing] Report a payment (212) by hand from the customer invoice card
+- NEW: [einvoicing] Fold a line's charges into its description instead of a line of their own
+- NEW: [einvoicing] An imported supplier invoice says on its timeline where it came from
+- FIX: [einvoicing] Concurrent OAuth token refreshes could revoke the whole SuperPDP token family
+- NEW: #1050 Pick the flow to map in a list, and read its vendor from the document
+- NEW: #1050 Default service of a vendor, picked by the billing framework BT-23
+- FIX: [einvoicing] The automatic precheck runs on the invoice sent at validation
+- FIX: [einvoicing] The module no longer replaces labels of the core
+- DOC: [einvoicing] What a stock installation does with a flow it cannot read
+- FIX: [einvoicing] Link the events of the module to their object on Dolibarr 18
+
 ## 1.3.0
 
 - FIX: [einvoicing] 'Import again' no longer gives a 404 on a Dolibarr installed in a sub-path
