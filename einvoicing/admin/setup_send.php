@@ -1,7 +1,8 @@
 <?php
-/* Copyright (C) 2004-2017  Laurent Destailleur     <eldy@users.sourceforge.net>
+/* Copyright (C) 2004-2026  Laurent Destailleur     <eldy@users.sourceforge.net>
  * Copyright (C) 2024       Frédéric France         <frederic.france@free.fr>
- * Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
+ * Copyright (C) 2025       SuperAdmin              <daoud.mouhamed@gmail.com>
+ * Copyright (C) 2026       Alexandre Spangaro      <alexandre@inovea-conseil.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -18,7 +19,7 @@
  */
 
 /**
- * \file    einvoicing/admin/setup_options.php
+ * \file    einvoicing/admin/setup_send.php
  * \ingroup einvoicing
  * \brief   EInvoicing setup page.
  */
@@ -148,14 +149,6 @@ foreach ($protocolsList as $key => $protocolconfig) {
 // Set the default protocol when no default value is specified
 if (getDolGlobalString('EINVOICING_PDP') && !getDolGlobalString('EINVOICING_PROTOCOL')) {
 	dolibarr_set_const($db, 'EINVOICING_PROTOCOL', 'CII', 'chaine', 0, '', $conf->entity);
-	header("Location: ".$_SERVER["PHP_SELF"]);
-	exit;
-}
-
-if ($action == 'savesyncoptions') {
-	dolibarr_set_const($db, "EINVOICING_DISABLE_SYNC_AP_TO_DOLI", (int) !GETPOSTINT("EINVOICING_DISABLE_SYNC_AP_TO_DOLI"), 'chaine', 0, '', $conf->entity);
-	dolibarr_set_const($db, "EINVOICING_DISABLE_SYNC_DOLI_TO_AP", (int) !GETPOSTINT("EINVOICING_DISABLE_SYNC_DOLI_TO_AP"), 'chaine', 0, '', $conf->entity);
-
 	header("Location: ".$_SERVER["PHP_SELF"]);
 	exit;
 }
@@ -362,146 +355,13 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 			.dol_escape_htmltag($vatexigibility)
 			.'</b> <a href="'.DOL_URL_ROOT.'/admin/taxes.php">'.$langs->trans('Setup').'</a>';
 	*/
-}
-
-
-if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or we are not in a generate only mode
-	// Setup conf for auto generation of objects
-	$itemtitle = $formSetup->newItem('EINVOICING_AUTO_GENERATION');
-	$itemtitle->setAsTitle();
-	$itemtitle->nameText = '<b>'.$langs->trans("EINVOICING_AUTO_GENERATION").'</b>';
-
-	// Setup conf to choose use of auto generation or not of products
-	$item = $formSetup->newItem('EINVOICING_PRODUCTS_AUTO_GENERATION')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_PRODUCTS_AUTO_GENERATION_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-	$item->fieldParams['forcereload'] = 1;
-	$item->fieldParams['warningifon'] = 1;
-
-	// Setup conf to import lines as free description lines when no product is found and no default product exist on supplier
-	// This option is in conflict with EINVOICING_PRODUCTS_AUTO_GENERATION, so it is disabled if EINVOICING_PRODUCTS_AUTO_GENERATION is on
-	if (!getDolGlobalString("EINVOICING_PRODUCTS_AUTO_GENERATION")) {
-		$item = $formSetup->newItem('EINVOICING_IMPORT_AS_FREE_LINES')->setAsYesNo();
-		$item->helpText = $langs->transnoentities('EINVOICING_IMPORT_AS_FREE_LINES_HELP');
-		$item->defaultFieldValue = '0';
-		$item->cssClass = 'minwidth500';
-		$item->fieldParams['warningifon'] = 1;
-	}
-
-	// Setup conf to choose the default of the vendor a line of a mixed invoice (BT-23 in M) falls back on.
-	// Empty by default: such an invoice then stops at import when one of its lines needs a default.
-	$item = $formSetup->newItem('EINVOICING_DEFAULT_ROUTING_MIXED')->setAsSelect(array(
-		'' => '',
-		'product' => $langs->transnoentities('DefaultProductEBilling'),
-		'service' => $langs->transnoentities('DefaultServiceEBilling'),
-	));
-	$item->helpText = $langs->transnoentities('EINVOICING_DEFAULT_ROUTING_MIXED_HELP');
-	$item->defaultFieldValue = '';
-	$item->cssClass = 'minwidth500';
-
-	// Setup conf to match a vendor product reference written with separators other than the recorded one.
-	// Off by default: the comparison ignores separators, so it is an approximation.
-	$item = $formSetup->newItem('EINVOICING_PRODUCTS_MATCH_CANONICAL_REF')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_PRODUCTS_MATCH_CANONICAL_REF_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-	$item->fieldParams['warningifon'] = 1;
-
-	// Setup conf to fold a line's charges (BG-28) into the description of the product line they belong
-	// to instead of importing them as a Dolibarr line of their own (community decision, issue #969).
-	// Off by default: matches the behaviour the module has always had. Can be overridden per supplier
-	// from its thirdparty card.
-	$item = $formSetup->newItem('EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-
-	// Setup conf to choose use of auto generation or not of third parties
-	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_AUTO_GENERATION')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_THIRDPARTIES_AUTO_GENERATION_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-
-	// Setup conf to enable complete third party information when receiving an invoice from from PDP
-	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_COMPLETE_INFO')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_THIRDPARTIES_COMPLETE_INFO_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-
-	// Setup conf to to enable a limit of flows to synchronize per one synchronization call
-	/* This option is useless, should be always on. Disabling it is possible by editing hidden cosntant
-	$item = $formSetup->newItem('EINVOICING_FLOWS_SYNC_CALL_LIMIT')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_FLOWS_SYNC_CALL_LIMIT_HELP');
-	$item->defaultFieldValue = '1';
-	$item->cssClass = 'minwidth500';
-	$item->fieldParams['forcereload'] = 1;
-	*/
-
-	// Setup conf to enable or not the consistency check on supplier invoice validation. Off by default:
-	// it re-checks every e-invoice at validation, including the ones edited by hand afterwards, which is
-	// a wider question than the one the import itself settles.
-	$item = $formSetup->newItem('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION');
-	$item->helpText = $langs->transnoentities('EINVOICING_SUPPLIER_INVOICE_CHECK_CONSISTENCY_ON_VALIDATION_HELP');
-	$item->setAsYesNo();
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-
-	// Tell the vendor that its invoice is approved (status 205) when the supplier invoice is validated so approved.
-	// Off by default.
-	$item = $formSetup->newItem('EINVOICING_SEND_APPROVED_ON_VALIDATION')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_SEND_APPROVED_ON_VALIDATION_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-
-	// Tell the vendor of a supplier invoice that its payment has been sent (status 211), as soon as the
-	// invoice is classified paid in Dolibarr. Optional status of the reform, hence off by default: it is
-	// a courtesy to the vendor and it costs one platform flow per invoice.
-	$item = $formSetup->newItem('EINVOICING_SEND_PAYMENT_SENT_STATUS')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_SEND_PAYMENT_SENT_STATUS_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-
-
-	// Experimental options
-	// EINVOICING_ENABLE_MANUAL_ACTION_QUEUE: This option log import blocked flow with the action to do so we can do it manually later.
-	// Risk: unblocking action in a different order may result in undesirable side effects.
-
-	// Activate postponeflow
-	// EINVOICING_ENABLE_POSTPONE_FLOWS: This option postpone flow with the action to do so we can do it manually later.
-	// Risk: very dangerous. continuing to process flows means changing the cursor, and when a new record is save, we lost
-	// all postpone flow that were discarded.
-}
-
-
-if (!einvoicingReceptionDisabled() || !einvoicingIsSendDisabled()) {
-	$itemtitle = $formSetup->newItem('EINVOICING_DEBUG')->setAsTitle();
-	$itemtitle->nameText = '<b>'.$langs->trans("Other").'</b>';
-
-	// Setup conf to to define the number of flows to synchronize per one synchronization call
-	$item = $formSetup->newItem('EINVOICING_FLOWS_SYNC_CALL_SIZE');
-	$item->helpText = $langs->transnoentities('EINVOICING_FLOWS_SYNC_CALL_SIZE_HELP');
-	$item->defaultFieldValue = '100';
-	$item->cssClass = 'maxwidth100';
-
-	// Setup conf to define a time margin in hours to go back from the current date of the last synchronization
-	$item = $formSetup->newItem('EINVOICING_SYNC_MARGIN_TIME_HOURS');
-	$item->helpText = $langs->transnoentities('EINVOICING_SYNC_MARGIN_TIME_HOURS_HELP');
-	$item->fieldAttr['placeholder'] = $langs->transnoentities('Hours');
-	$item->cssClass = 'maxwidth100';
-
-	// Setup conf to choose to use Chorus or not
-	$item = $formSetup->newItem('EINVOICING_USE_CHORUS')->setAsYesNo();
-	$item->nameText = $langs->trans("EINVOICING_USE_CHORUS").' <span class="opacitymedium">('.$langs->trans("FeatureNotFullyYetSupported").')</span>';
-	$item->helpText = $langs->transnoentities('EINVOICING_USE_CHORUS_HELP');
-	$item->cssClass = 'minwidth500';
-
-	// Setup conf to enable or not debug mode
-	$item = $formSetup->newItem('EINVOICING_DEBUG_MODE')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_DEBUG_MODE_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-	$item->fieldParams['warningifon'] = 1;
+} elseif (preg_match('/set_(.*)/', $action, $reg)) {
+	$code = $reg[1];
+	$value = (GETPOST($code) ? GETPOST($code) : 1);
+	$res = dolibarr_set_const($db, $code, $value, 'chaine', 0, '', $conf->entity);
+} elseif (preg_match('/del_(.*)/', $action, $reg)) {
+	$code = $reg[1];
+	$res = dolibarr_del_const($db, $code, $conf->entity);
 }
 
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
@@ -521,7 +381,7 @@ $form = new Form($db);
 $help_url = 'EN:Module_EInvoicing';
 $title = "EInvoicingSetup";
 
-llxHeader('', $langs->trans($title), $help_url, '', 0, 0, '', '', '', 'mod-einvoicing page-admin-options');
+llxHeader('', $langs->trans($title), $help_url, '', 0, 0, '', '', '', 'mod-einvoicing page-admin-send');
 
 // Subheader
 $linkback = '<a href="'.($backtopage ? $backtopage : DOL_URL_ROOT.'/admin/modules.php?restore_lastsearch_values=1').'">'.img_picto($langs->trans("BackToModuleList"), 'back', 'class="pictofixedwidth"').'<span class="hideonsmartphone">'.$langs->trans("BackToModuleList").'</span></a>';
@@ -531,7 +391,7 @@ print load_fiche_titre($langs->trans($title), $linkback, 'title_setup');
 
 // Configuration header
 $head = einvoicingAdminPrepareHead();
-print dol_get_fiche_head($head, 'options', $langs->trans($title), -1, "einvoicing.png@einvoicing");
+print dol_get_fiche_head($head, 'send', $langs->trans($title), -1, "einvoicing.png@einvoicing");
 
 // Setup page goes here
 //print info_admin($langs->trans("EInvoicingInfo"));
@@ -548,23 +408,25 @@ print '<input type="hidden" name="token" value="'.newToken().'">';
 print '<input type="hidden" name="action" value="savesyncoptions">';
 
 print '<div class="neutral">';
+print img_picto('', 'bill', 'class="pictofixedwidth"').$langs->trans("EnableInvoiceExport").'&nbsp;&nbsp;&nbsp;';
+//print $form->selectyesno("EINVOICING_DISABLE_SYNC_DOLI_TO_AP", GETPOSTISSET("EINVOICING_DISABLE_SYNC_DOLI_TO_AP") ? GETPOSTINT('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') : !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP'), 1, false, 0, 1);
+if (!empty($conf->use_javascript_ajax)) {
+	print ajax_constantonoff('EINVOICING_DISABLE_SYNC_DOLI_TO_AP', array(), $conf->entity, 1, 0, 1);
+} else {
+	if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
+		print '<a href="' . $_SERVER['PHP_SELF'] . '?action=set_EINVOICING_DISABLE_SYNC_DOLI_TO_AP&token=' . newToken() . '">' . img_picto($langs->trans("Enabled"), 'switch_on') . '</a>';
+	} else {
+		print '<a href="' . $_SERVER['PHP_SELF'] . '?action=del_EINVOICING_DISABLE_SYNC_DOLI_TO_AP&token=' . newToken() . '">' . img_picto($langs->trans("Disabled"), 'switch_off') . '</a>';
+	}
 
-print img_picto('', 'bill', 'class="pictofixedwidth"').$langs->trans("EnableInvoiceExport").' ';
-print $form->selectyesno("EINVOICING_DISABLE_SYNC_DOLI_TO_AP", GETPOSTISSET("EINVOICING_DISABLE_SYNC_DOLI_TO_AP") ? GETPOSTINT('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') : !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP'), 1, false, 0, 1);
-print '<br>';
-
-print '<br>';
-
-print img_picto('', 'supplier_invoice', 'class="pictofixedwidth"').$langs->trans("EnableInvoiceImport").' ';
-print $form->selectyesno("EINVOICING_DISABLE_SYNC_AP_TO_DOLI", GETPOSTISSET("EINVOICING_DISABLE_SYNC_AP_TO_DOLI") ? GETPOSTINT("EINVOIC
-NG_DISABLE_SYNC_AP_TO_DOLI") : !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI'), 1, false, 0, 1);
-print '<br>';
-
+}
 print '</div>';
 
-print '<div class="center">';
-print '<input type="submit" name="save" class="button" value="'.$langs->trans("Save").'">';
-print "</div>";
+if (empty($conf->use_javascript_ajax)) {
+	print '<div class="center">';
+	print '<input type="submit" name="save" class="button" value="' . $langs->trans("Save") . '">';
+	print "</div>";
+}
 
 print '</form>';
 
