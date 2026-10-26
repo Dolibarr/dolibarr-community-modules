@@ -25,10 +25,10 @@
  */
 
 // Load Dolibarr environment
-$res = 0;
+$res = false;
 // Try main.inc.php into web root known defined into CONTEXT_DOCUMENT_ROOT (not always defined)
-if (!$res && !empty($_SERVER["CONTEXT_DOCUMENT_ROOT"])) {
-	$res = @include $_SERVER["CONTEXT_DOCUMENT_ROOT"]."/main.inc.php";
+if (!empty($_SERVER['CONTEXT_DOCUMENT_ROOT'])) { // @phpstan-ignore booleanNot.alwaysTrue
+	$res = @include $_SERVER['CONTEXT_DOCUMENT_ROOT'].'/main.inc.php';
 }
 // Try main.inc.php into web root detected using web root calculated from SCRIPT_FILENAME
 $tmp = empty($_SERVER['SCRIPT_FILENAME']) ? '' : $_SERVER['SCRIPT_FILENAME'];
@@ -46,6 +46,9 @@ if (!$res && $i > 0 && file_exists(dirname(substr($tmp, 0, ($i + 1)))."/main.inc
 	$res = @include dirname(substr($tmp, 0, ($i + 1)))."/main.inc.php";
 }
 // Try main.inc.php using relative path
+if (!$res && file_exists("../main.inc.php")) {
+	$res = @include "../main.inc.php";
+}
 if (!$res && file_exists("../../main.inc.php")) {
 	$res = @include "../../main.inc.php";
 }
@@ -54,9 +57,6 @@ if (!$res && file_exists("../../../main.inc.php")) {
 }
 if (!$res && file_exists("../../../../main.inc.php")) {
 	$res = @include "../../../../main.inc.php";
-}
-if (!$res && file_exists("../../../../../main.inc.php")) {
-	$res = @include "../../../../../main.inc.php";
 }
 if (!$res) {
 	die("Include of main fails");
@@ -70,7 +70,7 @@ if (!$res) {
  * @var Societe $mysoc
  */
 // Libraries
-require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php";
+require_once DOL_DOCUMENT_ROOT."/core/lib/admin.lib.php"; // @phpstan-ignore requireOnce.fileNotFound (PHPStan takes DOL_DOCUMENT_ROOT from install/inc.php of the core, where it is '..')
 require_once __DIR__.'/../lib/einvoicing.lib.php';
 require_once __DIR__.'/../class/providers/PDPProviderManager.class.php';
 require_once __DIR__.'/../class/protocols/ProtocolManager.class.php';
@@ -102,7 +102,7 @@ $setupnotempty = 0;
 $useFormSetup = 1;
 
 if (!class_exists('FormSetup')) {
-	require_once DOL_DOCUMENT_ROOT.'/core/class/html.formsetup.class.php';
+	require_once DOL_DOCUMENT_ROOT.'/core/class/html.formsetup.class.php'; // @phpstan-ignore requireOnce.fileNotFound (PHPStan takes DOL_DOCUMENT_ROOT from install/inc.php of the core, where it is '..')
 }
 
 $formSetup = new FormSetup($db);
@@ -309,6 +309,7 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 	$res = dolibarr_del_const($db, $code, $conf->entity);
 }
 
+// @phpstan-ignore include.fileNotFound
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
 //print getDolGlobalString('EINVOICING_PDP');
@@ -326,6 +327,7 @@ $form = new Form($db);
 $help_url = 'EN:Module_EInvoicing';
 $title = "EInvoicingSetup";
 
+// @phpstan-ignore arguments.count (llxHeader is declared without parameters in the Dolibarr 18 analysis)
 llxHeader('', $langs->trans($title), $help_url, '', 0, 0, '', '', '', 'mod-einvoicing page-admin-receive');
 
 // Subheader
@@ -364,7 +366,6 @@ if (!empty($conf->use_javascript_ajax)) {
 	} else {
 		print '<a href="' . $_SERVER['PHP_SELF'] . '?action=del_EINVOICING_DISABLE_SYNC_AP_TO_DOLI&token=' . newToken() . '">' . img_picto($langs->trans("Disabled"), 'switch_off') . '</a>';
 	}
-
 }
 print '</div>';
 
