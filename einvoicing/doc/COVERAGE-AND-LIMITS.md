@@ -66,15 +66,16 @@ number of the group (BT-63).
 The module writes the seller identifier under the scheme set in `EINVOICING_PARTY_IDENTIFIER_SCHEME`
 — `0225` by default, `0009` or none for a French company; `0231` is not offered, it is not the
 registration identifier of the party the document names — plus a second one under `0009` (the SIRET)
-on a B2G invoice. It never constructs `ram:SellerTaxRepresentativeTradeParty`. **A seller belonging to a
+on a B2G invoice in an EXTENDED profile, and, when the customer card holds one, the identifier that
+customer gave us as its supplier, as a `ram:ID` without scheme. It never constructs `ram:SellerTaxRepresentativeTradeParty`. **A seller belonging to a
 VAT group cannot emit a conformant invoice through this module.**
 
 ## 2. Syntaxes
 
 | syntax | emission | reception |
 |---|---|---|
-| Factur-X (CII inside a PDF/A-3) | yes | yes |
-| CII, standalone XML | yes | yes |
+| Factur-X (CII inside a PDF/A-3) | yes, PHP 7.3 and up | yes |
+| CII, standalone XML | yes (default) | yes |
 | CDAR (lifecycle statuses) | yes | yes |
 | **UBL** | **no** | **no** |
 
