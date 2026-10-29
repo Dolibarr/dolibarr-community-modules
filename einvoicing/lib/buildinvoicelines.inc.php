@@ -763,7 +763,7 @@ foreach ($object->lines as $line) {
 		'prodname'                  => $libelle,			// BT-153
 		'proddesc'                  => $description,		// BT-154
 		'prodsellerid'              => $line->product_ref ? $line->product_ref : "",
-		'prodbuyerid'               => null,
+		'prodbuyerid'               => ($line->fk_product > 0 ? $einvoicing->getCustomerProductReference($line->fk_product, $object->socid) : ''),	// BT-156 (issue #1151)
 		'prodglobalidtype'          => null,
 		'prodglobalid'              => null,
 		'prodmultilangs'            => [],
