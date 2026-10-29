@@ -74,7 +74,8 @@ Rules:
 - the hook runs on every instantiation of `PDPProviderManager`, including in the cron job. Keep it to
   building the array: no query, no API call;
 - an operator setting `EINVOICING_SUPERPDP_VIAPARTNER_ONLY` disables every provider but the
-  via-partner one, hook-provided ones included.
+  via-partner one, hook-provided ones included. It has no effect unless `EINVOICING_SUPERPDP_VIAPARTNER`
+  is set too, since that is what declares the via-partner entry.
 
 ## 2. Write the provider class
 
@@ -139,7 +140,8 @@ Suffix the credentials with `_PROD` for the production ones (`EINVOICING_MYPDP_A
 native providers do: `EINVOICING_LIVE` then switches the whole set at once, and the sandbox keys are
 never sent to the production platform. A `_PROD` suffix hides the name from the automatic encryption
 of Dolibarr: call `$this->storeThisFieldEncrypted($item)` on every secret field (password, client
-secret, API key) so it reaches the database encrypted.
+secret, API key) so it reaches the database encrypted (a value this core could not decrypt back,
+such as a non-ASCII secret on Dolibarr 23, is kept in clear rather than made unusable).
 
 ### Methods to implement
 
@@ -174,17 +176,27 @@ Not abstract but required in practice:
   `$prefixenv` is `prod` or `test`.
 
 Optional: declare `exchangeAuthorizationCode($code)` to have an OAuth authorization-code return
-(`?code&state`) handled on the setup page, and fill `$helpToGetCredentials` (HTML shown above your
-block).
+(`?code&state`) handled on the setup page. The page only calls it when `state` matches
+`$_SESSION['einvoicing_superpdp_oauth_state']`, so the code that builds your authorize URL must store
+its state under that key, and use `dol_buildpath('/einvoicing/admin/setup.php', 2)` as the redirect
+URI. A proxy that already holds the tokens can instead send the user back to the setup page with
+`?accesstoken=…&refresh_token=…&expires_in=…`, which the page stores through `saveOAuthTokenDB()`.
+Fill `$helpToGetCredentials` (HTML shown above your block).
 
 ### What the base class already does for you
 
-- `getApiUrl($mode)` returns the production or sandbox URL of your config depending on
-  `EINVOICING_LIVE` — `$mode` being `auth`, `api`, `ap_api` or `afnor_directory`;
+- `getApiUrl($mode)` returns the URL of your config for `$mode`: `auth` and `api` pick `prod_*` or
+  `test_*` depending on `EINVOICING_LIVE`; `ap_api` returns the single `ap_api_url`;
+  `afnor_directory` returns `prod_/test_afnor_directory_url`, or an empty string when your config
+  has none;
 - `saveOAuthTokenDB()` / `fetchOAuthTokenDB()` / `deleteOAuthTokenDB()` / `isTokenExpired()` store
   (encrypted, on an independent database connection so a refreshed token survives a rollback) and
   read the tokens of your provider; `deleteAccessToken($forceentity)` backs the "remove the
   connection" link;
+- `acquireRefreshLock()` / `releaseRefreshLock()` serialize token refreshes across requests
+  (MySQL/MariaDB `GET_LOCK`, PostgreSQL advisory lock). Wrap your `refreshAccessToken()` in them when
+  your platform issues single-use refresh tokens, and re-read the token with `fetchOAuthTokenDB()`
+  once the lock is held: another process may already have rotated it;
 - `logCall()` records an API call in `llx_einvoicing_call`, on an independent database connection so
   the trace survives a rollback, and redacts the secrets. Call it from your `callApi()` and the whole
   module gets a complete call log. It only logs a call given a non-empty `$callType`, so always pass
@@ -195,10 +207,12 @@ block).
 - `getLastSyncDate($marginHours = 0)`, the last `updatedat` stored for your provider code;
 - `clearIncomingDiagnosticFiles()` (call it first in `syncFlows()`), `fetchImportableFlowDocument()`,
   `processIncomingSupplierInvoiceStatus()`, `findSupplierInvoiceByFlowId()`;
+- `addSupplierInvoiceImportEvent()` writes the "imported from" event on the timeline of a supplier
+  invoice your `syncFlow()` created;
 - `fetchFlowData()`, `fetchFlowXml()`, `resolveFlowProfile()`, `addEvent()`, `generateUuidV4()`.
 
 The XML itself is **not** the business of the provider: it is built by the exchange protocol chosen by
-the user (CII, Factur-X, UBL), loaded on first use. A provider transports a file, it does
+the user (CII, the default, or Factur-X; UBL is declared but disabled), loaded on first use. A provider transports a file, it does
 not produce it.
 
 ## 3. Check the integration

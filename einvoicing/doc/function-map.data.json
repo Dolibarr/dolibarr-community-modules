@@ -68,8 +68,8 @@
 			"label": "sendCashedInStatus()",
 			"chain": "out-status",
 			"role": "The gates of the 212: in scope, cash-in owed, invoice actually transmitted, and not sitting on STATUS_ERROR (a refused deposit holds no invoice at the PA to attach a cash-in to).",
-			"reads": "mustManageEInvoice(), needCashedInStatus(), fetchLastknownInvoiceStatus()",
-			"writes": "provider->sendStatusMessage($invoice, 212, '', ['amount' => …])"
+			"reads": "EInvoicing::reportCashIn() → getCashInReportState(): mustManageEInvoice(), isCashInReportDue(), fetchLastknownInvoiceStatus()",
+			"writes": "provider->sendStatusMessage($invoice, 212, '', ['amount' => …, 'reason' => …]) — the same path as the card action"
 		},
 		"trigger.bill_supplier_validate": {
 			"symbol": "InterfaceEInvoicingTriggers::runTrigger",
@@ -110,9 +110,9 @@
 			"symbol": "ActionsEInvoicing::doActions",
 			"label": "HOOK doActions()",
 			"chain": "cross",
-			"role": "Every button of the cards: send_to_pdp, generate_einvoice, precheck_einvoice, confirm_sendStatusMessage, the routing actions of the third party card, and the entity change.",
+			"role": "Every button of the cards: send_to_pdp, generate_einvoice, precheck_einvoice, confirm_sendStatusMessage, confirm_report_payment, setbuyerreference, setoverriderouting, seteinvoicestatus, the routing actions of the third party card, and the entity change.",
 			"reads": "GETPOST, extlinks, permissions of the core",
-			"writes": "delegates to the two shared helpers below, or to sendStatusMessage()"
+			"writes": "delegates to the two shared helpers below, or to sendStatusMessage(), or to EInvoicing::reportCashIn()"
 		},
 		"actions.sendone": {
 			"symbol": "ActionsEInvoicing::sendOneInvoiceToAccessPoint",
@@ -198,7 +198,7 @@
 			"symbol": "EInvoicing::isTransmittedLockActive",
 			"label": "isTransmittedLockActive()",
 			"chain": "cross",
-			"role": "The real lock. Keys on the persistent flow_id, which the first successful submission assigns and nothing ever clears — unlike syncstatus, which a manual status change can overwrite.",
+			"role": "The real lock. Keys on the persistent flow_id, which the first successful submission assigns and nothing ever clears — unlike syncstatus, which a manual status change can overwrite. Re-send and regeneration ask isSendLocked(), which frees an invoice only rejected at emission.",
 			"reads": "fetchLastknownInvoiceStatus()['everTransmitted']",
 			"writes": "—; opt-out EINVOICING_ALLOW_RESEND_TRANSMITTED"
 		},
@@ -302,7 +302,7 @@
 			"symbol": "CIIProtocol::generateXML",
 			"label": "generateXML()",
 			"chain": "out",
-			"role": "Data collection then serialization: includes buildinvoicelines.inc.php, calls buildXML(), runs the local business rules, writes the temp XML.",
+			"role": "Data collection then serialization: includes buildinvoicelines.inc.php, fires the beforeEinvoiceXmlBuild hook (other modules may amend $invoiceData / $linesData by reference; < 0 aborts), calls buildXML(), runs the local business rules, writes the temp XML.",
 			"reads": "$invoiceData and $linesData built by the include",
 			"writes": "<temp>/<REF>/einvoice.xml"
 		},
@@ -334,7 +334,7 @@
 			"symbol": "FacturXProtocol::generateInvoice",
 			"label": "FacturXProtocol::generateInvoice()",
 			"chain": "out",
-			"role": "Same XML, then the embedding: resolve the source PDF (the one the hook handed over, else the most recent one of the output dir, else regenerate it), copy it, merge the XML into a PDF/A-3, restore the metadata.",
+			"role": "Same XML, then the embedding: resolve the source PDF (the one the hook handed over, else the most recent `<REF>.pdf` / `<REF>_<template>.pdf` of the output dir, never our own `_facturx.pdf` nor a file attached to the invoice (`<REF>-<name>.pdf`), else regenerate it), copy it, merge the XML into a PDF/A-3, restore the metadata.",
 			"reads": "the generated XML, the source PDF, DOL_VERSION (which merger to use)",
 			"writes": "<output>/<REF>/<REF>_facturx.pdf; guards the rebuild with setEInvoiceGenerationInProgress()"
 		},
@@ -408,7 +408,7 @@
 			"chain": "in",
 			"role": "Walks the flow window in batches. This search endpoint ignores offset and page, caps a batch and reports no total, so the only cursor is updatedAfter and the batches walk it.",
 			"reads": "POST flows/search, then SELECT flow_id FROM einvoicing_document to discard what is already stored",
-			"writes": "one Call row for the whole run; the first flow failing (postponed included, unless EINVOICING_ENABLE_POSTPONE_FLOWS) aborts the run; with EINVOICING_ENABLE_MANUAL_ACTION_QUEUE a missing third party / product or a bad amount is queued in llx_einvoicing_sync_pending instead"
+			"writes": "one Call row for the whole run; the first flow failing (postponed included, unless EINVOICING_ENABLE_POSTPONE_FLOWS) aborts the run; with EINVOICING_ENABLE_MANUAL_ACTION_QUEUE a missing third party / product, an undecided mixed default (DEFAULT_ROUTING_MIXED_UNSET) or a bad amount is queued in llx_einvoicing_sync_pending instead"
 		},
 		"provider.syncflow": {
 			"symbol": "SuperPDPProvider::syncFlow",
@@ -526,7 +526,7 @@
 			"symbol": "CommonProtocol::findProductFromEinvoiceLine",
 			"label": "findProductFromEinvoiceLine()",
 			"chain": "in",
-			"role": "Matches a line to a product of the base, by the vendor reference first.",
+			"role": "Matches a line to a product of the base, by the vendor reference first; then falls back on the vendor's default service or product, picked by the billing framework BT-23, and last on the catch-all product of the setup.",
 			"reads": "the parsed line, the supplier product references",
 			"writes": "—"
 		},
@@ -534,9 +534,9 @@
 			"symbol": "CommonProtocol::_findOrCreateProductFromEinvoiceLine",
 			"label": "_findOrCreateProductFromEinvoiceLine()",
 			"chain": "in",
-			"role": "Creates the product when the setup allows it, guessing its type from what the line says. Otherwise the line falls back on the vendor's default routing product, or stays a free line.",
-			"reads": "_detectProductTypeFromEinvoiceLine(), the 'product' routing of the vendor",
-			"writes": "Product::create()"
+			"role": "Creates the product when the setup allows it, guessing its type from what the line says, once findProductFromEinvoiceLine() and its defaults found nothing. Otherwise the line stays a free line (EINVOICING_IMPORT_AS_FREE_LINES), or the import asks for a manual action.",
+			"reads": "_detectProductTypeFromEinvoiceLine(), findProductFromEinvoiceLine()",
+			"writes": "Product::create() (with a barcode per EINVOICING_PRODUCTS_AUTO_BARCODE or the barcode setup)"
 		},
 		"cii.createlines": {
 			"symbol": "CIIProtocol::createSupplierInvoiceLinesFromSource",
@@ -552,7 +552,7 @@
 			"chain": "in",
 			"role": "Writes the lines: a bare facture_fourn_det row, then the core updateline(). Deliberately not addline(), which does not re-price, overwrites ref_supplier and refuses a line with no supplier price.",
 			"reads": "$supplierInvoice->lines",
-			"writes": "FactureFournisseur::updateline() — so BT-131 is read and then dropped, the core recomputing from quantity x price"
+			"writes": "FactureFournisseur::updateline() — BT-131 is reached through the unit price resolveLineAmounts() chose, the core recomputing from quantity x price"
 		},
 		"cii.aligntotals": {
 			"symbol": "CIIProtocol::alignInvoiceTotalsWithDocument",
@@ -560,7 +560,7 @@
 			"chain": "in",
 			"role": "Once every line exists, confronts the totals of the invoice with the ones the document announces, and picks the rounding mode that reconciles them when one does.",
 			"reads": "the parsed header totals",
-			"writes": "carryAnnouncedVatOntoLines(), FactureFournisseur::update_price(); flagTotalsMismatch() / clearTotalsMismatch() in llx_einvoicing_extrafields (the mark BILL_SUPPLIER_VALIDATE enforces) and a message when they still disagree"
+			"writes": "carryAnnouncedVatOntoLines(), else keepVatRoundedPerLine() for an EXTENDED document whose totals add up the VAT rounded per line (noted in llx_einvoicing_extrafields.import_vat_rounded_per_line), FactureFournisseur::update_price(); flagTotalsMismatch() / clearTotalsMismatch() in llx_einvoicing_extrafields (the mark BILL_SUPPLIER_VALIDATE enforces) and a message when they still disagree"
 		},
 		"cii.saveattachment": {
 			"symbol": "CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment",
@@ -723,19 +723,19 @@
 						],
 						[
 							"`llx_einvoicing_routing`",
-							"one **routing identifier** of a third party (`routing_type='thirdparty'`), or its default import product (`='product'`)",
+							"one **routing identifier** of a third party (`routing_type='thirdparty'`), or its default import product (`='product'`) or service (`='service'`)",
 							"`addRouting()`, `setDefaultRouting()`, `setRoutingAsDefault()`, and the `COMPANY_CREATE/MODIFY` trigger",
-							"`getBuyerCommunicationURI()`, `generateCdarFile()` (MDT-73), the import (default product)"
+							"`getBuyerCommunicationURI()`, `generateCdarFile()` (MDT-73), the import (default product or service, picked by BT-23)"
 						],
 						[
 							"`llx_einvoicing_extrafields`",
 							"one **named property** the module keeps on a core object without using the core extrafields, which an admin could rename or delete",
-							"`insertOrUpdateExtraField()`",
-							"`getExtraFieldValue()`, the supplier invoice card"
+							"`insertOrUpdateExtraField()`: the `setbuyerreference` card action, the `COMPANY_CREATE/MODIFY` trigger, the import",
+							"`getExtraFieldValue()`: `buildinvoicelines.inc.php` (BT-10 buyer reference, BT-29 identifier given by the customer), the import (line-charges override of the vendor), the supplier invoice card"
 						],
 						[
 							"`llx_einvoicing_sync_pending`",
-							"one **received flow waiting for a manual action** (missing third party or product, supplier invoice with a different amount), only when `EINVOICING_ENABLE_MANUAL_ACTION_QUEUE` is on, and only through `SuperPDPProvider`",
+							"one **received flow waiting for a manual action** (missing third party or product, a mixed invoice (BT-23 = M…) whose default product or service the setup does not decide, supplier invoice with a different amount), only when `EINVOICING_ENABLE_MANUAL_ACTION_QUEUE` is on, and only through `SuperPDPProvider`",
 							"`EInvoicingSyncPending::queueFromFlow()` in `syncFlows()`, `resolveByFlowId()` once the flow goes through",
 							"`sync_pending_list.php` (retry, ignore), the pending counter of the flow list"
 						],
@@ -753,8 +753,8 @@
 						],
 						[
 							"supplier invoice dir",
-							"the received document and the PA readable view",
-							"`saveEInvoiceFileToSupplierInvoiceAttachment()`",
+							"the received document, the PA readable view, and the files the issuer embedded",
+							"`saveEInvoiceFileToSupplierInvoiceAttachment()`, `storeEmbeddedAttachments()`",
 							"`getXmlData()`, the consistency check, the CDAR vendor identity"
 						]
 					]
@@ -831,7 +831,9 @@
 						{
 							"kind": "node",
 							"fn": "cii.generatexml",
-							"lines": []
+							"lines": [
+								"hook beforeEinvoiceXmlBuild (other modules) before buildXML()"
+							]
 						},
 						{
 							"kind": "node",
@@ -979,7 +981,7 @@
 						[
 							"Card button *Send*",
 							"`doActions('send_to_pdp')`",
-							"`sendOneInvoiceToAccessPoint()` → `provider->sendInvoice()`"
+							"`sendOneInvoiceToAccessPoint()` → `provider->sendInvoice()`; also re-sends an invoice only ever rejected at emission (213)"
 						],
 						[
 							"Card button *Precheck*",
@@ -995,6 +997,11 @@
 							"Invoice list, mass action",
 							"`doMassActions('einvoicing_send_to_pdp')`",
 							"`sendOneInvoiceToAccessPoint()`"
+						],
+						[
+							"Card action *Report payment*",
+							"`doActions('confirm_report_payment')`",
+							"`EInvoicing::reportCashIn()` → `provider->sendStatusMessage(212)`"
 						]
 					]
 				},
@@ -1048,8 +1055,8 @@
 						],
 						[
 							"BT-3 `documenttypecode`",
-							"`_getTypeOfInvoice()`",
-							"380 / 381 / 384 / 386, from `type` and the situation"
+							"`_getTypeOfInvoice()` → `einvoicingDocumentTypeCode()`",
+							"380 / 381 / 384 / 386 from `type` (a situation invoice is a 380), 503 for a credit note of a deposit"
 						],
 						[
 							"BT-2 `documentdate`",
@@ -1063,12 +1070,12 @@
 						],
 						[
 							"BT-10 `buyerReference`",
-							"`array_options.options_d4d_promise_code`, else the Chorus service code",
+							"the invoice's own buyer reference (`llx_einvoicing_extrafields.buyer_reference`, set from the card), else `array_options.options_d4d_service_code`",
 							"not the same thing as BT-46 scheme 0224"
 						],
 						[
 							"BT-13 `orderReference`",
-							"`Facture::$ref_client` / `ref_customer`, else the first linked order",
+							"`array_options.options_d4d_promise_code`, else `Facture::$ref_client` / `ref_customer`, else the first linked order",
 							""
 						],
 						[
@@ -1079,7 +1086,7 @@
 						[
 							"BT-27…BT-34 seller",
 							"`$mysoc`, `einvoicingSellerTaxRegistrations()`, `getSellerCommunicationURI()`",
-							"BT-31 or BT-32 per VAT regime; on a B2G invoice the SIRET is added under scheme 0009 (EXTENDED), plus an ADN note 'B2G'"
+							"BT-31 or BT-32 per VAT regime; on a B2G invoice the SIRET is added under scheme 0009 (EXTENDED), plus an ADN note 'B2G'; BT-29 also carries, without scheme, the identifier the customer gave us as its supplier (`seller_id_by_buyer` of the buyer third party)"
 						],
 						[
 							"BT-44…BT-49 buyer",
@@ -1162,9 +1169,10 @@
 									"fn": "trigger.payment_customer_create",
 									"lines": [
 										"for each invoice paid by this payment, amount ≠ 0 (negative = refund, sent with its reason)",
-										"-> sendCashedInStatus()",
+										"-> sendCashedInStatus() → EInvoicing::reportCashIn()",
 										"AUTOMATIC, no option: the reform wants every",
-										"cash-in, partial ones included"
+										"cash-in, partial ones included",
+										"or by hand from the card: doActions('confirm_report_payment'), same reportCashIn()"
 									]
 								},
 								{
@@ -1499,7 +1507,8 @@
 							"fn": "cii.parseheader",
 							"label": "parseInvoiceHeader() / parseInvoiceLines()",
 							"lines": [
-								"pure XPath over $invoiceTemplate and $lineTemplate"
+								"pure XPath over $invoiceTemplate and $lineTemplate",
+								"no line at all (MINIMUM / BASIC WL): buildLinesFromVatBreakdown(), one line per VAT rate (BG-23), resolved by a default product only"
 							]
 						},
 						{
@@ -1521,7 +1530,7 @@
 							"kind": "list",
 							"label": "the two refusals that come before anything is written",
 							"items": [
-								"already imported for this supplier ? findIdByRef(ref_supplier, socid, BT-112 + BT-114, |BT-114|) -> same amount: only (re)attach the files; other amount (-3): postponeflow SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT; lookup error (-1/-2): postponeflow LINKED_INVOICE_LOOKUP_FAILED",
+								"already imported for this supplier ? findIdByRef(ref_supplier, socid, BT-112 + BT-114 signed as Dolibarr stores the type, |BT-114|, the draft a reimport rebuilds left out) -> same amount: link it to the flow when it has no extlink yet (an invoice keyed in by hand), then only (re)attach the files; other amount (-3): postponeflow SUPPLIER_INVOICE_FOUND_WITH_BAD_AMOUNT; lookup error (-1/-2): postponeflow LINKED_INVOICE_LOOKUP_FAILED",
 								"every referenced document (BG-3) present ? no -> postponeflow LINKED_INVOICE_NOT_FOUND, with a link to create it — only when a deposit is announced (BT-113 > 0, BT-23 not B2/S2/M2); a credit note, a self-reference or nothing to deduct steps over it with a message; a failed lookup -> postponeflow LINKED_INVOICE_LOOKUP_FAILED"
 							]
 						},
@@ -1529,8 +1538,9 @@
 							"kind": "list",
 							"label": "fill the FactureFournisseur, then",
 							"items": [
+								"on a reimport: clearSupplierInvoiceForRebuild() empties the draft (lines, discounts of the previous import)",
 								"createHeaderDiscounts() — document-level allowances -> DiscountAbsolute",
-								"FactureFournisseur::create($user)   <- CORE",
+								"FactureFournisseur::create($user)   <- CORE, or updateRebuiltSupplierInvoice() on the draft a reimport rebuilds; the discount ids -> llx_einvoicing_extrafields.import_discount_ids",
 								"_saveImportedBuyerOrderReference() -> llx_einvoicing_extrafields",
 								"_linkSupplierInvoiceToPurchaseOrder() -> core add_object_linked('order_supplier')"
 							]
@@ -1539,10 +1549,11 @@
 							"kind": "node",
 							"fn": "cii.createlines",
 							"lines": [
-								"per line: findProductFromEinvoiceLine()",
+								"per line: findProductFromEinvoiceLine() — vendor ref, ..., then the vendor's",
+								"  default service / product picked by BT-23, then the catch-all product",
 								"  else _findOrCreateProductFromEinvoiceLine() -> Product::create()",
-								"  else the vendor's default routing product",
-								"  else a free line"
+								"  else a free line (EINVOICING_IMPORT_AS_FREE_LINES)",
+								"  else a manual action"
 							]
 						},
 						{
@@ -1578,8 +1589,10 @@
 							"items": [
 								"ProductFournisseur::update_buyprice() — supplier prices of the imported products",
 								"insertOrUpdateExtLink($supplierInvoiceId, 'invoice_supplier', $flowId)",
+								"on a reimport: deleteImportedFilesOfSupplierInvoice() first (files attached by hand stay)",
 								"storeEmbeddedAttachments() — the files embedded in the document (BG-24)",
-								"saveEInvoiceFileToSupplierInvoiceAttachment() x2 — document and readable view"
+								"saveEInvoiceFileToSupplierInvoiceAttachment() x2 — document and readable view",
+								"back in syncFlow(): addSupplierInvoiceImportEvent() — 'EINVOICING - ' import (or reimport) event on the invoice timeline"
 							]
 						}
 					]
@@ -1587,7 +1600,7 @@
 				{
 					"type": "note",
 					"md": [
-						"`FacturXProtocol` overrides only `parseReceivedDocument()`: it extracts the CII out of the PDF/A-3 (`PdfAttachmentExtractor::getInvoiceXmlFromFile()`, or the external reader with `EINVOICING_USE_EXTERNAL_FACTURX_READER`) and then runs the same CII path."
+						"`FacturXProtocol` overrides, on the receiving side, `parseReceivedDocument()` — it extracts the CII out of the PDF/A-3 (`PdfAttachmentExtractor::getInvoiceXmlFromFile()`, or the external reader with `EINVOICING_USE_EXTERNAL_FACTURX_READER`) — and `extractContainerAttachments()`, which gives `storeEmbeddedAttachments()` the files carried beside the invoice XML; everything else is the same CII path."
 					]
 				},
 				{
@@ -1690,7 +1703,7 @@
 						[
 							"`prodname` / `proddesc` (BT-153/154)",
 							"`$line->desc`",
-							"kept even when a real product is linked"
+							"`resolveLineDescription()`: the name, then the description unless it repeats it; kept even when a real product is linked; the line charges (BG-28) appended when `EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION` (or the vendor's override) folds them in"
 						],
 						[
 							"`billedquantity` (BT-129)",
@@ -1709,7 +1722,7 @@
 						],
 						[
 							"`lineTotalAmount` (BT-131)",
-							"read, then **dropped**",
+							"not stored as such: `resolveLineAmounts()` rewrites the unit price when quantity x price does not reach it",
 							"`updateline()` recomputes from quantity x price"
 						],
 						[
@@ -1726,6 +1739,11 @@
 							"the whole XML",
 							"`einvoicing_document.xml_data`",
 							"attachments stripped, size checked"
+						],
+						[
+							"`businessProcessId` (BT-23)",
+							"which default of the vendor a line falls back on",
+							"S service, B product, M per `EINVOICING_DEFAULT_ROUTING_MIXED`"
 						]
 					]
 				},
@@ -1793,7 +1811,7 @@
 							"transmitted",
 							"`isTransmittedLockActive()`",
 							"`extlinks.flow_id`, **never cleared**",
-							"blocks unvalidate, delete, modification of the locked fields, re-send and regeneration; opt-out `EINVOICING_ALLOW_RESEND_TRANSMITTED`"
+							"blocks unvalidate, delete and modification of the locked fields; re-send and regeneration through `isSendLocked()`, which frees an invoice the seller's AP only ever rejected at emission (213, read in `lifecycle_msg`); opt-out `EINVOICING_ALLOW_RESEND_TRANSMITTED`"
 						],
 						[
 							"transmitted (weak)",
@@ -1850,7 +1868,7 @@
 						[
 							"customer invoice card block",
 							"`EInvoiceCardBlock()`, rendered by the `formObjectOptions` hook",
-							"extlinks (status, flow_id, precheck, routing override), the file on disk, `lifecycle_msg`"
+							"extlinks (status, flow_id, precheck, routing override), the file on disk, `lifecycle_msg`, `einvoicing_extrafields` (buyer reference, BT-10)"
 						],
 						[
 							"supplier invoice card block",
@@ -1860,7 +1878,7 @@
 						[
 							"third party card block",
 							"`thirdpartyCardBlock()`",
-							"`einvoicing_routing`, the directory check"
+							"`einvoicing_routing` (routing, default product and default service), `einvoicing_extrafields` (line-charges override, identifier given by the customer — BT-29), the directory check"
 						],
 						[
 							"invoice list columns",
@@ -1961,7 +1979,7 @@
 						[
 							"`EINVOICING_PROTOCOL`",
 							"OUT",
-							"`CII` or `FACTURX`: which file is produced and transmitted"
+							"`CII` (set on activation) or `FACTURX`: which file is produced and transmitted; none set: the PDF hook warns, and blocks only with `EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS`"
 						],
 						[
 							"`EINVOICING_XML_PROFILE`",
@@ -2076,7 +2094,7 @@
 						[
 							"`EINVOICING_ENABLE_MANUAL_ACTION_QUEUE`",
 							"IN",
-							"hidden, off: a missing third party or product, or an amount mismatch, queues the flow in `llx_einvoicing_sync_pending` and the run carries on (SuperPDP only)"
+							"hidden, off: a missing third party or product, an undecided mixed default, or an amount mismatch, queues the flow in `llx_einvoicing_sync_pending` and the run carries on (SuperPDP only)"
 						],
 						[
 							"`EINVOICING_PREFER_ORIGINAL`",
@@ -2126,7 +2144,27 @@
 						[
 							"`EINVOICING_IMPORT_AS_FREE_LINES`",
 							"IN",
-							"import every line as a free line, linked to no product"
+							"a line no product resolves, automatic creation being off, is imported as a free line instead of asking for a manual action; offered only when neither `EINVOICING_PRODUCTS_AUTO_GENERATION` nor `MAIN_DISABLE_FREE_LINES` is on"
+						],
+						[
+							"`EINVOICING_DEFAULT_ROUTING_MIXED`",
+							"IN",
+							"`product` or `service`: the default of the vendor a line of a mixed invoice (BT-23 = M…) falls back on; unset, such a line asks for a manual action (DEFAULT_ROUTING_MIXED_UNSET)"
+						],
+						[
+							"`EINVOICING_DEFAULT_PRODUCT_CATCHALL`, `EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID`",
+							"IN",
+							"last resort product for a line nothing else resolves, whatever its vendor; ignored with `EINVOICING_PRODUCTS_AUTO_GENERATION`"
+						],
+						[
+							"`EINVOICING_PRODUCTS_AUTO_BARCODE`",
+							"IN",
+							"a product created at import gets a barcode: the line GTIN (scheme 0160 / 0011) when given, else the next code; without it, only when the barcode setup requires one"
+						],
+						[
+							"`EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION`",
+							"IN",
+							"fold the charges of a received line (BG-28) into its description instead of a line of their own; a vendor may override it from its card (`llx_einvoicing_extrafields.merge_line_charges`)"
 						],
 						[
 							"`EINVOICING_TOLERANT_SUPPLIER_REF_MATCH`, `EINVOICING_TOLERANT_SUPPLIER_REF_MIN_LENGTH`",
@@ -2250,7 +2288,7 @@
 						],
 						[
 							"one flow blocks the whole run",
-							"by default it does: a failed or postponed flow aborts the run; `EINVOICING_ENABLE_POSTPONE_FLOWS` skips the postponed ones, `EINVOICING_ENABLE_MANUAL_ACTION_QUEUE` queues the manual-action ones (SuperPDP)"
+							"by default it does: a failed or postponed flow aborts the run; `EINVOICING_ENABLE_POSTPONE_FLOWS` skips the postponed ones, `EINVOICING_ENABLE_MANUAL_ACTION_QUEUE` queues the manual-action ones, an undecided mixed default included (SuperPDP)"
 						],
 						[
 							"a received invoice landed on the wrong vendor",
