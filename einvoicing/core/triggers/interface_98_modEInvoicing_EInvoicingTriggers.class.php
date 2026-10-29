@@ -165,6 +165,16 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 				}
 			}
 
+			// Buyer reference of this customer, sent as BT-10 on its invoices that have none (issue #1210).
+			// Same rules: an empty value deletes it, a save that does not carry the field leaves it untouched.
+			if (GETPOSTISSET('einvoicing_buyer_reference')) {
+				$result = $einvoicing->insertOrUpdateExtraField($socId, 'societe', EInvoicing::EXTRAFIELD_BUYER_REFERENCE, trim(GETPOST('einvoicing_buyer_reference', 'alphanohtml')));
+				if ($result < 0) {
+					$error++;
+					$this->errors[] = $langs->trans('FailedToSaveCustomerBuyerReference').' '.$einvoicing->error;
+				}
+			}
+
 			if ($error) {
 				return -4;
 			}
