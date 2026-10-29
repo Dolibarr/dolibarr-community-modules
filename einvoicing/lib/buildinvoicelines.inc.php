@@ -1230,7 +1230,7 @@ $invoiceData = [
 	'orderReference'            => $promise_code,
 	'contractReference'         => $object->array_options['options_d4d_contract_number'] ?? null,
 	'contractReferenceTypeCode' => $contractReferenceTypeCode,
-	'despatchAdviceRef'         => null,
+	'despatchAdviceRef'         => $einvoicing->getDespatchAdviceReference($object),	// BT-16 (issue #1151)
 
 	// VAT breakdown for section ApplicableHeaderTradeSettlement
 	'taxBreakdown'              => $taxBreakdown,

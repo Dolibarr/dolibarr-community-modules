@@ -86,8 +86,9 @@ documents; they are not part of what is measured.
 ## 3. Elements the reference documents carry and the builder never writes
 
 Measured by `test/conformance/emitted-terms.php`, which reads what the builder is **able** to
-construct anywhere in its source — not what one specimen invoice happens to contain. Sixteen distinct
-names, across the three profile families (22 entries counting a name once per family).
+construct anywhere in its source — not what one specimen invoice happens to contain. Fifteen distinct
+names, across the three profile families (21 entries counting a name once per family). BT-16 left
+the list when a customer asked for it ([issue #1151](https://github.com/Dolibarr/dolibarr-community-modules/issues/1151)).
 
 None of them is made mandatory by the CTC-FR schematron or by the CEN EN 16931 rules, apart from the
 four of section 1. They are not written, by the rule above.
@@ -97,7 +98,6 @@ four of section 1. They are not written, by the rule above.
 | `ram:PaymentReference` | BT-83 remittance information | BASICWL, EN16931, EXTENDED | no core field before 24.0, and `FactureFournisseur` never touches `payment_reference` |
 | `ram:ReceivableSpecifiedTradeAccountingAccount` | BT-19 buyer accounting reference | BASICWL, EN16931, EXTENDED | no per-invoice field in the core |
 | `ram:SellerOrderReferencedDocument` | BT-14 seller order reference | EN16931, EXTENDED | no field: it is a lookup on `llx_commande_fournisseur.ref_supplier` |
-| `ram:DespatchAdviceReferencedDocument` | BT-16 despatch advice reference | BASICWL | the parser reads it (`despatchAdviceRef`); the builder never writes it |
 | `ram:PayeeTradeParty` | BG-10 payee | BASICWL | a Dolibarr invoice has no payee party |
 | `ram:DirectDebitMandateID` | BT-89 mandate reference | BASICWL | `llx_societe_rib.rum` exists, nothing maps it |
 | `ram:CreditorReferenceID` | BT-90 creditor identifier | BASICWL | the core holds the ICS globally (`PRELEVEMENT_ICS`), not per thirdparty |
