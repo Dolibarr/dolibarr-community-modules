@@ -1020,6 +1020,23 @@ class SupplierInvoiceHelper
 			return 0;
 		}
 
+		// If a credit note already cancels this source, do not close it again as replaced: that would
+		// double-cancel it and make the accounting net fall to zero.
+		$sqlCreditNote = 'SELECT rowid FROM ' . MAIN_DB_PREFIX . 'facture_fourn'
+			. ' WHERE fk_facture_source = ' . $sourceId
+			. ' AND type = ' . FactureFournisseur::TYPE_CREDIT_NOTE
+			. ' AND fk_statut NOT IN (' . FactureFournisseur::STATUS_DRAFT . ',' . FactureFournisseur::STATUS_ABANDONED . ')'
+			. ' AND entity = ' . ((int) $source->entity);
+		$resCreditNote = $db->query($sqlCreditNote);
+		if (!$resCreditNote) {
+			dol_syslog(__METHOD__ . ' DB error checking credit notes for source id ' . $sourceId . ': ' . $db->lasterror(), LOG_ERR, 0, '_einvoicing');
+			return -1;
+		}
+		if ($db->num_rows($resCreditNote) > 0) {
+			dol_syslog(__METHOD__ . ' Supplier invoice id ' . $sourceId . ' replaced by id ' . $replacement->id . ' already has a validated credit note: leaving it as is to avoid double cancellation', LOG_INFO, 0, '_einvoicing');
+			return 0;
+		}
+
 		if ($source->setCanceled($user, FactureFournisseur::CLOSECODE_REPLACED, '') < 0) {
 			dol_syslog(__METHOD__ . ' Failed to close the supplier invoice id ' . $sourceId . ' replaced by id ' . $replacement->id . ' : ' . implode(', ', (array) $source->errors), LOG_ERR, 0, '_einvoicing');
 			return -1;
