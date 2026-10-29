@@ -1022,11 +1022,7 @@ class SupplierInvoiceHelper
 
 		// If a credit note already cancels this source, do not close it again as replaced: that would
 		// double-cancel it and make the accounting net fall to zero.
-		$sqlCreditNote = 'SELECT rowid FROM ' . MAIN_DB_PREFIX . 'facture_fourn'
-			. ' WHERE fk_facture_source = ' . $sourceId
-			. ' AND type = ' . FactureFournisseur::TYPE_CREDIT_NOTE
-			. ' AND fk_statut NOT IN (' . FactureFournisseur::STATUS_DRAFT . ',' . FactureFournisseur::STATUS_ABANDONED . ')'
-			. ' AND entity = ' . ((int) $source->entity);
+		$sqlCreditNote = 'SELECT rowid FROM ' . MAIN_DB_PREFIX . "facture_fourn WHERE fk_facture_source = " . ((int) $sourceId) . " AND type = " . FactureFournisseur::TYPE_CREDIT_NOTE . " AND fk_statut NOT IN (" . FactureFournisseur::STATUS_DRAFT . "," . FactureFournisseur::STATUS_ABANDONED . ") AND entity = " . ((int) $source->entity);
 		$resCreditNote = $db->query($sqlCreditNote);
 		if (!$resCreditNote) {
 			dol_syslog(__METHOD__ . ' DB error checking credit notes for source id ' . $sourceId . ': ' . $db->lasterror(), LOG_ERR, 0, '_einvoicing');
