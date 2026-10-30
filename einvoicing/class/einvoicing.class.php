@@ -620,6 +620,12 @@ class EInvoicing
 	const EXTRAFIELD_SELLER_ID_BY_BUYER = 'seller_id_by_buyer';
 
 	/**
+	 * Name, into llx_einvoicing_extrafields (element_type 'facturedet'), of the line of the buyer's
+	 * purchase order an invoice line bills. Sent as BT-132 on that line.
+	 */
+	const EXTRAFIELD_BUYER_ORDER_LINE_ID = 'buyer_order_line_id';
+
+	/**
 	 * ISO/IEC 6523 scheme identifier of the French routing code ("code de routage"), the scheme the
 	 * Chorus Pro "code service exécutant" is declared under as BT-46 by BR-FR-CPRO-11 and
 	 * BR-FR-CPRO-13 of XP Z12-012. Not to be confused with 0225 (e-invoice address) nor with 0002 /
@@ -2108,6 +2114,44 @@ class EInvoicing
 			$resprints .= '</tr>';
 		}
 
+		// Lines of the buyer's purchase order the invoice lines bill (BT-132, issue #1192), one per line.
+		// Last row: line-level, after the references of the invoice. Stored into llx_einvoicing_extrafields.
+		if (($object->element == 'facture' || $object->element == 'invoice') && $object->id > 0 && !empty($object->lines)) {
+			$orderLineIds = $this->getBuyerOrderLineIds($object);
+			$resprints .= '<tr class="treinvoicing_collapseseparator">';
+			$resprints .= '<td>';
+			$resprints .= $form->editfieldkey($form->textwithpicto($langs->trans("EInvoiceBuyerOrderLineIds"), $langs->trans("EInvoiceBuyerOrderLineIdsHelp")), 'einvoice_order_lines', '', $object, (int) $editenable);
+			$resprints .= '</td>';
+			$resprints .= '<td>';
+			if ($action == 'editeinvoice_order_lines' && $editenable) {
+				$resprints .= '<form name="setbuyerorderlines" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
+				$resprints .= '<input type="hidden" name="token" value="' . newToken() . '">';
+				$resprints .= '<input type="hidden" name="action" value="setbuyerorderlines">';
+				$resprints .= '<input type="hidden" name="page_y" value="page_y">';
+				$num = 0;
+				foreach ($object->lines as $line) {
+					$num++;
+					$label = (string) (!empty($line->product_ref) ? $line->product_ref : dol_trunc(dol_string_nohtmltag((string) $line->desc), 40));
+					$resprints .= '<div class="nowraponall">' . $num . '. ' . dol_escape_htmltag($label) . ' ';
+					$resprints .= '<input type="text" name="einvoice_order_line_' . ((int) $line->id) . '" class="width100" maxlength="255" value="' . dol_escape_htmltag($orderLineIds[(int) $line->id] ?? '') . '"></div>';
+				}
+				$resprints .= '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
+				$resprints .= '</form>';
+			} else {
+				$num = 0;
+				$shown = array();
+				foreach ($object->lines as $line) {
+					$num++;
+					if (($orderLineIds[(int) $line->id] ?? '') !== '') {
+						$shown[] = $num . ' &rarr; ' . dol_escape_htmltag($orderLineIds[(int) $line->id]);
+					}
+				}
+				$resprints .= implode(', ', $shown);
+			}
+			$resprints .= '</td>';
+			$resprints .= '</tr>';
+		}
+
 		// JavaScript for AJAX call to update status if current status is pending
 		if ((int) $currentStatusInfo['code'] === self::STATUS_AWAITING_VALIDATION
 			// || (int) $currentStatusInfo['code'] === self::STATUS_AWAITING_ACK			// If we want to call the checkinvoicestatus to get next steps...
@@ -3479,6 +3523,43 @@ class EInvoicing
 		}
 
 		return $exists ? 1 : $this->db->last_insert_id($this->db->prefix() . "einvoicing_extrafields");
+	}
+
+	/**
+	 * Lines of the buyer's purchase order the lines of an invoice bill (BT-132), read in one query.
+	 *
+	 * @param	Facture				$invoice	Customer invoice, with its lines
+	 * @return	array<int,string>				Order line id by rowid of the invoice line, lines without one left out
+	 */
+	public function getBuyerOrderLineIds($invoice)
+	{
+		$lineIds = array();
+		foreach ((array) $invoice->lines as $line) {
+			if ((int) $line->id > 0) {
+				$lineIds[] = (int) $line->id;
+			}
+		}
+		if (empty($lineIds)) {
+			return array();
+		}
+
+		$sql = "SELECT element_id, value FROM " . $this->db->prefix() . "einvoicing_extrafields";
+		$sql .= " WHERE element_type = 'facturedet' AND name = '" . $this->db->escape(self::EXTRAFIELD_BUYER_ORDER_LINE_ID) . "'";
+		$sql .= " AND element_id IN (" . $this->db->sanitize(implode(',', $lineIds)) . ")";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' ' . $this->db->lasterror(), LOG_ERR);
+			return array();
+		}
+		$ids = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			if (trim((string) $obj->value) !== '') {
+				$ids[(int) $obj->element_id] = trim((string) $obj->value);
+			}
+		}
+		$this->db->free($resql);
+
+		return $ids;
 	}
 
 	/**
