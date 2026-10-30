@@ -2077,6 +2077,8 @@ class EInvoicing
 		// user could rename, empty or delete.
 		if (($object->element == 'facture' || $object->element == 'invoice') && $object->id > 0) {
 			$currentBuyerReference = (string) $this->getExtraFieldValue($object->id, $object->element, self::EXTRAFIELD_BUYER_REFERENCE);
+			// Default of the customer, sent when the invoice has none (issue #1210): shown so the user sees what goes out.
+			$customerBuyerReference = empty($object->socid) ? '' : trim((string) $this->getExtraFieldValue($object->socid, 'societe', self::EXTRAFIELD_BUYER_REFERENCE));
 			$resprints .= '<tr class="treinvoicing_collapseseparator">';
 			$resprints .= '<td>';
 			$resprints .= $form->editfieldkey($form->textwithpicto($langs->trans("EInvoiceBuyerReference"), $langs->trans("EInvoiceBuyerReferenceHelp")), 'einvoice_buyer_reference', '', $object, (int) $editenable);
@@ -2087,13 +2089,13 @@ class EInvoicing
 				$resprints .= '<input type="hidden" name="token" value="' . newToken() . '">';
 				$resprints .= '<input type="hidden" name="action" value="setbuyerreference">';
 				$resprints .= '<input type="hidden" name="page_y" value="page_y">';
-				$resprints .= '<input type="text" name="einvoice_buyer_reference" class="minwidth200" maxlength="255" value="' . dol_escape_htmltag($currentBuyerReference) . '">';
+				$resprints .= '<input type="text" name="einvoice_buyer_reference" class="minwidth200" maxlength="255" value="' . dol_escape_htmltag($currentBuyerReference) . '"' . ($customerBuyerReference === '' ? '' : ' placeholder="' . dolPrintHTMLForAttribute($customerBuyerReference) . '"') . '>';
 				$resprints .= '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
 				$resprints .= '</form>';
 			} elseif ($currentBuyerReference !== '') {
 				$resprints .= dol_escape_htmltag($currentBuyerReference);
-			} else {
-				//$resprints .= '<span class="opacitymedium">' . $langs->trans("NotDefined") . '</span>';
+			} elseif ($customerBuyerReference !== '') {
+				$resprints .= '<span class="opacitymedium">' . $langs->trans("EInvoiceBuyerReferenceCustomerDefault") . ' (' . dol_escape_htmltag($customerBuyerReference) . ')</span>';
 			}
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
