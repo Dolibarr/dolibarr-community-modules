@@ -1008,6 +1008,12 @@ $prepaidAmount = 0.0;
 foreach (array('getSommePaiement', 'getSumDepositsUsed', 'getSumCreditNotesUsed') as $alreadyPaidMethod) {
 	$alreadyPaidPart = $object->$alreadyPaidMethod();
 
+	// A refund of a credit note is stored negative while the document amounts are positive (EN16931).
+	// The error is the int -1, a refund of 1.00 the float -1.0.
+	if ($alreadyPaidMethod == 'getSommePaiement' && $object->type == $object::TYPE_CREDIT_NOTE && is_float($alreadyPaidPart)) {
+		$alreadyPaidPart = abs($alreadyPaidPart);
+	}
+
 	// SUM() over no row answers NULL, handed back as it is: this invoice carries nothing of that kind.
 	if ($alreadyPaidPart === null || $alreadyPaidPart === '') {
 		continue;
