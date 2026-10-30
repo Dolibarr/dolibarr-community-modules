@@ -1002,6 +1002,48 @@ function formatDolistoreVersion($version)
 
 
 /**
+ * Pull all languages from Transifex (with dev/translation/txpull.sh), for one module or for all of them
+ *
+ * @param	string	$modulename		Name of the module, or '' for all modules
+ * @return	string					'' if OK, the error message otherwise
+ */
+function pullTranslationsFromTransifex($modulename)
+{
+	$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..');
+	$txpullScript = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev' . DIRECTORY_SEPARATOR . 'translation' . DIRECTORY_SEPARATOR . 'txpull.sh';
+
+	// txpull.sh returns 0 even when the tx client is missing, so check it here
+	$output = array();
+	$returnCode = 0;
+	exec('command -v tx', $output, $returnCode);
+	if ($returnCode != 0) {
+		return "Transifex client 'tx' not found, translations not pulled";
+	}
+
+	$command = escapeshellarg($txpullScript) . ' all';
+	if (!empty($modulename)) {
+		// Find the Transifex resource of the module into .tx/config (the one whose file_filter starts with "modulename/")
+		$modulename = strtolower($modulename);
+		$txconfig = (string) @file_get_contents($directoryToSearch . DIRECTORY_SEPARATOR . '.tx' . DIRECTORY_SEPARATOR . 'config');
+		$reg = array();
+		if (!preg_match('/^\[([^\]]+)\]\s*\nfile_filter\s*=\s*' . preg_quote($modulename, '/') . '\//m', $txconfig, $reg)) {
+			return "No Transifex resource found for module " . $modulename . " into .tx/config";
+		}
+		print "Pull all languages from Transifex for module " . $modulename . " (resource " . $reg[1] . ")\n";
+		$command .= ' -r ' . escapeshellarg($reg[1]);
+	} else {
+		print "Pull all languages from Transifex for all modules\n";
+	}
+
+	$returnCode = 0;
+	passthru($command, $returnCode);
+	if ($returnCode != 0) {
+		return "Command " . $command . " failed with return code " . $returnCode;
+	}
+	return '';
+}
+
+/**
  * Push a module zip package to the Dolistore (remote Dolibarr instance) using the REST API.
  *
  * The product ID is read from the dolistore-download URL found in the root index.yaml file.
@@ -1282,12 +1324,15 @@ if (empty($argv[1])) {
 	print "Usage:   ".$script_file." index|txsync|makezip|makeziptag|pushdolistore\n";
 	print "Example: ".$script_file." index                           to rebuild the index.yaml file (used by Dolibarr to retrieve list of community modules)\n";
 	print "Example: ".$script_file." txsync             [modulename] to pull all languages from Transifex (with dev/translation/txpull.sh)\n";
-	print "Example: ".$script_file." makezip|makeziptag [modulename] to regenerate zip of packages (and set Tag of version)\n";
+	print "Example: ".$script_file." makezip|makeziptag [modulename] [--notxsync] to pull languages from Transifex then regenerate zip of packages (and set Tag of version)\n";
 	print "Example: ".$script_file." pushdolistore      [modulename] to publish zip of packages on dolistore (ask for API key)\n";
 	print "\n";
 	exit(1);
 }
 
+// Option --notxsync: makezip and makeziptag build without pulling the translations from Transifex first
+$notxsync = in_array('--notxsync', $argv);
+$argv = array_values(array_diff($argv, array('--notxsync')));
 
 if ($argv[1] == 'index') {
 	$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..');
@@ -1316,32 +1361,21 @@ if ($argv[1] == 'index') {
 }
 
 if ($argv[1] == 'txsync') {
-	$directoryToSearch = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . '..');
-	$txpullScript = $directoryToSearch . DIRECTORY_SEPARATOR . 'dev' . DIRECTORY_SEPARATOR . 'translation' . DIRECTORY_SEPARATOR . 'txpull.sh';
-
-	$command = escapeshellarg($txpullScript) . ' all';
-	if (!empty($argv[2])) {
-		// Find the Transifex resource of the module into .tx/config (the one whose file_filter starts with "modulename/")
-		$modulename = strtolower($argv[2]);
-		$txconfig = (string) @file_get_contents($directoryToSearch . DIRECTORY_SEPARATOR . '.tx' . DIRECTORY_SEPARATOR . 'config');
-		$reg = array();
-		if (!preg_match('/^\[([^\]]+)\]\s*\nfile_filter\s*=\s*' . preg_quote($modulename, '/') . '\//m', $txconfig, $reg)) {
-			print "[fail] No Transifex resource found for module " . $modulename . " into .tx/config\n";
-			exit(1);
-		}
-		print "Pull all languages from Transifex for module " . $modulename . " (resource " . $reg[1] . ")\n";
-		$command .= ' -r ' . escapeshellarg($reg[1]);
-	} else {
-		print "Pull all languages from Transifex for all modules\n";
-	}
-
-	$returnCode = 0;
-	passthru($command, $returnCode);
-	if ($returnCode != 0) {
-		print "[fail] Command " . $command . " failed with return code " . $returnCode . "\n";
+	$error = pullTranslationsFromTransifex($argv[2] ?? '');
+	if ($error) {
+		print "[fail] " . $error . "\n";
 		exit(1);
 	}
 	print "All done.\n";
+}
+
+// makezip and makeziptag pull the translations first, so a package never ships languages older than Transifex.
+// A Transifex failure is only a warning here: it must never stop the build.
+if (($argv[1] == 'makezip' || $argv[1] == 'makeziptag') && !$notxsync) {
+	$error = pullTranslationsFromTransifex($argv[2] ?? '');
+	if ($error) {
+		print "[warning] " . $error . ". The package is built with the translations of the local tree.\n";
+	}
 }
 
 if ($argv[1] == 'pushdolistore') {
