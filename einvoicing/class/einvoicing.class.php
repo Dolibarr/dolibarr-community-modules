@@ -602,7 +602,8 @@ class EInvoicing
 	 * Name, into llx_einvoicing_extrafields, of the buyer reference (BT-10): a reference owned by the
 	 * buyer, used to route the invoice inside its own organisation (business unit, service reference,
 	 * internal mailbox...). A plain EN 16931 core term, unrelated to the public sector, so it is kept
-	 * per invoice and offered whatever the Chorus Pro option (issue #678).
+	 * per invoice and offered whatever the Chorus Pro option (issue #678). Under element_type 'societe',
+	 * the default of a customer, sent when its invoice has none (issue #1210).
 	 */
 	const EXTRAFIELD_BUYER_REFERENCE = 'buyer_reference';
 
@@ -2076,6 +2077,8 @@ class EInvoicing
 		// user could rename, empty or delete.
 		if (($object->element == 'facture' || $object->element == 'invoice') && $object->id > 0) {
 			$currentBuyerReference = (string) $this->getExtraFieldValue($object->id, $object->element, self::EXTRAFIELD_BUYER_REFERENCE);
+			// Default of the customer, sent when the invoice has none (issue #1210): shown so the user sees what goes out.
+			$customerBuyerReference = empty($object->socid) ? '' : trim((string) $this->getExtraFieldValue($object->socid, 'societe', self::EXTRAFIELD_BUYER_REFERENCE));
 			$resprints .= '<tr class="treinvoicing_collapseseparator">';
 			$resprints .= '<td>';
 			$resprints .= $form->editfieldkey($form->textwithpicto($langs->trans("EInvoiceBuyerReference"), $langs->trans("EInvoiceBuyerReferenceHelp")), 'einvoice_buyer_reference', '', $object, (int) $editenable);
@@ -2086,13 +2089,13 @@ class EInvoicing
 				$resprints .= '<input type="hidden" name="token" value="' . newToken() . '">';
 				$resprints .= '<input type="hidden" name="action" value="setbuyerreference">';
 				$resprints .= '<input type="hidden" name="page_y" value="page_y">';
-				$resprints .= '<input type="text" name="einvoice_buyer_reference" class="minwidth200" maxlength="255" value="' . dol_escape_htmltag($currentBuyerReference) . '">';
+				$resprints .= '<input type="text" name="einvoice_buyer_reference" class="minwidth200" maxlength="255" value="' . dol_escape_htmltag($currentBuyerReference) . '"' . ($customerBuyerReference === '' ? '' : ' placeholder="' . dolPrintHTMLForAttribute($customerBuyerReference) . '"') . '>';
 				$resprints .= '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
 				$resprints .= '</form>';
 			} elseif ($currentBuyerReference !== '') {
 				$resprints .= dol_escape_htmltag($currentBuyerReference);
-			} else {
-				//$resprints .= '<span class="opacitymedium">' . $langs->trans("NotDefined") . '</span>';
+			} elseif ($customerBuyerReference !== '') {
+				$resprints .= '<span class="opacitymedium">' . $langs->trans("EInvoiceBuyerReferenceCustomerDefault") . ' (' . dol_escape_htmltag($customerBuyerReference) . ')</span>';
 			}
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
@@ -2585,6 +2588,7 @@ class EInvoicing
 			}
 
 			$resprints .= $this->sellerIdByBuyerRowHtml($object, $mode, $parameters, $expand_display);
+			$resprints .= $this->buyerReferenceRowHtml($object, $mode, $parameters, $expand_display);
 
 			return $resprints;
 		}
@@ -2758,6 +2762,7 @@ class EInvoicing
 		}
 
 		$resprints .= $this->sellerIdByBuyerRowHtml($object, $mode, $parameters, $expand_display);
+		$resprints .= $this->buyerReferenceRowHtml($object, $mode, $parameters, $expand_display);
 
 		return $resprints;
 	}
@@ -2786,6 +2791,40 @@ class EInvoicing
 		$out .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
 		if ($mode == 'create' || $mode == 'edit') {
 			$out .= '<input type="text" name="einvoicing_seller_id_by_buyer" class="flat minwidth300" maxlength="255" spellcheck="false" value="' . dolPrintHTMLForAttribute($value) . '">';
+		} else {
+			$out .= dol_escape_htmltag($value);
+		}
+		$out .= '</td>';
+		$out .= '</tr>';
+
+		return $out;
+	}
+
+	/**
+	 * Row of the thirdparty card with the buyer reference of this customer (BT-10, issue #1210), sent on
+	 * its invoices that have none of their own.
+	 *
+	 * @param	Societe					$object				Thirdparty
+	 * @param	string					$mode				'create', 'edit' or view
+	 * @param	array<string,mixed>		$parameters			Hook parameters
+	 * @param	bool					$expand_display		Whether the block is expanded
+	 * @return	string										HTML of the row, '' when the thirdparty is not a customer
+	 */
+	private function buyerReferenceRowHtml($object, $mode, $parameters, $expand_display)
+	{
+		global $langs, $form;
+
+		if (!in_array((int) $object->client, array(1, 3), true)) {
+			return '';
+		}
+
+		$value = ($mode == 'create') ? '' : (string) $this->getExtraFieldValue($object->id, 'societe', self::EXTRAFIELD_BUYER_REFERENCE);
+
+		$out = '<tr class="treinvoicing_collapseseparator trbuyer_reference '.($expand_display ? '' : 'hidden').'">';
+		$out .= '<td>' . $form->textwithpicto($langs->trans("EInvoicingCustomerBuyerReference"), $langs->trans("EInvoicingCustomerBuyerReferenceHelp")) . '</td>';
+		$out .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
+		if ($mode == 'create' || $mode == 'edit') {
+			$out .= '<input type="text" name="einvoicing_buyer_reference" class="flat minwidth300" maxlength="255" spellcheck="false" value="' . dolPrintHTMLForAttribute($value) . '">';
 		} else {
 			$out .= dol_escape_htmltag($value);
 		}
