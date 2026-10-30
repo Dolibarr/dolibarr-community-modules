@@ -2813,7 +2813,7 @@ class EInvoicing
 			'0' => $langs->trans("No"),
 		);
 
-		return $form->selectarray('merge_line_charges', $options, $current, 0, 0, 0, '', 0, 0, 0, '', 'minwidth300');
+		return $form->selectarray('merge_line_charges', $options, $current, 0, 0, 0, '', 0, 0, 0, '', 'minwidth200 maxwidth300 widthcentpercentminusx');
 	}
 
 	/**
