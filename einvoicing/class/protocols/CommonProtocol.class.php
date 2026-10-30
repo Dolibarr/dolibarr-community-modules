@@ -116,7 +116,8 @@ trait CommonProtocol
 		if ($alreadyPaid === null) {
 			$alreadyPaid = (float) $invoice->getSommePaiement();
 		}
-		$isFullyPaid = ($totalTtc != 0.0 && abs((float) $alreadyPaid - $totalTtc) < 0.005);
+		// Credit note: total is negative in Dolibarr, BT-113 is positive in the document.
+		$isFullyPaid = ($totalTtc != 0.0 && abs(abs((float) $alreadyPaid) - abs($totalTtc)) < 0.005);
 
 		if ($invoice->status == Facture::STATUS_CLOSED && empty($invoice->close_code) && $isFullyPaid) {
 			return $prefix . '2';

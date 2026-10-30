@@ -7,6 +7,7 @@ IMPORTANT: After each version upgrade, you must disable and enable the module so
 
 ## 1.4.0
 
+- FIX: [einvoicing] A refunded credit note declares its refund as already paid and nothing left due
 - FIX: [einvoicing] A received line one cent off its price is imported at its amount
 - FIX: #1191 [einvoicing] The module home page no longer warns when no token is stored
 - FIX: [einvoicing] The supplier invoice e-invoice menu no longer overflows and draws a real separator
