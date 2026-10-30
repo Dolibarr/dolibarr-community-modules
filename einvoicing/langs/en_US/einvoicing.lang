@@ -6,6 +6,7 @@
 
 ModuleEInvoicingName = EInvoicing
 ModuleEInvoicingDesc = Support for E-invoice management. This module allows generating (automatically or manually) invoices in E-invoice format and send them to an E-invoice Access Point. It can also retrieve purchase invoices from this E-invoice Access Point. Only a few countries (France) and Access Points (also called PDP/PA) are supported.
+EInvoicingModuleNeedsReactivation=The files of the e-invoicing module were updated to version %s, but the module was last enabled with version %s. As after any update of a module, disable and enable it again in Home > Setup > Modules so that its database is upgraded.
 
 # Same text as keys of the core that some supported cores lack. A core key is never redefined here,
 # as the first file loaded wins: the module would replace the label of the core on every page.
