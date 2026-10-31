@@ -32,6 +32,8 @@ allowed-tools:
     - `file_filter = htdocs/`projectname`/langs/<lang>/<file>.lang` (where translated files are written)
     - `type = MOZILLAPROPERTIES` (the .lang format `key=value`)
 - The scripts refuse to run if `.tx/` does not exist at the repository root (they assume the root as working directory).
+- **Resource slug rule (before any `-r` option)**: the full resource slug is `<project>.<resource>` where `<project>` is the value after `:p:` and `<resource>` the value after `r:` in `.tx/config` — NOT the module name.
+- Always read `.tx/config` (or run `tx status`) to get the exact slug before pushing or pulling a single resource. The tx client (v1.6.x) exits with code 1 and prints NO error message when the slug is unknown, so a wrong slug fails silently.
 - Transifex client installation / update (see `dev/translation/README`): `sudo pip install --upgrade transifex-client`
 - The direct transifex URL to make translations is: https://app.transifex.com/`organizationname`/`projectname`/translate/
 
