@@ -81,7 +81,7 @@ Example: add the key `DossierMedical=Dossier médical` feature string.
 - `strip_language_file.php <primary_lang_dir> <secondary_lang_dir> [file.lang|all]` — strips from a secondary language file the entries redundant with its primary file (run from `htdocs/langs`).
 - `sanity_check_en_langfiles.php` — HTML report checking the en_US language files.
 - `autotranslator.php` — automatic translation helper.
-- `../fixaltlanguages.sh (list|fix) (all|file.lang) [xx_XX]` — deduplicates alternate language files; recommended by txpull.sh after each pull.
+- `fixaltlanguages.sh (list|fix) [ll_CC]` — deduplicates alternate language files (xx_YY) with their parent (xx_XX) across all modules; recommended by txpull.sh after each pull. In this repository run `./dev/translation/fixaltlanguages.sh fix` from the root (it calls `strip_language_file.php`, which accepts module-relative lang dir paths).
 - `../fixduplicatelangkey.sh` — removes duplicate keys inside language files.
 
 ## Dolibarr i18n reminders (apply when writing keys)

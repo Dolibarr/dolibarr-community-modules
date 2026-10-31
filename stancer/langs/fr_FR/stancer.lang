@@ -86,16 +86,15 @@ StancerAccountDeleteLink = Supprimer le lien avec le compte stancer
 StancerAccountReady = Le compte client Stancer %s est relié à cette fiche.
 StancerAccountCreationFailed = La création du compte client sur Stancer a échoué. Consultez le journal des événements de Dolibarr pour connaître le motif.
 StancerCompanyNameMissing = Il n'est pas possible de créer le compte Stancer de votre client : sa fiche n'a pas de nom.
-StancerOrderID=Réf. interne
-StancerUniqueID=Id. unique
-StancerPartialPayment=Acompte
-StancerCustomer=Client Stancer
-StancerCBCard=Carte Bancaire
+StancerOrderID = Réf. interne
+StancerUniqueID = Id. unique
+StancerPartialPayment = Acompte
+StancerCustomer = Client Stancer
+StancerCBCard = Carte Bancaire
 STANCER_PAY_BUTTON = Paiement par CB
 STANCER_PAY_BUTTON_MESSAGE = Vous allez basculer sur le site de Stancer pour procéder au paiement
 STANCER_PAY_BUTTON_DEPOSIT = Paiement de l'acompte de %s %% soit %s
-StancerPaymentFrameTitle = Paiement sécurisé par Stancer
-StancerSendPayLinkNotSent = Le lien de paiement n'a pas pu être envoyé à %s. Le journal en indique la raison.
+StancerPaymentFrameTitle = Paiement sécurisé par Stancer\n
 STANCER_CB_ORDER_PARTIAL_PAY = Activation du paiement partiel des commandes avec création automatique de facture d'acompte
 STANCER_CB_ORDER_PARTIAL_PAYTooltip = Cette option permet de mettre en place le "paiement de 30%% à la commande" par exemple. Plus d'informations sur <a href="https://doc.cap-rel.fr/projet_stancer/versement_d_un_acompte_a_la_commande">la documentation</a>
 STANCER_CB_PROPAL_PARTIAL_PAY = Activation du paiement partiel des devis avec création automatique de facture d'acompte
@@ -105,6 +104,14 @@ STANCER_AUTO_SEPA_ONLY_FOR_CONTRACTS = Ne lancer les prélèvements SEPA automat
 STANCER_AUTO_SEPA_ONLY_FOR_CONTRACTSTooltip = Laissez cette case décochée si vous voulez que n'importe quelle facture dont le mode de paiement est prélèvement soit automatiquement prélevée par la tâche planifiée
 STANCER_SEPA_GROUP_SAME_DAY = Regrouper en un seul prélèvement SEPA les factures du même client éditées le même jour
 STANCER_SEPA_GROUP_SAME_DAYTooltip = Activez cette option pour réduire les frais Stancer : si un client a plusieurs factures éditées le même jour, un unique prélèvement SEPA est émis pour le total. La référence affichée sur le relevé bancaire concatène les références des factures (ex : FA2603-0001+FA2603-0002).
+stancer_status_refused = Paiement refusé
+stancer_status_failed = Paiement échoué
+stancer_status_expired = Paiement expiré
+stancer_status_canceled = Paiement annulé
+stancer_status_disputed = Paiement contesté
+stancer_status_authorized = Paiement autorisé
+stancer_status_captured = Paiement capturé
+stancer_status_capture_sent = Capture en cours
 stancer_status_to_capture = Paiement accepté
 MainAPIURI = Adresse du serveur
 STANCER_IS_PROD = Activer le mode "production" (laisser décocher pour le mode test)
@@ -208,6 +215,7 @@ StancerCompanyMailOrPhoneNewPayment = Le paiement par Stancer n'est pas possible
 YouCanAccelSignWithUptoSign = Notez que vous pouvez accélérer et fluidifier le processus en mettant en place la signature électronique conforme à la règlementation eIDAS en ajoutant le %s module complémentaire UptoSign %s sur votre dolibarr...
 NiceUptoSignIsEnabled = UptoSign est actif, votre client pourra donc signer électroniquement votre mandat en ligne !
 StancerAlreadyPaid = D'après Stancer cette transaction a déjà été payée, merci de prendre contact avec %s pour procéder à des vérifications.
+ErrorStancerPaymentNotStarted = Le paiement n'a pas pu être lancé. Aucun montant n'a été débité. Vous pouvez réessayer dans un instant.
 ErrorStancerPleaseContactBy = Veuillez contacter la société
 ErrorStancerPleaseContactByPhone = Par téléphone, au numéro %s
 ErrorStancerPleaseContactByMail = Par email, à l'adresse %s
@@ -223,6 +231,9 @@ StancerPaymentDoneEndMessage = Vous pouvez sauvegarder ce message pour conserver
 StancerPaymentDoneErrorTitle = Erreur !
 StancerPaymentDoneErrorMessage = Une erreur est survenue durant le processus de paiement. Vous trouverez quelques informations complémentaires ci-dessous.
 StancerPaymentDoneErrorMessageShortByStancer = Message d'erreur (résumé) : %s
+StancerPaymentErrorAuthNotCompleted = La vérification auprès de votre banque n'a pas pu aboutir ; votre banque n'a donc jamais été sollicitée pour autoriser ce paiement. Réessayez avec votre application bancaire à portée de main, ou utilisez un autre moyen de paiement.
+StancerPaymentErrorBankRefused = Votre banque a refusé le paiement (code %s).
+StancerPaymentNothingCharged = Aucun montant n'a été débité de votre compte.
 StancerPaymentDoneErrorEndMessage = Merci de faire une capture d'écran de cette erreur et de l'envoyer à %s accompagné de la référence de votre commande ou facture.
 StancerPaymentDoneErrorSeverityStancer = Niveau de message d'erreur Stancer : %s
 StancerPaymentOrderRef = Paiement de la commande ou facture %s
@@ -260,11 +271,11 @@ STANCER_AUDIT_CAPTURED_WINDOW_DAYS = Fenêtre de ré-audit des paiements encaiss
 STANCER_AUDIT_CAPTURED_WINDOW_DAYSTooltip = Stancer n'envoie pas de notification (webhook) : un paiement marqué encaissé localement peut être refusé, contesté ou remboursé par la banque après coup. À chaque exécution de la tâche planifiée, le module ré-interroge l'API pour les paiements encaissés dont la date de création est dans cette fenêtre, afin de corriger leur statut local (par exemple encaissé -> refusé). Plus la fenêtre est large, plus le nombre d'appels API augmente. La valeur 0 désactive ce contrôle.
 PRELEVEMENT_ICS = Votre numéro ICS (Identifiant Créancier SEPA)
 PRELEVEMENT_ICSTooltip = Ce numéro vous est communiqué par votre prestataire bancaire (banque ou stancer) il est unique pour chaque entreprise et doit être communiqué par la banque de france, c'est le code qui identifie votre société auprès du système SEPA.
-ModeRECUR=Paiements récurrents
+ModeRECUR = Paiements récurrents
 StancerSignature = Signature électronique
-StancerMailSubjectIBANandMandateReady=IBAN ajouté et mandat prêt
+StancerMailSubjectIBANandMandateReady = IBAN ajouté et mandat prêt
 StancerMailIBANandMandateReady = Un numéro IBAN a été ajouté par votre client %s, le mandat a été généré comme paramétré dans la configuration du module et le processus de signature électronique a été lancé.
-StancerMailSubjectIBANandMandateReadyToSign=IBAN ajouté et mandat prêt a être signé
+StancerMailSubjectIBANandMandateReadyToSign = IBAN ajouté et mandat prêt a être signé
 StancerMailIBANandMandateReadyToSignErr = Un numéro IBAN a été ajouté par votre client %s, le mandat a été généré comme paramétré dans la configuration du module mais le processus de signature électronique n'a pas pu se lancer (module uptosign incompatible ou absent), vous devrez reprendre ça en main et terminer la procédure manuellement.
 StancerMailIBANandMandateReadyToSign = Un numéro IBAN a été ajouté par votre client %s, le mandat a été généré comme paramétré dans la configuration du module mais n'est pas signé, vous devrez maintenant faire le nécessaire.
 StancerMailSubjectIBANandMandateErr = IBAN ajouté mais erreur de création du mandat
@@ -409,18 +420,18 @@ STANCER_AUTO_MAIL_NOTIFICATIONS_ON_NEW_CB_AND_SEPA = Notification par mail lorsq
 ErrorStancerModuleVersionDatabase = Module Stancer: Attention la version de votre module n'est pas cohérente par rapport à la version de la base de données, pensez bien à désactiver et réactiver le module ...
 ErrorStancerDPOmissing = Attention l'adresse email de votre DPO n'est pas encore renseignée, cette information est nécessaire pour le Mandat de prélèvement.
 ErrorStancerCustomerNotFound = Impossible d'identifier le client sur Stancer. Veuillez vérifier l'email et les coordonnées du client, ou essayez un autre moyen de paiement.
-draft=Brouillon
-authorized=Autorisé
-StancerAuthorized=Autorisé
-captured=Encaissé
-capture_sent=En cours
-disputed=Dispute
-expired=Expiré
-StancerExpired=Expiré
-failed=Erreur
-StancerFailed=Erreur
-refused=Refusé
-to_capture=En attente de la banque
+draft = Brouillon
+authorized = Autorisé
+StancerAuthorized = Autorisé
+captured = Encaissé
+capture_sent = En cours
+disputed = Dispute
+expired = Expiré
+StancerExpired = Expiré
+failed = Erreur
+StancerFailed = Erreur
+refused = Refusé
+to_capture = En attente de la banque
 STANCER_EMAIL_DPO = Adresse mail de votre DPO
 STANCER_EMAIL_DPOTooltip = Nécessaire pour l'information présente sur le formulaire de saisie du Mandat SEPA
 STANCER_ENABLE_CB = Activer la gestion des cartes bancaires
@@ -429,10 +440,10 @@ StancerCBPresentation = Le module Stancer permet d'accepter les paiements par ca
 STANCER_ENABLE_SEPA = Activer la gestion des prélèvements SEPA
 STANCER_NO_CODE_CB = Il n'y a pas de code 'CB' dans les Modes de paiements actifs sur votre dolibarr. Plus d'informations dans la <a href="https://doc.cap-rel.fr/projet_stancer/cb_et_pre_dans_le_dictionnaire_des_moyens_de_paiements">documentation en ligne suivante</a>.
 STANCER_NO_CODE_PRE = Il n'y a pas de code 'PRE' dans les Modes de paiements actifs sur votre dolibarr. Plus d'informations dans la <a href="https://doc.cap-rel.fr/projet_stancer/cb_et_pre_dans_le_dictionnaire_des_moyens_de_paiements">documentation en ligne suivante</a>.
-STANCER_MANDATE_AUTO_UPTOSIGN_NOCLICK=Redirection vers la signature électronique uptosign automatique
-STANCER_MANDATE_AUTO_UPTOSIGN_NOCLICKTooltip=Si vous n'activez pas cette option votre client devra cliquer sur le lien "passer à la signature électronique en ligne" du mandat après l'avoir complété
-StancerInCaseOfTroubleYourLinkTopay=Si votre navigateur web ne vous a pas permis de payer directement, vous pouvez re-tenter <a href="%s">en suivant ce lien</a>.
-StancerMailSubjectConfirmLinkToPay=Lien de paiement de votre commande
+STANCER_MANDATE_AUTO_UPTOSIGN_NOCLICK = Redirection vers la signature électronique uptosign automatique
+STANCER_MANDATE_AUTO_UPTOSIGN_NOCLICKTooltip = Si vous n'activez pas cette option votre client devra cliquer sur le lien "passer à la signature électronique en ligne" du mandat après l'avoir complété
+StancerInCaseOfTroubleYourLinkTopay = Si votre navigateur web ne vous a pas permis de payer directement, vous pouvez re-tenter <a href="%s">en suivant ce lien</a>.
+StancerMailSubjectConfirmLinkToPay = Lien de paiement de votre commande
 StancerMailPayoutConfirmMail = Merci pour votre commande.
 
 STANCER_AUTO_MAIL_ORDER_CB = Envoyer un rappel de la commande avec le lien de paiement avant de basculer sur le site Stancer
@@ -468,6 +479,18 @@ StancerdoCheckInvoicesPaidResultMessageA = Une factures a été classée payée 
 StancerdoCheckInvoicesPaidResultMessageAP = %s factures ont été classées payées avec succès sur un total de %s factures qualifiées %s.
 STANCER_CB_AS_PAID = Marquer la facture comme payée dès le retour positif de stancer sans attendre la confirmation définitive
 STANCER_CB_AS_PAIDTooltip = Si vous activez cette option la facture de votre client sera maquée payée dès le premier retour de pré-validation par Stancer. Attention cette information peut-être contredite quelques jours plus tard si le paiement est rejeté par la banque de votre client. Voir la <a href="https://doc.cap-rel.fr/projet_stancer/des_le_retour_de_pre-acceptation_du_paiement_cb">documentation pour plus de détails</a>
+StancerNo3dsFieldLabel = Paiement par carte sans 3-D Secure
+StancerNo3dsAllow = Autoriser le paiement sans 3-D Secure
+StancerNo3dsRevoke = Exiger de nouveau le 3-D Secure
+StancerNo3dsConfirmTitle = Autoriser le paiement par carte sans 3-D Secure
+StancerNo3dsConfirmText = Les paiements par carte de %s seront envoyés sans authentification 3-D Secure, jusqu'à ce qu'il soit payé ou que le 3-D Secure soit de nouveau exigé. À n'utiliser que pour un client dont la carte ne peut pas s'authentifier : le refus l'indique alors. <br><b>Sans 3-D Secure, une contestation frauduleuse (chargeback) est à votre charge, et non à celle de l'émetteur de la carte.</b>
+StancerNo3dsBanner = Autorisé sur ce document. Une contestation frauduleuse serait à votre charge. L'auteur de l'autorisation est enregistré dans ses événements.
+StancerNo3dsAllowed = Les paiements par carte de ce document seront envoyés sans 3-D Secure.
+StancerNo3dsWithdrawn = Les paiements par carte de ce document exigeront de nouveau le 3-D Secure.
+StancerNo3dsChangeFailed = La modification n'a pas pu être enregistrée, rien n'a été changé.
+StancerNo3dsNeedsReactivation = Désactivez puis réactivez le module Stancer pour terminer sa mise à jour.
+StancerNo3dsEventOn = Paiement par carte sans 3-D Secure autorisé sur %s
+StancerNo3dsEventOff = 3-D Secure exigé de nouveau sur %s
 STANCER_CB_ALLOW_RETRY = Autoriser une nouvelle tentative de paiement CB via Stancer après un échec
 STANCER_CB_ALLOW_RETRYTooltip = Par défaut, si un paiement Stancer a déjà été tenté (même en échec), le bouton de paiement Stancer n'est plus affiché sur la page publique. Si vous activez cette option, le bouton sera de nouveau proposé tant qu'aucun paiement n'a été capturé avec succès.
 STANCER_SWITCH_SEPA_AMOUNT = Activer le changement automatique de prestataire en cas de montant à prélever supérieur à une limite ?
@@ -510,7 +533,7 @@ StancerRefundNoPaymentFound = Aucun paiement Stancer trouve pour cette facture
 StancerRefundNoLinkedPayment = Pas de paiement Stancer lie a la facture d'origine
 StancerRefundAlreadyDone = Un remboursement a déjà été effectué pour ce montant
 
-# Propal (devis) payment
+# Propal (quote) payment
 STANCER_PROPAL_TITLE = Paiement des devis
 STANCER_AUTO_INVOICE_ON_PROPAL_PAID = Creer automatiquement une facture lors du paiement d'un devis
 STANCER_AUTO_INVOICE_ON_PROPAL_PAIDTooltip = Si cette option est activée, une facture sera automatiquement créée et validée lorsqu'un client paie un devis via Stancer
@@ -526,7 +549,7 @@ StancerInvoiceAlreadyPaid = La facture est déjà entièrement payée ou sur-pay
 STANCER_MONTHLY_SUBSCRIPTION_FEE = Frais mensuels d'abonnement TPE Stancer (en EUR)
 STANCER_MONTHLY_SUBSCRIPTION_FEETooltip = Montant mensuel fixe facturé par Stancer pour l'abonnement au service (ex: 18 EUR/mois pour le TPE)
 
-# Accounting / Comptabilite
+# Accounting
 StancerComptaMenu = Comptabilité
 StancerComptaSetup = Configuration Stancer : Comptabilité
 StancerComptaSetupDesc = Configuration pour la régularisation automatique des écarts comptables sur les factures fournisseur Stancer.
@@ -599,7 +622,7 @@ StancerCronSummaryReported = Statut de paiement signalé : %s - %s - %s €
 StancerCronSummaryReportedDesc = Le paiement %s avec le statut %s (%s €) a été signalé dans le mail récapitulatif de la tâche planifiée
 
 #
-# Page À propos (feedback, liens)
+# About page (feedback, links)
 #
 StancerAboutModuleInfo = Informations sur le module
 StancerAboutUsefulLinks = Liens utiles
@@ -623,7 +646,7 @@ StancerFeedbackSendError = Erreur lors de l'envoi du retour
 StancerAndDolibarrCommunity = et la communauté Dolibarr
 
 #
-# Clés spécifiques manquantes
+# Missing module-specific keys
 #
 ibanBank = Banque
 ibanBIC = BIC
@@ -667,7 +690,7 @@ StancerNotifyCustomers = Notifier les destinataires par mail
 StancerRefreshSelected = Forcer le rafraîchissement des lignes sélectionnées
 StancerForceRefreshSelectedDone = Rafraîchissement forcé de %s paiement(s) terminé. Vérifiez les logs pour le détail des corrections appliquées.
 
-# Audit de l'attribution des paiements Stancer (page stancer_audit.php)
+# Stancer payment attribution audit (page stancer_audit.php)
 StancerAuditTitle = Audit attribution paiements Stancer
 StancerAuditIntro = Cette page interroge l'API Stancer pour chaque paiement local et vérifie que le client, la facture et le montant attribués dans Dolibarr correspondent bien a la realite Stancer. Aucune ecriture n'est faite : la page est strictement en lecture seule. Cliquez sur "Lancer l'audit" pour obtenir le rapport.
 StancerAuditRun = Lancer l'audit
@@ -695,7 +718,7 @@ StancerAuditDoublesFlagDouble = DOUBLE PRÉLÈVEMENT
 StancerAuditDoublesFlagOk = Pas de double
 StancerAuditDoublesDetail = Détail des paiements
 
-# Boutons + modale d'action (phase 2)
+# Action buttons + modal (phase 2)
 StancerAuditActions = Actions
 StancerAuditFix = Corriger
 StancerAuditIgnore = Ignorer
@@ -785,62 +808,39 @@ StancerRepairRealStatus = Statut réel Stancer
 StancerRepairStatusUnknown = non confirmé
 
 #
-# Paiement sans 3-D Secure, statuts Stancer et envoi du lien de paiement
+# Send the payment link
 #
-stancer_status_refused = Paiement refusé
-stancer_status_failed = Paiement en échec
-stancer_status_expired = Paiement expiré
-stancer_status_canceled = Paiement annulé
-stancer_status_disputed = Paiement contesté
-stancer_status_authorized = Paiement autorisé
-stancer_status_captured = Paiement capturé
-stancer_status_capture_sent = Capture en cours
-ErrorStancerPaymentNotStarted = Le paiement n'a pas pu être démarré. Aucun montant n'a été débité. Vous pouvez réessayer dans un instant.
-StancerPaymentErrorAuthNotCompleted = La vérification auprès de votre banque n'a pas pu aboutir : votre banque n'a donc jamais été sollicitée pour autoriser ce paiement. Réessayez avec votre application bancaire à portée de main, ou utilisez un autre moyen de paiement.
-StancerPaymentErrorBankRefused = Votre banque a refusé le paiement (code %s).
-StancerPaymentNothingCharged = Aucun montant n'a été débité de votre compte.
-StancerNo3dsFieldLabel = Paiement par carte sans 3-D Secure
-StancerNo3dsAllow = Autoriser le paiement sans 3-D Secure
-StancerNo3dsRevoke = Exiger à nouveau 3-D Secure
-StancerNo3dsConfirmTitle = Autoriser le paiement par carte sans 3-D Secure
-StancerNo3dsConfirmText = Les paiements par carte de %s seront envoyés sans authentification 3-D Secure, jusqu'à son règlement ou jusqu'à ce que 3-D Secure soit à nouveau exigé. Ne le faites que pour un client dont la carte ne parvient pas à s'authentifier : le refus l'indique alors.<br><b>Sans 3-D Secure, une contestation frauduleuse reste à votre charge, et non à celle de l'émetteur de la carte.</b>
-StancerNo3dsBanner = Autorisé sur ce document. Une contestation frauduleuse serait à votre charge. L'auteur de l'autorisation est enregistré dans ses événements.
-StancerNo3dsAllowed = Les paiements par carte de ce document seront envoyés sans 3-D Secure.
-StancerNo3dsWithdrawn = Les paiements par carte de ce document exigent à nouveau 3-D Secure.
-StancerNo3dsChangeFailed = La modification n'a pas pu être enregistrée, rien n'a été changé.
-StancerNo3dsNeedsReactivation = Désactivez puis réactivez le module Stancer pour terminer sa mise à jour.
-StancerNo3dsEventOn = Paiement par carte sans 3-D Secure autorisé sur %s
-StancerNo3dsEventOff = 3-D Secure à nouveau exigé sur %s
 STANCER_PAYLINK_ORDER_MAILTYPE = Modèle d'email du lien de paiement (commande)
-STANCER_PAYLINK_ORDER_MAILTYPETooltip = Modèle utilisé par le bouton "Envoyer le lien de paiement" sur une commande. Le modèle doit contenir __ONLINE_PAYMENT_URL__. Sans modèle sélectionné, un message simple est envoyé à la place.
+STANCER_PAYLINK_ORDER_MAILTYPETooltip = Modèle utilisé par le bouton « Envoyer le lien de paiement » sur une commande. Le modèle doit contenir __ONLINE_PAYMENT_URL__. Sans modèle sélectionné, un message simple est envoyé à la place.
 STANCER_PAYLINK_INVOICE_MAILTYPE = Modèle d'email du lien de paiement (facture)
-STANCER_PAYLINK_INVOICE_MAILTYPETooltip = Modèle utilisé par le bouton "Envoyer le lien de paiement" sur une facture. Le modèle doit contenir __ONLINE_PAYMENT_URL__. Sans modèle sélectionné, un message simple est envoyé à la place.
+STANCER_PAYLINK_INVOICE_MAILTYPETooltip = Modèle utilisé par le bouton « Envoyer le lien de paiement » sur une facture. Le modèle doit contenir __ONLINE_PAYMENT_URL__. Sans modèle sélectionné, un message simple est envoyé à la place.
 StancerSendPayLink = Envoyer le lien de paiement
 StancerSendPayLinkConfirm = Envoyer le lien de paiement en ligne à %s ?
 StancerSendPayLinkSource = Adresse trouvée sur : %s
 StancerSendPayLinkSent = Lien de paiement envoyé à %s
-StancerSendPayLinkNoRecipient = Aucune adresse email n'a été trouvée, ni sur ce tiers ni sur ses contacts. Renseignez le tiers ou l'un de ses contacts avant d'envoyer le lien.
+StancerSendPayLinkNoRecipient = Aucune adresse email trouvée, ni sur ce tiers ni sur ses contacts. Renseignez le tiers ou l'un de ses contacts avant d'envoyer le lien.
 StancerSendPayLinkNoUrl = Le paiement en ligne n'est pas disponible pour ce document.
+StancerSendPayLinkNotSent = Le lien de paiement n'a pas pu être envoyé à %s. Consultez le journal pour en connaître la raison.
 StancerPayLinkMailSubject = Lien de paiement pour %s
-StancerPayLinkMailIntro = %s vous invite à régler le document %s en ligne.
+StancerPayLinkMailIntro = %s vous invite à payer en ligne le document %s.
 StancerPayLinkMailButton = Payer en ligne
 StancerPayLinkMailFallback = Si le lien ci-dessus ne fonctionne pas, copiez cette adresse dans votre navigateur :
-StancerImportCsvHeaderNotFound = La ligne d'en-tête du relevé Stancer est introuvable, vérifiez que le fichier est bien l'export CSV des reversements.
+StancerImportCsvHeaderNotFound = La ligne d'en-tête du relevé Stancer est introuvable, vérifiez que le fichier est bien l'export CSV des virements (payouts).
 StancerSyncSepa = Synchroniser les mandats SEPA avec Stancer
 StancerApiTestCreateCustomerButton = Créer un client de test
-StancerApiTestCreateCustomerLive = Indisponible avec les clés de production : passez le module en mode test pour créer un client de test.
-StancerAmountUnderMinimum = Le montant à prélever est inférieur au minimum Stancer de 0,50 EUR, rien n'a été lancé.
+StancerApiTestCreateCustomerLive = Non disponible avec les clés de production : passez le module en mode test pour créer un client de test.
+StancerAmountUnderMinimum = Le montant à encaisser est inférieur au minimum Stancer de 0,50 EUR, rien n'a été lancé.
 StancerRefundStatusToRefund = À rembourser
 StancerRefundStatusSent = Remboursement envoyé
 StancerRefundStatusRefunded = Remboursé
 StancerRefundStatusFailed = Échoué
 StancerRefundStatusCanceled = Annulé
-StancerComptaOdCreateError = Erreur à la création de l'OD pour %s : %s
+StancerComptaOdCreateError = Erreur lors de la création de l'opération diverse pour %s : %s
 StancerErrObjectNotInvoiceOrOrder = L'objet à payer n'est ni une facture ni une commande
 StancerErrObjectAlreadyPaid = Ce document est déjà payé
 StancerErrOrderNotValidated = Cette commande n'est pas validée, elle ne peut pas encore être payée
-StancerErrPaymentModeNotSepa = Le mode de règlement de cette facture n'est pas le prélèvement SEPA
-StancerErrPaymentModeNotCard = Le mode de règlement de cette facture n'est pas la carte bancaire
+StancerErrPaymentModeNotSepa = Le mode de paiement de cette facture n'est pas le prélèvement SEPA
+StancerErrPaymentModeNotCard = Le mode de paiement de cette facture n'est pas le paiement par carte
 StancerSepaPaymentEngaged = Le prélèvement SEPA Stancer est lancé
 StancerSepaGroupedPaymentEngaged = Le prélèvement SEPA Stancer groupé est lancé
 StancerCardPaymentEngaged = Le paiement par carte Stancer est lancé
