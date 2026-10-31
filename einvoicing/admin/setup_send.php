@@ -21,7 +21,7 @@
 /**
  * \file    einvoicing/admin/setup_send.php
  * \ingroup einvoicing
- * \brief   EInvoicing setup page.
+ * \brief   EInvoicing sending setup page.
  */
 
 // Load Dolibarr environment
