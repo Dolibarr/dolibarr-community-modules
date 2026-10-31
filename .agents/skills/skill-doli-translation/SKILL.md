@@ -10,7 +10,7 @@ allowed-tools:
  - grep
 ---
 
-# Translations management with Transifex (DoliMed)
+# Translations management with Transifex
 
 ## Golden rule
 
@@ -40,26 +40,26 @@ allowed-tools:
 Usage (from the repository root):
 
 ```
-./dev/translation/txpush.sh (source|xx_XX) [-r dolimed.<file>] [-f] [--no-interactive]
+./dev/translation/txpush.sh (source|xx_XX) [-r projectname.<file>] [-f] [--no-interactive]
 ```
 
 - `txpush.sh source` → runs `tx push -s`: pushes the en_US source files to Transifex. **This is the command to run after editing en_US files.**
-- `txpush.sh fr_FR` (or any `xx_XX`) → loops over `htdocs/`projectname`/langs/xx_XX/*.lang` and runs `tx push --skip -r dolimed.<file> -t -l xx_XX` for each: pushes a local translation file into Transifex as a translation. Only used to feed Transifex with a locally-corrected translation.
+- `txpush.sh fr_FR` (or any `xx_XX`) → loops over `htdocs/`projectname`/langs/xx_XX/*.lang` and runs `tx push --skip -r projectname.<file> -t -l xx_XX` for each: pushes a local translation file into Transifex as a translation. Only used to feed Transifex with a locally-corrected translation.
 - A local translation file is skipped if the Transifex side is newer. `-f` forces the overwrite of the translation on Transifex (but not the translation memory).
-- `-r dolimed.<file>` limits the push to one resource, e.g. `-r dolimed.cabinetmed`.
+- `-r projectname.<file>` limits the push to one resource, e.g. `-r projectname.myfile`.
 
 ## dev/translation/txpull.sh — pull translated files from Transifex
 
 Usage (from the repository root):
 
 ```
-./dev/translation/txpull.sh (all|xx_XX) [-r dolimed.<file>] [-f] [-s]
+./dev/translation/txpull.sh (all|xx_XX) [-r projectname.<file>] [-f] [-s]
 ```
 
 - `txpull.sh all` → loops over every directory in `htdocs/`projectname`/langs/*` except `en_US` and runs `tx pull -l <lang>` for each: downloads all translated files from Transifex into the local tree.
 - `txpull.sh fr_FR` (or any `xx_XX`) → `tx pull -l xx_XX`: downloads only that language.
 - A local file is skipped if the local copy is newer than the Transifex one. `-f` forces the local file to be overwritten (does not work with `all`).
-- `-r dolimed.<file>` limits the pull to one resource.
+- `-r projectname.<file>` limits the pull to one resource.
 - The script ends by reminding to also run: `dev/fixaltlanguages.sh fix all` (see below).
 
 ## Complete workflow for a new translation key
