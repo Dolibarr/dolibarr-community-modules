@@ -25,7 +25,7 @@ allowed-tools:
 ## Transifex project layout
 
 - Organization / project / resources are defined in `.tx/config` at the repository root.
-  - Organization: `dolicloud`, project: `dolimed`.
+  - Organization: Defined after the `[o:`, project: defined after the `:p:`.
   - One resource per `.lang` file: `r:admin`, `r:cabinetmed`, etc.
   - For each resource:
     - `source_file = htdocs/`projectname`/langs/en_US/<file>.lang` (the reference language)
