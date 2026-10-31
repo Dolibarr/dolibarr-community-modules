@@ -167,7 +167,6 @@ StancerCBID = Existing CB identifier on Stancer
 StancerSEPAstart = SEPA Direct Debit by Stancer
 StancerPleaseEnterYourIBANTitle = Automatic direct debit
 StancerPleaseEnterYourIBAN = Please enter your IBAN code to set up automatic direct debit (SEPA) for your invoices.
-StancerYouAcceptPaymentViaSEPA =
 StancerYourIBAN = Your IBAN code:
 StancerIBANCBinpoutSecurekeyError = The security key to access this page is incorrect, please check with your supplier that the access link to this page has not changed.
 StancerLinkFoCustomerIBAN = You can offer your customer to complete their IBAN code themselves to manage the Direct Debit Mandate by providing them with this special link.
