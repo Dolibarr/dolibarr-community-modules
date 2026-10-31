@@ -143,7 +143,7 @@ the provider call, not the data model.
   validate right. It is withheld while the invoice does not total what its document announces
   (issue #861) — refusing stays offered.
 - Automatic: option **`EINVOICING_SEND_APPROVED_ON_VALIDATION`**, *off by default*
-  (`admin/setup_options.php`). When on, `BILL_SUPPLIER_VALIDATE` sends it
+  (`admin/setup_receive.php`). When on, `BILL_SUPPLIER_VALIDATE` sends it
   (`core/triggers/interface_98_modEInvoicing_EInvoicingTriggers.class.php`), the rationale being that
   validating a supplier invoice in Dolibarr *is* the act of accepting it.
 - Guards (`SupplierInvoiceHelper::shouldSendApprovedOnValidation()`): once per invoice, never on an

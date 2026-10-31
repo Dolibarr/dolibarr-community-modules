@@ -34,13 +34,37 @@ parameters:
 			message: '#^Negated boolean expression is always true\.$#'
 			identifier: booleanNot.alwaysTrue
 			count: 1
-			path: ../../../einvoicing/admin/setup_options.php
+			path: ../../../einvoicing/admin/setup_advanced.php
 
 		-
 			message: '#^Property FormSetupItem\:\:\$fieldAttr \(array\{name\?\: string, id\?\: string, value\?\: mixed, class\?\: string, disabled\?\: int\<0, 1\>\|null, type\?\: string, size\?\: int, placeholder\?\: string, \.\.\.\}\) does not accept array\{name\?\: string, id\?\: string, value\?\: mixed, class\?\: string, disabled\?\: int\<0, 1\>\|null, type\?\: string, size\?\: int, placeholder\?\: string, \.\.\.\}\.$#'
 			identifier: assign.propertyType
 			count: 1
-			path: ../../../einvoicing/admin/setup_options.php
+			path: ../../../einvoicing/admin/setup_advanced.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/admin/setup_receive.php
+
+		-
+			message: '#^Property FormSetupItem\:\:\$fieldAttr \(array\{name\?\: string, id\?\: string, value\?\: mixed, class\?\: string, disabled\?\: int\<0, 1\>\|null, type\?\: string, size\?\: int, placeholder\?\: string, \.\.\.\}\) does not accept array\{name\?\: string, id\?\: string, value\?\: mixed, class\?\: string, disabled\?\: int\<0, 1\>\|null, type\?\: string, size\?\: int, placeholder\?\: string, \.\.\.\}\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../../einvoicing/admin/setup_receive.php
+
+		-
+			message: '#^Negated boolean expression is always true\.$#'
+			identifier: booleanNot.alwaysTrue
+			count: 1
+			path: ../../../einvoicing/admin/setup_send.php
+
+		-
+			message: '#^Property FormSetupItem\:\:\$fieldAttr \(array\{name\?\: string, id\?\: string, value\?\: mixed, class\?\: string, disabled\?\: int\<0, 1\>\|null, type\?\: string, size\?\: int, placeholder\?\: string, \.\.\.\}\) does not accept array\{name\?\: string, id\?\: string, value\?\: mixed, class\?\: string, disabled\?\: int\<0, 1\>\|null, type\?\: string, size\?\: int, placeholder\?\: string, \.\.\.\}\.$#'
+			identifier: assign.propertyType
+			count: 1
+			path: ../../../einvoicing/admin/setup_send.php
 
 		-
 			message: '#^Function einvoicing_directory_html\(\) has parameter \$r with no value type specified in iterable type array\.$#'
