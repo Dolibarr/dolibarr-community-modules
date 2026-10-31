@@ -12,7 +12,7 @@ Written 2026-09-22 against `main` of the module, checked again 2026-10-04.
 
 The code has eleven places that ask for it, but the single switch that acts on the request,
 `EINVOICING_ENABLE_POSTPONE_FLOWS`, is **off**: it is not in the module's install constants, and the
-setup screen does not even offer it — `admin/setup_options.php` only carries a comment describing
+setup screen does not even offer it — `admin/setup_receive.php` only carries a comment describing
 it. It exists for someone who sets it by hand in `llx_const`.
 
 So on a stock installation, every case in section 4 does the opposite of postponing: it **aborts the
