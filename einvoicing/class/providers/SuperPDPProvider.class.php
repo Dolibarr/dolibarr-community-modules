@@ -1892,6 +1892,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$syncedFlows = 0;
 		$postponedFlows = 0;	// Flows left unread on purpose, retried on the next run (see 'postponeflow')
 		$pendingQueued = 0;		// Flows recorded in the manual-action queue instead of aborting the whole run
+		$newProcessedFlows = 0;	// New flows processed during this run (synced or skipped), compared to $maxToProcess
 		$providershort = preg_replace('/ViaPartner$/', '', (string) $this->providerName);
 		dol_include_once('/einvoicing/class/einvoicingsyncpending.class.php');
 		$syncPending = new EInvoicingSyncPending($db);
@@ -2143,6 +2144,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 						//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
 					}
 
+					// A new flow skipped (res == 0, e.g. a life cycle flow) is still recorded, so it counts in the ceiling too
+					if ($res['res'] >= 0) {
+						$newProcessedFlows++;
+					}
+
 					// A flow that finally synchronized (or now already exists) leaves the manual-action queue.
 					// When an incoming flow created a supplier invoice, keep the link to it for traceability.
 					if (getDolGlobalInt('EINVOICING_ENABLE_MANUAL_ACTION_QUEUE') && $res['res'] >= 0) {
@@ -2173,7 +2179,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				// The ceiling counts flows, not batches: a batch holds up to a hundred of them, so
 				// checking it only between batches would blow straight past what was asked for.
-				if ($maxToProcess > 0 && $syncedFlows >= $maxToProcess) {
+				if ($maxToProcess > 0 && $newProcessedFlows >= $maxToProcess) {
 					break;
 				}
 			}
@@ -2181,7 +2187,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			if ($error > 0) {
 				break;
 			}
-			if ($maxToProcess > 0 && $syncedFlows >= $maxToProcess) {
+			if ($maxToProcess > 0 && $newProcessedFlows >= $maxToProcess) {
 				break;
 			}
 			if (count($results) < $effectiveLimit) {		// Short batch: the window is exhausted
