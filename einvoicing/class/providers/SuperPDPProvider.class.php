@@ -2131,10 +2131,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$error++;
 					}
 
-					// If res == 0, commit but count it as already existed
+					// If res == 0, the flow is stored but not attached to an object: it is still a new flow, so count it as synced
 					if ($res['res'] == 0) {
 						$results_messages[] = "<span class=\"opacitylow\">Flow " . dol_escape_htmltag((string) $flow['flowId']) . " skipped: " . $res['message'] . "</span>";
-						$alreadyExist++;
+						$syncedFlows++;
 						//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
 					}
 
