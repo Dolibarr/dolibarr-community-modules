@@ -1676,6 +1676,120 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 
 	/**
+	 * Field of the buyer's order line (BT-132, issue #1192) into the form adding a line to a customer order
+	 * or to a customer invoice (free entry, for an invoice not made from an order).
+	 *
+	 * @param	array<string,mixed>	$parameters		Hook parameters
+	 * @param	CommonObject		$object			Order or invoice the line is added to
+	 * @param	string				$action			Current action
+	 * @param	HookManager			$hookmanager	Hook manager
+	 * @return	int									0, the standard form goes on
+	 */
+	public function formCreateProductOptions($parameters, $object, &$action, $hookmanager)
+	{
+		$this->resprints = '';
+		if (self::buyerOrderLineIdApplies($object)) {
+			$this->resprints = self::buyerOrderLineIdInput(GETPOST('einvoice_buyer_order_line_id', 'alphanohtml'));
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Field of the buyer's order line (BT-132, issue #1192) into the form editing a line of a customer order
+	 * or invoice. The template does not print ->resPrint for this hook: the field is printed here.
+	 *
+	 * @param	array<string,mixed>	$parameters		Hook parameters, with the line edited into 'line'
+	 * @param	CommonObject		$object			Order or invoice of the line
+	 * @param	string				$action			Current action
+	 * @param	HookManager			$hookmanager	Hook manager
+	 * @return	int									0, the standard form goes on
+	 */
+	public function formEditProductOptions($parameters, $object, &$action, $hookmanager)
+	{
+		global $db;
+
+		$line = $parameters['line'] ?? null;
+		if (self::buyerOrderLineIdApplies($object) && is_object($line) && (int) $line->id > 0) {
+			$einvoicing = new EInvoicing($db);
+			$value = GETPOSTISSET('einvoice_buyer_order_line_id') ? GETPOST('einvoice_buyer_order_line_id', 'alphanohtml') : (string) $einvoicing->getExtraFieldValue((int) $line->id, $object->element == 'commande' ? 'commandedet' : 'facturedet', EInvoicing::EXTRAFIELD_BUYER_ORDER_LINE_ID);
+			print self::buyerOrderLineIdInput($value);
+		}
+
+		return 0;
+	}
+
+	// phpcs:disable PEAR.NamingConventions.ValidFunctionName.ScopeNotCamelCaps
+	/**
+	 * Buyer's order line (BT-132, issue #1192) under the description of a line of an order or an invoice.
+	 * The hook exists from Dolibarr 22: before, the value is seen into the line edit form.
+	 *
+	 * @param	array<string,mixed>	$parameters		Hook parameters, with the line shown into 'line'
+	 * @param	CommonObject		$object			Order or invoice of the line
+	 * @param	string				$action			Current action
+	 * @param	HookManager			$hookmanager	Hook manager
+	 * @return	int									0, the standard view goes on
+	 */
+	public function objectLineView_BeforeProductExtrafield($parameters, $object, &$action, $hookmanager)
+	{
+		global $db, $langs;
+
+		$this->resprints = '';
+		$line = $parameters['line'] ?? null;
+		if (!self::buyerOrderLineIdApplies($object) || !is_object($line) || (int) $line->id <= 0) {
+			return 0;
+		}
+		// One query for all the lines of the object, not one per line shown
+		static $cache = array();
+		$key = $object->element . '-' . (int) $object->id;
+		if (!isset($cache[$key])) {
+			$einvoicing = new EInvoicing($db);
+			$cache[$key] = $einvoicing->getBuyerOrderLineIds($object);
+		}
+		if (($cache[$key][(int) $line->id] ?? '') !== '') {
+			$langs->load('einvoicing@einvoicing');
+			$this->resprints = '<br><span class="opacitymedium">' . $langs->trans('EInvoiceBuyerOrderLineId') . ' :</span> ' . dol_escape_htmltag($cache[$key][(int) $line->id]);
+		}
+
+		return 0;
+	}
+	// phpcs:enable
+
+	/**
+	 * Whether the buyer's order line (BT-132) is shown on the lines of this object: a customer order or invoice.
+	 *
+	 * @param	mixed	$object			Object of the hook
+	 * @return	bool
+	 */
+	private static function buyerOrderLineIdApplies($object)
+	{
+		if (!is_object($object) || empty($object->element) || !in_array($object->element, array('commande', 'facture'), true)) {
+			return false;
+		}
+
+		return !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || getDolGlobalString('EINVOICING_ONLY_GENERATE');
+	}
+
+	/**
+	 * Input of the buyer's order line (BT-132), for the line forms of an order or an invoice.
+	 *
+	 * @param	string	$value	Value to show
+	 * @return	string			HTML
+	 */
+	private static function buyerOrderLineIdInput($value)
+	{
+		global $form, $langs;
+
+		$langs->load('einvoicing@einvoicing');
+		$label = $langs->trans('EInvoiceBuyerOrderLineId');
+		if (is_object($form)) {
+			$label = $form->textwithpicto($label, $langs->trans('EInvoiceBuyerOrderLineIdHelp'));
+		}
+
+		return '<div class="einvoicebuyerorderline paddingtop">' . $label . ' <input type="text" name="einvoice_buyer_order_line_id" class="width100" maxlength="255" value="' . dol_escape_htmltag((string) $value) . '"></div>';
+	}
+
+	/**
 	 * Complete the $arrayfields with custom fields to be able to use them in list views (like thirdparty or invoice list)
 	 *
 	 * @param array<string,mixed> 	$parameters		Array of parameters
