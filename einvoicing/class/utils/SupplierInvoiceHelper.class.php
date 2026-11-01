@@ -175,6 +175,46 @@ class SupplierInvoiceHelper
 	}
 
 	/**
+	 * Tell whether the lines of a received document add up to the sum of line net amounts it announces.
+	 *
+	 * BR-CO-10 fixes BT-106 as the sum of every BT-131, and BT-109, BT-110 and BT-112 are computed from
+	 * BT-106. A document breaking it computes its VAT on a base its own lines contradict, so an invoice
+	 * built from those lines cannot total what the document announces (issue #1198). Nothing is said when
+	 * the document announces no BT-106 or a line carries no BT-131: there is then no sum to confront.
+	 * Nor for an EXTENDED document, which that rule does not bind.
+	 *
+	 * @param	array<string,mixed>				$parsedHeader	Header data of the received document
+	 * @param	array<int,array<string,mixed>>	$parsedLines	Lines of the received document, as parsed
+	 * @return	?array{lines:float,announced:float}				Sum of BT-131 and BT-106 when they differ, null otherwise
+	 */
+	public static function lineTotalContradiction(array $parsedHeader, array $parsedLines)
+	{
+		// An EXTENDED profile disables BR-CO-10 and tolerates a cent per line instead (BR-FREXT-CO-10), which
+		// keepVatRoundedPerLine() answers: within it the document is right, beyond it the generic report says enough.
+		if (self::isExtendedDocument($parsedHeader)) {
+			return null;
+		}
+		if (!isset($parsedHeader['lineTotalAmount']) || empty($parsedLines)) {
+			return null;
+		}
+
+		$sum = 0.0;
+		foreach ($parsedLines as $line) {
+			if (!isset($line['lineTotalAmount'])) {
+				return null;
+			}
+			$sum += (float) $line['lineTotalAmount'];
+		}
+		$sum = round($sum, 2);
+
+		if (abs($sum - (float) $parsedHeader['lineTotalAmount']) < 0.005) {
+			return null;
+		}
+
+		return array('lines' => $sum, 'announced' => (float) $parsedHeader['lineTotalAmount']);
+	}
+
+	/**
 	 * The VAT excluded total a Dolibarr invoice is expected to carry for a received document (issue #994).
 	 *
 	 * BT-109 sums the taxable bases and ignores BT-114, which the invoice carries as a line of its own:
@@ -795,9 +835,10 @@ class SupplierInvoiceHelper
 	 * @param	float	$announcedTtc			BT-112 of the received document, absolute value
 	 * @param	?float	$announcedPrepaid		BT-113 of the received document, when it is what the mark is about
 	 * @param	?string	$announcedRefOfDeposit	The ref of the deposit if prepaid is from a deposit
+	 * @param	?array{lines:float,announced:float}	$lineTotalContradiction	What lineTotalContradiction() found, when the mark is about it
 	 * @return	int								-1 on error, >0 otherwise
 	 */
-	public static function flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc, $announcedPrepaid = null, $announcedRefOfDeposit = null)
+	public static function flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc, $announcedPrepaid = null, $announcedRefOfDeposit = null, $lineTotalContradiction = null)
 	{
 		global $db;
 
@@ -806,6 +847,10 @@ class SupplierInvoiceHelper
 		if ($announcedPrepaid !== null && $announcedRefOfDeposit !== null) {
 			$value['prepaid'] = (float) $announcedPrepaid;
 			$value['prepaidref'] = (string) $announcedRefOfDeposit;
+		}
+		if ($lineTotalContradiction !== null) {
+			$value['lines'] = (float) $lineTotalContradiction['lines'];
+			$value['linetotal'] = (float) $lineTotalContradiction['announced'];
 		}
 		$value = json_encode($value);
 
@@ -816,7 +861,7 @@ class SupplierInvoiceHelper
 	 * Read the mark left by an import that could not reproduce the totals of the document.
 	 *
 	 * @param	int		$supplierInvoiceId		Id of the supplier invoice
-	 * @return	?array{tva:float,ttc:float,prepaid?:float}	The totals the document announces, or null when the invoice carries no mark
+	 * @return	?array{tva:float,ttc:float,prepaid?:float,prepaidref?:string,lines?:float,linetotal?:float}	The totals the document announces, or null when the invoice carries no mark
 	 */
 	public static function totalsMismatch($supplierInvoiceId)
 	{
@@ -841,6 +886,11 @@ class SupplierInvoiceHelper
 		}
 		if (isset($decoded['prepaidref'])) {
 			$announced['prepaidref'] = (string) $decoded['prepaidref'];
+		}
+		// Only a mark written for a document whose lines contradict BT-106 carries both sums (issue #1198)
+		if (isset($decoded['lines'], $decoded['linetotal'])) {
+			$announced['lines'] = (float) $decoded['lines'];
+			$announced['linetotal'] = (float) $decoded['linetotal'];
 		}
 
 		return $announced;
