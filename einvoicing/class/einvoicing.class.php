@@ -656,6 +656,12 @@ class EInvoicing
 	const EXTRAFIELD_SELLER_ID_BY_BUYER = 'seller_id_by_buyer';
 
 	/**
+	 * Name, into llx_einvoicing_extrafields, of the line of the buyer's purchase order a line bills: entered
+	 * on the order line ('commandedet'), copied to the invoice line ('facturedet') and sent as BT-132.
+	 */
+	const EXTRAFIELD_BUYER_ORDER_LINE_ID = 'buyer_order_line_id';
+
+	/**
 	 * ISO/IEC 6523 scheme identifier of the French routing code ("code de routage"), the scheme the
 	 * Chorus Pro "code service exécutant" is declared under as BT-46 by BR-FR-CPRO-11 and
 	 * BR-FR-CPRO-13 of XP Z12-012. Not to be confused with 0225 (e-invoice address) nor with 0002 /
@@ -3598,6 +3604,112 @@ class EInvoicing
 		}
 
 		return $exists ? 1 : $this->db->last_insert_id($this->db->prefix() . "einvoicing_extrafields");
+	}
+
+	/**
+	 * Delete what the module stores on the lines of an order or an invoice being deleted: the core deletes
+	 * them without the line triggers.
+	 *
+	 * @param	string	$elementType	'commandedet' or 'facturedet'
+	 * @param	int		$parentId		Id of the order or of the invoice
+	 * @return	int						>0 if OK, <0 if KO
+	 */
+	public function deleteLineExtraFields($elementType, $parentId)
+	{
+		$sql = "DELETE FROM " . $this->db->prefix() . "einvoicing_extrafields";
+		if ($elementType == 'commandedet') {
+			$sql .= " WHERE element_type = 'commandedet' AND element_id IN (SELECT rowid FROM " . $this->db->prefix() . "commandedet WHERE fk_commande = " . ((int) $parentId) . ")";
+		} else {
+			$sql .= " WHERE element_type = 'facturedet' AND element_id IN (SELECT rowid FROM " . $this->db->prefix() . "facturedet WHERE fk_facture = " . ((int) $parentId) . ")";
+		}
+		if (!$this->db->query($sql)) {
+			$this->errors[] = $this->db->lasterror();
+			return -1;
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Give the lines of an invoice made from an order the buyer's order line (BT-132) of their order line.
+	 * For Facture::createFromOrder() (automatic billing, API), whose lines carry no origin and not always the
+	 * rank of the order: an invoice line takes the value of the only order line of same description, product,
+	 * quantity and unit price. Lines that already have a value, or match none or several, are left as they are.
+	 *
+	 * @param	int		$invoiceId	Id of the invoice
+	 * @param	int		$orderId	Id of the order it was made from
+	 * @return	int					Number of lines filled, <0 if KO
+	 */
+	public function copyBuyerOrderLineIdsFromOrder($invoiceId, $orderId)
+	{
+		$sql = "SELECT fd.rowid as invoiceline, x.value";
+		$sql .= " FROM " . $this->db->prefix() . "facturedet as fd";
+		$sql .= " INNER JOIN " . $this->db->prefix() . "commandedet as cd ON cd.fk_commande = " . ((int) $orderId);
+		$sql .= " AND COALESCE(cd.fk_product, 0) = COALESCE(fd.fk_product, 0) AND cd.qty = fd.qty AND cd.subprice = fd.subprice";
+		$sql .= " AND COALESCE(cd.description, '') = COALESCE(fd.description, '')";
+		$sql .= " INNER JOIN " . $this->db->prefix() . "einvoicing_extrafields as x ON x.element_type = 'commandedet' AND x.element_id = cd.rowid AND x.name = '" . $this->db->escape(self::EXTRAFIELD_BUYER_ORDER_LINE_ID) . "'";
+		$sql .= " LEFT JOIN " . $this->db->prefix() . "einvoicing_extrafields as y ON y.element_type = 'facturedet' AND y.element_id = fd.rowid AND y.name = '" . $this->db->escape(self::EXTRAFIELD_BUYER_ORDER_LINE_ID) . "'";
+		$sql .= " WHERE fd.fk_facture = " . ((int) $invoiceId) . " AND y.rowid IS NULL";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->errors[] = $this->db->lasterror();
+			return -1;
+		}
+		$values = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$values[(int) $obj->invoiceline][] = (string) $obj->value;
+		}
+		$this->db->free($resql);
+
+		$nb = 0;
+		foreach ($values as $lineId => $found) {
+			if (count($found) == 1 && trim($found[0]) !== '') {
+				if ($this->insertOrUpdateExtraField($lineId, 'facturedet', self::EXTRAFIELD_BUYER_ORDER_LINE_ID, trim($found[0])) < 0) {
+					return -1;
+				}
+				$nb++;
+			}
+		}
+
+		return $nb;
+	}
+
+	/**
+	 * Lines of the buyer's purchase order the lines of an order or an invoice bill (BT-132), in one query.
+	 *
+	 * @param	CommonObject		$object		Customer order or invoice, with its lines
+	 * @return	array<int,string>				Buyer's order line by rowid of the line, lines without one left out
+	 */
+	public function getBuyerOrderLineIds($object)
+	{
+		$elementType = ($object->element == 'commande') ? 'commandedet' : 'facturedet';
+		$lineIds = array();
+		foreach ((array) $object->lines as $line) {
+			if ((int) $line->id > 0) {
+				$lineIds[] = (int) $line->id;
+			}
+		}
+		if (empty($lineIds)) {
+			return array();
+		}
+
+		$sql = "SELECT element_id, value FROM " . $this->db->prefix() . "einvoicing_extrafields";
+		$sql .= " WHERE element_type = '" . $this->db->escape($elementType) . "' AND name = '" . $this->db->escape(self::EXTRAFIELD_BUYER_ORDER_LINE_ID) . "'";
+		$sql .= " AND element_id IN (" . $this->db->sanitize(implode(',', $lineIds)) . ")";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' ' . $this->db->lasterror(), LOG_ERR);
+			return array();
+		}
+		$ids = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			if (trim((string) $obj->value) !== '') {
+				$ids[(int) $obj->element_id] = trim((string) $obj->value);
+			}
+		}
+		$this->db->free($resql);
+
+		return $ids;
 	}
 
 	/**

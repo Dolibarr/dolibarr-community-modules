@@ -127,7 +127,7 @@ class modEInvoicing extends DolibarrModules
 			// Contexts are listed one by one on purpose: 'all' loads this class into every HookManager of the
 			// request, including the ones other modules build for their own contexts.
 			'hooks' => [
-				'invoicecard', 'invoicesuppliercard', 'thirdpartycard', 'thirdpartycomm', 'productcard',
+				'invoicecard', 'invoicesuppliercard', 'ordercard', 'thirdpartycard', 'thirdpartycomm', 'productcard',
 				'invoicedocument', 'invoicesuppliercarddocument',
 				'invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'societelist', 'productlist',
 				'productservicelist', 'accountancysupplierlist',
