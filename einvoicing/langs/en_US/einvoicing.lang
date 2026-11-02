@@ -6,6 +6,7 @@
 
 ModuleEInvoicingName = EInvoicing
 ModuleEInvoicingDesc = Support for E-invoice management. This module allows generating (automatically or manually) invoices in E-invoice format and sending them to an E-invoice Access Point. It can also retrieve purchase invoices from this E-invoice Access Point. Only a few countries (France) and Access Points (also called PDP/PA) are supported.
+EInvoicingModuleNeedsReactivation=The files of the e-invoicing module were updated to version %s, but the module was last enabled with version %s. As after any update of a module, disable and enable it again in Home > Setup > Modules so that its database is upgraded.
 
 # Same text as keys of the core that some supported cores lack. A core key is never redefined here,
 # as the first file loaded wins: the module would replace the label of the core on every page.
@@ -154,6 +155,9 @@ FailedToSetDefaultRoutingID=Failed to set default routing address
 EInvoicingSellerIdByBuyer=Our supplier ID at this customer
 EInvoicingSellerIdByBuyerHelp=Identifier this customer gave us as its supplier (vendor code), sent as BT-29 on the e-invoices addressed to it. Leave empty if the customer did not ask for it.
 FailedToSaveSellerIdByBuyer=Failed to save our supplier ID at this customer
+EInvoicingCustomerBuyerReference=Default buyer reference
+EInvoicingCustomerBuyerReferenceHelp=Reference this customer asks to find on its invoices to route them internally (service, business unit...), sent as BT-10 on the e-invoices addressed to it when the invoice has no buyer reference of its own. Leave empty if the customer did not ask for it.
+FailedToSaveCustomerBuyerReference=Failed to save the buyer reference of this customer
 FxCheckErrorRoutingID=Your company does not have a valid E-invoicing address.
 FxCheckErrorRoutingIDFR=In France, the E-invoice address must be or start with the SIREN.
 sendToPDP=Transmit
@@ -531,6 +535,7 @@ EInvoiceChorusReferenceTooLong=The %s reference is %s characters long, while rul
 EInvoiceRoutingCodeRejected=The Chorus Pro service code "%s" was not sent as a buyer routing identifier (BT-46, scheme 0224): rules BR-FR-24 and BR-FR-26 only allow letters, digits and the characters + - _ . up to 100 characters. Please correct it, otherwise a public buyer that requires a service code will reject the invoice.
 EInvoiceRoutingCodeNeedsExtendedProfile=The Chorus Pro service code "%s" was not sent as a buyer routing identifier (BT-46, scheme 0224): the %s profile allows a single identifier for the buyer. Select the EXTENDED-CTC-FR profile to send it, as rules BR-FR-CPRO-11 and BR-FR-CPRO-13 require for a public buyer.
 EInvoiceBuyerReference=Invoice buyer reference
+EInvoiceBuyerReferenceCustomerDefault=Default of the customer
 EInvoiceBuyerReferenceHelp=Reference owned by the customer, used to route the invoice inside its own organization (business unit, service reference, internal mailbox...). Sent as BT-10. The Chorus Pro service code is not this field: it is sent as a buyer identifier (BT-46).
 WarningEinvoicingInvoiceStatusDifferentProvider=Invoice generated or sent for another Access Point %s.
 EinvoicingCantUnvalidateATransmittedInvoice=You are trying to modify the status of an invoice that is locked because it has been transmitted to the Access Point
