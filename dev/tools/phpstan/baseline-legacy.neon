@@ -997,6 +997,12 @@ parameters:
 			path: ../../../einvoicing/class/protocols/FacturXProtocol.class.php
 
 		-
+			message: '#^Parameter \#2 \$start of function dol_substr expects string, int given\.$#'
+			identifier: argument.type
+			count: 3
+			path: ../../../einvoicing/class/providers/AbstractPDPProvider.class.php
+
+		-
 			message: '#^Parameter \#3 \$value of function dolibarr_set_const expects string, int given\.$#'
 			identifier: argument.type
 			count: 1
