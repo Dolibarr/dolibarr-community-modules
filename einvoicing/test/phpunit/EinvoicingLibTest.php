@@ -22,7 +22,8 @@
  *      \brief      PHPUnit test for the functions of einvoicing/lib/einvoicing.lib.php: the tax
  *                  identifier of the seller (BT-31 / BT-32), the VAT point date code (BT-8), the
  *                  invoicing period derived from the lines (BG-14), the redirect allowlist of
- *                  the OAuth callback page and the url of a dropdown entry.
+ *                  the OAuth callback page, the url of a dropdown entry and the state of the
+ *                  scheduled synchronization.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -52,6 +53,32 @@ require_once __DIR__ . '/CommonClassTestCompat.inc.php';
  */
 class EinvoicingLibTest extends CommonClassTest
 {
+	/**
+	 * @var	string|null|false	Entry of the module Scheduled jobs in $conf->modules before the test, false while untouched
+	 */
+	private $savedCronModule = false;
+
+	/**
+	 * Turn the module Scheduled jobs on or off for this test only, the way isModEnabled() reads it.
+	 * tearDown() gives it back as the instance had it.
+	 *
+	 * @param	bool	$on		True to have it enabled
+	 * @return	void
+	 */
+	private function cronModule($on)
+	{
+		global $conf;
+
+		if ($this->savedCronModule === false) {
+			$this->savedCronModule = isset($conf->modules['cron']) ? $conf->modules['cron'] : null;
+		}
+		if ($on) {
+			$conf->modules['cron'] = 'cron';
+		} else {
+			unset($conf->modules['cron']);
+		}
+	}
+
 	/**
 	 * A seller, described the way Societe::setMysoc() describes $mysoc.
 	 *
@@ -234,6 +261,15 @@ class EinvoicingLibTest extends CommonClassTest
 		}
 		$this->hadallowlist = false;
 		$this->savedallowlist = null;
+
+		if ($this->savedCronModule !== false) {
+			if ($this->savedCronModule === null) {
+				unset($conf->modules['cron']);
+			} else {
+				$conf->modules['cron'] = $this->savedCronModule;
+			}
+			$this->savedCronModule = false;
+		}
 
 		parent::tearDown();
 	}
@@ -807,5 +843,93 @@ class EinvoicingLibTest extends CommonClassTest
 		$this->assertSame($page, DOL_URL_ROOT . einvoicingDropdownEntryUrl($page), 'The core must land on the page of this instance');
 		$this->assertSame('/custom/einvoicing/document_card.php', einvoicingDropdownEntryUrl('/dolibarr/custom/einvoicing/document_card.php', '/dolibarr'), 'An instance in a sub-path must not get it twice');
 		$this->assertSame('/custom/einvoicing/document_card.php', einvoicingDropdownEntryUrl('/custom/einvoicing/document_card.php', ''), 'An instance at the root of its domain has nothing to remove');
+	}
+
+	/**
+	 * Leave in llx_cronjob a single synchronization job of the module, with the given columns.
+	 * The class runs in a transaction that is rolled back, so the rows of the instance come back.
+	 *
+	 * @param	array<string,string>	$columns	Column => SQL value
+	 * @return	void
+	 */
+	private function syncJob($columns)
+	{
+		global $conf, $db;
+
+		$db->query("UPDATE ".MAIN_DB_PREFIX."cronjob SET status = 2 WHERE module_name = 'einvoicing' AND methodename = 'cronSyncFlows'");
+		$db->query("DELETE FROM ".MAIN_DB_PREFIX."cronjob WHERE label = 'PHPUNIT1142'");
+		$columns = array_merge(array(
+			'label' => "'PHPUNIT1142'", 'jobtype' => "'method'", 'module_name' => "'einvoicing'", 'methodename' => "'cronSyncFlows'",
+			'objectname' => "'Document'", 'frequency' => '15', 'unitfrequency' => "'60'", 'status' => '1', 'processing' => '0',
+			'entity' => (string) ((int) $conf->entity),
+		), $columns);
+		$sql = "INSERT INTO ".MAIN_DB_PREFIX."cronjob (".implode(', ', array_keys($columns)).") VALUES (".implode(', ', $columns).")";
+		$this->assertTrue((bool) $db->query($sql), (string) $db->lasterror());
+	}
+
+	/**
+	 * A failed run is told apart from a job that no longer runs at all, the case the e-mail of the
+	 * scheduler can never report (issue #1142).
+	 *
+	 * @return void
+	 */
+	public function testTheSyncJobStateComesFromTheRowOfTheScheduler()
+	{
+		global $db;
+
+		$soon = "'".$db->idate(dol_now() + 600)."'";
+		$past = "'".$db->idate(dol_now() - 7200)."'";
+		$ran = "'".$db->idate(dol_now() - 300)."'";
+		$this->cronModule(true);
+
+		$this->syncJob(array('datelastrun' => $ran, 'datenextrun' => $soon, 'lastresult' => "'0'"));
+		$this->assertSame('ok', einvoicingSyncJobState(einvoicingSyncJobHealth($db)));
+
+		$this->syncJob(array('datelastrun' => $ran, 'datenextrun' => $soon, 'lastresult' => "'1'", 'lastoutput' => "'Flow 2 / 5<br>skipped: 1\nERROR_SYNCFLOW - Failed'"));
+		$health = einvoicingSyncJobHealth($db);
+		$this->assertSame('failed', einvoicingSyncJobState($health));
+		$this->assertFalse($health['late']);
+
+		$this->syncJob(array('datelastrun' => $past, 'datenextrun' => $past, 'lastresult' => "'0'"));
+		$this->assertSame('late', einvoicingSyncJobState(einvoicingSyncJobHealth($db)), 'A system cron no longer launched leaves the due date behind');
+
+		$this->syncJob(array('datelastrun' => $past, 'datenextrun' => $past, 'lastresult' => "''", 'processing' => '1'));
+		$this->assertSame('stuck', einvoicingSyncJobState(einvoicingSyncJobHealth($db)), 'A run that died leaves the job processing, the scheduler skips it forever');
+
+		$this->syncJob(array('datelastrun' => $ran, 'datenextrun' => $soon, 'lastresult' => "''", 'processing' => '1'));
+		$this->assertSame('running', einvoicingSyncJobState(einvoicingSyncJobHealth($db)));
+
+		$this->syncJob(array('datenextrun' => $soon));
+		$this->assertSame('neverrun', einvoicingSyncJobState(einvoicingSyncJobHealth($db)));
+
+		$this->syncJob(array('datelastrun' => $past, 'datenextrun' => $past, 'lastresult' => "'1'", 'status' => '0'));
+		$this->assertSame('disabled', einvoicingSyncJobState(einvoicingSyncJobHealth($db)), 'A disabled job is neither failed nor late');
+
+		$this->syncJob(array('datelastrun' => $past, 'datenextrun' => $past, 'lastresult' => "'1'"));
+		$this->cronModule(false);
+		$this->assertSame('disabled', einvoicingSyncJobState(einvoicingSyncJobHealth($db)), 'Without the module Scheduled jobs nothing runs the job: neither failed nor late');
+		$this->cronModule(true);
+
+		$this->syncJob(array('status' => '2'));
+		$this->assertNull(einvoicingSyncJobHealth($db), 'An archived job is not the job of the module');
+		$this->assertSame('notfound', einvoicingSyncJobState(null));
+	}
+
+	/**
+	 * The scheduler stores the output of the job and then the error: the error is what is shown.
+	 *
+	 * @return void
+	 */
+	public function testTheSyncJobLinesShowTheErrorNotTheOutput()
+	{
+		global $db;
+
+		$this->cronModule(true);
+		$this->syncJob(array('datelastrun' => "'".$db->idate(dol_now() - 300)."'", 'datenextrun' => "'".$db->idate(dol_now() + 600)."'", 'lastresult' => "'1'", 'lastoutput' => "'Flow <b>2</b> / 5<br>skipped: 1\nERROR_SYNCFLOW - Failed to synchronize flow i_1'"));
+		$lines = einvoicingSyncJobHealthLines($db, einvoicingSyncJobHealth($db));
+
+		$this->assertCount(3, $lines, 'State, error and last document');
+		$this->assertStringContainsString('ERROR_SYNCFLOW - Failed to synchronize flow i_1</span>', $lines[1][1]);
+		$this->assertStringNotContainsString('skipped', strip_tags($lines[1][1]));
 	}
 }

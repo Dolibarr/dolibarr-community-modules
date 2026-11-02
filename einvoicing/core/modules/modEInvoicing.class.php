@@ -131,7 +131,7 @@ class modEInvoicing extends DolibarrModules
 				'invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'societelist', 'productlist',
 				'productservicelist', 'accountancysupplierlist',
 				'pdfgeneration', 'odtgeneration',
-				'api',
+				'api', 'index',
 			],
 			/* END MODULEBUILDER HOOKSCONTEXTS */
 			// Set this to 1 if features of module are opened to external users
@@ -279,12 +279,11 @@ class modEInvoicing extends DolibarrModules
 		// Add here list of php file(s) stored in einvoicing/core/boxes that contains a class to show a widget.
 		/* BEGIN MODULEBUILDER WIDGETS */
 		$this->boxes = array(
-			//  0 => array(
-			//      'file' => 'einvoicingwidget1.php@einvoicing',
-			//      'note' => 'Widget provided by EInvoicing',
-			//      'enabledbydefaulton' => 'Home',
-			//  ),
-			//  ...
+			0 => array(
+				'file' => 'box_einvoicing_sync.php@einvoicing',
+				'note' => 'Widget provided by EInvoicing',
+				'enabledbydefaulton' => 'Home',
+			),
 		);
 		/* END MODULEBUILDER WIDGETS */
 
