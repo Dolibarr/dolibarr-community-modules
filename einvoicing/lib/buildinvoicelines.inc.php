@@ -380,8 +380,11 @@ if ($chorus && dol_strlen((string) $promise_code) > 50) {
 // Buyer reference (BT-10): a reference owned by the buyer, used to route the invoice inside its own
 // organisation. The Chorus Pro service code keeps feeding it when the dedicated property is empty:
 // Annexe A of XP Z12-012 documents BT-10 as the "Service Executant" of the public sector, so that
-// mapping is a documented usage of the term (issue #678).
+// mapping is a documented usage of the term (issue #678). In between, the default of the customer (issue #1210).
 $buyerReference = $einvoicing->getExtraFieldValue($object->id, $object->element, EInvoicing::EXTRAFIELD_BUYER_REFERENCE);
+if (trim((string) $buyerReference) === '') {
+	$buyerReference = $einvoicing->getExtraFieldValue($object->socid, 'societe', EInvoicing::EXTRAFIELD_BUYER_REFERENCE);
+}
 if (trim((string) $buyerReference) === '') {
 	$buyerReference = $object->array_options['options_d4d_service_code'] ?? null;
 }

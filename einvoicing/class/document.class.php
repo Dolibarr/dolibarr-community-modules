@@ -653,6 +653,8 @@ class Document extends CommonObject
 	 * import again. It keeps its id and reference, and with them the files attached by hand, the events,
 	 * the contacts, the notes and the lifecycle statuses. A validated invoice is refused, it is an
 	 * accounting record. With no invoice left, the document is imported as a new one.
+	 * A received lifecycle status (SupplierInvoiceLC) not attached to any invoice is processed again,
+	 * so it is attached and recorded on the supplier invoice it refers to, if found now.
 	 *
 	 * @param	User				$user		User asking for the import
 	 * @return	array{res:int,message:string}	res > 0 is the id of the supplier invoice
@@ -680,9 +682,15 @@ class Document extends CommonObject
 			return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportNoProvider'));
 		}
 
+		// A lifecycle status already attached to an invoice has been applied: nothing to do again.
+		$isLifecycleStatus = ($this->flow_type === 'SupplierInvoiceLC');
+		if ($isLifecycleStatus && (int) $this->fk_element_id > 0) {
+			return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportLifecycleAlreadyApplied'));
+		}
+
 		// The draft this document was booked on, if it is still there: the import rebuilds it.
 		$draftId = 0;
-		if ((int) $this->fk_element_id > 0) {
+		if (!$isLifecycleStatus && (int) $this->fk_element_id > 0) {
 			$draft = new FactureFournisseur($this->db);
 			if ($draft->fetch((int) $this->fk_element_id) > 0) {
 				if ((int) $draft->status !== FactureFournisseur::STATUS_DRAFT) {
@@ -698,7 +706,10 @@ class Document extends CommonObject
 		} finally {
 			AbstractProtocol::$rebuildSupplierInvoiceId = 0;
 		}
-		if (!isset($res['res']) || $res['res'] <= 0) {
+		// A lifecycle status still not attached (res=0) has been stored again anyway: take that record
+		// over below so this line is refreshed instead of duplicated, then report the failure.
+		$lifecycleNotAttached = ($isLifecycleStatus && isset($res['res']) && $res['res'] == 0);
+		if (!$lifecycleNotAttached && (!isset($res['res']) || $res['res'] <= 0)) {
 			return array('res' => -1, 'message' => (string) ($res['message'] ?? ''));
 		}
 
@@ -707,6 +718,9 @@ class Document extends CommonObject
 		$importedRecord = $this->fetchRecordWrittenByImport();
 		if (!($importedRecord instanceof Document)) {
 			dol_syslog(__METHOD__.' imported flow '.$this->flow_id.' again but found no record written by the import to move onto record '.$this->id, LOG_WARNING);
+			if ($lifecycleNotAttached) {
+				return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportLifecycleNotAttached').' '.(string) ($res['message'] ?? ''));
+			}
 
 			return array('res' => ($draftId > 0 ? $draftId : 1), 'message' => (string) ($res['message'] ?? ''));
 		}
@@ -718,6 +732,10 @@ class Document extends CommonObject
 		// instead of losing it for a new one describing the same flow.
 		if ($this->adoptRecordWrittenByImport($importedRecord, $user) < 0) {
 			dol_syslog(__METHOD__.' imported flow '.$this->flow_id.' again but could not move record '.$importedRecord->id.' onto record '.$this->id.': '.$this->error, LOG_WARNING);
+		}
+
+		if ($lifecycleNotAttached) {
+			return array('res' => -1, 'message' => $langs->trans('EInvoiceReimportLifecycleNotAttached').' '.(string) ($res['message'] ?? ''));
 		}
 
 		return array('res' => ($invoiceId > 0 ? $invoiceId : 1), 'message' => (string) ($res['message'] ?? ''));

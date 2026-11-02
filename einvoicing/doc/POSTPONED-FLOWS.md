@@ -2,7 +2,7 @@
 
 Memo. What "postponing a flow" means in this module, every case that asks for it, and what happens
 to those cases **out of the box** — a module freshly activated, every delivery default left alone.
-Written 2026-09-22 against `main` of the module, checked again 2026-10-04.
+Written 2026-09-22 against `main` of the module, checked again 2026-10-29 (module 1.4.0).
 
 ---
 
@@ -107,10 +107,12 @@ The switch being off, `syncFlows()` never reaches its postpone branch. Instead:
 That last point is the one that surprises people: a single unreadable flow freezes reception
 entirely, and it stays frozen until the cause is fixed, not until some retry budget runs out.
 
-> The four *manual-action* business errors — `THIRDPARTY_NOT_FOUND`, `PRODUCT_NOT_FOUND`,
+> The five *manual-action* business errors — `THIRDPARTY_NOT_FOUND`, `PRODUCT_NOT_FOUND`,
+> `DEFAULT_ROUTING_MIXED_UNSET` (a mixed invoice while `EINVOICING_DEFAULT_ROUTING_MIXED` is empty),
 > `THIRDPARTY_DUPLICATE_VAT`, `THIRDPARTY_DUPLICATE_SUPPLIER_CODE` — abort the same way, with a
 > different closing line: *"Aborting synchronization due to a business error. There is a manual
-> action to do."* They never carry `postponeflow`; their opt-in alternative is section 8.
+> action to do."* (on Esalink, the two duplicate errors end with the generic line). They never carry
+> `postponeflow`; their opt-in alternative is section 8.
 
 ---
 
@@ -127,6 +129,8 @@ The window is built from one cursor, `updatedAfter`:
   entity, **minus** `EINVOICING_SYNC_MARGIN_TIME_HOURS` (12 h by default);
 - flows are then walked in batches of `EINVOICING_FLOWS_SYNC_CALL_SIZE` (100), the cursor moving to
   just before the last `updatedAt` of each batch — one batch of overlap, never a skipped flow;
+- inside a batch, flows are processed oldest first (by `updatedAt`), so a final invoice does not
+  stall the run ahead of the down payment it deducts;
 - already-stored flowIds of the listing are discarded up front, so the overlap is cheap.
 
 The margin exists **for** the postponed flows: a flow that stored nothing does not move
@@ -156,7 +160,8 @@ The module ships with the loud one.
 ## 8. The other opt-in: the manual-action queue
 
 `EINVOICING_ENABLE_MANUAL_ACTION_QUEUE` (also off, also hidden) covers the *other* family — a
-missing third party, a missing product, a supplier invoice found with a different amount. It is
+missing third party, a missing product, a mixed invoice with no default routing set, a supplier
+invoice found with a different amount. It is wired in the SuperPDP synchronization only. It is
 **not** the same mechanism: the flow is written to a persistent queue
 (`sync_pending_list.php`, counted as `TotalQueuedForManualAction`), the run carries on, and the flow
 is retried **on demand** once the product or third party exists.
@@ -177,7 +182,12 @@ remembering between the two opt-ins — postponing relies on the window, queuein
 |---|---|---|---|
 | Unreadable document, missing linked invoice, unreadable status | abort the whole run | skip, retried next run | not covered |
 | Amount mismatch | abort the whole run | skip, retried next run | queued, retried on demand |
-| Missing third party / product | abort the whole run | not covered | queued, retried on demand |
+| Missing third party / product / mixed-invoice default | abort the whole run | not covered | queued, retried on demand (SuperPDP) |
 | Flows behind the faulty one | not read | read | read |
 | Can a document be lost? | no | **yes**, if it leaves the window | no |
 | Where you see it | `SyncAborted` + the action to do | `TotalPostponedSync` | `TotalQueuedForManualAction` + the queue page |
+
+A missing product can also be avoided before any of this: `EINVOICING_DEFAULT_PRODUCT_CATCHALL` and
+`EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID` (off by default, in the setup screen) give every line nothing
+else resolved a last-resort product, so `PRODUCT_NOT_FOUND` is never raised. They are ignored while
+`EINVOICING_PRODUCTS_AUTO_GENERATION` is on.
