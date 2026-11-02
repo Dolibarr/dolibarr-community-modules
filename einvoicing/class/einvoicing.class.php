@@ -2754,6 +2754,7 @@ class EInvoicing
 				$resprints .= '<tr class="treinvoicing_collapseseparator tr'.$htmlname.' '.($expand_display ? '' : 'hidden').'">';
 				$resprints .= '<td>' . $form->textwithpicto($langs->trans($labelkey), $langs->trans($labelkey.'Help')) . '</td>';
 				$resprints .= '<td'.(empty($parameters['colspanvalue']) ? '' : ' colspan="'.(((int) $parameters['colspanvalue']) - 1).'"').'>';
+				$reg = array();
 				if ($mode == 'edit') {
 					$resprints .= $this->selectVendorProduct($form, $object->id, $selected, $htmlname, $filtertype);
 
