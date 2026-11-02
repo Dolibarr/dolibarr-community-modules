@@ -4018,6 +4018,35 @@ class EInvoicing
 	}
 
 	/**
+	 * Tell whether an element already holds a lifecycle status message dated after a given date, in any
+	 * direction. Used to not overwrite the current status of an element with an older one (a re-import).
+	 *
+	 * @param	int		$elementId		Id of the element
+	 * @param	string	$elementType	Element type ('facture', 'invoice_supplier')
+	 * @param	int		$date			Date of the status about to be recorded (timestamp)
+	 * @return	int<-1,1>				1 if a more recent status message exists, 0 if not, -1 on SQL error
+	 */
+	public function hasNewerStatusMessage($elementId, $elementType, $date)
+	{
+		$sql = "SELECT rowid FROM " . $this->db->prefix() . "einvoicing_lifecycle_msg";
+		$sql .= " WHERE element_type = '" . $this->db->escape($elementType) . "'";
+		$sql .= " AND element_id = " . (int) $elementId;
+		$sql .= " AND date_creation > '" . $this->db->idate($date) . "'";
+		$sql .= $this->db->plimit(1);
+
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' SQL error: ' . $this->db->lasterror(), LOG_ERR);
+			return -1;
+		}
+
+		$found = ($this->db->num_rows($resql) > 0);
+		$this->db->free($resql);
+
+		return ($found ? 1 : 0);
+	}
+
+	/**
 	 * Tell whether a cash-in on a customer invoice has to be reported with the status 212 (Encaissee).
 	 *
 	 * @param	Facture	$invoice	Customer invoice, transmitted or not

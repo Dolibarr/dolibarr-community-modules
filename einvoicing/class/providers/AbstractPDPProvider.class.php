@@ -1529,8 +1529,15 @@ abstract class AbstractPDPProvider
 		// new delivery, not the invoice the platform already holds and this status quotes (issue #985).
 		$statusToRecord = $einvoicing->isTransmissionOnlyRejection($supplierInvoice->id, $supplierInvoice->element, $document->cdar_lifecycle_code, $document->cdar_reason_code)
 			? 0 : $document->cdar_lifecycle_code;
+		// Same for a status older than one the invoice already holds (a flow imported again): it only goes
+		// into the history, the current status and its comment stay the newer ones.
+		$isOlderStatus = (!empty($document->submittedat) && $einvoicing->hasNewerStatusMessage($supplierInvoice->id, $supplierInvoice->element, $document->submittedat) > 0);
+		if ($isOlderStatus) {
+			dol_syslog(__METHOD__ . " FlowId " . $flowId . " - status " . $document->cdar_lifecycle_code . " is older than the current status of supplier invoice " . $supplierInvoice->ref . ", only added to its history", LOG_INFO);
+			$statusToRecord = 0;
+		}
 
-		$resExtLink = $einvoicing->insertOrUpdateExtLink($supplierInvoice->id, $supplierInvoice->element, '', $statusToRecord, '', $statusComment);
+		$resExtLink = $einvoicing->insertOrUpdateExtLink($supplierInvoice->id, $supplierInvoice->element, '', $statusToRecord, '', ($isOlderStatus ? '' : $statusComment));
 
 		$resStatusMessage = ($resExtLink > 0 ? $einvoicing->storeStatusMessage(
 			$supplierInvoice->id,
@@ -1558,7 +1565,7 @@ abstract class AbstractPDPProvider
 		$reasonDetail = $statusComment ? " - " . $statusComment : '';
 		$this->addEvent('STATUS', "EINVOICING - Status: " . $statusLabel, "EINVOICING - Status: " . $statusLabel . $reasonDetail, $supplierInvoice);
 
-		return array('res' => 1, 'message' => "FlowId " . $flowId . " - Vendor status " . $document->cdar_lifecycle_code . ($amountsReported !== '' ? " (" . $amountsReported . ")" : '') . " recorded on supplier invoice " . $supplierInvoice->ref);
+		return array('res' => 1, 'message' => "FlowId " . $flowId . " - Vendor status " . $document->cdar_lifecycle_code . ($amountsReported !== '' ? " (" . $amountsReported . ")" : '') . " recorded on supplier invoice " . $supplierInvoice->ref . ($isOlderStatus ? " (older than its current status, history only)" : ''));
 	}
 
 	/**
