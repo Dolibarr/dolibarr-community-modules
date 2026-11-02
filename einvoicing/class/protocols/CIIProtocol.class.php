@@ -1133,6 +1133,9 @@ class CIIProtocol extends AbstractProtocol
 		$parsedDocument = $this->parseReceivedDocument($file, $tempFile);
 		$parsedHeader = $parsedDocument['header'];
 		$parsedLines = $parsedDocument['lines'];
+		// Read on the lines of the document only: the ones rebuilt from BG-23 below sum the taxable bases,
+		// which a document level allowance or charge legitimately sets apart from BT-106 (issue #1198).
+		$lineTotalContradiction = SupplierInvoiceHelper::lineTotalContradiction($parsedHeader, (array) $parsedLines);
 		if (empty($parsedLines)) {
 			$parsedLines = $this->buildLinesFromVatBreakdown($parsedHeader);
 		}
@@ -1548,7 +1551,7 @@ class CIIProtocol extends AbstractProtocol
 
 			// Every line of the invoice exists now, so its totals can be confronted with the ones the
 			// document announces (issue #781).
-			$this->alignInvoiceTotalsWithDocument($supplierInvoiceId, $parsedHeader, $return_messages);
+			$this->alignInvoiceTotalsWithDocument($supplierInvoiceId, $parsedHeader, $return_messages, $lineTotalContradiction);
 
 			// Create or update supplier prices for imported products
 			if (!empty($supplierPriceEntries)) {
@@ -4380,9 +4383,10 @@ class CIIProtocol extends AbstractProtocol
 	 * @param	int					$supplierInvoiceId	Id of the invoice the import has just built
 	 * @param	array<string,mixed>	$parsedHeader		Header data of the received document
 	 * @param	array<int,string>	$return_messages	Messages of the import, completed here
+	 * @param	?array{lines:float,announced:float}	$lineTotalContradiction	What lineTotalContradiction() found on the document, null when its lines add up
 	 * @return	void
 	 */
-	protected function alignInvoiceTotalsWithDocument($supplierInvoiceId, array $parsedHeader, array &$return_messages)
+	protected function alignInvoiceTotalsWithDocument($supplierInvoiceId, array $parsedHeader, array &$return_messages, $lineTotalContradiction = null)
 	{
 		global $db, $langs;
 
@@ -4485,6 +4489,29 @@ class CIIProtocol extends AbstractProtocol
 			}
 		}
 
+		// An EXTENDED document may announce a net amount its lines miss by a cent per line (BR-FREXT-CO-10):
+		// the gap goes onto a line, then the VAT is answered as for any other document (issue #1198).
+		$saved = $this->moveExtendedBaseGapOntoLines($supplierInvoiceId, $parsedHeader);
+		if ($saved !== null) {
+			$this->carryAnnouncedVatOntoLines($supplierInvoiceId, $parsedHeader);
+			$aligned = new FactureFournisseur($db);
+			$kept = $aligned->fetch($supplierInvoiceId) > 0 && SupplierInvoiceHelper::totalsAgreeWithDocument($aligned, $announcedTva, $announcedTtc);
+			if ($kept) {
+				SupplierInvoiceHelper::clearTotalsMismatch($supplierInvoiceId);
+			} else {
+				$kept = $this->keepVatRoundedPerLine($supplierInvoiceId, $parsedHeader, $announcedTva, $announcedTtc, $return_messages);
+			}
+			if ($kept) {
+				$langs->load('einvoicing@einvoicing');
+				foreach ($saved['moves'] as $move) {
+					$return_messages[] = $langs->trans('EInvoiceImportLineAmountsAligned', price2num($move['lines'], 'MT'), price2num($move['announced'], 'MT'), price2num($move['gap'], 'MT'), $move['rang']);
+				}
+				dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' records the net amount of its EXTENDED document, its lines being off by a tolerated gap', LOG_DEBUG);
+				return;
+			}
+			$this->restoreLineAmounts($saved['rows']);
+		}
+
 		if ($this->keepVatRoundedPerLine($supplierInvoiceId, $parsedHeader, $announcedTva, $announcedTtc, $return_messages)) {
 			return;
 		}
@@ -4499,9 +4526,23 @@ class CIIProtocol extends AbstractProtocol
 			return;
 		}
 
-		SupplierInvoiceHelper::flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc);
+		SupplierInvoiceHelper::flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc, null, null, $lineTotalContradiction);
 
 		$langs->load('einvoicing@einvoicing');
+		// A document whose lines do not add up to BT-106 (BR-CO-10) computes its VAT and its totals on a
+		// base its own lines contradict: the invoice, built from the lines, cannot total both. That is
+		// the vendor's document to correct, not a figure the import misread, and saying "the import could
+		// not reproduce it" sent the operator hunting for an error on their side (issue #1198).
+		if ($lineTotalContradiction !== null) {
+			$return_messages[] = $langs->trans(
+				'EInvoiceImportLineTotalMismatch',
+				dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')),
+				price2num($lineTotalContradiction['lines'], 'MT'),
+				price2num($lineTotalContradiction['announced'], 'MT')
+			);
+			dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' comes from a document whose lines add up to ' . $lineTotalContradiction['lines'] . ' while it announces ' . $lineTotalContradiction['announced'] . ' (BR-CO-10): validation and approval blocked', LOG_WARNING);
+			return;
+		}
 		$return_messages[] = $langs->trans(
 			'EInvoiceImportTotalsMismatch',
 			dol_escape_htmltag((string) ($parsedHeader['documentno'] ?? '')),
@@ -4555,9 +4596,8 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		SupplierInvoiceHelper::clearTotalsMismatch($supplierInvoiceId);
-		SupplierInvoiceHelper::noteVatRoundedPerLine($supplierInvoiceId, (float) $announcedTva, $tva);
-
 		$langs->load('einvoicing@einvoicing');
+		SupplierInvoiceHelper::noteVatRoundedPerLine($supplierInvoiceId, (float) $announcedTva, $tva);
 		$return_messages[] = $langs->trans('EInvoiceImportVatRoundedPerLine', price2num($tva, 'MT'), price2num($announcedTva, 'MT'));
 		dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' keeps the VAT rounded per line (' . $tva . '), its EXTENDED document announcing ' . $announcedTva . ' rounded per rate', LOG_DEBUG);
 
@@ -5100,6 +5140,171 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		return true;
+	}
+
+	/**
+	 * Move onto a line the gap an EXTENDED document tolerates between its lines and the net amount it announces.
+	 *
+	 * EXTENDED-CTC-FR replaces BR-CO-10 and BR-S-08 with BR-FREXT-CO-10 and BR-FREXT-S-08: the lines of a rate may
+	 * miss its BT-116 by a cent per line. A vendor billing prices that include VAT lands there: four train tickets
+	 * add up to 52.56 while the document announces 52.55 + 5.25 = 57.80, which no VAT calculation mode rebuilds
+	 * from the lines (issue #1198). The gap goes onto the unit price of the last line of the rate that carries it
+	 * to the cent, so the line stays consistent through any later recalculation, which starts from the unit price.
+	 *
+	 * @param	int					$supplierInvoiceId	Id of the invoice the import has just built
+	 * @param	array<string,mixed>	$parsedHeader		Header data of the received document
+	 * @return	?array{rows:array<int,array<string,mixed>>,moves:array<int,array{rang:int,gap:float,lines:float,announced:float}>}	The lines as they were and what moved, null when nothing moved
+	 */
+	protected function moveExtendedBaseGapOntoLines($supplierInvoiceId, array $parsedHeader)
+	{
+		global $db;
+
+		if (!SupplierInvoiceHelper::isExtendedDocument($parsedHeader) || empty($parsedHeader['taxBreakdown']) || !is_array($parsedHeader['taxBreakdown'])) {
+			return null;
+		}
+		$invoice = new FactureFournisseur($db);
+		if ($invoice->fetch((int) $supplierInvoiceId) <= 0 || $invoice->fetch_lines() <= 0) {
+			return null;
+		}
+		$invoice->fetch_thirdparty();
+		$sign = SupplierInvoiceHelper::documentSign($invoice, SupplierInvoiceHelper::announcedTotalTtc($parsedHeader));
+		// Only a net amount that misses BT-109 is moved: one that totals it is right, whatever BG-23 rounds (issue #1166)
+		$announcedHt = SupplierInvoiceHelper::announcedTotalHt($parsedHeader);
+		$deposits = SupplierInvoiceHelper::linkedDepositTotals((int) $supplierInvoiceId);
+		$ht = $sign * ((float) $invoice->total_ht + $deposits['ttc'] - $deposits['tva']);
+		if ($announcedHt === null || abs($ht - $announcedHt) < 0.005) {
+			return null;
+		}
+
+		// Grouped the way carryAnnouncedVatOntoLines() groups them, for the same reasons
+		$groups = array();
+		foreach (array_values($invoice->lines) as $position => $line) {
+			if ((int) $line->product_type == 9 || !empty($line->fk_remise_except) || SupplierInvoiceHelper::isRoundingLine($line)) {
+				continue;
+			}
+			$rate = (string) price2num($line->tva_tx);
+			$groups[$rate]['base'] = ($groups[$rate]['base'] ?? 0) + (float) $line->total_ht;
+			$groups[$rate]['lines'][$position + 1] = $line;
+		}
+
+		$targets = array();
+		foreach ($parsedHeader['taxBreakdown'] as $tax) {
+			if (($tax['typeCode'] ?? '') !== 'VAT') {
+				continue;
+			}
+			$rate = (string) price2num($tax['rateApplicablePercent'] ?? 0);
+			if (empty($groups[$rate])) {
+				return null;
+			}
+			$gap = round($sign * (float) ($tax['basisAmount'] ?? 0) - $groups[$rate]['base'], 2);
+			if (abs($gap) < 0.005) {
+				continue;
+			}
+			// BR-FREXT-S-08: beyond a cent per line, a base that differs is a line the import read wrong
+			if (abs($gap) > SupplierInvoiceHelper::extendedTolerance($parsedHeader, $rate) + 0.0001) {
+				return null;
+			}
+			$targets[$rate] = $gap;
+		}
+		if (empty($targets) || abs($ht + array_sum($targets) - $announcedHt) >= 0.005) {
+			return null;
+		}
+
+		$columns = 'rowid, pu_ht, pu_ttc, total_ht, tva, total_localtax1, total_localtax2, total_ttc, multicurrency_subprice, multicurrency_total_ht, multicurrency_total_tva, multicurrency_total_ttc';
+		$resql = $db->query('SELECT ' . $columns . ' FROM ' . MAIN_DB_PREFIX . 'facture_fourn_det WHERE fk_facture_fourn = ' . (int) $supplierInvoiceId);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' ' . $db->lasterror(), LOG_ERR);
+			return null;
+		}
+		$rows = array();
+		while ($row = $db->fetch_array($resql)) {
+			$rows[] = $row;
+		}
+
+		$moves = array();
+		foreach ($targets as $rate => $gap) {
+			$moved = false;
+			foreach (array_reverse($groups[$rate]['lines'], true) as $position => $line) {
+				$amounts = $this->lineAmountsForTotal($line, (float) $line->total_ht + $sign * $gap, $invoice);
+				if ($amounts === null) {
+					continue;
+				}
+				$sql = 'UPDATE ' . MAIN_DB_PREFIX . 'facture_fourn_det SET';
+				$sql .= ' pu_ht = ' . ((float) $amounts[3]) . ', pu_ttc = ' . ((float) $amounts[5]);
+				$sql .= ', total_ht = ' . ((float) $amounts[0]) . ', tva = ' . ((float) $amounts[1]) . ', total_ttc = ' . ((float) $amounts[2]);
+				$sql .= ', total_localtax1 = ' . ((float) $amounts[9]) . ', total_localtax2 = ' . ((float) $amounts[10]);
+				$sql .= ', multicurrency_subprice = ' . ((float) $amounts[19]) . ', multicurrency_total_ht = ' . ((float) $amounts[16]);
+				$sql .= ', multicurrency_total_tva = ' . ((float) $amounts[17]) . ', multicurrency_total_ttc = ' . ((float) $amounts[18]);
+				$sql .= ' WHERE rowid = ' . (int) $line->id;
+				if (!$db->query($sql)) {
+					dol_syslog(__METHOD__ . ' ' . $db->lasterror(), LOG_ERR);
+					$this->restoreLineAmounts($rows);
+					return null;
+				}
+				$moves[] = array('rang' => (int) $position, 'gap' => $gap, 'lines' => $sign * $groups[$rate]['base'], 'announced' => $sign * $groups[$rate]['base'] + $gap);
+				$moved = true;
+				break;
+			}
+			if (!$moved) {
+				$this->restoreLineAmounts($rows);
+				return null;
+			}
+		}
+
+		// The header follows its lines; '0' keeps the VAT of each line as calculated from its unit price
+		if ($invoice->update_price(1, '0', 0, $invoice->thirdparty) < 0) {
+			$this->restoreLineAmounts($rows);
+			return null;
+		}
+
+		return array('rows' => $rows, 'moves' => $moves);
+	}
+
+	/**
+	 * Amounts of a line once its unit price is set so that it totals a given net amount.
+	 *
+	 * @param	object				$line		A line of the supplier invoice
+	 * @param	float				$totalHt	Net amount the line has to total, as stored
+	 * @param	FactureFournisseur	$invoice	The invoice, with its thirdparty loaded
+	 * @return	?array<int,string>				What calcul_price_total() returns, null when no unit price totals that amount
+	 */
+	protected function lineAmountsForTotal($line, $totalHt, FactureFournisseur $invoice)
+	{
+		$qty = (float) $line->qty;
+		$factor = $qty * (1 - (float) $line->remise_percent / 100);
+		if (abs($factor) < 0.000001) {
+			return null;
+		}
+		$pu = (float) price2num($totalHt / $factor, 'MU');
+		$localtaxes = array($line->localtax1_type, $line->localtax1_tx, $line->localtax2_type, $line->localtax2_tx);
+		// @phpstan-ignore argument.type (a quantity may be decimal, the core documents it int)
+		$amounts = calcul_price_total($qty, $pu, (float) $line->remise_percent, (float) $line->tva_tx, (float) $line->localtax1_tx, (float) $line->localtax2_tx, 0, 'HT', (int) $line->info_bits, (int) $line->product_type, $invoice->thirdparty, $localtaxes, 100, (float) ($invoice->multicurrency_tx ?: 1));
+
+		return (abs((float) $amounts[0] - $totalHt) < 0.005) ? $amounts : null;
+	}
+
+	/**
+	 * Put back the amounts of supplier invoice lines saved by moveExtendedBaseGapOntoLines().
+	 *
+	 * @param	array<int,array<string,mixed>>	$rows	The lines as read from facture_fourn_det
+	 * @return	void
+	 */
+	protected function restoreLineAmounts(array $rows)
+	{
+		global $db;
+
+		foreach ($rows as $row) {
+			$sets = array();
+			foreach ($row as $column => $value) {
+				if (!is_string($column) || $column === 'rowid') {
+					continue;
+				}
+				$sets[] = $column . ' = ' . ($value === null ? 'NULL' : (float) $value);
+			}
+			if (!$db->query('UPDATE ' . MAIN_DB_PREFIX . 'facture_fourn_det SET ' . implode(', ', $sets) . ' WHERE rowid = ' . (int) $row['rowid'])) {
+				dol_syslog(__METHOD__ . ' ' . $db->lasterror(), LOG_ERR);
+			}
+		}
 	}
 
 	/**
