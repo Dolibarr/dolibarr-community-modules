@@ -266,7 +266,7 @@ class HelloAssoMemberUtils
 			$date_start_subscription = dol_stringtotime($newmember->order->meta->createdAt);
 			$member = new Adherent($db);
 			$membertype = new AdherentType($db);
-			$amount = $newmember->initialAmount / 100;
+			$amount = (isset($newmember->amount) ? $newmember->amount : $newmember->initialAmount) / 100;
 			$dolibarrmembertype = 0;
 
 			// Verify if member_type mapping contain HelloAsso memberId
@@ -435,12 +435,21 @@ class HelloAssoMemberUtils
 										break;
 								}
 								$label = $langs->transnoentitiesnoconv("HelloAssoMemberPaymentLabel", $payment->id);
-								$paymentamount = $payment->amount /100;
-								$result = $member->subscriptionComplementaryActions($subscriptionid, $subscriptioncomplementaryaction, $bankaccountid, (int) $date_start_subscription, $payment->date, $paymentmethod, $label, $paymentamount, '');
-								if ($result <= 0) {
-									$this->error = $member->error;
-									$this->errors = array_merge($member->errors, $this->errors);
-									$error++;
+								if (isset($payment->shareAmount)) {
+									$paymentamount = $payment->shareAmount / 100;
+								} elseif (isset($newmember->amount)) {
+									$paymentamount = $newmember->amount / 100;
+								} else {
+									$paymentamount = min($payment->amount / 100, $amount);
+								}
+
+								if ($paymentamount > 0) {
+									$result = $member->subscriptionComplementaryActions($subscriptionid, $subscriptioncomplementaryaction, $bankaccountid, (int) $date_start_subscription, $payment->date, $paymentmethod, $label, $paymentamount, '');
+									if ($result <= 0) {
+										$this->error = $member->error;
+										$this->errors = array_merge($member->errors, $this->errors);
+										$error++;
+									}
 								}
 							}
 						}
