@@ -1892,6 +1892,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 		$syncedFlows = 0;
 		$postponedFlows = 0;	// Flows left unread on purpose, retried on the next run (see 'postponeflow')
 		$pendingQueued = 0;		// Flows recorded in the manual-action queue instead of aborting the whole run
+		$newProcessedFlows = 0;	// New flows processed during this run (synced or skipped), compared to $maxToProcess
 		$providershort = preg_replace('/ViaPartner$/', '', (string) $this->providerName);
 		dol_include_once('/einvoicing/class/einvoicingsyncpending.class.php');
 		$syncPending = new EInvoicingSyncPending($db);
@@ -1943,7 +1944,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 			// On the sub-second key, because the cursor moves along it.
 			dol_syslog(__METHOD__ . " Sort the flows per updatedAt", LOG_DEBUG, 0, "_einvoicing");
 			usort($results, function ($a, $b) {
-				return strcmp(self::updatedAtSortKey($a['updatedAt'] ?? ''), self::updatedAtSortKey($b['updatedAt'] ?? ''));
+				$cmp = strcmp(self::updatedAtSortKey($a['updatedAt'] ?? ''), self::updatedAtSortKey($b['updatedAt'] ?? ''));
+				if ($cmp == 0) {	// Same updatedAt: the invoice before its lifecycle statuses, so they can find it
+					$cmp = self::flowTypeSortRank($a['flowType'] ?? '') - self::flowTypeSortRank($b['flowType'] ?? '');
+				}
+				return $cmp;
 			});
 
 			// Clean already processed flows from the list
@@ -2130,10 +2135,10 @@ class SuperPDPProvider extends AbstractPDPProvider
 						$error++;
 					}
 
-					// If res == 0, commit but count it as already existed
+					// If res == 0, the flow is stored but not attached to an object: it is still a new flow, so count it as synced
 					if ($res['res'] == 0) {
 						$results_messages[] = "<span class=\"opacitylow\">Flow " . dol_escape_htmltag((string) $flow['flowId']) . " skipped: " . $res['message'] . "</span>";
-						$alreadyExist++;
+						$syncedFlows++;
 						//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
 					}
 
@@ -2141,6 +2146,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 					if ($res['res'] > 0) {
 						$syncedFlows++;
 						//$lastsuccessfullSyncronizedFlow = $flow['flowId'];
+					}
+
+					// A new flow skipped (res == 0, e.g. a life cycle flow) is still recorded, so it counts in the ceiling too
+					if ($res['res'] >= 0) {
+						$newProcessedFlows++;
 					}
 
 					// A flow that finally synchronized (or now already exists) leaves the manual-action queue.
@@ -2173,7 +2183,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 
 				// The ceiling counts flows, not batches: a batch holds up to a hundred of them, so
 				// checking it only between batches would blow straight past what was asked for.
-				if ($maxToProcess > 0 && $syncedFlows >= $maxToProcess) {
+				if ($maxToProcess > 0 && $newProcessedFlows >= $maxToProcess) {
 					break;
 				}
 			}
@@ -2181,7 +2191,7 @@ class SuperPDPProvider extends AbstractPDPProvider
 			if ($error > 0) {
 				break;
 			}
-			if ($maxToProcess > 0 && $syncedFlows >= $maxToProcess) {
+			if ($maxToProcess > 0 && $newProcessedFlows >= $maxToProcess) {
 				break;
 			}
 			if (count($results) < $effectiveLimit) {		// Short batch: the window is exhausted
@@ -2587,11 +2597,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// Some flows have no 'Original' on the platform, only the converted copy, and the sync then
 				// stops on that flow and on every flow behind it. Both carry the same CDAR, so fall back on
 				// the converted one. docType can be 'Metadata', 'Original', 'Converted' or 'ReadableView'.
-				$flowResponse = $this->fetchFlowData($flowId, 'Original');
+				$flowResponse = $this->fetchFlowData($flowId, 'Original', 'get_flow_for_lifecycle_status');
 
 				if ($flowResponse['status_code'] != 200) {
 					dol_syslog(__METHOD__ . " No 'Original' document for flowId: " . $flowId . " (HTTP " . $flowResponse['status_code'] . "), reading the CDAR from the 'Converted' document instead", LOG_WARNING);
-					$flowResponse = $this->fetchFlowData($flowId, 'Converted');
+					$flowResponse = $this->fetchFlowData($flowId, 'Converted', 'get_flow_for_lifecycle_status');
 				}
 
 				if ($flowResponse['status_code'] != 200) {
