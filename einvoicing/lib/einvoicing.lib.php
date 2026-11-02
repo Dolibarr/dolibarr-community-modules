@@ -1432,7 +1432,8 @@ function einvoicingSyncJobHealth($db)
 		return null;
 	}
 
-	$enabled = ((int) $obj->status == 1);
+	// With the module Scheduled jobs off, nothing runs the job, whatever its row says: it is disabled, not late.
+	$enabled = ((int) $obj->status == 1 && isModEnabled('cron'));
 	$running = ((int) $obj->processing > 0);
 	$datenextrun = (int) $db->jdate($obj->datenextrun);
 	// The scheduler reprograms the job after each run, failed or not. A due date left more than one period

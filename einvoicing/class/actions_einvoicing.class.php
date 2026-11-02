@@ -2719,7 +2719,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 	/**
 	 * Add the state of the scheduled synchronization to the open elements dashboard of the home page
-	 * (issue #1142). It counts as one late element while the job failed or no longer runs.
+	 * (issue #1142). It counts as one late element while the job failed or no longer runs. Hidden when
+	 * the synchronization is not scheduled: module Scheduled jobs off, job disabled or not found.
 	 *
 	 * @param	array<string,mixed>	$parameters		Hook parameters
 	 * @param	object				$object			Unused
@@ -2739,11 +2740,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		$langs->load("einvoicing@einvoicing");
 
 		$code = einvoicingSyncJobState(einvoicingSyncJobHealth($db));
+		if (in_array($code, array('notfound', 'disabled'), true)) {
+			return 0;
+		}
 		$problem = in_array($code, array('stuck', 'failed', 'late'), true);
 
 		$board = new WorkboardResponse();
 		$board->label = $langs->trans("EInvoicingSyncJobBoard", einvoicingSyncJobStateLabel($code));
-		$board->labelShort = einvoicingSyncJobStateLabel($code);
 		$board->url = dol_buildpath('/einvoicing/einvoicingindex.php', 1);
 		$board->img = img_object('', 'einvoicing@einvoicing');
 		$board->nbtodo = $problem ? 1 : 0;
@@ -2755,7 +2758,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	}
 
 	/**
-	 * Declare the card that holds the line of addOpenElementsDashboardLine()
+	 * Put the line of addOpenElementsDashboardLine() in the Invoices card of the core, so it takes the look
+	 * of the core instead of a card of its own
 	 *
 	 * @param	array<string,mixed>	$parameters		Hook parameters
 	 * @param	object				$object			Unused
@@ -2765,13 +2769,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	 */
 	public function addOpenElementsDashboardGroup($parameters, $object, &$action, $hookmanager)
 	{
-		$this->results = array(
-			'einvoicing' => array(
-				'groupName' => 'EInvoicingSyncWidget',
-				'lang' => 'einvoicing@einvoicing',
-				'stats' => array('einvoicing_sync'),
-			),
-		);
+		// The core merges the returned groups over its own: the group is returned whole, the line added to it
+		if (empty($parameters['dashboardgroup']['facture']['stats']) || !is_array($parameters['dashboardgroup']['facture']['stats'])) {
+			return 0;
+		}
+		$group = $parameters['dashboardgroup']['facture'];
+		$group['stats'][] = 'einvoicing_sync';
+		$this->results = array('facture' => $group);
 
 		return 0;
 	}

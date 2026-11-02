@@ -54,6 +54,32 @@ require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 class EinvoicingLibTest extends CommonClassTest
 {
 	/**
+	 * @var	string|null|false	Entry of the module Scheduled jobs in $conf->modules before the test, false while untouched
+	 */
+	private $savedCronModule = false;
+
+	/**
+	 * Turn the module Scheduled jobs on or off for this test only, the way isModEnabled() reads it.
+	 * tearDown() gives it back as the instance had it.
+	 *
+	 * @param	bool	$on		True to have it enabled
+	 * @return	void
+	 */
+	private function cronModule($on)
+	{
+		global $conf;
+
+		if ($this->savedCronModule === false) {
+			$this->savedCronModule = isset($conf->modules['cron']) ? $conf->modules['cron'] : null;
+		}
+		if ($on) {
+			$conf->modules['cron'] = 'cron';
+		} else {
+			unset($conf->modules['cron']);
+		}
+	}
+
+	/**
 	 * A seller, described the way Societe::setMysoc() describes $mysoc.
 	 *
 	 * @param	int|string	$assuj		->tva_assuj, which the core fills from FACTURE_TVAOPTION
@@ -235,6 +261,15 @@ class EinvoicingLibTest extends CommonClassTest
 		}
 		$this->hadallowlist = false;
 		$this->savedallowlist = null;
+
+		if ($this->savedCronModule !== false) {
+			if ($this->savedCronModule === null) {
+				unset($conf->modules['cron']);
+			} else {
+				$conf->modules['cron'] = $this->savedCronModule;
+			}
+			$this->savedCronModule = false;
+		}
 
 		parent::tearDown();
 	}
@@ -747,6 +782,7 @@ class EinvoicingLibTest extends CommonClassTest
 		$soon = "'".$db->idate(dol_now() + 600)."'";
 		$past = "'".$db->idate(dol_now() - 7200)."'";
 		$ran = "'".$db->idate(dol_now() - 300)."'";
+		$this->cronModule(true);
 
 		$this->syncJob(array('datelastrun' => $ran, 'datenextrun' => $soon, 'lastresult' => "'0'"));
 		$this->assertSame('ok', einvoicingSyncJobState(einvoicingSyncJobHealth($db)));
@@ -771,6 +807,11 @@ class EinvoicingLibTest extends CommonClassTest
 		$this->syncJob(array('datelastrun' => $past, 'datenextrun' => $past, 'lastresult' => "'1'", 'status' => '0'));
 		$this->assertSame('disabled', einvoicingSyncJobState(einvoicingSyncJobHealth($db)), 'A disabled job is neither failed nor late');
 
+		$this->syncJob(array('datelastrun' => $past, 'datenextrun' => $past, 'lastresult' => "'1'"));
+		$this->cronModule(false);
+		$this->assertSame('disabled', einvoicingSyncJobState(einvoicingSyncJobHealth($db)), 'Without the module Scheduled jobs nothing runs the job: neither failed nor late');
+		$this->cronModule(true);
+
 		$this->syncJob(array('status' => '2'));
 		$this->assertNull(einvoicingSyncJobHealth($db), 'An archived job is not the job of the module');
 		$this->assertSame('notfound', einvoicingSyncJobState(null));
@@ -785,6 +826,7 @@ class EinvoicingLibTest extends CommonClassTest
 	{
 		global $db;
 
+		$this->cronModule(true);
 		$this->syncJob(array('datelastrun' => "'".$db->idate(dol_now() - 300)."'", 'datenextrun' => "'".$db->idate(dol_now() + 600)."'", 'lastresult' => "'1'", 'lastoutput' => "'Flow <b>2</b> / 5<br>skipped: 1\nERROR_SYNCFLOW - Failed to synchronize flow i_1'"));
 		$lines = einvoicingSyncJobHealthLines($db, einvoicingSyncJobHealth($db));
 
