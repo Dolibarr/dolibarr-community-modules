@@ -147,7 +147,7 @@ the provider call, not the data model.
 - A supplier invoice keyed in by hand before its flow arrived gets these statuses once the
   synchronization attaches the received document to it (`sql/update_v1.4.0.sql` repairs the older ones).
 - Automatic: option **`EINVOICING_SEND_APPROVED_ON_VALIDATION`**, *off by default*
-  (`admin/setup_options.php`). When on, `BILL_SUPPLIER_VALIDATE` sends it
+  (`admin/setup_receive.php`). When on, `BILL_SUPPLIER_VALIDATE` sends it
   (`core/triggers/interface_98_modEInvoicing_EInvoicingTriggers.class.php`), the rationale being that
   validating a supplier invoice in Dolibarr *is* the act of accepting it.
 - Guards (`SupplierInvoiceHelper::shouldSendApprovedOnValidation()`): once per invoice, never on an

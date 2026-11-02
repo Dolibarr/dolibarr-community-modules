@@ -54,7 +54,9 @@ runs:
           "/custom/einvoicing/call_list.php"
           "/custom/einvoicing/vendorref_list.php"
           "/custom/einvoicing/admin/setup.php"
-          "/custom/einvoicing/admin/setup_options.php"
+          "/custom/einvoicing/admin/setup_advanced.php"
+          "/custom/einvoicing/admin/setup_receive.php"
+          "/custom/einvoicing/admin/setup_send.php"
           "/custom/einvoicing/admin/about.php"
         )
         if [ "${invoice:-0}" -gt 0 ]; then

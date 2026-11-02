@@ -1642,7 +1642,7 @@ trait CommonProtocol
 		global $langs, $user;
 
 		$langs->load("einvoicing@einvoicing");
-		$setupUrl = dol_buildpath('/einvoicing/admin/setup_options.php', 1) . '#EINVOICING_DEFAULT_ROUTING_MIXED';
+		$setupUrl = dol_buildpath('/einvoicing/admin/setup_receive.php', 1) . '#EINVOICING_DEFAULT_ROUTING_MIXED';
 		$action = $user->admin
 			? '<a class="button small smallpaddingimp" style="display:inline-block;width:auto;" href="' . dol_escape_htmltag($setupUrl) . '" target="_blank">'
 			: '<a class="button disabled classfortooltip small smallpaddingimp" style="display:inline-block;width:auto;" href="#" title="' . dol_escape_htmltag($langs->trans("NotEnoughPermissions")) . '">';

@@ -28,7 +28,9 @@ EInvDisabledBecauseNotEditable=This invoice is not editable
 EInvoicingSetup = Setup of the E-invoice module
 EInvoicingSetupPage = Setup of the Access Point. You must choose here the Access Point you subscribed to as the official Access Point for your company.
 NewSection=New section
-
+OptionsEInvoicingAdvanced=Advanced Options
+OptionsEInvoicingReceive=Receiving Options
+OptionsEInvoicingSend=Sending Options
 
 #
 # About page

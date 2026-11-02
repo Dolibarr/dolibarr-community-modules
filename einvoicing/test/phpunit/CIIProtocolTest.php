@@ -1326,7 +1326,7 @@ class CIIProtocolTest extends CommonClassTest
 		$found = $this->matchUnknownLine($ids['socid'], 'M1', '');
 		$this->assertSame(-1, (int) $found['res'], 'M1 with no choice in the setup must stop');
 		$this->assertSame('DEFAULT_ROUTING_MIXED_UNSET', $found['actioncode'] ?? '');
-		$this->assertStringContainsString('setup_options.php', (string) ($found['actionurl'] ?? ''));
+		$this->assertStringContainsString('setup_receive.php', (string) ($found['actionurl'] ?? ''));
 
 		$this->assertSame($ids['service'], (int) $this->matchUnknownLine($ids['socid'], 'M1', 'service')['res'], 'M1 must use the default service when the setup says so');
 		$this->assertSame($ids['product'], (int) $this->matchUnknownLine($ids['socid'], 'M2', 'product')['res'], 'M2 must use the default product when the setup says so');

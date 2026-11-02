@@ -117,7 +117,7 @@ function einvsp_actionsFromHtml($html)
  */
 function einvsp_actionMetaFromUrl($url)
 {
-	if (strpos($url, 'admin/setup_options.php') !== false) {
+	if (strpos($url, 'admin/setup_receive.php') !== false) {
 		return array('label' => 'SetDefaultRoutingMixed', 'help' => 'EINVOICING_DEFAULT_ROUTING_MIXED_HELP', 'icon' => 'fa-cog');
 	}
 	if (strpos($url, 'product_mapping.php') !== false) {
