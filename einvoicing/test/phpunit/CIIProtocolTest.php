@@ -1053,9 +1053,11 @@ class CIIProtocolTest extends CommonClassTest
 	 */
 	public function testABarcodeTheNumberingCannotGiveExplainsTheRefusal()
 	{
+		global $langs;
+
 		list($res) = $this->importWithBarcodeSetup(0, '');
 		$this->assertLessThan(0, (int) $res['res']);
-		$this->assertStringContainsString('its numbering module gave none', (string) $res['message']);
+		$this->assertStringContainsString($langs->trans('ErrorEInvoicingBarcodeRequiredOnImport'), (string) $res['message']);
 	}
 
 	/**
@@ -1547,7 +1549,7 @@ class CIIProtocolTest extends CommonClassTest
 	 */
 	public function testACreditNoteSignedLikeAnInvoiceIsRecordedAsSent()
 	{
-		global $conf, $db;
+		global $conf, $db, $langs;
 
 		foreach (array('EINVOICING_IMPORT_AS_FREE_LINES', 'EINVOICING_PRODUCTS_AUTO_GENERATION', 'FACTURE_ENABLE_NEGATIVE_LINES', 'INVOICE_KEEP_DISCOUNT_LINES_AS_IN_ORIGIN') as $name) {
 			$this->savedConstants[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
@@ -1560,13 +1562,14 @@ class CIIProtocolTest extends CommonClassTest
 		foreach (array(0, 1) as $keepSign) {
 			$conf->global->FACTURE_ENABLE_NEGATIVE_LINES = $keepSign;
 			$conf->global->INVOICE_KEEP_DISCOUNT_LINES_AS_IN_ORIGIN = $keepSign;
-			$xml = str_replace('EINV1077-0001', 'EINV1077-' . strtoupper(bin2hex(random_bytes(4))), $fixture);
+			$documentno = 'EINV1077-' . strtoupper(bin2hex(random_bytes(4)));
+			$xml = str_replace('EINV1077-0001', $documentno, $fixture);
 
 			$res = (new CIIProtocol($db))->createSupplierInvoiceFromSource($xml, null, 'test1077');
 			$id = (int) ($res['res'] ?? 0);
 			$this->assertGreaterThan(0, $id, 'options ' . $keepSign . ': ' . strip_tags((string) ($res['message'] ?? '')));
 			$this->createdInvoiceIds[] = $id;
-			$this->assertStringContainsString('carries amounts with the sign the vendor gave them', (string) $res['message']);
+			$this->assertStringContainsString($langs->trans('EInvoiceImportCreditNoteKeptAsReceived', $documentno), (string) $res['message']);
 
 			$invoice = new FactureFournisseur($db);
 			$invoice->fetch($id);
