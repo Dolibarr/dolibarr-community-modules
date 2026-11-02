@@ -727,6 +727,12 @@ parameters:
 			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
 
 		-
+			message: '#^Parameter \#7 \$moreinfo of function dol_move expects int, array\<string, mixed\> given\.$#'
+			identifier: argument.type
+			count: 1
+			path: ../../../einvoicing/class/protocols/CIIProtocol.class.php
+
+		-
 			message: '#^Path in include_once\(\) "\.\./blockedlog/lib/blockedlog\.lib\.php" is not a file or it does not exist\.$#'
 			identifier: includeOnce.fileNotFound
 			count: 1
