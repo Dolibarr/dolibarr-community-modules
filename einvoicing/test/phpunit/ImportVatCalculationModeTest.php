@@ -272,6 +272,8 @@ class ImportVatCalculationModeTest extends CommonClassTest
 	 */
 	public function testTheInvoiceCarriesTheTotalsTheDocumentAnnounces()
 	{
+		global $langs;
+
 		$this->setInstanceVatMode(1);
 
 		$invoice = $this->createFixtureInvoice();
@@ -286,8 +288,7 @@ class ImportVatCalculationModeTest extends CommonClassTest
 		$this->assertEquals(2.09, (float) $realigned->total_tva, 'the VAT is the one of the document');
 		$this->assertEquals(12.56, (float) $realigned->total_ttc);
 		$this->assertCount(1, $messages, 'the import says where the amounts come from');
-		$this->assertStringContainsString('12.56', $messages[0], 'the total the document announces');
-		$this->assertStringContainsString('the document', $messages[0], 'and where the amounts come from');
+		$this->assertSame($langs->trans('EInvoiceImportVatCarriedFromDocument', price2num(2.09, 'MT'), price2num(12.56, 'MT')), $messages[0], 'the amounts of the document, and where they come from');
 	}
 
 	/**
@@ -385,6 +386,8 @@ class ImportVatCalculationModeTest extends CommonClassTest
 	 */
 	public function testAnInstanceOnMode2ReceivingADocumentRoundedLineByLine()
 	{
+		global $langs;
+
 		$this->setInstanceVatMode(2);
 
 		$invoice = $this->createFixtureInvoice();
@@ -397,8 +400,7 @@ class ImportVatCalculationModeTest extends CommonClassTest
 		$this->assertEquals(2.10, (float) $realigned->total_tva);
 		$this->assertEquals(12.57, (float) $realigned->total_ttc);
 		$this->assertCount(1, $messages);
-		$this->assertStringContainsString('12.57', $messages[0], 'the total the document announces');
-		$this->assertStringContainsString('the document', $messages[0], 'and where the amounts come from');
+		$this->assertSame($langs->trans('EInvoiceImportVatCarriedFromDocument', price2num(2.10, 'MT'), price2num(12.57, 'MT')), $messages[0], 'the amounts of the document, and where they come from');
 	}
 
 	/**
