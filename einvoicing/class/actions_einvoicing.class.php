@@ -660,6 +660,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	{
 		global $db, $langs, $user, $conf;
 
+		// Only an admin can disable and enable a module: the others are not told, nor is the check run
+		if (!empty($user->admin)) {
+			EInvoicing::warnIfReactivationNeeded();
+		}
+
 		// Before anything else, and before the early return below: a list of the core builds its
 		// $arrayfields before it knows any action, and the versions that offer no 'completeArrayFields'
 		// hook pass the array by reference here instead. See addFieldsToList().

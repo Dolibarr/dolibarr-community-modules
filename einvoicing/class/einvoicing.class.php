@@ -83,6 +83,13 @@ class EInvoicing
 	 */
 	private static $einvoicegenerationinprogress = array();
 
+	/**
+	 * Whether the files of the module are newer than the version it was last enabled with, once known.
+	 *
+	 * @var bool|null
+	 */
+	private static $needsreactivation = null;
+
 
 	// Dolibarr internal statuses
 	const STATUS_UNKNOWN             = 0;		// By default, before the e-invoice has been generated
@@ -704,6 +711,33 @@ class EInvoicing
 	public static function isEInvoiceGenerationInProgress($invoiceid)
 	{
 		return !empty(self::$einvoicegenerationinprogress[(int) $invoiceid]);
+	}
+
+	/**
+	 * Remind that the module must be disabled and enabled again after an update.
+	 *
+	 * Its database is only upgraded when it is enabled, as for any module. Warns once per page when the
+	 * files are newer than the version the module was last enabled with.
+	 *
+	 * @return bool		True if the files are newer than the version the module was last enabled with
+	 */
+	public static function warnIfReactivationNeeded()
+	{
+		global $db, $langs;
+
+		if (self::$needsreactivation === null) {
+			dol_include_once('/einvoicing/core/modules/modEInvoicing.class.php');
+			$module = new modEInvoicing($db);
+			$lastversion = (string) ($module->getLastActivationInfo()['lastactivationversion'] ?? '');
+			// 'unknown' or empty when the core did not record it: nothing to compare with
+			self::$needsreactivation = (preg_match('/^\d/', $lastversion) && version_compare($module->version, $lastversion, '>'));
+			if (self::$needsreactivation) {
+				$langs->load('einvoicing@einvoicing');
+				setEventMessages($langs->trans('EInvoicingModuleNeedsReactivation', $module->version, $lastversion), null, 'warnings');
+			}
+		}
+
+		return self::$needsreactivation;
 	}
 
 
