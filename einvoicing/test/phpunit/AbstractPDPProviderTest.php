@@ -130,7 +130,7 @@ class AbstractPDPProviderTest extends CommonClassTest
 	 */
 	public function testAReimportWritesItsOwnEvent()
 	{
-		global $db, $user;
+		global $db, $user, $langs;
 
 		$supplier = new Societe($db);
 		$supplier->name = 'EINVOICING TEST IMPORT EVENT';
@@ -168,9 +168,11 @@ class AbstractPDPProviderTest extends CommonClassTest
 		$invoice->delete($user);
 		$supplier->delete($supplier->id);
 
-		$this->assertSame('EINVOICING - Import of the received invoice ' . $invoice->ref_supplier, $labels[0]);
-		$this->assertSame('EINVOICING - Import again of the received invoice ' . $invoice->ref_supplier, $labels[1]);
-		$this->assertStringStartsWith('Imported again from the flow flow-of-the-test received from TEST', $notes[1]);
+		// The wording belongs to the lang file (and the language of the instance), so compare with the key.
+		$this->assertSame('EINVOICING - ' . $langs->transnoentitiesnoconv('EInvoicingEventImportLabel', $invoice->ref_supplier), $labels[0]);
+		$this->assertSame('EINVOICING - ' . $langs->transnoentitiesnoconv('EInvoicingEventReimportLabel', $invoice->ref_supplier), $labels[1]);
+		$this->assertNotSame($labels[0], $labels[1], 'a re-import must not read like a first import');
+		$this->assertStringStartsWith($langs->transnoentitiesnoconv('EInvoicingEventReimportNote', 'flow-of-the-test', 'TEST', einvoicingModuleStamp()), $notes[1]);
 	}
 
 	/**
