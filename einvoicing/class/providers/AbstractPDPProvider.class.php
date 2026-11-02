@@ -1389,7 +1389,7 @@ abstract class AbstractPDPProvider
 	 * Record a lifecycle status the vendor issued about one of its invoices, onto the supplier
 	 * invoice it refers to.
 	 *
-	 * A status this Dolibarr instance cannot attach to an invoice (refused, an unparseable CDAR, or an
+	 * A status this Dolibarr instance cannot attach to an invoice (refused, an unparsable CDAR, or an
 	 * access point account shared with another system) is not worth retrying: the flow is stored with
 	 * res=0 so the synchronization does not stall on it run after run. A negative result is reserved for
 	 * a transient failure of the platform call itself - the caller must NOT store the flow in that case
@@ -1421,11 +1421,11 @@ abstract class AbstractPDPProvider
 		// An exact link to try below, before it is overwritten with the CDAR's IssuerAssignedID.
 		$flowTrackingId = (string) $document->tracking_idref;
 
-		$flowResponse = $this->fetchFlowData($flowId, 'Original');
+		$flowResponse = $this->fetchFlowData($flowId, 'Original', 'get_flow_for_lifecycle_status');
 		if ($flowResponse['status_code'] != 200) {
 			// Some flows have no 'Original' on the access point, only the converted copy. Both carry
 			// the same CDAR, so fall back rather than fail the flow (and every flow behind it).
-			$flowResponse = $this->fetchFlowData($flowId, 'Converted');
+			$flowResponse = $this->fetchFlowData($flowId, 'Converted', 'get_flow_for_lifecycle_status');
 		}
 		if ($flowResponse['status_code'] != 200) {
 			return $this->postponeIncomingSupplierInvoiceStatus($flowId, "Failed to retrieve flow details for flowId: " . $flowId);
@@ -1562,6 +1562,18 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
+	 * Rank of a flow type to order flows sharing the same updatedAt: an invoice comes before the
+	 * lifecycle statuses about it (the platform issues its 202 at the very instant it receives the invoice).
+	 *
+	 * @param	string	$flowType	Flow type (SupplierInvoice, SupplierInvoiceLC, CustomerInvoice, ...)
+	 * @return	int					0 for an invoice, 1 for any other flow
+	 */
+	protected static function flowTypeSortRank($flowType)
+	{
+		return in_array((string) $flowType, array('SupplierInvoice', 'CustomerInvoice')) ? 0 : 1;
+	}
+
+	/**
 	 * Find the supplier invoice already booked on the flow a vendor lifecycle status carries as its own
 	 * trackingId - the flow of the invoice itself, the received supplier invoice flow, on a platform
 	 * that sets it that way (verified on Hubtimize). Not the flowId of an outgoing SupplierInvoiceLC we
@@ -1607,7 +1619,8 @@ abstract class AbstractPDPProvider
 	 * a third party can be keyed in with spaces where a CDAR never carries any. A GlobalID under scheme
 	 * 0002 (SIREN) is also tried against the first 9 digits of the SIRET, since a third party recorded
 	 * with only its SIRET filled in still carries the same SIREN (verified on the Hubtimize case behind
-	 * #857: GlobalID '908544638' under scheme 0002).
+	 * #857: GlobalID '908544638' under scheme 0002). Spaces are ignored everywhere, a SIRET GlobalID matches
+	 * the SIREN, and a French VAT number matches the SIREN it embeds (third party created from its VAT only).
 	 *
 	 * @param	string	$vendorLegalId	Legal identifier carried by the CDAR, empty when it carries none
 	 * @param	string	$siren			Third party SIREN
@@ -1617,18 +1630,31 @@ abstract class AbstractPDPProvider
 	 */
 	protected function matchesVendorLegalId($vendorLegalId, $siren, $siret, $tvaIntra)
 	{
+		$vendorLegalId = removeAllSpaces((string) $vendorLegalId);
 		if ($vendorLegalId === '') {
 			return false;
 		}
+		$siren = removeAllSpaces((string) $siren);
+		$siret = removeAllSpaces((string) $siret);
+		$tvaIntra = dol_strtoupper(removeAllSpaces((string) $tvaIntra));
 
-		if ($vendorLegalId === (string) $siren || $vendorLegalId === (string) $siret) {
+		if ($vendorLegalId === $siren || $vendorLegalId === $siret) {
 			return true;
 		}
-		if ((string) $siret !== '' && $vendorLegalId === substr((string) $siret, 0, 9)) {
+		if ($siret !== '' && $vendorLegalId === dol_substr($siret, 0, 9)) {
+			return true;
+		}
+		// A GlobalID given as a SIRET (scheme 0009) while the third party only carries its SIREN
+		if ($siren !== '' && dol_strlen($vendorLegalId) == 14 && dol_substr($vendorLegalId, 0, 9) === $siren) {
+			return true;
+		}
+		// A third party known only by its French VAT number (FR + 2-char key + SIREN) still carries the SIREN
+		$reg = array();
+		if (preg_match('/^FR[0-9A-Z]{2}([0-9]{9})$/', $tvaIntra, $reg) && dol_substr($vendorLegalId, 0, 9) === $reg[1]) {
 			return true;
 		}
 
-		return removeAllSpaces($vendorLegalId) === removeAllSpaces($tvaIntra);
+		return dol_strtoupper($vendorLegalId) === $tvaIntra;
 	}
 
 	/**

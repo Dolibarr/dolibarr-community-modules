@@ -1944,7 +1944,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 			// On the sub-second key, because the cursor moves along it.
 			dol_syslog(__METHOD__ . " Sort the flows per updatedAt", LOG_DEBUG, 0, "_einvoicing");
 			usort($results, function ($a, $b) {
-				return strcmp(self::updatedAtSortKey($a['updatedAt'] ?? ''), self::updatedAtSortKey($b['updatedAt'] ?? ''));
+				$cmp = strcmp(self::updatedAtSortKey($a['updatedAt'] ?? ''), self::updatedAtSortKey($b['updatedAt'] ?? ''));
+				if ($cmp == 0) {	// Same updatedAt: the invoice before its lifecycle statuses, so they can find it
+					$cmp = self::flowTypeSortRank($a['flowType'] ?? '') - self::flowTypeSortRank($b['flowType'] ?? '');
+				}
+				return $cmp;
 			});
 
 			// Clean already processed flows from the list
@@ -2593,11 +2597,11 @@ class SuperPDPProvider extends AbstractPDPProvider
 				// Some flows have no 'Original' on the platform, only the converted copy, and the sync then
 				// stops on that flow and on every flow behind it. Both carry the same CDAR, so fall back on
 				// the converted one. docType can be 'Metadata', 'Original', 'Converted' or 'ReadableView'.
-				$flowResponse = $this->fetchFlowData($flowId, 'Original');
+				$flowResponse = $this->fetchFlowData($flowId, 'Original', 'get_flow_for_lifecycle_status');
 
 				if ($flowResponse['status_code'] != 200) {
 					dol_syslog(__METHOD__ . " No 'Original' document for flowId: " . $flowId . " (HTTP " . $flowResponse['status_code'] . "), reading the CDAR from the 'Converted' document instead", LOG_WARNING);
-					$flowResponse = $this->fetchFlowData($flowId, 'Converted');
+					$flowResponse = $this->fetchFlowData($flowId, 'Converted', 'get_flow_for_lifecycle_status');
 				}
 
 				if ($flowResponse['status_code'] != 200) {
