@@ -176,6 +176,14 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->cssClass = 'minwidth500';
 	$item->fieldParams['forcereload'] = 1;
 
+	if (getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
+		$item = $formSetup->newItem('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')->setAsYesNo();
+		$item->helpText = $langs->transnoentities('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS').'<br>'.$langs->transnoentities('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS2');
+		$item->defaultFieldValue = '0';
+		$item->cssClass = 'minwidth500';
+		$item->fieldParams['warningifon'] = 1;
+	}
+
 	// Setup conf to enable third-party validation via government APIs (SIREN via data.gouv.fr and VAT via VIES)
 	$item = $formSetup->newItem('EINVOICING_ENABLE_API_VALIDATION')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_ENABLE_API_VALIDATION_HELP');
@@ -189,7 +197,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	// stays the reference.
 	$item = $formSetup->newItem('EINVOICING_BR_CHECK')->setAsSelect(array(
 		'nocheck' => $langs->transnoentities('EINVOICING_BR_CHECK_NOCHECK'),
-		'warning_only' => $langs->transnoentities('EINVOICING_BR_CHECK_WARNING_ONLY'),
+		'warning_only' => $langs->transnoentities('EINVOICING_BR_CHECK_WARNING_ONLY').' ('.$langs->trans("Recommended").')',
 		'blocking' => $langs->transnoentities('EINVOICING_BR_CHECK_BLOCKING'),
 	));
 	$item->helpText = $langs->transnoentities('EINVOICING_BR_CHECK_HELP');
@@ -216,24 +224,6 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 			$item->cssClass = 'minwidth500';
 		}
 	}
-
-
-	if (getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
-		$item = $formSetup->newItem('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')->setAsYesNo();
-		$item->helpText = $langs->transnoentities('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS').'<br>'.$langs->transnoentities('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS2');
-		$item->defaultFieldValue = '0';
-		$item->cssClass = 'minwidth500';
-		$item->fieldParams['warningifon'] = 1;
-	}
-
-	// Setup conf to choose to block generation/send of an invoice if no routing ID is found for the third party otherwise use SIREN
-	/* Option no more useful due to other added option that are more accurate, but we can still use it as hidden option
-	$item = $formSetup->newItem('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-	$item->fieldParams['forcereload'] = 0;
-	*/
 
 	// Setup conf to check the recipient reachability in the Approved Platforms directory (annuaire PA) before
 	// sending, and surface it on the invoice card. On by default. A read-only directory lookup: it never blocks.
