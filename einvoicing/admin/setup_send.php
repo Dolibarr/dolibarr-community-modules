@@ -208,7 +208,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 		if ($hasValidator) {
 			$item = $formSetup->newItem('EINVOICING_AP_PRECHECK')->setAsSelect(array(
 				'nocheck' => $langs->transnoentities('EINVOICING_AP_PRECHECK_NOCHECK'),
-				'manuel' => $langs->transnoentities('EINVOICING_AP_PRECHECK_MANUEL'),
+				'manuel' => $langs->transnoentities('EINVOICING_AP_PRECHECK_MANUEL').' ('.$langs->trans("Recommended").')',
 				'auto' => $langs->transnoentities('EINVOICING_AP_PRECHECK_AUTO'),
 			));
 			$item->helpText = $langs->transnoentities('EINVOICING_AP_PRECHECK_HELP');
@@ -297,6 +297,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 		$item->helpText = $langs->transnoentities('EINVOICING_AUTO_SEND_ON_GENERATION_HELP');
 		$item->defaultFieldValue = '0';
 		$item->cssClass = 'minwidth500';
+		$item->fieldParams['warningifon'] = 1;
 	}
 
 	// Setup conf for maximum e-invoice file size (warning if exceeded)
@@ -346,7 +347,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$conf->global->EINVOICING_TELL_CUSTOMER_PAYMENT_RECEIVED = $langs->trans("Mandatory");
 	$item = $formSetup->newItem('EINVOICING_TELL_CUSTOMER_PAYMENT_RECEIVED');
 	$item->helpText = $langs->trans('EINVOICING_TELL_CUSTOMER_PAYMENT_RECEIVED_HELP');
-	$item->fieldInputOverride = $langs->trans("Mandatory");
+	$item->fieldOverride = '<span class="opacitymedium">'.$langs->trans("Mandatory").'</span>';
 	//$item->enabled = 0;
 	$item->cssClass = 'opacitymedium';
 

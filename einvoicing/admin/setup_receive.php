@@ -209,7 +209,7 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 		// product already chosen survives while the option is off.
 		$item = $formSetup->newItem('EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID')->setAsProduct();
 		$item->helpText = $langs->transnoentities('EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID_HELP');
-		$item->cssClass = 'minwidth500';
+		$item->cssClass = 'minwidth300 maxwidth500 widthcentpercentminusx';
 		$item->setValueFromPostCallBack(function () use ($item) {
 			if (!GETPOSTISSET($item->confKey)) {
 				return 0;
@@ -255,6 +255,7 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 	$item->helpText = $langs->transnoentities('EINVOICING_THIRDPARTIES_AUTO_GENERATION_HELP');
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
+	$item->fieldParams['warningifon'] = 1;
 
 	// Setup conf to enable complete third party information when receiving an invoice from from PDP
 	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_COMPLETE_INFO')->setAsYesNo();
