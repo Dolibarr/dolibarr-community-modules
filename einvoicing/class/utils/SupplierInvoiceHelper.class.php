@@ -53,7 +53,7 @@ class SupplierInvoiceHelper
 	const LINE_SPECIAL_CODE_ROUNDING = 95020;
 
 	/**
-	 * Special code marking the line that are created by eInvoice Supplier invoice import
+	 * Special code marking the lines that are created by eInvoice Supplier invoice import
 	 */
 	const LINE_EINVOICE_IMPORTED = 950201;
 
