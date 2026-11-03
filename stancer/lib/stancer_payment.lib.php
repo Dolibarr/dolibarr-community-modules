@@ -103,6 +103,135 @@ function stancerReturnObjectMatchesPayment($object, $localPayment)
 }
 
 /**
+ * Record on its invoice a payment the customer comes back from refused
+ * (AC_PAYMENT_STANCER_KO, deduplicated on the payment id so a reload of the
+ * return page adds nothing). Orders, proposals and other objects get no event.
+ *
+ * @param   array                  $tmptag        Return tag exploded into an array (INV, ORD, ...)
+ * @param   array|false            $paymentData   Payment as returned by the Stancer API, false when not fetched
+ * @param   Stancer_payments|null  $localPayment  Local row of the payment
+ * @param   string                 $paymentId     Stancer payment id (paym_xxx)
+ * @return  int                                   1 recorded, 0 nothing to record, -1 on error
+ */
+function stancerRecordReturnFailure($tmptag, $paymentData, $localPayment, $paymentId)
+{
+	global $db;
+
+	// Only a status given by Stancer counts: an API error tells nothing about the payment
+	$status = (is_array($paymentData) && isset($paymentData['status'])) ? (string) $paymentData['status'] : '';
+	if (!in_array($status, stancerPaymentFailureStatuses(), true)) {
+		dol_syslog("stancerRecordReturnFailure payment $paymentId status '$status' is not a failure, nothing to record", LOG_DEBUG);
+		return 0;
+	}
+	if (!is_array($tmptag) || !array_key_exists('INV', $tmptag) || (int) $tmptag['INV'] <= 0) {
+		dol_syslog("stancerRecordReturnFailure payment $paymentId is not for an invoice, no AC_PAYMENT_STANCER_KO", LOG_DEBUG);
+		return 0;
+	}
+	$invoice = new Facture($db);
+	if ($invoice->fetch((int) $tmptag['INV']) <= 0) {
+		dol_syslog("stancerRecordReturnFailure invoice " . $tmptag['INV'] . " of payment $paymentId not found: " . $invoice->error, LOG_ERR);
+		return -1;
+	}
+	if (!stancerReturnObjectMatchesPayment($invoice, $localPayment)) {
+		dol_syslog("stancerRecordReturnFailure invoice " . $invoice->ref . " does not belong to payment $paymentId, AC_PAYMENT_STANCER_KO not recorded", LOG_ERR);
+		return -1;
+	}
+	// The customer has just been refused: now is the time of the failure
+	$res = stancerAddPaymentFailureEvent($invoice, $paymentId, $paymentData, dol_now());
+	return $res < 0 ? -1 : $res;
+}
+
+/**
+ * Invoice, order or proposal a return tag names, loaded only when it really is
+ * the document the payment was issued for (see stancerReturnObjectMatchesPayment())
+ *
+ * @param   array                  $tmptag        Return tag exploded into an array (INV, ORD, PRO, ...)
+ * @param   Stancer_payments|null  $localPayment  Local row of the payment
+ * @return  Facture|Commande|Propal|null          Loaded object, null when the tag names none of them or it does not match
+ */
+function stancerLoadReturnObject($tmptag, $localPayment)
+{
+	global $db;
+
+	$classes = array('INV' => 'Facture', 'ORD' => 'Commande', 'PRO' => 'Propal');
+	foreach ($classes as $key => $class) {
+		if (!is_array($tmptag) || !array_key_exists($key, $tmptag) || (int) $tmptag[$key] <= 0) {
+			continue;
+		}
+		if ($class == 'Commande') {
+			require_once DOL_DOCUMENT_ROOT . '/commande/class/commande.class.php';
+		} elseif ($class == 'Propal') {
+			require_once DOL_DOCUMENT_ROOT . '/comm/propal/class/propal.class.php';
+		}
+		$object = new $class($db);
+		if ($object->fetch((int) $tmptag[$key]) <= 0) {
+			dol_syslog("stancerLoadReturnObject " . $class . " " . $tmptag[$key] . " named by the return tag not found: " . $object->error, LOG_ERR);
+			return null;
+		}
+		if (!stancerReturnObjectMatchesPayment($object, $localPayment)) {
+			dol_syslog("stancerLoadReturnObject " . $class . " " . $object->ref . " does not belong to the payment, not loaded", LOG_ERR);
+			return null;
+		}
+		return $object;
+	}
+	dol_syslog("stancerLoadReturnObject the return tag names no invoice, order or proposal", LOG_DEBUG);
+	return null;
+}
+
+/**
+ * Actions of the return page when the payment did not succeed: AC_PAYMENT_STANCER_KO
+ * on the invoice, PAYMENTONLINE_PAYMENT_KO trigger on the paid document, and the
+ * failure email to the customer of an invoice (STANCER_AUTO_MAIL_INVOICES_ERROR)
+ * when Stancer did refuse the payment (an API error tells nothing about it)
+ *
+ * @param   array                  $tmptag        Return tag exploded into an array (INV, ORD, PRO, ...)
+ * @param   array|false            $paymentData   Payment as returned by the Stancer API, false when not fetched
+ * @param   Stancer_payments|null  $localPayment  Local row of the payment
+ * @param   string                 $paymentId     Stancer payment id (paym_xxx)
+ * @param   int                    $error         Incremented when the trigger fails
+ * @return  Facture|Commande|Propal|null          Document of the payment, null when none could be loaded
+ */
+function stancerProcessReturnFailure($tmptag, $paymentData, $localPayment, $paymentId, &$error)
+{
+	global $user;
+
+	if (stancerRecordReturnFailure($tmptag, $paymentData, $localPayment, $paymentId) < 0) {
+		dol_syslog("stancerProcessReturnFailure failed payment " . $paymentId . " could not be recorded on its invoice", LOG_ERR);
+	}
+
+	$object = stancerLoadReturnObject($tmptag, $localPayment);
+	if ($object === null) {
+		dol_syslog("stancerProcessReturnFailure no document loaded for payment " . $paymentId . ", no trigger and no customer email", LOG_WARNING);
+		return null;
+	}
+
+	if ($object->call_trigger('PAYMENTONLINE_PAYMENT_KO', $user) < 0) {
+		dol_syslog("stancerProcessReturnFailure trigger PAYMENTONLINE_PAYMENT_KO failed on " . $object->ref . ": " . $object->error, LOG_ERR);
+		$error++;
+	}
+
+	if ($object->element == 'facture' && getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_ERROR')) {
+		$status = (is_array($paymentData) && isset($paymentData['status'])) ? (string) $paymentData['status'] : '';
+		if (in_array($status, stancerPaymentFailureStatuses(), true)) {
+			dol_syslog("stancerProcessReturnFailure payment refused, sending error email to customer for " . $object->ref, LOG_DEBUG);
+			$mailRes = stancerSendInvoiceMailModele(
+				getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_ERROR', ''),
+				$object,
+				'BILL_PAYMENTFAILED_SENTBYMAIL',
+				1  // forceMail=1: each failed attempt should notify the customer
+			);
+			if ($mailRes < 0) {
+				dol_syslog("stancerProcessReturnFailure error email to customer failed for " . $object->ref, LOG_ERR);
+			}
+		} else {
+			dol_syslog("stancerProcessReturnFailure status '" . $status . "' is not a refusal, customer of " . $object->ref . " not emailed", LOG_WARNING);
+		}
+	}
+
+	return $object;
+}
+
+/**
  * Resolve the currency code of a payment coming back from Stancer.
  *
  * Same session-less scenario as stancerResolveReturnPaymentId(): an empty
@@ -935,6 +1064,10 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 			'fk_soc' => $socid,
 		];
 		$sp->fillDataArray($data);
+		// Stancer may refuse the debit right away: record it on the invoice like the refresh would
+		if (in_array((string) $data['status'], stancerPaymentFailureStatuses(), true)) {
+			stancerAddPaymentFailureEvent($object, (string) $paymentId, $paymentData);
+		}
 		$res = $sp->create($user, true);
 		if ($res > 0) {
 			$message = $langs->trans('StancerSepaPaymentEngaged');
@@ -1297,6 +1430,12 @@ function stancerSEPAstartPayGrouped(array $invoices, $companypaymentmodeid, $use
 	);
 	$sp->fillDataArray($data);
 	$resCreate = $sp->create($user, true);
+	// Stancer may refuse the debit right away: one event per invoice of the group
+	if (in_array((string) $data['status'], stancerPaymentFailureStatuses(), true)) {
+		foreach ($invoices as $inv) {
+			stancerAddPaymentFailureEvent($inv, (string) $paymentId, $paymentData);
+		}
+	}
 	if (!$resCreate) {
 		dol_syslog("stancerSEPAstartPayGrouped Stancer_payments create failed", LOG_ERR);
 		return -1;
@@ -1542,6 +1681,10 @@ function stancerCBstartPay($object, $userMessage = true, $companypaymentmodeid =
 			'fk_soc' => $socid,
 		];
 		$sp->fillDataArray($data);
+		// The saved card is charged at once: a refusal is known now, record it on the invoice
+		if (in_array((string) $data['status'], stancerPaymentFailureStatuses(), true)) {
+			stancerAddPaymentFailureEvent($object, (string) $pid, $paymentResult);
+		}
 		$res = $sp->create($user, true);
 		if ($res > 0) {
 			$message = $langs->trans('StancerCardPaymentEngaged');

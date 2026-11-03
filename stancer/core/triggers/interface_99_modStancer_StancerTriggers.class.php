@@ -136,6 +136,34 @@ class InterfaceStancerTriggers extends DolibarrTriggers
 
 		// Or you can execute some code below in the switch/case
 		switch ($action) {
+			// Sent by the signature module once the customer has signed a mandate
+			case 'COMPANYPAYMENTMODE_SIGNED':
+				if (!$object instanceof CompanyPaymentMode) {
+					dol_syslog("stancerTrigger $action called with " . $objClass . " instead of CompanyPaymentMode, skip", LOG_ERR);
+					return 0;
+				}
+				$applied = stancerApplySignedSepaMandate((int) $object->id, $user);
+				if ($applied['status'] === 'error') {
+					// The signature callback has no user to show an error to: tell the SEPA contact
+					// so the switch is done by hand from the Stancer tab of the thirdparty
+					dol_syslog("stancerTrigger $action mandate " . $object->id . ": template invoices not switched to direct debit, " . $applied['message'], LOG_ERR);
+					$langs->load('stancer@stancer');
+					$societe = new Societe($this->db);
+					$societe->fetch((int) $object->fk_soc);
+					$sent = stancerSendMail(
+						getDolGlobalString('STANCER_EMAIL_INFO_SEPA', ''),
+						$langs->transnoentitiesnoconv('StancerMailSubjectSepaSignedSwitchError', $societe->name),
+						$langs->transnoentitiesnoconv('StancerMailSepaSignedSwitchError', dol_escape_htmltag((string) $societe->name), dol_escape_htmltag($applied['message'])),
+						false,
+						'',
+						'thi' . ((int) $object->fk_soc)
+					);
+					if ($sent <= 0) {
+						dol_syslog("stancerTrigger $action mandate " . $object->id . ": warning mail not sent (STANCER_EMAIL_INFO_SEPA empty or mail error)", LOG_ERR);
+					}
+				}
+				return 0;
+
 			// Users
 			//case 'USER_CREATE':
 			//case 'USER_MODIFY':
