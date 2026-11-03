@@ -787,6 +787,8 @@ if ($ispaymentok) {
 
 					if (!$error) {
 						$db->commit();
+						// The order is paid through the invoice made from it: the event goes on that invoice
+						stancerAddPaymentResultEvent($invoice, true, (string) $stancerPaymentId, '', '', '', $now);
 					} else {
 						$db->rollback();
 					}
@@ -935,6 +937,11 @@ if ($ispaymentok) {
 							// Send invoice by mail if configured
 							if (!$error && getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_CB')) {
 								stancerSendInvoiceMailModele(getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_CB_MAILTYPE', ''), $invoice, 'BILL_PAYED_SENTBYMAIL');
+							}
+
+							if (!$error) {
+								// The proposal is paid through the invoice made from it: the event goes on that invoice
+								stancerAddPaymentResultEvent($invoice, true, (string) $stancerPaymentId, '', '', '', $now);
 							}
 
 							$postactionmessages[] = 'Invoice ' . $invoice->ref . ' created and paid from propal ' . $propal->ref;
@@ -1637,24 +1644,11 @@ if ($ispaymentok) {
 	// session here. On a failed payment $_SESSION["FinalPaymentAmt"] is never even
 	// written, so this block used to blank the values it then emailed to the admin.
 
-	if (is_object($object) && method_exists($object, 'call_trigger')) {
-		// Call trigger
-		$result = $object->call_trigger('PAYMENTONLINE_PAYMENT_KO', $user);
-		if ($result < 0) {
-			$error++;
-		}
-		// End call triggers
-	}
-
-	// Send failure notification email to customer (template-based with PDF and payment link)
-	if (is_object($object) && $object->element == 'facture' && getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_ERROR')) {
-		dol_syslog("stancer paymentback payment failed, sending error email to customer for " . $object->ref, LOG_DEBUG);
-		stancerSendInvoiceMailModele(
-			getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_ERROR', ''),
-			$object,
-			'BILL_PAYMENTFAILED_SENTBYMAIL',
-			1  // forceMail=1: each failed attempt should notify the customer
-		);
+	// $object is only loaded by the success branch above: load the document named by the
+	// tag here too, so the KO trigger and the customer failure email do fire
+	$failedObject = stancerProcessReturnFailure($tmptag, $paymentData, $sp, (string) $stancerPaymentId, $error);
+	if ($failedObject !== null) {
+		$object = $failedObject;
 	}
 
 	$sendemail = '';

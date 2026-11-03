@@ -1,6 +1,6 @@
 ---
 title: "Nouveautés de la version 2.0.24"
-weight: 300
+weight: 301
 description: "Lien de paiement envoyé depuis une commande ou une facture, carte sans 3-D Secure, nouvel essai après un refus, et une série de durcissements de sécurité."
 ---
 
