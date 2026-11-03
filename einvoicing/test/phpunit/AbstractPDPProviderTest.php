@@ -169,7 +169,7 @@ class AbstractPDPProviderTest extends CommonClassTest
 		$supplier->delete($supplier->id);
 
 		$this->assertSame('EINVOICING - Import of the received invoice ' . $invoice->ref_supplier, $labels[0]);
-		$this->assertSame('EINVOICING - Import again of the received invoice ' . $invoice->ref_supplier, $labels[1]);
+		$this->assertSame('EINVOICING - Re-import of the received invoice ' . $invoice->ref_supplier, $labels[1]);
 		$this->assertStringStartsWith('Imported again from the flow flow-of-the-test received from TEST', $notes[1]);
 	}
 
