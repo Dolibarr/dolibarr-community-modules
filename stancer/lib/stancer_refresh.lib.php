@@ -341,8 +341,12 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 				}
 			} else {
 				// Failure statuses on grouped: call reopen ONCE (it handles the whole group internally and returns array<Facture>).
-				$failureStatuses = array('disputed', 'refused', 'expired', 'failed');
+				$failureStatuses = stancerPaymentFailureStatuses();
 				if (in_array($paymentStatus, $failureStatuses)) {
+					// One AC_PAYMENT_STANCER_KO per invoice of the group, deduplicated on the payment id
+					foreach ($groupedInvoices as $inv) {
+						stancerAddPaymentFailureEvent($inv, $paymentId, $paymentData);
+					}
 					$reopenActionCode = 'BILL_REOPEN_FAILED_' . strtoupper($paymentStatus);
 					// Idempotence: skip if the action was already created on the first invoice of the group.
 					$firstInv = $groupedInvoices[0];
@@ -666,6 +670,11 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 			}
 			dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId : " . $message);
 		} else {
+			// The failure is a fact even when the invoice left Stancer since: record it before the
+			// eligibility check. Invoices only, deduplicated on the payment id across daily runs.
+			if (in_array($paymentStatus, stancerPaymentFailureStatuses())) {
+				stancerAddPaymentFailureEvent($obj, $paymentId, $paymentData);
+			}
 			// Stop nagging when the merchant has manually switched the linked invoice/order
 			// away from Stancer (eg. customer asks for a bank transfer after a CB failure):
 			// payment mode no longer CB/PRE OR bank account no longer the Stancer one. Mark
@@ -683,7 +692,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 			if ($mailNotif) {
 				$adminActionCode = 'ADMIN_PAYERROR_' . strtoupper($paymentStatus);
 				$actioncommCheck = new ActionComm($db);
-				$existingAdminNotif = $actioncommCheck->getActions($obj->socid, $obj->id, $obj->element, " AND code='AC_" . $db->escape($adminActionCode) . "'");
+				$existingAdminNotif = $actioncommCheck->getActions($obj->socid, $obj->id, stancerActionCommElementType($obj), " AND code='AC_" . $db->escape($adminActionCode) . "'");
 				if (empty($existingAdminNotif)) {
 					$obj->fetch_thirdparty();
 					$customerName = is_object($obj->thirdparty) ? $obj->thirdparty->name : '';
@@ -697,7 +706,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 				}
 			}
 			// Send customer notification for payment failures detected a posteriori (dispute, refused, expired, failed)
-			$failureStatuses = ['disputed', 'refused', 'expired', 'failed'];
+			$failureStatuses = stancerPaymentFailureStatuses();
 			if (in_array($paymentStatus, $failureStatuses) && $obj->element == 'facture') {
 				// Reopen the invoice if it had been marked paid (idempotent: noop if already unpaid)
 				$reopenActionCode = 'BILL_REOPEN_FAILED_' . strtoupper($paymentStatus);
@@ -792,7 +801,7 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 			// invoice's lifetime is negligible.
 			$cronSummaryCode = 'CRON_PAY_REP_' . substr(md5($paymentId), 0, 8) . '_' . strtoupper($paymentStatus);
 			$actioncommCheckSummary = new ActionComm($db);
-			$existingSummary = $actioncommCheckSummary->getActions($obj->socid, $obj->id, $obj->element, " AND code='AC_" . $db->escape($cronSummaryCode) . "'");
+			$existingSummary = $actioncommCheckSummary->getActions($obj->socid, $obj->id, stancerActionCommElementType($obj), " AND code='AC_" . $db->escape($cronSummaryCode) . "'");
 
 			if (empty($existingSummary)) {
 				$urlPayment = stancerBuildManagerLink($paymentId, $paymentId);
@@ -1230,6 +1239,10 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 					}
 					dol_syslog("stancerRefreshAllPayments $paymentId : " . $message);
 			} else {
+				// Recorded before the eligibility check, invoices only, deduplicated on the payment id
+				if (in_array($paymentStatus, stancerPaymentFailureStatuses())) {
+					stancerAddPaymentFailureEvent($obj, $paymentId, $payment);
+				}
 				// Stop nagging when the merchant has manually switched the linked invoice/order
 				// away from Stancer (eg. customer asks for a bank transfer after a CB failure):
 				// payment mode no longer CB/PRE OR bank account no longer the Stancer one. Mark
@@ -1250,7 +1263,7 @@ function stancerRefreshAllPayments($userMessage = true, $lastrun = null, $sendNo
 				// invoice's lifetime is negligible.
 				$cronSummaryCode = 'CRON_PAY_REP_' . substr(md5($paymentId), 0, 8) . '_' . strtoupper($paymentStatus);
 				$actioncommCheck = new ActionComm($db);
-				$existingSummary = $actioncommCheck->getActions($obj->socid, $obj->id, $obj->element, " AND code='AC_" . $db->escape($cronSummaryCode) . "'");
+				$existingSummary = $actioncommCheck->getActions($obj->socid, $obj->id, stancerActionCommElementType($obj), " AND code='AC_" . $db->escape($cronSummaryCode) . "'");
 
 				if (empty($existingSummary)) {
 					if ($mailNotif) {

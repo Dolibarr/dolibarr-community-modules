@@ -808,9 +808,8 @@ class ActionsStancer
 				dol_include_once('/stancer/lib/stancer_customer.lib.php');
 				$payerIsReachable = false;
 				if ($object->element == 'member') {
-					$memberCountry = empty($object->country_code) ? 'FR' : $object->country_code;
 					$payerIsReachable = (strpos((string) $object->email, '@') !== false)
-						|| (stancerNormalizePhone($object->phone, $memberCountry) !== '');
+						|| (stancerResolveMemberMobile($object) !== '');
 				} else {
 					$societe = new Societe($this->db);
 					if ($societe->fetch($object->socid) > 0) {
@@ -982,7 +981,14 @@ class ActionsStancer
 			// Only for validated propals
 			if ($object->statut == Propal::STATUS_VALIDATED || $object->statut == Propal::STATUS_SIGNED) {
 				if (getDolGlobalString('STANCER_ENABLE_CB')) {
-					if ($object->thirdparty->email) {
+					// The link is shown when the payment can go through, which is the
+					// very check stancerAddCustomerIfNeeded() makes: an email or a
+					// mobile, on the thirdparty or on its contacts.
+					if (empty($object->thirdparty) && $object->fetch_thirdparty() <= 0) {
+						dol_syslog("stancer showLinkedObjectBlock: cannot load the thirdparty of propal id=" . ((int) $object->id), LOG_ERR);
+					}
+					$payer = stancerResolvePayerContact($object->thirdparty, $object);
+					if ($payer['email'] !== '' || $payer['mobile'] !== '') {
 						$paymentUrl = stancerGetPropalPaymentUrl($object);
 						print '<br><!-- Stancer payment link -->';
 						print '<div class="titre inline-block">' . $langs->trans("StancerPropalPaymentLink") . '</div>';

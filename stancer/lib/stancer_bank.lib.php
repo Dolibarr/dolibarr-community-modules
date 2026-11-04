@@ -1011,6 +1011,8 @@ function stancerAddPaymentOnObject($object, $data, &$errorMessage, $bypassCustom
 		dol_syslog("stancerAddPaymentOnObject commit then add action comm ....");
 		$db->commit();
 		stancerAddActionComm($object, $actioncode, $label, $paiement->note_public, $postactionmessages, '');
+		// Core convention of automatic debits, only on invoices (skipped for other objects)
+		stancerAddPaymentResultEvent($object, true, (string) $data['payment_id'], '', '', '', stancerDateToTimeStamp($data['date']));
 
 		//erics add new line on bank account for Stancer Fees ?
 		//or in stancer listing ?
@@ -1180,6 +1182,7 @@ function stancerAddPaymentOnInvoices(array $invoices, $data, &$errorMessage)
 
 	foreach ($invoices as $inv) {
 		stancerAddActionComm($inv, 'STANCER_PAYMENT_OK', $label, $paiement->note_public, $postactionmessages, '');
+		stancerAddPaymentResultEvent($inv, true, (string) $data['payment_id'], '', '', '', stancerDateToTimeStamp($data['date']));
 	}
 
 	if (getDolGlobalString('STANCER_ADD_FEES') == 'PAYMENT' && !empty($data['FinalFees'])) {
