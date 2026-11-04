@@ -114,7 +114,14 @@ trait CommonProtocol
 		// the amount the document will actually carry in BT-113 covers the total.
 		$totalTtc = (float) price2num($invoice->total_ttc, 'MT');
 		if ($alreadyPaid === null) {
-			$alreadyPaid = (float) $invoice->getSommePaiement();
+			// The error is the int -1, a refund of 1.00 the float -1.0.
+			$alreadyPaid = $invoice->getSommePaiement();
+			if (!is_float($alreadyPaid)) {
+				if ($alreadyPaid < 0) {
+					dol_syslog(__METHOD__ . ' cannot read the payments of invoice ' . $invoice->id . ': ' . $invoice->error, LOG_ERR);
+				}
+				$alreadyPaid = 0.0;
+			}
 		}
 		// Credit note: total is negative in Dolibarr, BT-113 is positive in the document.
 		$isFullyPaid = ($totalTtc != 0.0 && abs(abs((float) $alreadyPaid) - abs($totalTtc)) < 0.005);
