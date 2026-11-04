@@ -459,16 +459,123 @@ if (!empty($formSetup->items)) {
 	print '<br>';
 }
 
-// on change EINVOICING_PDP reload page to show specific configuration of selected PDP
+$excludedUntdidCodes = array('PMT', 'PMD', 'AAB');
+
+$extraUntdidCodes = einvoicingGetActiveUntdid4451Codes($db, $langs, $conf->entity, $excludedUntdidCodes);
+
+print '<br>';
+print load_fiche_titre($langs->trans('EINVOICING_EXTRA_MENTIONS'), '', 'title_setup');
+print '<div class="opacitymedium">'.$langs->trans('EINVOICING_EXTRA_MENTIONS_HELP').'</div>';
+print '<br>';
+
+// Form for Adding or Modifying Information
+print '<form method="POST" action="'.dol_escape_htmltag($_SERVER['PHP_SELF']).'">';
+print '<input type="hidden" name="token" value="'.newToken().'">';
+print '<input type="hidden" name="action" value="save_extra_untdid">';
+
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre">';
+print '<td>'.$langs->trans('EINVOICING_UNTDID_CODE').'</td>';
+print '<td>'.$langs->trans('EINVOICING_UNTDID_DESCRIPTION').'</td>';
+print '<td>'.$langs->trans('EINVOICING_MENTION_TEXT').'</td>';
+print '<td></td>';
+print '</tr>';
+print '<tr class="oddeven">';
+
+print '<td>';
+print '<select name="untdid_code" id="untdid_code" class="minwidth200">';
+print '<option value="">-- '.$langs->trans('Select'). ' --</option>';
+foreach ($extraUntdidCodes as $code => $codeData) {
+	$constantName = 'EINVOICING_EXTRA_'.$code;
+	$existingText = getDolGlobalString($constantName);
+	print '<option value="'.dol_escape_htmltag($code).'"';
+	print ' data-description="'.dol_escape_htmltag($codeData['label']).'"';
+	print ' data-existing-text="'.dol_escape_htmltag($existingText).'"';
+	print '>'.dol_escape_htmltag($code.' - '.$codeData['label']).'</option>';
+}
+print '</select>';
+print '</td>';
+
+print '<td><span id="untdid_description" class="opacitymedium"></span></td>';
+print '<td><textarea name="untdid_text" id="untdid_text" class="minwidth500" rows="4"></textarea></td>';
+print '<td><input type="submit" class="button" value="'.$langs->trans('Add').'"></td>';
+print '</tr>';
+print '</table>';
+print '</form>';
+
+print '<br>';
+print '<table class="noborder centpercent">';
+print '<tr class="liste_titre">';
+print '<td>'.$langs->trans('EINVOICING_UNTDID_CODE').'</td>';
+print '<td>'.$langs->trans('EINVOICING_UNTDID_DESCRIPTION').'</td>';
+print '<td>'.$langs->trans('EINVOICING_MENTION_TEXT').'</td>';
+print '<td class="right">'.$langs->trans('Action').'</td>';
+print '</tr>';
+
+$hasExtraMention = false;
+foreach ($extraUntdidCodes as $code => $codeData) {
+	$constantName = 'EINVOICING_EXTRA_'.$code;
+	$existingText = getDolGlobalString($constantName);
+	if ($existingText === '') {
+		continue;
+	}
+
+	$hasExtraMention = true;
+	print '<tr class="oddeven">';
+	print '<td><strong>'.dol_escape_htmltag($code).'</strong></td>';
+	print '<td>'.dol_escape_htmltag($codeData['label']).'</td>';
+	print '<td>'.dol_escape_htmltag($existingText).'</td>';
+	print '<td class="right">';
+	print '<a class="reposition" href="#" data-code="'.dol_escape_htmltag($code).'">'.$langs->trans('Modify').'</a> ';
+	print '<a class="reposition" href="'.dol_escape_htmltag($_SERVER['PHP_SELF'].'?action=delete_extra_untdid&token='.newToken().'&untdid_code='.urlencode($code)).'" onclick="return confirm(\''.dol_escape_js($langs->trans('ConfirmDelete')).'\');">';
+	print img_picto($langs->trans('Delete'), 'delete').'</a>';
+	print '</td>';
+	print '</tr>';
+}
+
+if (!$hasExtraMention) {
+	print '<tr><td colspan="4" class="opacitymedium">'.$langs->trans('EINVOICING_NO_EXTRA_MENTION').'</td></tr>';
+}
+print '</table>';
+
 print '<script>
 $(document).ready(function() {
-	var pdpSelect = $("select[name=\'EINVOICING_PDP\']");
-	if (pdpSelect.length) {
-		pdpSelect.on("change", function() {
-			console.log("PDP changed, submit form to reload page");
-			$(this).closest("form").submit();
-		});
-	}
+    // Additional Information UNTDID 4451
+    var codeSelect = $("#untdid_code");
+    var description = $("#untdid_description");
+    var textArea = $("#untdid_text");
+
+    if (codeSelect.length && description.length && textArea.length) {
+        codeSelect.on("change", function() {
+            var selectedOption = this.options[this.selectedIndex];
+
+            description.text(
+                selectedOption.getAttribute("data-description") || ""
+            );
+
+            textArea.val(
+                selectedOption.getAttribute("data-existing-text") || ""
+            );
+        });
+
+        $("[data-code]").on("click", function(event) {
+            event.preventDefault();
+
+            codeSelect.val($(this).data("code"));
+            codeSelect.trigger("change");
+            textArea.trigger("focus");
+        });
+    }
+
+    // Reload the page when the platform is modified
+    var pdpSelect = $("select[name=\'EINVOICING_PDP\']");
+
+    if (pdpSelect.length) {
+        pdpSelect.on("change", function() {
+            console.log("PDP changed, submit form to reload page");
+            $(this).closest("form").submit();
+        });
+    }
 });
 </script>';
 
