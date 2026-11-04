@@ -3,7 +3,7 @@ name: Check PR files
 
 on:
   # Use pull_request_target (and not pull_request), so the GITHUB_TOKEN is read/write
-  # even for a PR coming from a fork, allowing the workflow to comment the PR.
+  # even for a PR coming from a fork, allowing the workflow to comment the PR and add a label on it.
   # It is safe because no code of the PR is checked out and executed.
   pull_request_target:
     paths-ignore:
@@ -16,7 +16,7 @@ concurrency:
 
 permissions:
   pull-requests: write # to comment the PR
-  issues: write # to comment the PR
+  issues: write # to add a label on the PR
 
 jobs:
   check-files:
@@ -43,6 +43,10 @@ jobs:
                 || echo "::warning::Failed to comment the PR."
             fi
 
+            # Tag the PR as "PR not qualified"
+            #gh pr edit "${{ github.event.number }}" --repo "${{ github.repository }}" --add-label "PR not qualified" \
+            #  || echo "::warning::Failed to add the label \"PR not qualified\" on the PR."
+
             echo "::error::Translation files outside langs/en_US must not be modified in a pull request. Translations are generated from en_US. The following files were modified:"
             echo "$CHANGED_FILES" | sed 's/^/ - /'
             echo ""
@@ -51,6 +55,13 @@ jobs:
           fi
 
           echo "No translation files outside langs/en_US were modified. OK."
+
+          # If a previous run of this check has tagged the PR as "PR not qualified",
+          # remove the label now that the forbidden files have been reverted.
+          #if gh api "repos/${{ github.repository }}/issues/${{ github.event.number }}/labels" 2>/dev/null | grep -qF '"name": "PR not qualified"'; then
+          #  gh pr edit "${{ github.event.number }}" --repo "${{ github.repository }}" --remove-label "PR not qualified" \
+          #    || echo "::warning::Failed to remove the label \"PR not qualified\" on the PR."
+          #fi
 
       - name: Check the number of modified files is not higher than 10, except for QUAL PR
         env:
@@ -106,3 +117,28 @@ jobs:
           fi
 
           echo "No ChangeLog file was modified. OK."
+
+      - name: Check that database structure and code are not modified in the same PR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the list of files changed (whatever is the status) by the pull request,
+          # using the GitHub API so no git history is needed (no checkout).
+          ALL_FILES=$(gh api --paginate "repos/${{ github.repository }}/pulls/${{ github.event.number }}/files?per_page=100" \
+            --jq '.[] | .filename, (.previous_filename // empty)' | sort -u)
+
+          # Files of the database structure of a module (tables, keys, migrations, ...) are into <module>/sql/
+          SQL_FILES=$(echo "$ALL_FILES" | grep -E '^[^/]+/sql/.*\.sql$' || true)
+          # Files of code: PHP files outside <module>/sql/
+          PHP_FILES=$(echo "$ALL_FILES" | grep -E '\.php$' | grep -Ev '^[^/]+/sql/' || true)
+
+          if [ -n "$SQL_FILES" ] && [ -n "$PHP_FILES" ]; then
+            echo "::error::A PR must not modify the database structure (<module>/sql/*.sql) and the code (PHP files) at the same time. Please submit the database structure change into a dedicated PR first."
+            echo "Database structure files modified:"
+            echo "$SQL_FILES" | sed 's/^/ - /'
+            echo "Code files modified:"
+            echo "$PHP_FILES" | sed 's/^/ - /'
+            exit 1
+          fi
+
+          echo "The PR does not mix database structure and code changes. OK."
