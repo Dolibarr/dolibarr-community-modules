@@ -55,8 +55,10 @@ jobs:
     steps:
       - id: pick
         run: |
-          all='["18.0.0","24.0.0"]'
-          review='["18.0.0","24.0.0"]'
+          # The oldest supported line is followed on its maintenance branch, not on a frozen release
+          # tag: the branch carries the core fixes (its PHPDoc in particular) that a tag never will.
+          all='["18.0","24.0.0"]'
+          review='["18.0","24.0.0"]'
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "matrix=$review" >> "$GITHUB_OUTPUT"
           else
@@ -72,10 +74,10 @@ jobs:
       matrix:
         dolibarr: ${{ fromJSON(needs.cores.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Checkout Dolibarr ${{ matrix.dolibarr }}
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: Dolibarr/dolibarr
           ref: ${{ matrix.dolibarr }}
@@ -94,7 +96,7 @@ jobs:
       # The pinned phar and the analysis cache. The cache is per core: PHPStan stores what it read
       # of the checkout it was pointed at.
       - name: Restore the PHPStan cache
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: .run-phpstan
           key: phpstan-${{ env.PHPSTAN_VERSION }}-${{ matrix.dolibarr }}-${{ github.sha }}

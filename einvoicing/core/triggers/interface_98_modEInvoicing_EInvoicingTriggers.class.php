@@ -37,6 +37,12 @@ dol_include_once('einvoicing/class/providers/PDPProviderManager.class.php');
 class InterfaceEInvoicingTriggers extends DolibarrTriggers
 {
 	/**
+	 * Warnings reported by the trigger (declared by DolibarrTriggers only since Dolibarr 23)
+	 * @var string[]
+	 */
+	public $warnings = array();
+
+	/**
 	 * Constructor
 	 *
 	 * @param DoliDB $db Database handler
@@ -149,6 +155,26 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 				}
 			}
 
+			// Identifier this customer gave us as its supplier, sent as BT-29 (issue #1151). An empty value
+			// deletes it. A save that does not carry the field (API, mass action, import) leaves it untouched.
+			if (GETPOSTISSET('einvoicing_seller_id_by_buyer')) {
+				$result = $einvoicing->insertOrUpdateExtraField($socId, 'societe', EInvoicing::EXTRAFIELD_SELLER_ID_BY_BUYER, trim(GETPOST('einvoicing_seller_id_by_buyer', 'alphanohtml')));
+				if ($result < 0) {
+					$error++;
+					$this->errors[] = $langs->trans('FailedToSaveSellerIdByBuyer').' '.$einvoicing->error;
+				}
+			}
+
+			// Buyer reference of this customer, sent as BT-10 on its invoices that have none (issue #1210).
+			// Same rules: an empty value deletes it, a save that does not carry the field leaves it untouched.
+			if (GETPOSTISSET('einvoicing_buyer_reference')) {
+				$result = $einvoicing->insertOrUpdateExtraField($socId, 'societe', EInvoicing::EXTRAFIELD_BUYER_REFERENCE, trim(GETPOST('einvoicing_buyer_reference', 'alphanohtml')));
+				if ($result < 0) {
+					$error++;
+					$this->errors[] = $langs->trans('FailedToSaveCustomerBuyerReference').' '.$einvoicing->error;
+				}
+			}
+
 			if ($error) {
 				return -4;
 			}
@@ -232,7 +258,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 										$this->warnings[] = $message;
 									}
 								}
-							} elseif ($result['res'] == 0) {	// Warning case
+							} elseif ($checkresult['res'] == 0) {	// Warning case
 								$message = $langs->trans("InvoiceGeneratedWithWarnings") . ': <br>' . $checkresult['message'];
 								if ((float) DOL_VERSION >= 23) {
 									$this->warnings[] = $message;
@@ -395,12 +421,23 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 						price2num(SupplierInvoiceHelper::linkedDepositAmount((int) $object->id), 'MT')
 					);
 					return -1;
+				} elseif (isset($announced['lines'], $announced['linetotal'])) {
+					// The document contradicts itself (BR-CO-10): pointing at two totals that may well be
+					// equal, as they are on the reported document, told the operator nothing (issue #1198).
+					$this->errors[] = $langs->trans(
+						'EInvoiceLineTotalMismatchBlocksValidation',
+						price2num($announced['lines'], 'MT'),
+						price2num($announced['linetotal'], 'MT'),
+						price2num($announced['tva'], 'MT')
+					);
+					return -1;
 				} else {
 					$this->errors[] = $langs->trans(
 						'EInvoiceTotalsMismatchBlocksValidation',
 						price2num($announced['ttc'], 'MT'),
 						price2num($announced['tva'], 'MT'),
-						price2num(abs((float) $object->total_ttc), 'MT')
+						price2num(abs((float) $object->total_ttc), 'MT'),
+						price2num(abs((float) $object->total_tva), 'MT')
 					);
 					return -1;
 				}

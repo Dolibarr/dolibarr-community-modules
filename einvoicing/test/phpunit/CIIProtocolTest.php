@@ -60,6 +60,7 @@ require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/class/discount.class.php';
 require_once DOL_DOCUMENT_ROOT . '/core/lib/files.lib.php';
 require_once DOL_DOCUMENT_ROOT . '/ecm/class/ecmfiles.class.php';
+require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 
 if (empty($user->id)) {
@@ -501,6 +502,25 @@ class CIIProtocolTest extends CommonClassTest
 		foreach (array('393' => '380', '396' => '381', '472' => '384') as $factored => $plain) {
 			$this->assertSame($method->invoke($protocol, $plain), $method->invoke($protocol, $factored), $factored);
 		}
+	}
+
+	/**
+	 * A received line shows its name once, followed by a description that differs from it.
+	 *
+	 * @return void
+	 */
+	public function testALineDescriptionNeverRepeatsItsName()
+	{
+		global $db;
+
+		$method = new ReflectionMethod(CIIProtocol::class, 'resolveLineDescription');
+		$method->setAccessible(true);
+		$protocol = new CIIProtocol($db);
+
+		$this->assertSame('FRAIS DE DOSSIER', $method->invoke($protocol, array('prodname' => 'FRAIS DE DOSSIER', 'proddesc' => 'FRAIS DE DOSSIER')));
+		$this->assertSame("Fees\nFile 42", $method->invoke($protocol, array('prodname' => 'Fees', 'proddesc' => 'File 42')));
+		$this->assertSame('Fees', $method->invoke($protocol, array('prodname' => 'Fees', 'proddesc' => '')));
+		$this->assertSame('File 42', $method->invoke($protocol, array('prodname' => '', 'proddesc' => 'File 42')));
 	}
 
 	/**
@@ -1000,6 +1020,125 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
+	 * A product created at import gets no barcode by default: the codes of our numbering are not to be
+	 * spent on vendor products (#1159).
+	 *
+	 * @return void
+	 */
+	public function testAProductCreatedAtImportGetsNoBarcodeByDefault()
+	{
+		list($res, $item) = $this->importWithBarcodeSetup(0, null);
+		$this->assertGreaterThan(0, (int) $res['res'], 'import: ' . strip_tags((string) ($res['message'] ?? '')));
+		$this->assertSame('', (string) $item->barcode, 'no barcode is taken from the numbering');
+	}
+
+	/**
+	 * A numbering module with a mask requires a barcode on every product: the product gets the next
+	 * code even without the option, or the import could never create it (#1159).
+	 *
+	 * @return void
+	 */
+	public function testABarcodeRequiredByTheSetupIsAlwaysGiven()
+	{
+		list($res, $item) = $this->importWithBarcodeSetup(0, '1159{000000}');
+		$this->assertGreaterThan(0, (int) $res['res'], 'import: ' . strip_tags((string) ($res['message'] ?? '')));
+		$this->assertSame(1, preg_match('/^1159[0-9]{6}$/', (string) $item->barcode), 'the product gets the next code of the numbering module, not ' . $item->barcode);
+	}
+
+	/**
+	 * The standard numbering without mask requires a barcode it cannot give: the creation is refused
+	 * and the message says what to do, where it was empty before (#1159).
+	 *
+	 * @return void
+	 */
+	public function testABarcodeTheNumberingCannotGiveExplainsTheRefusal()
+	{
+		global $langs;
+
+		list($res) = $this->importWithBarcodeSetup(0, '');
+		$this->assertLessThan(0, (int) $res['res']);
+		$this->assertStringContainsString($langs->trans('ErrorEInvoicingBarcodeRequiredOnImport'), (string) $res['message']);
+	}
+
+	/**
+	 * With the option, the product gets the next code of the numbering module. The word 'auto' was sent,
+	 * unknown before Dolibarr 20: the core checked it against the mask and refused the product (#1159).
+	 *
+	 * @return void
+	 */
+	public function testWithTheOptionAProductCreatedAtImportGetsTheNextBarcode()
+	{
+		list($res, $item) = $this->importWithBarcodeSetup(1, '1159{000000}');
+		$this->assertGreaterThan(0, (int) $res['res'], 'import: ' . strip_tags((string) ($res['message'] ?? '')));
+		$this->assertSame(1, preg_match('/^1159[0-9]{6}$/', (string) $item->barcode), 'the product gets the next code of the numbering module, not ' . $item->barcode);
+	}
+
+	/**
+	 * Import a document billing a product unknown here, with the barcode module on.
+	 *
+	 * @param	int		$option		Value of EINVOICING_PRODUCTS_AUTO_BARCODE
+	 * @param	?string	$mask		Mask of the standard numbering module, null for no numbering
+	 * @return	array{0:array<string,mixed>,1:Product}	Result of the import, product of its first line
+	 */
+	private function importWithBarcodeSetup($option, $mask)
+	{
+		global $conf, $db, $user;
+
+		require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
+		if (empty($user->id)) {
+			$user->fetch(1);
+		}
+
+		$R = 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100';
+		$doc = new DOMDocument();
+		$doc->load(__DIR__ . '/fixtures/received_documents/cii_rounding_amount.xml');
+		$xp = new DOMXPath($doc);
+		$xp->registerNamespace('ram', $R);
+		$siren = (string) random_int(100000000, 999999999);
+		$seller = $xp->query('//ram:SellerTradeParty')->item(0);
+		$xp->query('ram:GlobalID', $seller)->item(0)->nodeValue = $siren . '00017';
+		$xp->query('ram:SpecifiedLegalOrganization/ram:ID', $seller)->item(0)->nodeValue = $siren;
+		$xp->query('ram:SpecifiedTaxRegistration/ram:ID', $seller)->item(0)->nodeValue = 'FR00' . $siren;
+		$product = $xp->query('//ram:SpecifiedTradeProduct')->item(0);
+		$product->insertBefore($doc->createElementNS($R, 'SellerAssignedID', 'BC-' . $siren), $product->firstChild);
+		$xp->query('ram:Name', $product)->item(0)->nodeValue = 'BARCODE ' . $siren;
+		$xp->query('//*[local-name()="ExchangedDocument"]/*[local-name()="ID"]')->item(0)->nodeValue = 'BC-' . $siren;
+
+		$saved = array();
+		$settings = array('EINVOICING_THIRDPARTIES_AUTO_GENERATION' => 1, 'EINVOICING_PRODUCTS_AUTO_GENERATION' => 1, 'EINVOICING_IMPORT_AS_FREE_LINES' => 0,
+			'EINVOICING_PRODUCTS_AUTO_BARCODE' => $option, 'BARCODE_PRODUCT_ADDON_NUM' => ($mask !== null ? 'mod_barcode_product_standard' : ''),
+			'BARCODE_STANDARD_PRODUCT_MASK' => (string) $mask, 'PRODUIT_DEFAULT_BARCODE_TYPE' => 2);
+		foreach ($settings as $name => $value) {
+			$saved[$name] = getDolGlobalString($name);
+			$conf->global->$name = $value;
+		}
+		$savedModule = $conf->modules['barcode'] ?? null;
+		$conf->modules['barcode'] = 'barcode';
+		$savedEnabled = isset($conf->barcode) ? $conf->barcode : null;
+		$conf->barcode = (object) array('enabled' => 1);
+
+		$res = (new CIIProtocol($db))->createSupplierInvoiceFromSource($doc->saveXML(), null, 'test-barcode-' . $siren);
+
+		foreach ($saved as $name => $value) {
+			$conf->global->$name = $value;
+		}
+		if ($savedModule === null) {
+			unset($conf->modules['barcode']);
+		} else {
+			$conf->modules['barcode'] = $savedModule;
+		}
+		$conf->barcode = $savedEnabled;
+
+		$item = new Product($db);
+		if ((int) ($res['res'] ?? 0) > 0) {
+			$invoice = new FactureFournisseur($db);
+			$invoice->fetch((int) $res['res']);
+			$item->fetch((int) $invoice->lines[0]->fk_product);
+		}
+		return array($res, $item);
+	}
+
+	/**
 	 * "0" is a valid vendor reference: emptiness has to be tested on the string, because empty()
 	 * answers true on it and drops BT-155 from the generated line.
 	 *
@@ -1028,19 +1167,21 @@ class CIIProtocolTest extends CommonClassTest
 	 * A vendor id carrying no vendor price at all, so the fixture is the only row the lookup can see.
 	 * A unique key allows a single price with an empty ref_fourn per vendor, so an existing vendor
 	 * cannot be reused; product_fournisseur_price.fk_soc has no foreign key, so no third party is
-	 * needed to hold the row either.
+	 * needed to hold the row either. No routing either: a default product left on that id by a test
+	 * that did not roll back would be found by the lookup.
 	 *
-	 * @return int	Vendor id free of any vendor price
+	 * @return int	Vendor id free of any vendor price and of any routing
 	 */
 	private function vendorWithoutAnyPrice()
 	{
 		global $db;
 
-		$resql = $db->query("SELECT COALESCE(MAX(fk_soc), 0) + 1 as freesoc FROM " . MAIN_DB_PREFIX . "product_fournisseur_price");
-		$this->assertNotFalse($resql, 'could not read the vendor prices: ' . $db->lasterror());
-		$obj = $db->fetch_object($resql);
+		$sql = "SELECT GREATEST((SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "product_fournisseur_price),";
+		$sql .= " (SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "einvoicing_routing)) + 1 as freesoc";
+		$resql = $db->query($sql);
+		$this->assertNotFalse($resql, 'could not find a free vendor id: ' . $db->lasterror());
 
-		return (int) $obj->freesoc;
+		return (int) $db->fetch_object($resql)->freesoc;
 	}
 
 	/**
@@ -1055,12 +1196,8 @@ class CIIProtocolTest extends CommonClassTest
 	{
 		global $conf, $db;
 
-		// A vendor id free of any price and of any routing, so two vendors of the same test never share one
-		$sql = "SELECT GREATEST((SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "product_fournisseur_price),";
-		$sql .= " (SELECT COALESCE(MAX(fk_soc), 0) FROM " . MAIN_DB_PREFIX . "einvoicing_routing)) + 1 as freesoc";
-		$resql = $db->query($sql);
-		$this->assertNotFalse($resql, 'could not find a free vendor id: ' . $db->lasterror());
-		$socid = (int) $db->fetch_object($resql)->freesoc;
+		// Free of any price and of any routing, so two vendors of the same test never share one
+		$socid = $this->vendorWithoutAnyPrice();
 		$ids = array('socid' => $socid, 'product' => 0, 'service' => 0);
 		$einvoicing = new EInvoicing($db);
 		foreach (array('product' => $withProduct, 'service' => $withService) as $type => $wanted) {
@@ -1191,7 +1328,7 @@ class CIIProtocolTest extends CommonClassTest
 		$found = $this->matchUnknownLine($ids['socid'], 'M1', '');
 		$this->assertSame(-1, (int) $found['res'], 'M1 with no choice in the setup must stop');
 		$this->assertSame('DEFAULT_ROUTING_MIXED_UNSET', $found['actioncode'] ?? '');
-		$this->assertStringContainsString('setup_options.php', (string) ($found['actionurl'] ?? ''));
+		$this->assertStringContainsString('setup_receive.php', (string) ($found['actionurl'] ?? ''));
 
 		$this->assertSame($ids['service'], (int) $this->matchUnknownLine($ids['socid'], 'M1', 'service')['res'], 'M1 must use the default service when the setup says so');
 		$this->assertSame($ids['product'], (int) $this->matchUnknownLine($ids['socid'], 'M2', 'product')['res'], 'M2 must use the default product when the setup says so');
@@ -1210,6 +1347,59 @@ class CIIProtocolTest extends CommonClassTest
 		$found = $this->matchUnknownLine($ids['socid'], 'M1', '');
 		$this->assertSame(0, (int) $found['res']);
 		$this->assertArrayNotHasKey('actioncode', $found);
+	}
+
+	/**
+	 * The catch-all product of the setup (issue #1146) answers a line only once everything else failed,
+	 * including the defaults of the vendor, and only while its option is on and products are not created.
+	 *
+	 * @return void
+	 */
+	public function testTheCatchallProductIsTheLastResort()
+	{
+		global $conf;
+
+		// The vendor with defaults first: one without any routing leaves its id free for the next call
+		$withdefault = $this->vendorWithDefaults(true, true);
+		$none = $this->vendorWithDefaults(false, false);
+		$catchall = $none['product'];	// a product of the fixture no routing points at
+
+		$names = array('EINVOICING_DEFAULT_PRODUCT_CATCHALL', 'EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID', 'EINVOICING_PRODUCTS_AUTO_GENERATION');
+		$saved = array();
+		foreach ($names as $name) {
+			$saved[$name] = $conf->global->$name ?? null;
+		}
+		try {
+			$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 0;
+			$conf->global->EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID = $catchall;
+			$conf->global->EINVOICING_DEFAULT_PRODUCT_CATCHALL = 0;
+			$this->assertSame(0, (int) $this->matchUnknownLine($none['socid'], 'B1')['res'], 'the product alone must not apply while the option is off');
+
+			$conf->global->EINVOICING_DEFAULT_PRODUCT_CATCHALL = 1;
+			$found = $this->matchUnknownLine($none['socid'], 'B1');
+			$this->assertSame($catchall, (int) $found['res'], 'a line of a vendor without default must use the catch-all');
+			$this->assertSame('defaultrouting', $found['matchtype'] ?? '');
+			$this->assertSame('catchall', $found['routingtype'] ?? '');
+			$this->assertSame($catchall, (int) $this->matchUnknownLine($none['socid'], 'M1', '')['res'], 'a mixed invoice of a vendor without default must use the catch-all');
+
+			$this->assertSame($withdefault['service'], (int) $this->matchUnknownLine($withdefault['socid'], 'S1')['res'], 'the default of the vendor must keep priority');
+			$this->assertSame(-1, (int) $this->matchUnknownLine($withdefault['socid'], 'M1', '')['res'], 'the catch-all must not hide the choice a mixed invoice asks for');
+
+			$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 1;
+			$this->assertSame(0, (int) $this->matchUnknownLine($none['socid'], 'B1')['res'], 'the catch-all must leave the line to the product creation');
+
+			$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 0;
+			$conf->global->EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID = $catchall + 1000000;
+			$this->assertSame(0, (int) $this->matchUnknownLine($none['socid'], 'B1')['res'], 'a deleted catch-all product must not be linked');
+		} finally {
+			foreach ($saved as $name => $value) {
+				if ($value === null) {
+					unset($conf->global->$name);
+				} else {
+					$conf->global->$name = $value;
+				}
+			}
+		}
 	}
 
 	/**
@@ -1295,6 +1485,216 @@ class CIIProtocolTest extends CommonClassTest
 		$this->assertGreaterThan(0, $invoice->insert_discount($id), (string) $invoice->error);
 
 		return (int) $id;
+	}
+
+	/**
+	 * An EXTENDED document may announce its VAT rounded per rate while BT-109 and BT-112 add up the VAT rounded
+	 * per line (BR-FREXT-CO-15): the invoice keeps the VAT per line, totals BT-109 and BT-112, and notes the two
+	 * VAT totals (issue #1166). The tolerance is a cent per line, 1.01 on 101 lines: one cent more and the
+	 * invoice is marked, like an EN 16931 document, which tolerates nothing.
+	 *
+	 * @return void
+	 */
+	public function testAnExtendedDocumentKeepsItsVatRoundedPerLine()
+	{
+		global $conf, $db;
+
+		foreach (array('EINVOICING_IMPORT_AS_FREE_LINES', 'EINVOICING_PRODUCTS_AUTO_GENERATION') as $name) {
+			$this->savedConstants[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
+		}
+		$conf->global->EINVOICING_IMPORT_AS_FREE_LINES = 1;
+		$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 0;
+		$this->createFixtureSeller();
+
+		$extended = 'urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr';
+		// The document of #1166: six lines of 93.24, 18.66 of VAT per line, 18.65 per rate on a base of 93.25
+		$bred = array('8.70', '0.28', '0.28', '8.70', '0.28', '75.00');
+		$hundredOne = array_fill(0, 101, '10.00');
+		// label => guideline, lines, BT-116, BT-110, BT-112, VAT of the invoice when it is kept (null: marked)
+		$cases = array(
+			'extended' => array($extended, $bred, '93.25', '18.65', '111.90', 18.66),
+			'en16931' => array('urn:cen.eu:en16931:2017', $bred, '93.25', '18.65', '111.90', null),
+			'extended, BT-112 beyond its VAT per line' => array($extended, $bred, '93.25', '18.65', '111.97', null),
+			'extended, 101 lines, 1.01 off' => array($extended, $hundredOne, '1010.00', '200.99', '1212.00', 202.00),
+			'extended, 101 lines, 1.02 off' => array($extended, $hundredOne, '1010.00', '200.98', '1212.00', null),
+		);
+		foreach ($cases as $label => $case) {
+			list($guideline, $lines, $basis, $tax, $grandTotal, $keptVat) = $case;
+			$id = $this->importBuiltDocument($guideline, $lines, $basis, $tax, $grandTotal);
+			$this->assertGreaterThan(0, $id, $label);
+			$invoice = new FactureFournisseur($db);
+			$invoice->fetch($id);
+
+			if ($keptVat !== null) {
+				$lineTotal = array_sum(array_map('floatval', $lines));
+				$this->assertNull(SupplierInvoiceHelper::totalsMismatch($id), $label . ': the invoice is not marked');
+				$this->assertEqualsWithDelta($lineTotal, (float) $invoice->total_ht, 0.001, $label . ': the invoice totals BT-109');
+				$this->assertEqualsWithDelta($keptVat, (float) $invoice->total_tva, 0.001, $label . ': with the VAT rounded per line');
+				$this->assertEqualsWithDelta((float) $grandTotal, (float) $invoice->total_ttc, 0.001, $label . ': and BT-112');
+				$this->assertCount(count($lines), $invoice->lines, $label . ': no line is added');
+				$this->assertSame(array('announced' => (float) $tax, 'invoice' => $keptVat), SupplierInvoiceHelper::vatRoundedPerLine($id), $label . ': both VAT totals are noted');
+			} else {
+				$this->assertNotNull(SupplierInvoiceHelper::totalsMismatch($id), $label . ': the invoice is marked');
+				$this->assertNull(SupplierInvoiceHelper::vatRoundedPerLine($id), $label . ': no note');
+			}
+		}
+	}
+
+	/**
+	 * A credit note its vendor signed like an invoice (issue #1077) is recorded as sent: the fee it charges
+	 * stays positive, the deposit it refunds negative, and the credit note totals BT-115, -72.80. The two
+	 * core options that keep the sign of a credit note line change nothing to it.
+	 *
+	 * @return void
+	 */
+	public function testACreditNoteSignedLikeAnInvoiceIsRecordedAsSent()
+	{
+		global $conf, $db, $langs;
+
+		foreach (array('EINVOICING_IMPORT_AS_FREE_LINES', 'EINVOICING_PRODUCTS_AUTO_GENERATION', 'FACTURE_ENABLE_NEGATIVE_LINES', 'INVOICE_KEEP_DISCOUNT_LINES_AS_IN_ORIGIN') as $name) {
+			$this->savedConstants[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
+		}
+		$conf->global->EINVOICING_IMPORT_AS_FREE_LINES = 1;
+		$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 0;
+		$this->createFixtureSeller();
+		$fixture = (string) file_get_contents(__DIR__ . '/fixtures/received_documents/cii_credit_note_signed_as_invoice.xml');
+
+		foreach (array(0, 1) as $keepSign) {
+			$conf->global->FACTURE_ENABLE_NEGATIVE_LINES = $keepSign;
+			$conf->global->INVOICE_KEEP_DISCOUNT_LINES_AS_IN_ORIGIN = $keepSign;
+			$documentno = 'EINV1077-' . strtoupper(bin2hex(random_bytes(4)));
+			$xml = str_replace('EINV1077-0001', $documentno, $fixture);
+
+			$res = (new CIIProtocol($db))->createSupplierInvoiceFromSource($xml, null, 'test1077');
+			$id = (int) ($res['res'] ?? 0);
+			$this->assertGreaterThan(0, $id, 'options ' . $keepSign . ': ' . strip_tags((string) ($res['message'] ?? '')));
+			$this->createdInvoiceIds[] = $id;
+			$this->assertStringContainsString($langs->trans('EInvoiceImportCreditNoteKeptAsReceived', $documentno), (string) $res['message']);
+
+			$invoice = new FactureFournisseur($db);
+			$invoice->fetch($id);
+			$invoice->fetch_lines();
+			$this->assertSame(FactureFournisseur::TYPE_CREDIT_NOTE, (int) $invoice->type);
+			$this->assertEquals(-76.00, (float) $invoice->total_ht, 'options ' . $keepSign);
+			$this->assertEquals(3.20, (float) $invoice->total_tva, 'the VAT of the fee it charges');
+			$this->assertEquals(-72.80, (float) $invoice->total_ttc);
+			$this->assertFalse(SupplierInvoiceHelper::totalsMismatchBlocks($id), 'nothing holds its validation back');
+
+			$byRate = array();
+			foreach ($invoice->lines as $line) {
+				if ((float) $line->total_ht != 0) {
+					$this->assertSame($line->total_ht > 0, $line->subprice > 0, 'a line and its unit price carry the same sign');
+				}
+				$byRate[(string) price2num($line->tva_tx)] = ($byRate[(string) price2num($line->tva_tx)] ?? 0) + (float) $line->total_ht;
+			}
+			$this->assertEquals(array('20' => 16.00, '0' => -92.00), $byRate);
+		}
+	}
+
+	/**
+	 * A received credit note keeps the sign its vendor gave each line, and its header totals them (issue #1077):
+	 * a 381 of 100 with a restocking fee of 20 is a credit of 80, signed like a credit note or like an invoice.
+	 * An EXTENDED one signed like an invoice keeps its VAT rounded per line like an invoice does (#1166).
+	 *
+	 * @return void
+	 */
+	public function testAReceivedCreditNoteKeepsTheSignOfEachLine()
+	{
+		global $conf, $db;
+
+		foreach (array('EINVOICING_IMPORT_AS_FREE_LINES', 'EINVOICING_PRODUCTS_AUTO_GENERATION') as $name) {
+			$this->savedConstants[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
+		}
+		$conf->global->EINVOICING_IMPORT_AS_FREE_LINES = 1;
+		$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 0;
+		$this->createFixtureSeller();
+
+		$en16931 = 'urn:cen.eu:en16931:2017';
+		// label => lines, BT-116, BT-110, BT-112
+		$cases = array(
+			'signed like a credit note' => array(array('100.00', '-20.00'), '80.00', '16.00', '96.00'),
+			'signed like an invoice' => array(array('-100.00', '20.00'), '-80.00', '-16.00', '-96.00'),
+		);
+		foreach ($cases as $label => $case) {
+			list($lines, $basis, $tax, $grandTotal) = $case;
+			$id = $this->importBuiltDocument($en16931, $lines, $basis, $tax, $grandTotal, '381');
+			$invoice = new FactureFournisseur($db);
+			$invoice->fetch($id);
+
+			$this->assertSame(FactureFournisseur::TYPE_CREDIT_NOTE, (int) $invoice->type, $label);
+			$this->assertEqualsWithDelta(array(-100.0, 20.0), array_map(function ($line) {
+				return (float) $line->total_ht;
+			}, $invoice->lines), 0.001, $label . ': each line keeps its sign');
+			$this->assertEqualsWithDelta(-80.0, (float) $invoice->total_ht, 0.001, $label . ': the header totals its lines');
+			$this->assertEqualsWithDelta(-16.0, (float) $invoice->total_tva, 0.001, $label);
+			$this->assertEqualsWithDelta(-96.0, (float) $invoice->total_ttc, 0.001, $label);
+			$this->assertNull(SupplierInvoiceHelper::totalsMismatch($id), $label . ': the credit note is not marked');
+		}
+
+		$extended = 'urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr';
+		$bred = array('-8.70', '-0.28', '-0.28', '-8.70', '-0.28', '-75.00');
+		$id = $this->importBuiltDocument($extended, $bred, '-93.25', '-18.65', '-111.90', '381');
+		$invoice = new FactureFournisseur($db);
+		$invoice->fetch($id);
+		$this->assertNull(SupplierInvoiceHelper::totalsMismatch($id), 'extended, signed like an invoice: not marked');
+		$this->assertEqualsWithDelta(-18.66, (float) $invoice->total_tva, 0.001, 'extended: the VAT rounded per line');
+		$this->assertEqualsWithDelta(-111.90, (float) $invoice->total_ttc, 0.001, 'extended: BT-112');
+	}
+
+	/**
+	 * Import a document built on the rounding fixture: its line repeated at the given amounts, 20 % each.
+	 *
+	 * @param	string				$guideline	BT-24
+	 * @param	array<int,string>	$lines		BT-131 of each line
+	 * @param	string				$basis		BT-116
+	 * @param	string				$tax		BT-117 and BT-110
+	 * @param	string				$grandTotal	BT-112 and BT-115
+	 * @param	string				$typeCode	BT-3
+	 * @return	int								Id of the invoice the import built
+	 */
+	private function importBuiltDocument($guideline, array $lines, $basis, $tax, $grandTotal, $typeCode = '380')
+	{
+		global $db;
+
+		$doc = new DOMDocument();
+		$doc->load(__DIR__ . '/fixtures/received_documents/cii_rounding_amount.xml');
+		$xp = new DOMXPath($doc);
+		$xp->registerNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
+		$model = $xp->query('//ram:IncludedSupplyChainTradeLineItem')->item(0);
+		foreach ($lines as $n => $amount) {
+			$copy = $model->parentNode->insertBefore($model->cloneNode(true), $model);
+			$xp->query('.//ram:LineID', $copy)->item(0)->nodeValue = (string) ($n + 1);
+			// A negative line is a negative quantity: BR-27 forbids a negative net price
+			$xp->query('.//ram:ChargeAmount', $copy)->item(0)->nodeValue = ltrim($amount, '-');
+			$xp->query('.//ram:BilledQuantity', $copy)->item(0)->nodeValue = ((float) $amount < 0) ? '-1.0000' : '1.0000';
+			$xp->query('.//ram:LineTotalAmount', $copy)->item(0)->nodeValue = $amount;
+		}
+		$model->parentNode->removeChild($model);
+		$rounding = $xp->query('//ram:RoundingAmount')->item(0);
+		$rounding->parentNode->removeChild($rounding);
+		$lineTotal = number_format(array_sum(array_map('floatval', $lines)), 2, '.', '');
+		$values = array(
+			'//ram:GuidelineSpecifiedDocumentContextParameter/ram:ID' => $guideline,
+			'//*[local-name()="ExchangedDocument"]/ram:ID' => 'EINV1166-' . strtoupper(bin2hex(random_bytes(4))),
+			'//*[local-name()="ExchangedDocument"]/ram:TypeCode' => $typeCode,
+			'//ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/ram:BasisAmount' => $basis,
+			'//ram:ApplicableHeaderTradeSettlement/ram:ApplicableTradeTax/ram:CalculatedAmount' => $tax,
+			'//ram:SpecifiedTradeSettlementHeaderMonetarySummation/ram:LineTotalAmount' => $lineTotal,
+			'//ram:TaxBasisTotalAmount' => $lineTotal,
+			'//ram:TaxTotalAmount' => $tax,
+			'//ram:GrandTotalAmount' => $grandTotal,
+			'//ram:DuePayableAmount' => $grandTotal,
+		);
+		foreach ($values as $path => $value) {
+			$xp->query($path)->item(0)->nodeValue = $value;
+		}
+
+		$res = (new CIIProtocol($db))->createSupplierInvoiceFromSource($doc->saveXML(), null, 'test1166');
+		$id = (int) ($res['res'] ?? 0);
+		$this->assertGreaterThan(0, $id, strip_tags((string) ($res['message'] ?? '')));
+		$this->createdInvoiceIds[] = $id;
+
+		return $id;
 	}
 
 	/**
@@ -1484,5 +1884,157 @@ class CIIProtocolTest extends CommonClassTest
 		sort($names);
 
 		return $names;
+	}
+
+	/**
+	 * Import the BASIC WL fixture, which has no line, for the fixture seller.
+	 *
+	 * @param	int		$autoGeneration		Value of EINVOICING_PRODUCTS_AUTO_GENERATION and EINVOICING_IMPORT_AS_FREE_LINES
+	 * @return	array<string,mixed>			What createSupplierInvoiceFromSource() answers
+	 */
+	private function importDocumentWithoutLines($autoGeneration)
+	{
+		global $conf, $db;
+
+		foreach (array('EINVOICING_IMPORT_AS_FREE_LINES', 'EINVOICING_PRODUCTS_AUTO_GENERATION') as $name) {
+			$this->savedConstants[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
+			$conf->global->$name = $autoGeneration;
+		}
+
+		$xml = str_replace('EINVWL-0001', 'EINVWL-' . strtoupper(bin2hex(random_bytes(4))), (string) file_get_contents(__DIR__ . '/fixtures/received_documents/cii_basicwl_without_lines.xml'));
+		$protocol = new CIIProtocol($db);
+		$result = $protocol->createSupplierInvoiceFromSource($xml, null, 'testbasicwl');
+		if ((int) ($result['res'] ?? 0) > 0) {
+			$this->createdInvoiceIds[] = (int) $result['res'];
+		}
+
+		return $result;
+	}
+
+	/**
+	 * A document without line becomes one line per VAT rate on the default product of the vendor, the
+	 * document level charge and allowance staying lines of their own, so the invoice totals what the document announces.
+	 *
+	 * @return void
+	 */
+	public function testADocumentWithoutLinesIsImportedOnTheDefaultProduct()
+	{
+		global $db, $user;
+
+		$socid = $this->createFixtureSeller();
+		$product = new Product($db);
+		$product->ref = 'PHPUNIT-WL-' . strtoupper(bin2hex(random_bytes(4)));
+		$product->label = 'Default product of the vendor';
+		$product->type = Product::TYPE_SERVICE;
+		$productId = $product->create($user);
+		$this->assertGreaterThan(0, $productId, (string) $product->error);
+		$einvoicing = new EInvoicing($db);
+		$this->assertGreaterThan(0, $einvoicing->setDefaultRouting($socid, 'idprod_' . $productId, '', '', '', 'product'));
+
+		$result = $this->importDocumentWithoutLines(0);
+
+		$id = (int) ($result['res'] ?? 0);
+		$this->assertGreaterThan(0, $id, strip_tags((string) ($result['message'] ?? '')));
+		$invoice = new FactureFournisseur($db);
+		$invoice->fetch($id);
+		$invoice->fetch_lines();
+		$byRate = array();
+		foreach ($invoice->lines as $line) {
+			$byRate[(string) price2num($line->tva_tx)][] = array((int) $line->fk_product, (float) $line->total_ht);
+		}
+		ksort($byRate);
+		$this->assertEquals(array('20' => array(array($productId, 800.00), array(0, 27.23)), '5.5' => array(array(0, -10.00), array($productId, 110.00))), $byRate);
+		$this->assertEquals(170.95, (float) $invoice->total_tva);
+		$this->assertEquals(1098.18, (float) $invoice->total_ttc);
+	}
+
+	/**
+	 * Without a default product the import stops on the actions to take, even when it may create products
+	 * or free lines: a line built from the VAT breakdown names nothing a product could be made of.
+	 *
+	 * @return void
+	 */
+	public function testADocumentWithoutLinesAsksForADefaultProduct()
+	{
+		global $db, $langs;
+
+		$socid = $this->createFixtureSeller();
+		$einvoicing = new EInvoicing($db);
+		foreach (array('product', 'service') as $type) {
+			foreach ((array) $einvoicing->fetchAllRoutings($socid, $type, 0) as $routing) {
+				$einvoicing->deleteRouting((int) $routing['rowid'], $socid);
+			}
+			$this->assertSame('0', (string) $einvoicing->fetchDefaultRouting($socid, $type));
+		}
+
+		$result = $this->importDocumentWithoutLines(1);
+
+		$this->assertSame(-1, (int) $result['res'], strip_tags((string) ($result['message'] ?? '')));
+		$this->assertSame('PRODUCT_NOT_FOUND', $result['actioncode'] ?? '');
+		$this->assertArrayHasKey('setdefaultproduct', $result['allactiondata'] ?? array());
+		$this->assertStringContainsString($langs->trans('EInvoiceNoLineNeedsDefaultProduct'), (string) ($result['action'] ?? ''));
+	}
+
+	/**
+	 * Prepaid amounts (BT-113), billing frames (BT-23), and the deposit still to attach.
+	 *
+	 * @return	array<string,array{0:?float,1:string,2:float}>
+	 */
+	public static function prepaidAmounts(): array
+	{
+		return array(
+			'a deposit'                     => array(120.0, 'B1', 120.0),
+			'half a cent under float noise' => array(0.004999999999999, 'B1', 0.004999999999999),
+			'below half a cent'             => array(0.004, 'B1', 0.0),
+			'absent'                        => array(null, 'B1', 0.0),
+			'negative'                      => array(-5.0, 'B1', 0.0),
+			'already paid frame'            => array(120.0, 'B2', 0.0),
+		);
+	}
+
+	/**
+	 * Only a prepaid amount writing a positive cent, outside an already paid frame, is a deposit to attach.
+	 *
+	 * @dataProvider prepaidAmounts
+	 *
+	 * @param	?float	$prepaid	BT-113, null when absent
+	 * @param	string	$frame		BT-23
+	 * @param	float	$expected	Amount still to attach
+	 * @return	void
+	 */
+	public function testOnlyAPositiveCentIsADepositToAttach($prepaid, $frame, $expected)
+	{
+		global $db;
+
+		$method = new ReflectionMethod(CIIProtocol::class, 'depositAnnouncedByDocument');
+		$method->setAccessible(true);
+
+		$header = array('businessProcessId' => $frame);
+		if ($prepaid !== null) {
+			$header['totalPrepaidAmount'] = $prepaid;
+		}
+
+		$this->assertSame($expected, $method->invokeArgs(new CIIProtocol($db), array($header)));
+	}
+
+	/**
+	 * A payable that answers BR-CO-16 to the cent does not mark the invoice.
+	 *
+	 * @return	void
+	 */
+	public function testAPayableAnsweringToTheCentIsNoContradiction()
+	{
+		global $db;
+
+		$method = new ReflectionMethod(CIIProtocol::class, 'flagPayableMismatch');
+		$method->setAccessible(true);
+		$protocol = new CIIProtocol($db);
+
+		foreach (array(array(1.02, 0.0, 1.015), array(1.1, 2.2, 3.3)) as list($due, $prepaid, $announcedTtc)) {
+			$messages = array();
+			$header = array('duePayableAmount' => $due, 'totalPrepaidAmount' => $prepaid, 'documentno' => 'TEST');
+			$this->assertFalse($method->invokeArgs($protocol, array(0, $header, 0.0, $announcedTtc, &$messages)), 'BT-115 ' . $due . ' + BT-113 ' . $prepaid . ' against ' . $announcedTtc);
+			$this->assertCount(0, $messages);
+		}
 	}
 }

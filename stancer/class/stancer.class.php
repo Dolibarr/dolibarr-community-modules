@@ -694,7 +694,13 @@ class Stancer extends CommonObject
 					$paid = $facture->getSommePaiement() ?? 0;
 					$invoiceprocessed[] = $facture->ref;
 					if ((float) price2num($paid, 'MT') >= (float) price2num($facture->total_ttc, 'MT') - 0.005) {
-						$facture->setPaid($user);
+						if ($facture->setPaid($user) < 0) {
+							$reason = $facture->error ? $facture->error : implode(', ', $facture->errors);
+							dol_syslog("stancer doCheckInvoicesPaid: cannot set invoice " . $facture->ref . " as paid: " . $reason, LOG_ERR);
+							$invoiceprocessedko[] = $facture->ref;
+							$error++;
+							continue;
+						}
 						$listeFactureOKLink .= " " . $facture->getNomUrl(0, '', 0, 0, '', 1);
 						$invoiceprocessedok[] = $facture->ref;
 					}
@@ -705,10 +711,14 @@ class Stancer extends CommonObject
 				$error++;
 			}
 
-			if (@count($invoiceprocessedok) == 1) {
+			if (count($invoiceprocessedok) == 1) {
 				$message = $langs->transnoentitiesnoconv("StancerdoCheckInvoicesPaidResultMessageA", (string) count($invoiceprocessed), $listeFactureOKLink);
-			} elseif (@count($invoiceprocessedok) > 1) {
+			} elseif (count($invoiceprocessedok) > 1) {
 				$message = $langs->transnoentitiesnoconv("StancerdoCheckInvoicesPaidResultMessageAP", (string) count($invoiceprocessedok), (string) count($invoiceprocessed), $listeFactureOKLink);
+			}
+			if (count($invoiceprocessedko) > 0) {
+				$this->error = $langs->transnoentitiesnoconv("StancerdoCheckInvoicesPaidFailedMessage", (string) count($invoiceprocessedko), implode(', ', $invoiceprocessedko));
+				$message .= ($message ? "\n" : "") . $this->error;
 			}
 			$this->output = $message;
 

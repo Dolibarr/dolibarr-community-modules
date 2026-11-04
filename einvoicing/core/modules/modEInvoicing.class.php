@@ -5,6 +5,7 @@
  * Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
+ * Copyright (C) 2026       Alexandre Spangaro          <alexandre@inovea-conseil.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,7 +44,7 @@ class modEInvoicing extends DolibarrModules
 	 */
 	public function __construct($db)
 	{
-		global $conf;
+		global $conf, $langs;
 
 		$this->db = $db;
 
@@ -131,7 +132,7 @@ class modEInvoicing extends DolibarrModules
 				'invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'societelist', 'productlist',
 				'productservicelist', 'accountancysupplierlist',
 				'pdfgeneration', 'odtgeneration',
-				'api',
+				'api', 'index',
 			],
 			/* END MODULEBUILDER HOOKSCONTEXTS */
 			// Set this to 1 if features of module are opened to external users
@@ -185,6 +186,7 @@ class modEInvoicing extends DolibarrModules
 			2 => array('EINVOICING_FLOWS_SYNC_CALL_LIMIT', 'chaine', '1', '0'),
 			3 => array('EINVOICING_SYNC_MARGIN_TIME_HOURS', 'chaine', '12', '0'),
 			4 => array('EINVOICING_FLOWS_SYNC_CALL_SIZE', 'chaine', '100', '0'),
+			5 => array('EINVOICING_PROTOCOL', 'chaine', 'CII', '0'),
 		);
 
 		// Some keys to add into the overwriting translation tables
@@ -271,19 +273,30 @@ class modEInvoicing extends DolibarrModules
 		 );
 		 */
 		/* BEGIN MODULEBUILDER DICTIONARIES */
-		$this->dictionaries = array();
+		$this->dictionaries = array(
+			'langs' => 'einvoicing@einvoicing',
+			'tabname' => array(MAIN_DB_PREFIX.'c_einvoicing_untdid4451',),
+			'tablib' => array('EInvoicingUntdidDictionary',),
+			'tabsql' => array('SELECT f.rowid as rowid, f.code, f.label, f.active FROM '.MAIN_DB_PREFIX.'c_einvoicing_untdid4451 as f'),
+			'tabsqlsort' => array('code ASC',),
+			'tabfield' => array('code,label'),
+			'tabfieldvalue' => array('code,label'),
+			'tabfieldinsert' => array('code,label'),
+			'tabrowid' => array('rowid'),
+			'tabcond' => array(isModEnabled('einvoicing')),
+			'tabhelp' => array(array('code' => $langs->trans('CodeTooltipHelpEInvoicing')))
+		);
 		/* END MODULEBUILDER DICTIONARIES */
 
 		// Boxes/Widgets
 		// Add here list of php file(s) stored in einvoicing/core/boxes that contains a class to show a widget.
 		/* BEGIN MODULEBUILDER WIDGETS */
 		$this->boxes = array(
-			//  0 => array(
-			//      'file' => 'einvoicingwidget1.php@einvoicing',
-			//      'note' => 'Widget provided by EInvoicing',
-			//      'enabledbydefaulton' => 'Home',
-			//  ),
-			//  ...
+			0 => array(
+				'file' => 'box_einvoicing_sync.php@einvoicing',
+				'note' => 'Widget provided by EInvoicing',
+				'enabledbydefaulton' => 'Home',
+			),
 		);
 		/* END MODULEBUILDER WIDGETS */
 

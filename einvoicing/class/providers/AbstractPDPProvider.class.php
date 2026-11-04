@@ -101,11 +101,11 @@ abstract class AbstractPDPProvider
 	/**
 	 * Get current token in memory (loaded by fetchOAuthTokenDB in constructor)
 	 *
-	 * @return array<string,null|int|string>	Token
+	 * @return array<string,null|int|string>	Token, empty when none is stored (fetchOAuthTokenDB() returned false)
 	 */
 	public function getTokenData()
 	{
-		return $this->tokenData;
+		return is_array($this->tokenData) ? $this->tokenData : [];
 	}
 
 	/**
@@ -271,9 +271,27 @@ abstract class AbstractPDPProvider
 		if (isset($response['response']['results']) && is_array($response['response']['results'])) {
 			$lines = $response['response']['results'];
 		}
+		// The search answers one page (25 lines on SuperPDP): a SIREN with more addresses, like the French State
+		// with one per service, loses the address this invoice is sent to. Ask for that one by its exact identifier,
+		// still under the same SIREN, rather than paging through thousands of lines on every check. Only when the
+		// page is short of the total (SuperPDP and Esalink name it differently); a missing total counts as short.
+		$wanted = self::normalizeAddressingIdentifier($addressingidentifier);
+		$total = isset($response['response']['totalNumberOfResults']) ? $response['response']['totalNumberOfResults'] : (isset($response['response']['total_number_results']) ? $response['response']['total_number_results'] : null);
+		if (!empty($lines) && $wanted !== '' && ($total === null || (int) $total > count($lines)) && !in_array($wanted, array_map(function ($line) {
+			return self::normalizeAddressingIdentifier(isset($line['addressingIdentifier']) ? $line['addressingIdentifier'] : '');
+		}, $lines), true)) {
+			$exactbody = json_encode(array('filters' => array(
+				'siren' => array('op' => 'strict', 'value' => $siren),
+				'addressingIdentifier' => array('op' => 'strict', 'value' => $wanted),
+			)));
+			$exact = $this->callApi('afnor-directory/v1/directory-line/search', 'POST', $exactbody, array(), 'precheck_directory');
+			if ((int) (isset($exact['status_code']) ? $exact['status_code'] : 0) == 200 && isset($exact['response']['results']) && is_array($exact['response']['results'])) {
+				$lines = array_merge($lines, $exact['response']['results']);
+			}
+		}
 		$result['entries'] = count($lines);
 
-		if ($result['entries'] > 0 && ($wanted = self::normalizeAddressingIdentifier($addressingidentifier)) !== '') {
+		if ($result['entries'] > 0 && $wanted !== '') {
 			// Keep only the line of the address this invoice is sent to. Whoever recorded a routing
 			// identifier for that third party (or forced one on the invoice) took responsibility for the
 			// address: reporting on a sibling line, open or not, would answer a question nobody asked.
@@ -796,7 +814,7 @@ abstract class AbstractPDPProvider
 			}
 
 			// Neither '_TOKEN' nor '_REFRESH' is in the list dolibarr_set_const() matches, so both would
-			// be stored as received. Reading needs no change, dolDecrypt() is applied to every constant.
+			// be stored as received. They are decrypted when the constants are loaded, and by fetchOAuthTokenDB() in memory.
 			dolibarr_set_const($db, $serviceName.'_TOKEN', self::encryptIfReadable($accessToken), 'chaine', 0, '', $forceentity);
 
 			if ($refreshToken !== null) {
@@ -900,9 +918,11 @@ abstract class AbstractPDPProvider
 				return false;
 			}
 
+			// dolibarr_set_const() leaves in memory the value it stored, encrypted by saveOAuthTokenDB(). dolDecrypt()
+			// returns unchanged a value already in clear (loaded at the start of the page, or read by dolibarr_get_const()).
 			return [
-				'token' => $token,
-				'refresh_token' => $refresh,
+				'token' => dolDecrypt($token),
+				'refresh_token' => dolDecrypt($refresh),
 				'token_expires_at' => $expire
 			];
 		}
@@ -1315,7 +1335,7 @@ abstract class AbstractPDPProvider
 	 * the access point and the build of the module that read it. Same untranslated "EINVOICING - " prefix
 	 * as the status events, so one search on the label finds them all.
 	 *
-	 * @param   FactureFournisseur  $supplierInvoice    The supplier invoice the import created
+	 * @param   FactureFournisseur  $supplierInvoice    The supplier invoice the import created or rebuilt
 	 * @param   Document            $document           The flow record the invoice was imported from
 	 * @return  int                                     Id of the created event, < 0 if KO
 	 */
@@ -1324,9 +1344,11 @@ abstract class AbstractPDPProvider
 		global $langs;
 
 		$langs->load('einvoicing@einvoicing');
-		// transnoentitiesnoconv(): an event label is stored raw and escaped where it is printed.
-		$label = "EINVOICING - " . $langs->transnoentitiesnoconv('EInvoicingEventImportLabel', (string) ($supplierInvoice->ref_supplier ?: $supplierInvoice->ref));
-		$message = $langs->transnoentitiesnoconv('EInvoicingEventImportNote', (string) $document->flow_id, $this->name, einvoicingModuleStamp());
+		// A re-import rebuilds the draft Document::reimport() names for the run. transnoentitiesnoconv():
+		// an event label is stored raw and escaped where it is printed.
+		$prefix = AbstractProtocol::$rebuildSupplierInvoiceId > 0 ? 'EInvoicingEventReimport' : 'EInvoicingEventImport';
+		$label = "EINVOICING - " . $langs->transnoentitiesnoconv($prefix . 'Label', (string) ($supplierInvoice->ref_supplier ?: $supplierInvoice->ref));
+		$message = $langs->transnoentitiesnoconv($prefix . 'Note', (string) $document->flow_id, $this->name, einvoicingModuleStamp());
 
 		$res = $this->addEvent('IMPORT', $label, $message, $supplierInvoice);
 		if ($res < 0) {
@@ -1367,7 +1389,7 @@ abstract class AbstractPDPProvider
 	 * Record a lifecycle status the vendor issued about one of its invoices, onto the supplier
 	 * invoice it refers to.
 	 *
-	 * A status this Dolibarr instance cannot attach to an invoice (refused, an unparseable CDAR, or an
+	 * A status this Dolibarr instance cannot attach to an invoice (refused, an unparsable CDAR, or an
 	 * access point account shared with another system) is not worth retrying: the flow is stored with
 	 * res=0 so the synchronization does not stall on it run after run. A negative result is reserved for
 	 * a transient failure of the platform call itself - the caller must NOT store the flow in that case
@@ -1399,11 +1421,11 @@ abstract class AbstractPDPProvider
 		// An exact link to try below, before it is overwritten with the CDAR's IssuerAssignedID.
 		$flowTrackingId = (string) $document->tracking_idref;
 
-		$flowResponse = $this->fetchFlowData($flowId, 'Original');
+		$flowResponse = $this->fetchFlowData($flowId, 'Original', 'get_flow_for_lifecycle_status');
 		if ($flowResponse['status_code'] != 200) {
 			// Some flows have no 'Original' on the access point, only the converted copy. Both carry
 			// the same CDAR, so fall back rather than fail the flow (and every flow behind it).
-			$flowResponse = $this->fetchFlowData($flowId, 'Converted');
+			$flowResponse = $this->fetchFlowData($flowId, 'Converted', 'get_flow_for_lifecycle_status');
 		}
 		if ($flowResponse['status_code'] != 200) {
 			return $this->postponeIncomingSupplierInvoiceStatus($flowId, "Failed to retrieve flow details for flowId: " . $flowId);
@@ -1507,8 +1529,15 @@ abstract class AbstractPDPProvider
 		// new delivery, not the invoice the platform already holds and this status quotes (issue #985).
 		$statusToRecord = $einvoicing->isTransmissionOnlyRejection($supplierInvoice->id, $supplierInvoice->element, $document->cdar_lifecycle_code, $document->cdar_reason_code)
 			? 0 : $document->cdar_lifecycle_code;
+		// Same for a status older than one the invoice already holds (a flow imported again): it only goes
+		// into the history, the current status and its comment stay the newer ones.
+		$isOlderStatus = (!empty($document->submittedat) && $einvoicing->hasNewerStatusMessage($supplierInvoice->id, $supplierInvoice->element, $document->submittedat) > 0);
+		if ($isOlderStatus) {
+			dol_syslog(__METHOD__ . " FlowId " . $flowId . " - status " . $document->cdar_lifecycle_code . " is older than the current status of supplier invoice " . $supplierInvoice->ref . ", only added to its history", LOG_INFO);
+			$statusToRecord = 0;
+		}
 
-		$resExtLink = $einvoicing->insertOrUpdateExtLink($supplierInvoice->id, $supplierInvoice->element, '', $statusToRecord, '', $statusComment);
+		$resExtLink = $einvoicing->insertOrUpdateExtLink($supplierInvoice->id, $supplierInvoice->element, '', $statusToRecord, '', ($isOlderStatus ? '' : $statusComment));
 
 		$resStatusMessage = ($resExtLink > 0 ? $einvoicing->storeStatusMessage(
 			$supplierInvoice->id,
@@ -1536,7 +1565,19 @@ abstract class AbstractPDPProvider
 		$reasonDetail = $statusComment ? " - " . $statusComment : '';
 		$this->addEvent('STATUS', "EINVOICING - Status: " . $statusLabel, "EINVOICING - Status: " . $statusLabel . $reasonDetail, $supplierInvoice);
 
-		return array('res' => 1, 'message' => "FlowId " . $flowId . " - Vendor status " . $document->cdar_lifecycle_code . ($amountsReported !== '' ? " (" . $amountsReported . ")" : '') . " recorded on supplier invoice " . $supplierInvoice->ref);
+		return array('res' => 1, 'message' => "FlowId " . $flowId . " - Vendor status " . $document->cdar_lifecycle_code . ($amountsReported !== '' ? " (" . $amountsReported . ")" : '') . " recorded on supplier invoice " . $supplierInvoice->ref . ($isOlderStatus ? " (older than its current status, history only)" : ''));
+	}
+
+	/**
+	 * Rank of a flow type to order flows sharing the same updatedAt: an invoice comes before the
+	 * lifecycle statuses about it (the platform issues its 202 at the very instant it receives the invoice).
+	 *
+	 * @param	string	$flowType	Flow type (SupplierInvoice, SupplierInvoiceLC, CustomerInvoice, ...)
+	 * @return	int					0 for an invoice, 1 for any other flow
+	 */
+	protected static function flowTypeSortRank($flowType)
+	{
+		return in_array((string) $flowType, array('SupplierInvoice', 'CustomerInvoice')) ? 0 : 1;
 	}
 
 	/**
@@ -1585,7 +1626,8 @@ abstract class AbstractPDPProvider
 	 * a third party can be keyed in with spaces where a CDAR never carries any. A GlobalID under scheme
 	 * 0002 (SIREN) is also tried against the first 9 digits of the SIRET, since a third party recorded
 	 * with only its SIRET filled in still carries the same SIREN (verified on the Hubtimize case behind
-	 * #857: GlobalID '908544638' under scheme 0002).
+	 * #857: GlobalID '908544638' under scheme 0002). Spaces are ignored everywhere, a SIRET GlobalID matches
+	 * the SIREN, and a French VAT number matches the SIREN it embeds (third party created from its VAT only).
 	 *
 	 * @param	string	$vendorLegalId	Legal identifier carried by the CDAR, empty when it carries none
 	 * @param	string	$siren			Third party SIREN
@@ -1595,18 +1637,31 @@ abstract class AbstractPDPProvider
 	 */
 	protected function matchesVendorLegalId($vendorLegalId, $siren, $siret, $tvaIntra)
 	{
+		$vendorLegalId = removeAllSpaces((string) $vendorLegalId);
 		if ($vendorLegalId === '') {
 			return false;
 		}
+		$siren = removeAllSpaces((string) $siren);
+		$siret = removeAllSpaces((string) $siret);
+		$tvaIntra = dol_strtoupper(removeAllSpaces((string) $tvaIntra));
 
-		if ($vendorLegalId === (string) $siren || $vendorLegalId === (string) $siret) {
+		if ($vendorLegalId === $siren || $vendorLegalId === $siret) {
 			return true;
 		}
-		if ((string) $siret !== '' && $vendorLegalId === substr((string) $siret, 0, 9)) {
+		if ($siret !== '' && $vendorLegalId === dol_substr($siret, 0, 9)) {
+			return true;
+		}
+		// A GlobalID given as a SIRET (scheme 0009) while the third party only carries its SIREN
+		if ($siren !== '' && dol_strlen($vendorLegalId) == 14 && dol_substr($vendorLegalId, 0, 9) === $siren) {
+			return true;
+		}
+		// A third party known only by its French VAT number (FR + 2-char key + SIREN) still carries the SIREN
+		$reg = array();
+		if (preg_match('/^FR[0-9A-Z]{2}([0-9]{9})$/', $tvaIntra, $reg) && dol_substr($vendorLegalId, 0, 9) === $reg[1]) {
 			return true;
 		}
 
-		return removeAllSpaces($vendorLegalId) === removeAllSpaces($tvaIntra);
+		return dol_strtoupper($vendorLegalId) === $tvaIntra;
 	}
 
 	/**

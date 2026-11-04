@@ -1123,4 +1123,54 @@ class RecipientDirectoryTest extends CommonClassTest
 		// Only the standardized search was called: the answer needed no tie-breaker.
 		$this->assertSame(array('afnor-directory/v1/directory-line/search'), $provider->calledResources);
 	}
+
+	/**
+	 * A SIREN with more addresses than one page (the French State, one line per service): the address the
+	 * invoice is sent to is asked for by its exact identifier and found, instead of reported undeclared.
+	 *
+	 * @return void
+	 */
+	public function testAnAddressBeyondTheFirstPageIsAskedForByItsIdentifier()
+	{
+		global $db;
+
+		$provider = new FakeDirectorySuperPDPProvider($db);
+		$provider->cannedResponses = array(
+			array('status_code' => 200, 'response' => array('results' => array(
+				array('addressingIdentifier' => '110002011_11000201100044_AAIACNU075', 'directoryLineStatus' => 'Enabled', 'siren' => '110002011'),
+			), 'totalNumberOfResults' => 3000)),
+			array('status_code' => 200, 'response' => array('results' => array(
+				array('addressingIdentifier' => '110002011_11000201100044_D18118Q018', 'directoryLineStatus' => 'Enabled', 'siren' => '110002011'),
+			), 'totalNumberOfResults' => 1)),
+		);
+
+		$result = $provider->checkRecipientDirectory('110002011', '110002011_11000201100044_D18118Q018');
+
+		$this->assertSame('routable', $result['status']);
+		$this->assertSame(1, $result['reachable']);
+		$this->assertSame(array('afnor-directory/v1/directory-line/search', 'afnor-directory/v1/directory-line/search'), $provider->calledResources);
+	}
+
+	/**
+	 * Without a total in the answer, nothing says the page is complete: the exact address is asked for.
+	 *
+	 * @return void
+	 */
+	public function testAnAnswerWithoutTotalStillAsksForTheExactAddress()
+	{
+		global $db;
+
+		$provider = new FakeDirectorySuperPDPProvider($db);
+		$provider->cannedResponses = array(
+			array('status_code' => 200, 'response' => array('results' => array(
+				array('addressingIdentifier' => '824369342', 'directoryLineStatus' => 'Enabled', 'siren' => '824369342'),
+			))),
+			array('status_code' => 200, 'response' => array('results' => array())),
+		);
+
+		$result = $provider->checkRecipientDirectory('824369342', '824369342_82436934200017');
+
+		$this->assertSame('unknownaddress', $result['status']);
+		$this->assertSame(array('afnor-directory/v1/directory-line/search', 'afnor-directory/v1/directory-line/search'), $provider->calledResources);
+	}
 }

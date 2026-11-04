@@ -124,7 +124,7 @@ restrictedArea($user, 'societe', $socid, '&societe');
 // take a payment, refresh/delete the Stancer account) must require the write
 // permission. Guard them centrally so a read-only user or a forged request
 // cannot elevate read -> write. Log the refusal (no silent failure).
-$stancerWriteActions = array('stancertakepayment', 'add', 'addsepa', 'deletesepa', 'refreshStancerAccount', 'deleteStancerAccount', 'syncsepa');
+$stancerWriteActions = array('stancertakepayment', 'add', 'addsepa', 'deletesepa', 'refreshStancerAccount', 'deleteStancerAccount', 'syncsepa', 'sepasigned');
 if (in_array($action, $stancerWriteActions, true) && !$permissiontoadd) {
 	dol_syslog("stancer_thirdparty: write action '" . $action . "' denied for user " . (int) $user->id . " without write permission", LOG_WARNING);
 	accessforbidden();
@@ -168,6 +168,31 @@ if ($action == "stancertakepayment") {
 		$error = 'Failed to fetch company payment mode for id '.GETPOST('companymodeid', 'int');
 		dol_syslog("stancer_thirdparty: " . $error . " of thirdparty " . $socid, LOG_ERR);
 		setEventMessages($error, [], 'errors');
+	}
+}
+
+if ($action == "sepasigned") {
+	// Mandate signed outside the signature module (paper, scan): same switch as its callback
+	$signedMandateId = (int) GETPOST('companyPaymentModeID', 'int');
+	$signedMandate = new CompanyPaymentModeStancer($db);
+	if ($signedMandateId <= 0 || $signedMandate->fetch($signedMandateId) <= 0 || (int) $signedMandate->fk_soc !== $socid) {
+		dol_syslog("stancer_thirdparty: sepasigned refused, mandate " . $signedMandateId . " not found for thirdparty " . $socid, LOG_ERR);
+		setEventMessages($langs->trans('ErrorRecordNotFound'), [], 'errors');
+	} else {
+		$applied = stancerApplySignedSepaMandate($signedMandateId, $user, true);
+		if ($applied['status'] === 'done') {
+			if (count($applied['templates']) > 0) {
+				setEventMessages($langs->trans('StancerSepaSignedDone', $signedMandate->rum, implode(', ', $applied['templates'])), [], 'mesgs');
+			} else {
+				setEventMessages($langs->trans('StancerSepaSignedDoneNoTemplate', $signedMandate->rum), [], 'mesgs');
+			}
+		} elseif ($applied['status'] === 'notstancer') {
+			setEventMessages($langs->trans('StancerSepaSignedNotStancer'), [], 'errors');
+		} elseif ($applied['status'] === 'disabled') {
+			setEventMessages($langs->trans('StancerSepaSignedDisabled'), [], 'warnings');
+		} else {
+			setEventMessages($langs->trans('StancerSepaSignedError', $applied['message']), [], 'errors');
+		}
 	}
 }
 
@@ -283,16 +308,11 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 		// print "  <li><a href='https://payment.stancer.com/" . stancer_get_public_key() . "/" . $pid . "15?lang=fr'>PayLink</a></li>\n";
 		print "</ul>\n";
 	} else {
-		//Verifications de base: il faut un num de tel format +... ou une adresse mail
-		$error = 0;
-		$message = array();
-		if (substr($societe->phone, 0, 1) != '+') {
-			$error++;
-		}
-		if (empty($societe->email)) {
-			$error++;
-		}
-		if ($error > 1) {
+		// The button is offered when the creation can succeed, which is the very
+		// check stancerAddCustomerIfNeeded() makes: an email or a mobile, on the
+		// thirdparty or on its contacts.
+		$payer = stancerResolvePayerContact($societe, null);
+		if ($payer['email'] === '' && $payer['mobile'] === '') {
 			print "<p>" . $langs->trans("StancerCompanyMailOrPhone") . "</p>";
 		} else {
 			print '<form name="addstancer" id="addstancer" action="'.$_SERVER["PHP_SELF"].'?socid='.$socid.'" method="POST">';
@@ -449,6 +469,15 @@ if (isModEnabled('stancer') && $user->hasRight('stancer', 'read')) {
 					$genbutton .= '>';
 					print $genbutton;
 					print '</form>';
+
+					if ($permissiontoadd && getDolGlobalString('STANCER_SEPA_SIGNED_SWITCH_TEMPLATES')) {
+						print '<form name="sepasigned_' . ((int) $companypaymentmode->id) . '" action="'.$_SERVER["PHP_SELF"].'?socid='.$socid.'" method="POST">';
+						print '<input type="hidden" name="token" value="'.newToken().'">';
+						print '<input type="hidden" name="action" value="sepasigned">';
+						print '<input type="hidden" name="companyPaymentModeID" value="' . ((int) $companypaymentmode->id) . '">';
+						print '<input class="button reposition" type="submit" value="' . dol_escape_htmltag($langs->trans("StancerSepaMandateSigned")) . '" title="' . dol_escape_htmltag($langs->trans("StancerSepaMandateSignedHelp")) . '">';
+						print '</form>';
+					}
 				} else {
 					//add sepa
 					print '<form name="addstancersepa" id="addstancersepa" action="'.$_SERVER["PHP_SELF"].'?socid='.$socid.'" method="POST">';

@@ -646,7 +646,7 @@ if ((float) DOL_VERSION >= 21) {
 		dol_htmloutput_mesg($langs->trans('YouAreCurrentlyInSandboxMode', 'HelloAsso'), [], 'warning');
 	}
 }
-print dolGetButtonAction('', $titlebutton, 'default', $_SERVER["PHP_SELF"].'?action=testconnect', '', 1, array('attr' => array('class' => 'reposition')));
+print dolGetButtonAction('', $titlebutton, 'default', $_SERVER["PHP_SELF"].'?action=testconnect&token='.newToken(), '', 1, array('attr' => array('class' => 'reposition')));
 
 
 $storage = new DoliStorage($db, $conf);

@@ -54,7 +54,9 @@ runs:
           "/custom/einvoicing/call_list.php"
           "/custom/einvoicing/vendorref_list.php"
           "/custom/einvoicing/admin/setup.php"
-          "/custom/einvoicing/admin/setup_options.php"
+          "/custom/einvoicing/admin/setup_advanced.php"
+          "/custom/einvoicing/admin/setup_receive.php"
+          "/custom/einvoicing/admin/setup_send.php"
           "/custom/einvoicing/admin/about.php"
         )
         if [ "${invoice:-0}" -gt 0 ]; then
@@ -69,7 +71,9 @@ runs:
           # The built-in server writes the PHP errors to its own log, and Dolibarr prints them in the
           # page as well when it is not in production mode: both are read.
           if [ "$code" != "200" ]; then
-            location=$(curl -sS -o /dev/null -D - "http://127.0.0.1:${port}${page}" | grep -i '^location:' | tr -d '\r')
+            # A 404 or a 500 has no Location header: under pipefail the empty grep would end the
+            # step here, before the error line, so it is allowed to find nothing.
+            location=$(curl -sS -o /dev/null -D - "http://127.0.0.1:${port}${page}" | { grep -i '^location:' || true; } | tr -d '\r')
             echo "::error::$page answered $code ${location}"
             failed=1
           elif grep -qiE '(Fatal error|Parse error|Uncaught [A-Za-z]*(Error|Exception))' "$body"; then

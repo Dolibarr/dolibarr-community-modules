@@ -926,6 +926,36 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 	}
 
 	/**
+	 * A credit note is stored negative: announced positive it is reversed, signed like an invoice it is taken
+	 * as received (issue #1077). Any other type keeps the sign of its document.
+	 *
+	 * @return void
+	 */
+	public function testDocumentSignOfType()
+	{
+		$this->assertSame(-1, SupplierInvoiceHelper::documentSignOfType(FactureFournisseur::TYPE_CREDIT_NOTE, 100.0));
+		$this->assertSame(1, SupplierInvoiceHelper::documentSignOfType(FactureFournisseur::TYPE_CREDIT_NOTE, -100.0));
+		$this->assertSame(-1, SupplierInvoiceHelper::documentSignOfType(FactureFournisseur::TYPE_CREDIT_NOTE, null));
+		$this->assertSame(1, SupplierInvoiceHelper::documentSignOfType(FactureFournisseur::TYPE_STANDARD, 100.0));
+		$this->assertSame(1, SupplierInvoiceHelper::documentSignOfType(FactureFournisseur::TYPE_STANDARD, -100.0));
+	}
+
+	/**
+	 * A line of a credit note owes or credits relative to the sign of the credit note, and has no sign
+	 * without an amount (issue #1077).
+	 *
+	 * @return void
+	 */
+	public function testCreditNoteLineSign()
+	{
+		$line = (object) array('qty' => 1, 'subprice' => 20);
+		$this->assertSame(-1, SupplierInvoiceHelper::creditNoteLineSign($line, -1), 'a refund of a credit note announced positive');
+		$this->assertSame(1, SupplierInvoiceHelper::creditNoteLineSign($line, 1), 'a fee of a credit note signed like an invoice');
+		$this->assertSame(1, SupplierInvoiceHelper::creditNoteLineSign((object) array('qty' => -1, 'subprice' => 20), -1), 'a fee of a credit note announced positive');
+		$this->assertSame(0, SupplierInvoiceHelper::creditNoteLineSign((object) array('qty' => 0, 'subprice' => 20), -1));
+	}
+
+	/**
 	 * The comparison is made on the absolute values: Dolibarr stores a credit note negative while
 	 * BT-110 and BT-112 are always announced positive, the document type carrying the sign.
 	 *
@@ -1492,5 +1522,59 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 		$this->assertContains(EInvoicing::STATUS_APPROVED, $offered);
 		$this->assertContains(EInvoicing::STATUS_REFUSED, $offered, 'nothing was accepted, so the choice is still open');
 		$this->assertContains(EInvoicing::STATUS_PAYMENT_SENT, $offered, 'a rejected approval is not a refusal, so the payment status stays open too');
+	}
+
+	/**
+	 * Invoice totals, announced totals, and whether the invoice agrees with its document.
+	 *
+	 * @return	array<string,array{0:float,1:float,2:float,3:float,4:int,5:bool}>
+	 */
+	public static function invoiceTotals(): array
+	{
+		return array(
+			'same cents'                            => array(358.31, 2149.85, 358.31, 2149.85, FactureFournisseur::TYPE_STANDARD, true),
+			'one cent of VAT'                       => array(358.28, 2149.85, 358.31, 2149.85, FactureFournisseur::TYPE_STANDARD, false),
+			'float noise of a sum of lines'         => array(0.1 + 0.2, 1.1 + 2.2, 0.3, 3.3, FactureFournisseur::TYPE_STANDARD, true),
+			'instance on 3 decimals, half cents'    => array(1.015, 6.105, 1.02, 6.11, FactureFournisseur::TYPE_STANDARD, true),
+			'credit note on 3 decimals, half cents' => array(-1.015, -6.105, 1.02, 6.11, FactureFournisseur::TYPE_CREDIT_NOTE, true),
+		);
+	}
+
+	/**
+	 * The VAT and the total of the invoice are confronted to the cent the document writes.
+	 *
+	 * @dataProvider invoiceTotals
+	 *
+	 * @param	float	$totalTva		VAT total of the invoice
+	 * @param	float	$totalTtc		Total of the invoice
+	 * @param	float	$announcedTva	BT-110
+	 * @param	float	$announcedTtc	BT-112
+	 * @param	int		$type			Type of the invoice
+	 * @param	bool	$expected		Whether they agree
+	 * @return	void
+	 */
+	public function testTheInvoiceAgreesWithItsDocumentToTheCent($totalTva, $totalTtc, $announcedTva, $announcedTtc, $type, $expected)
+	{
+		global $db;
+
+		$invoice = new FactureFournisseur($db);
+		$invoice->id = 0;
+		$invoice->type = $type;
+		$invoice->total_tva = $totalTva;
+		$invoice->total_ttc = $totalTtc;
+
+		$this->assertSame($expected, SupplierInvoiceHelper::totalsAgreeWithDocument($invoice, $announcedTva, $announcedTtc));
+	}
+
+	/**
+	 * BT-115 is read when it answers BR-CO-16 to the cent.
+	 *
+	 * @return	void
+	 */
+	public function testThePayableIsReadWhenItAnswersToTheCent()
+	{
+		$this->assertEquals(1.02, SupplierInvoiceHelper::announcedTotalTtc(array('grandTotalAmount' => 1.015, 'duePayableAmount' => 1.02)), 'half a cent writes the same cent');
+		$this->assertEquals(1.0, SupplierInvoiceHelper::announcedTotalTtc(array('grandTotalAmount' => 1.0, 'duePayableAmount' => 1.01)), 'one cent is a contradiction');
+		$this->assertEquals(3.3, SupplierInvoiceHelper::announcedTotalTtc(array('grandTotalAmount' => 1.1 + 2.2, 'duePayableAmount' => 3.3)), 'float noise is none');
 	}
 }

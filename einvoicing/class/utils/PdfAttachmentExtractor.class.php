@@ -42,6 +42,11 @@ class PdfAttachmentExtractor extends tcpdi_parser
 	const INVOICE_ATTACHMENT_NAMES = array('factur-x.xml', 'zugferd-invoice.xml', 'ZUGFeRD-invoice.xml', 'xrechnung.xml');
 
 	/**
+	 * Deepest dictionary read, a crafted container is not trusted to stop nesting
+	 */
+	const MAX_DICTIONARY_DEPTH = 64;
+
+	/**
 	 * Files found in the container, keyed by their declared name
 	 *
 	 * @var array<string,string>
@@ -54,6 +59,31 @@ class PdfAttachmentExtractor extends tcpdi_parser
 	 * @var bool
 	 */
 	private $collected = false;
+
+	/**
+	 * Raw content of the PDF, which the parent keeps private
+	 *
+	 * @var string
+	 */
+	private $content = '';
+
+	/**
+	 * Depth of the dictionary being read
+	 *
+	 * @var int
+	 */
+	private $dictionaryDepth = 0;
+
+	/**
+	 * Free the memory held by the parser.
+	 *
+	 * @return	void
+	 */
+	public function cleanUp()
+	{
+		$this->content = '';
+		parent::cleanUp();
+	}
 
 	/**
 	 * Return the invoice attached to a Factur-X container.
@@ -99,7 +129,8 @@ class PdfAttachmentExtractor extends tcpdi_parser
 	 */
 	public function __construct($data, $uniqueid)
 	{
-		parent::__construct(self::blankCommentsBeforeStartxref((string) $data), $uniqueid);
+		$this->content = self::blankCommentsBeforeStartxref((string) $data);
+		parent::__construct($this->content, $uniqueid);
 	}
 
 	/**
@@ -133,6 +164,65 @@ class PdfAttachmentExtractor extends tcpdi_parser
 	public function Error($msg)			// phpcs:ignore PEAR.NamingConventions.ValidFunctionName.ScopeNotCamelCaps
 	{
 		throw new Exception('PDF cannot be read: '.$msg);
+	}
+
+	/**
+	 * Read one object; comments, dictionaries and hex strings are read here, the parent loops or fails on them.
+	 *
+	 * @param	int			$offset			Offset of the object
+	 * @param	string|null	$data			Data to read, the whole PDF when null
+	 * @return	array{0:array<int,mixed>,1:int}	Object, then the offset that follows it
+	 * @throws	Exception					When the object cannot be read
+	 */
+	protected function getRawObject($offset = 0, $data = null)
+	{
+		if ($data === null) {
+			$data = $this->content;
+		}
+		$length = strlen($data);
+		$start = $offset + strspn($data, "\x00\x09\x0a\x0c\x0d\x20", $offset);
+		while ($start < $length && $data[$start] === '%') {
+			$start += strcspn($data, "\r\n", $start);
+			$start += strspn($data, "\x00\x09\x0a\x0c\x0d\x20", $start);
+		}
+		if ($start >= $length) {
+			$this->Error('unexpected end of data at offset '.$start);
+		}
+		if ($data[$start] !== '<') {
+			return parent::getRawObject($start, $data);
+		}
+
+		if (substr($data, $start, 2) !== '<<') {
+			$end = strpos($data, '>', $start);
+			if ($end === false) {
+				$this->Error('hexadecimal string not closed at offset '.$start);
+			}
+			return array(array(PDF_TYPE_HEX, substr($data, $start + 1, $end - $start - 1)), $end + 1);
+		}
+
+		if ($this->dictionaryDepth >= self::MAX_DICTIONARY_DEPTH) {
+			$this->Error('dictionary nested too deeply at offset '.$start);
+		}
+		$this->dictionaryDepth++;
+		try {
+			$dict = array();
+			$offset = $start + 2;
+			do {
+				list($key, $offset) = $this->getRawObject($offset, $data);
+				if ($key[0] === '>>') {
+					return array(array(PDF_TYPE_DICTIONARY, $dict), $offset);
+				}
+				if ($key[0] !== PDF_TYPE_TOKEN || $offset >= $length) {
+					break;
+				}
+				list($element, $offset) = $this->getRawObject($offset, $data);
+				$dict['/'.$key[1]] = $element;
+			} while ($offset < $length);
+		} finally {
+			$this->dictionaryDepth--;
+		}
+
+		throw new Exception('PDF cannot be read: dictionary not closed at offset '.$start);
 	}
 
 	/**

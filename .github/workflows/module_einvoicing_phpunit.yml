@@ -56,7 +56,7 @@ jobs:
     outputs:
       matrix: ${{ steps.pick.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: What the change touches
         id: changed
@@ -102,7 +102,8 @@ jobs:
   phpunit:
     name: PHPUnit on Dolibarr ${{ matrix.dolibarr }}
     needs: cores
-    runs-on: ubuntu-latest
+    # Pinned: on ubuntu-26.04, Dolibarr 22.0.0 hangs in tidy on compta/facture/list.php (30 s timeout).
+    runs-on: ubuntu-24.04
 
     strategy:
       # One core failing says nothing about the others, and the interesting information is usually
@@ -127,7 +128,7 @@ jobs:
 
     steps:
       - name: Checkout the modules repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: A Dolibarr ${{ matrix.dolibarr }} to run against
         id: instance
@@ -210,7 +211,7 @@ jobs:
       # standing here - which is why they are not a job of their own.
       - name: Java for the FNFE schematrons
         if: ${{ matrix.validate == 'yes' }}
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: 17
@@ -420,6 +421,36 @@ jobs:
           cat control-import-report.txt
           echo "The gate refuses the damaged document, as it has to."
 
+      - name: An EXTENDED document totalling its VAT rounded per line is rebuilt at the total it bills
+        if: ${{ !cancelled() && matrix.validate == 'yes' }}
+        # The same cent, on a document declaring EXTENDED-CTC-FR: 540.28 is 450.23 plus the VAT of its line
+        # rounded per line (90.05), BT-110 keeps 90.04. BR-FREXT-CO-15 tolerates a cent per line, and the
+        # invoice keeps the VAT per line, totalling BT-109 and BT-112 (issue #1166).
+        env:
+          DOLIBARR_HTDOCS: ${{ steps.instance.outputs.htdocs }}
+        run: |
+          set -euo pipefail
+          mkdir -p control-extended
+          php -r '
+            $xml = file_get_contents("generated/cii_standard.xml");
+            $xml = preg_replace("|(<ram:GuidelineSpecifiedDocumentContextParameter>\s*<ram:ID>)[^<]*|", "\${1}urn:cen.eu:en16931:2017#conformant#urn.cpro.gouv.fr:1p0:extended-ctc-fr", $xml, 1, $profile);
+            $xml = str_replace(array("<ram:GrandTotalAmount>540.27", "<ram:DuePayableAmount>540.27"), array("<ram:GrandTotalAmount>540.28", "<ram:DuePayableAmount>540.28"), $xml, $count);
+            if ($profile < 1 || $count < 2) { fwrite(STDERR, "the control cannot be built: cii_standard.xml no longer carries the totals it is built from\n"); exit(2); }
+            file_put_contents("control-extended/cii_standard.xml", $xml);
+            echo "EXTENDED-CTC-FR declared, grand total and amount due moved by one cent\n";
+          '
+          if ! php einvoicing/test/conformance/import-amounts.php --id-from-name control-extended/cii_standard.xml > control-extended-report.txt 2>&1; then
+            echo "::error::an EXTENDED document totalling its VAT rounded per line is refused"
+            cat control-extended-report.txt
+            exit 1
+          fi
+          cat control-extended-report.txt
+          if ! grep -qE '^cii_standard\.xml +ok +540\.28 incl\. VAT rebuilt' control-extended-report.txt; then
+            echo "::error::the EXTENDED document is not rebuilt at the 540.28 it bills"
+            exit 1
+          fi
+          echo "The EXTENDED document is rebuilt at the total it bills."
+
       - name: An amount already paid is not, by itself, a deposit the import has to attach
         if: ${{ !cancelled() && matrix.validate == 'yes' }}
         # BT-113 is mostly a payment made online, not a deposit (8cd2fa9a): until the document names the
@@ -481,7 +512,7 @@ jobs:
 
     steps:
       - name: Checkout the modules repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: A Dolibarr to install into
         id: instance

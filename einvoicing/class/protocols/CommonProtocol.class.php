@@ -114,9 +114,17 @@ trait CommonProtocol
 		// the amount the document will actually carry in BT-113 covers the total.
 		$totalTtc = (float) price2num($invoice->total_ttc, 'MT');
 		if ($alreadyPaid === null) {
-			$alreadyPaid = (float) $invoice->getSommePaiement();
+			// The error is the int -1, a refund of 1.00 the float -1.0.
+			$alreadyPaid = $invoice->getSommePaiement();
+			if (!is_float($alreadyPaid)) {
+				if ($alreadyPaid < 0) {
+					dol_syslog(__METHOD__ . ' cannot read the payments of invoice ' . $invoice->id . ': ' . $invoice->error, LOG_ERR);
+				}
+				$alreadyPaid = 0.0;
+			}
 		}
-		$isFullyPaid = ($totalTtc != 0.0 && abs((float) $alreadyPaid - $totalTtc) < 0.005);
+		// Credit note: total is negative in Dolibarr, BT-113 is positive in the document.
+		$isFullyPaid = ($totalTtc != 0.0 && abs(abs((float) $alreadyPaid) - abs($totalTtc)) < 0.005);
 
 		if ($invoice->status == Facture::STATUS_CLOSED && empty($invoice->close_code) && $isFullyPaid) {
 			return $prefix . '2';
@@ -1405,7 +1413,7 @@ trait CommonProtocol
 	 * flow, if the line is already resolved or not, without importing anything.
 	 *
 	 * @param 	array 	$lineData 	Array containing invoice line data extracted from XML
-	 * @return 	array{res:int, message:string, matchtype?:string, routingtype?:string, actioncode?:string, action?:string, actionurl?:string, actiondata?:array<string,mixed>, allactiondata?:array<string,array<string,mixed>>}   'res' = ID of the product found, 0 if no product found, -1 when a mixed invoice needs a default the setup does not choose. 'matchtype' tells how it was resolved ('defaultrouting' when the line fell back on a default of the vendor, 'routingtype' then says which one).
+	 * @return 	array{res:int, message:string, matchtype?:string, routingtype?:string, actioncode?:string, action?:string, actionurl?:string, actiondata?:array<string,mixed>, allactiondata?:array<string,array<string,mixed>>}   'res' = ID of the product found, 0 if no product found, -1 when a mixed invoice needs a default the setup does not choose. 'matchtype' tells how it was resolved ('defaultrouting' when the line fell back on a default of the vendor or on the catch-all product of the setup, 'routingtype' then says which one: 'product', 'service' or 'catchall').
 	 */
 	public function findProductFromEinvoiceLine($lineData)
 	{
@@ -1501,15 +1509,17 @@ trait CommonProtocol
 		}
 
 		// Text Search using prodname
-		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
-		$sql .= " WHERE label = '" . $db->escape(trim(dol_substr((string) ($lineData['prodname'] ?? ''), 0, 255))) . "'";
-		$sql .= " AND entity IN (" . getEntity('product') . ")";
-		$resql = $db->query($sql);
-		if ($resql) {
-			if ($db->num_rows($resql) === 1) {
-				$obj = $db->fetch_object($resql);
-				dol_syslog(__METHOD__ . ' Found product by text search: ' . $obj->rowid);
-				return array('res' => $obj->rowid, 'message' => 'Product found by text search');
+		if ($searchname !== '') {
+			$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
+			$sql .= " WHERE label = '" . $db->escape(trim(dol_substr((string) ($lineData['prodname'] ?? ''), 0, 255))) . "'";
+			$sql .= " AND entity IN (" . getEntity('product') . ")";
+			$resql = $db->query($sql);
+			if ($resql) {
+				if ($db->num_rows($resql) === 1) {
+					$obj = $db->fetch_object($resql);
+					dol_syslog(__METHOD__ . ' Found product by text search: ' . $obj->rowid);
+					return array('res' => $obj->rowid, 'message' => 'Product found by text search');
+				}
 			}
 		}
 
@@ -1533,7 +1543,42 @@ trait CommonProtocol
 			}
 		}
 
+		// Last resort, opt-in: the product the setup gives to every line nothing else resolved, whatever its
+		// vendor. It is a catch-all like the default of the vendor, so it is reported the same way. Not with
+		// the automatic product creation, which it would otherwise always pre-empt.
+		if (getDolGlobalInt('EINVOICING_DEFAULT_PRODUCT_CATCHALL') && !getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_GENERATION')) {
+			$productId = $this->resolveCatchallProduct();
+			if ($productId > 0) {
+				dol_syslog(__METHOD__ . ' Catch-all product of the setup used: product=' . $productId);
+				return array('res' => $productId, 'message' => 'Line product not found, the catch-all product of the setup was used', 'matchtype' => 'defaultrouting', 'routingtype' => 'catchall');
+			}
+		}
+
 		return array('res' => 0, 'message' => 'No product found for this e-invoice line');
+	}
+
+	/**
+	 * Product of the setup used for the lines nothing else resolved, if it still exists.
+	 *
+	 * @return 	int 	Product id, 0 if none is set or the product is gone
+	 */
+	private function resolveCatchallProduct()
+	{
+		global $db;
+
+		$productId = getDolGlobalInt('EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID');
+		if ($productId <= 0) {
+			return 0;
+		}
+		$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "product";
+		$sql .= " WHERE rowid = " . ((int) $productId);
+		$sql .= " AND entity IN (" . getEntity('product') . ")";
+		$resql = $db->query($sql);
+		if ($resql && ($obj = $db->fetch_object($resql))) {
+			return (int) $obj->rowid;
+		}
+
+		return 0;
 	}
 
 	/**
@@ -1605,7 +1650,7 @@ trait CommonProtocol
 		global $langs, $user;
 
 		$langs->load("einvoicing@einvoicing");
-		$setupUrl = dol_buildpath('/einvoicing/admin/setup_options.php', 1) . '#EINVOICING_DEFAULT_ROUTING_MIXED';
+		$setupUrl = dol_buildpath('/einvoicing/admin/setup_receive.php', 1) . '#EINVOICING_DEFAULT_ROUTING_MIXED';
 		$action = $user->admin
 			? '<a class="button small smallpaddingimp" style="display:inline-block;width:auto;" href="' . dol_escape_htmltag($setupUrl) . '" target="_blank">'
 			: '<a class="button disabled classfortooltip small smallpaddingimp" style="display:inline-block;width:auto;" href="#" title="' . dol_escape_htmltag($langs->trans("NotEnoughPermissions")) . '">';
@@ -1657,8 +1702,11 @@ trait CommonProtocol
 			return $resFind;
 		}
 
+		// A line built from the VAT breakdown has nothing to create a product from: only a default product resolves it.
+		$isVatBreakdownLine = !empty($lineData['vatBreakdownLine']);
+
 		// If no match found after all steps: Create new product
-		if (getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_GENERATION')) {
+		if (!$isVatBreakdownLine && getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_GENERATION')) {
 			// Auto-create product
 			$product = new Product($db);
 			$product->type 		= $this->_detectProductTypeFromEinvoiceLine($lineData);
@@ -1677,12 +1725,15 @@ trait CommonProtocol
 			$product->status_buy = 1; // Status to buy
 			$product->note_private = 'Product created automatically from E-invoice import.';
 			$product->import_key = AbstractPDPProvider::$EINVOICING_LAST_IMPORT_KEY; // It does not work here, so we will update it after creation
-			// Set barcode if global ID is provided and is a GTIN/EAN type
-			if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
-				$product->barcode = $lineData['prodglobalid'];
-				$product->barcode_type = getDolGlobalInt('PRODUIT_DEFAULT_BARCODE_TYPE', 0);
-			} else {
-				$product->barcode = 'auto';
+			// A barcode on request, or when the barcode setup requires one on every product (#1159).
+			if (isModEnabled('barcode')) {
+				if (getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_BARCODE') && !empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
+					$product->barcode = $lineData['prodglobalid'];
+					$product->barcode_type = getDolGlobalInt('PRODUIT_DEFAULT_BARCODE_TYPE', 0);
+				} elseif (getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_BARCODE') || $product->check_barcode('', $product->barcode_type_code) == -2) {
+					// create() takes the next code for 'auto' from Dolibarr 20, for -1 only before.
+					$product->barcode = ((float) DOL_VERSION < 20) ? '-1' : 'auto';
+				}
 			}
 			// Validate before creation
 			$resCheck = $product->check();
@@ -1711,18 +1762,25 @@ trait CommonProtocol
 				];
 			}
 
-			// Error on creation
-			dol_syslog(__METHOD__ . ' Product creation error: ' . $product->error, LOG_ERR);
+			// Error on creation. verify() reports in errors[] only, which left the message empty.
+			$langs->loadLangs(array('errors', 'products'));
+			$creationErrors = array_map(array($langs, 'trans'), array_filter(array_merge(array($product->error), (array) $product->errors)));
+			$creationError = implode(', ', array_unique($creationErrors));
+			if (in_array('ErrorBarCodeRequired', (array) $product->errors)) {
+				$langs->load('einvoicing@einvoicing');
+				$creationError .= '. ' . $langs->trans('ErrorEInvoicingBarcodeRequiredOnImport');
+			}
+			dol_syslog(__METHOD__ . ' Product creation error: ' . $creationError, LOG_ERR);
 			return [
 				'res' => -1,
-				'message' => 'Product creation error: ' . dol_escape_htmltag($product->error),
+				'message' => 'Product creation error: ' . dol_escape_htmltag($creationError),
 			];
 		} else {
 			// Suggest manual creation of product
 			dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Auto-creation of products is disabled', LOG_ERR);
 
 			// Free line mode: import the line without linking any product (res=0 signals the protocol to set desc from XML)
-			if (getDolGlobalInt('EINVOICING_IMPORT_AS_FREE_LINES')) {
+			if (!$isVatBreakdownLine && getDolGlobalInt('EINVOICING_IMPORT_AS_FREE_LINES')) {
 				dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Free line mode: importing without product link', LOG_DEBUG);
 				return array('res' => 0, 'message' => 'Product not found, line imported as free description line (no product link)');
 			}
@@ -1771,11 +1829,9 @@ trait CommonProtocol
 			$createParams['type'] = $prodType;
 			$createParams['tva_tx'] = (float) ($lineData['rateApplicablePercent'] ?? 0);
 			$createParams['status'] = 1; // Active
-			if (!empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
+			if (getDolGlobalInt('EINVOICING_PRODUCTS_AUTO_BARCODE') && !empty($lineData['prodglobalid']) && !empty($lineData['prodglobalidtype']) && in_array($lineData['prodglobalidtype'], ['0160', '0011'])) {
 				$createParams['barcode'] = $lineData['prodglobalid'];
 				$createParams['barcode_type'] = getDolGlobalInt('PRODUIT_DEFAULT_BARCODE_TYPE', 0);
-			} else {
-				$createParams['barcode'] = 'auto';
 			}
 
 			// Create URL to prefill product creation form
@@ -1801,6 +1857,9 @@ trait CommonProtocol
 			$btnStyle = 'display:inline-block;width:auto;';
 
 			$action = '<div class="marginbottomonly opacitymedium">' . $langs->trans('SuggestedActionsIntro') . '</div>';
+			if ($isVatBreakdownLine) {
+				$action .= '<div class="marginbottomonly">' . $langs->trans('EInvoiceNoLineNeedsDefaultProduct') . '</div>';
+			}
 
 
 			// First choice: create a new product manually

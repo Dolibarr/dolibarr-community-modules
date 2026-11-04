@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
  * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
+ * Copyright (C) 2026       Alexandre Spangaro          <alexandre@inovea-conseil.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -139,6 +140,8 @@ $mySchemeGlobalIdProf = $this->getIEC6523Code($mysoc->country_code, 1);
 $sellerGlobalIds   = ($mySchemeGlobalIdProf !== '' && $myGlobalIdProf !== '')
 	? array(array('schemeID' => $mySchemeGlobalIdProf, 'value' => $myGlobalIdProf))
 	: array();
+// BT-29 again, without scheme: the identifier this customer gave us as its supplier (issue #1151).
+$sellerIdByBuyer   = trim((string) $einvoicing->getExtraFieldValue($object->socid, 'societe', EInvoicing::EXTRAFIELD_SELLER_ID_BY_BUYER));
 $myUri             = $einvoicing->getSellerCommunicationURI(0);
 $mySchemeUri       = $this->getIEC6523Code($mysoc->country_code, 2);
 // BT-28, the trading name of the seller: "a name by which the seller is known, other than the
@@ -378,8 +381,11 @@ if ($chorus && dol_strlen((string) $promise_code) > 50) {
 // Buyer reference (BT-10): a reference owned by the buyer, used to route the invoice inside its own
 // organisation. The Chorus Pro service code keeps feeding it when the dedicated property is empty:
 // Annexe A of XP Z12-012 documents BT-10 as the "Service Executant" of the public sector, so that
-// mapping is a documented usage of the term (issue #678).
+// mapping is a documented usage of the term (issue #678). In between, the default of the customer (issue #1210).
 $buyerReference = $einvoicing->getExtraFieldValue($object->id, $object->element, EInvoicing::EXTRAFIELD_BUYER_REFERENCE);
+if (trim((string) $buyerReference) === '') {
+	$buyerReference = $einvoicing->getExtraFieldValue($object->socid, 'societe', EInvoicing::EXTRAFIELD_BUYER_REFERENCE);
+}
 if (trim((string) $buyerReference) === '') {
 	$buyerReference = $object->array_options['options_d4d_service_code'] ?? null;
 }
@@ -634,17 +640,26 @@ foreach ($object->lines as $line) {
 			$description = $line->multilangs[$newlang]["description"];  // @phan-suppress-current-line PhanTypeArraySuspiciousNullable
 		}
 	}
-	if (empty($libelle)) {
-		$libelle = $line->product_label ? $line->product_label : "";
-	}
+	// A seller who hides the product label on the PDF (the core reads this constant for every line,
+	// whatever its name says) keeps it out of the e-invoice too: BT-153 is then named from the
+	// description, as for a line with no product. The label stays the last resort, BT-153 being mandatory.
+	$hideProductLabel = getDolGlobalString('PDF_HIDE_PRODUCT_LABEL_IN_SUPPLIER_LINES') !== '';
+	$productLabel = (empty($libelle) ? ($line->product_label ? $line->product_label : "") : $libelle);
+	$libelle = $hideProductLabel ? "" : $productLabel;
 	if (empty($description)) {
 		$description = $line->desc ? dol_string_nohtmltag($line->desc, 0) : "";
 	}
 	if (empty($libelle) && !empty($description)) {
-		$libelle = dol_trunc(dolGetFirstLineOfText(dol_string_nohtmltag($description)), 49, 'right', 'UTF-8', 1);
+		// The first line, line feeds kept (0): the default of dol_string_nohtmltag() turns them into
+		// spaces, and BT-153 was the whole description cut at 49 characters. Not dolGetFirstLineOfText(),
+		// which appends "..." to an item name whose rest BT-154 carries anyway.
+		$libelle = dol_trunc(trim(preg_split('/\R/', dol_string_nohtmltag($description, 0))[0]), 49, 'right', 'UTF-8', 1);
 		if ($libelle == $description) {
 			$description = "";
 		}
+	}
+	if (empty($libelle)) {
+		$libelle = $productLabel;
 	}
 
 	// A discount line still standing here is a deposit deducted, and its description is the sentinel the
@@ -761,7 +776,7 @@ foreach ($object->lines as $line) {
 		'prodname'                  => $libelle,			// BT-153
 		'proddesc'                  => $description,		// BT-154
 		'prodsellerid'              => $line->product_ref ? $line->product_ref : "",
-		'prodbuyerid'               => null,
+		'prodbuyerid'               => ($line->fk_product > 0 ? $einvoicing->getCustomerProductReference($line->fk_product, $object->socid) : ''),	// BT-156 (issue #1151)
 		'prodglobalidtype'          => null,
 		'prodglobalid'              => null,
 		'prodmultilangs'            => [],
@@ -820,6 +835,10 @@ foreach ($object->lines as $line) {
 		'discountPercent'       	=> $LineDiscountPercent,
 	];
 
+	// BT-155 is optional: a ref the PDF hides (MAIN_GENERATE_DOCUMENTS_HIDE_REF) is not sent either.
+	if (getDolGlobalString('MAIN_GENERATE_DOCUMENTS_HIDE_REF')) {
+		$linesData[$numligne]['prodsellerid'] = "";
+	}
 
 
 	// If a unit price including tax is known (rarely)
@@ -1006,6 +1025,12 @@ $prepaidAmount = 0.0;
 foreach (array('getSommePaiement', 'getSumDepositsUsed', 'getSumCreditNotesUsed') as $alreadyPaidMethod) {
 	$alreadyPaidPart = $object->$alreadyPaidMethod();
 
+	// A refund of a credit note is stored negative while the document amounts are positive (EN16931).
+	// The error is the int -1, a refund of 1.00 the float -1.0.
+	if ($alreadyPaidMethod == 'getSommePaiement' && $object->type == $object::TYPE_CREDIT_NOTE && is_float($alreadyPaidPart)) {
+		$alreadyPaidPart = abs($alreadyPaidPart);
+	}
+
 	// SUM() over no row answers NULL, handed back as it is: this invoice carries nothing of that kind.
 	if ($alreadyPaidPart === null || $alreadyPaidPart === '') {
 		continue;
@@ -1093,6 +1118,46 @@ if ($notSubjectToVatGroups > 0) {
 	}
 }
 
+// The PMT, PMD, AAB, and TXD notes are handled separately.
+// The other EINVOICING_EXTRA_<CODE> constants are added as structured notes BT-21 / BT-22.
+$documentNotes = array();
+
+$sqlExtraNotes = 'SELECT name, value';
+$sqlExtraNotes .= ' FROM '.MAIN_DB_PREFIX.'const';
+$sqlExtraNotes .= " WHERE name LIKE 'EINVOICING_EXTRA_%'";
+$sqlExtraNotes .= ' AND entity = '.((int) $conf->entity);
+$sqlExtraNotes .= ' ORDER BY name ASC';
+
+$resqlExtraNotes = $db->query($sqlExtraNotes);
+
+if (!$resqlExtraNotes) {
+	dol_syslog('ExtraNotes - SQL error while loading extra notes: '.$db->lasterror(), LOG_ERR);
+} else {
+	while ($extraNote = $db->fetch_object($resqlExtraNotes)) {
+		$subjectCode = substr($extraNote->name, strlen('EINVOICING_EXTRA_'));
+
+		$content = trim((string) $extraNote->value);
+
+		// Only 3-character UNTDID codes are accepted.
+		if (!preg_match('/^[A-Z0-9]{3}$/', $subjectCode)) {
+			continue;
+		}
+
+		if ($content === '') {
+			continue;
+		}
+
+		// These codes already have dedicated variables.
+		if (in_array($subjectCode, array('PMT', 'PMD', 'AAB', 'TXD'), true)) {
+			continue;
+		}
+
+		$documentNotes[] = array('subjectCode' => $subjectCode, 'content' => $content);
+	}
+
+	$db->free($resqlExtraNotes);
+}
+
 $invoiceData = [
 	// Document part
 	'documentno'           => $object->ref,												// BT-25
@@ -1129,7 +1194,7 @@ $invoiceData = [
 	'documentNoteTXD'      => $vatOnDebits ? $outputlangs->transnoentities('VATOnDebitsMention') : '',
 	// BR-FR-CPRO-00: a note with subject code ADN and content B2G flags the invoice as B2G for the platforms.
 	'documentNoteADN'      => $looksLikeB2GInvoice ? 'B2G' : '',
-	'documentNotes'        => [],
+	'documentNotes'        => $documentNotes,  // BT-21 / BT-22
 
 	// BT-8 (VAT point date code), which tells the buyer when the VAT falls due, hence from when it can be
 	// deducted. See einvoicingVatPointDateCode() for the rule and what the French socle names.
@@ -1137,7 +1202,7 @@ $invoiceData = [
 
 	// Seller part
 	'sellername'                => $mysoc->name,
-	'sellerids'                 => (empty($sellerGlobalIds) ? '' : $myidprof),
+	'sellerids'                 => $sellerIdByBuyer,
 
 	'sellerlineone'             => $sellerAddressLines[0],
 	'sellerlinetwo'             => $sellerAddressLines[1],
