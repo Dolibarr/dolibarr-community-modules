@@ -50,7 +50,7 @@ class SupplierInvoiceHelper
 	 * document. It is the module number, the way Dolibarr tags a line a module created, and it is the
 	 * only line of an imported invoice outside the VAT breakdown: every per-rate comparison skips it.
 	 */
-	const LINE_SPECIAL_CODE_ROUNDING = 95020;
+	const EINVOICING_SPECIAL_CODE_ROUNDING_LINE = 95020;
 
 	/**
 	 * BT-114 of a received document, the amount that rounds its total to what is due.
@@ -240,7 +240,7 @@ class SupplierInvoiceHelper
 	 */
 	public static function isRoundingLine($line): bool
 	{
-		return isset($line->special_code) && (int) $line->special_code === self::LINE_SPECIAL_CODE_ROUNDING;
+		return isset($line->special_code) && (int) $line->special_code === self::EINVOICING_SPECIAL_CODE_ROUNDING_LINE;
 	}
 
 	/**
