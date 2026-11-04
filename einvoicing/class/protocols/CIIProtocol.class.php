@@ -4864,7 +4864,7 @@ class CIIProtocol extends AbstractProtocol
 		$line->tva_tx = 0;
 		$line->product_type = 1;	// A rounding is no stocked good
 		$line->remise_percent = 0;
-		$line->special_code = SupplierInvoiceHelper::LINE_SPECIAL_CODE_ROUNDING;
+		$line->special_code = SupplierInvoiceHelper::EINVOICING_SPECIAL_CODE_ROUNDING_LINE;
 
 		return $line;
 	}

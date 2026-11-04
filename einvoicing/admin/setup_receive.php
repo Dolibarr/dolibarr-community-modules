@@ -182,18 +182,22 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 	}
 
 	// Setup conf to import lines as free description lines when no product is found and no default product exist on supplier
-	// This option is in conflict with EINVOICING_PRODUCTS_AUTO_GENERATION and with MAIN_DISABLE_FREE_LINES,
-	// so it is disabled if EINVOICING_PRODUCTS_AUTO_GENERATION is on or MAIN_DISABLE_FREE_LINES is on
-	if (!getDolGlobalString("EINVOICING_PRODUCTS_AUTO_GENERATION") && !getDolGlobalString("MAIN_DISABLE_FREE_LINES")) {
-		$item = $formSetup->newItem('EINVOICING_IMPORT_AS_FREE_LINES')->setAsYesNo();
-		$item->helpText = $langs->transnoentities('EINVOICING_IMPORT_AS_FREE_LINES_HELP');
-		$item->defaultFieldValue = '0';
-		$item->cssClass = 'minwidth500';
-		$item->fieldParams['warningifon'] = 1;
+	// This option is now useless because we can set a default product to use when importanting free lines. As using it is a very bad idea,
+	// this option is now hidden by default (end user are invited to use instead EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID).
+	if (getDolGlobalString("EINVOICING_ENABLE_DEPRECATED_OPTION_IMPORT_AS_FREE_LINES")) {
+		// This option is in conflict with EINVOICING_PRODUCTS_AUTO_GENERATION and with MAIN_DISABLE_FREE_LINES,
+		// so it is disabled if EINVOICING_PRODUCTS_AUTO_GENERATION is on or MAIN_DISABLE_FREE_LINES is on
+		if (!getDolGlobalString("EINVOICING_PRODUCTS_AUTO_GENERATION") && !getDolGlobalString("MAIN_DISABLE_FREE_LINES")) {
+			$item = $formSetup->newItem('EINVOICING_IMPORT_AS_FREE_LINES')->setAsYesNo();
+			$item->helpText = $langs->transnoentities('EINVOICING_IMPORT_AS_FREE_LINES_HELP');
+			$item->defaultFieldValue = '0';
+			$item->cssClass = 'minwidth500';
+			$item->fieldParams['warningifon'] = 1;
+		}
 	}
 
 	// Setup conf to give a catch-all product to the lines no product and no default of the vendor resolved (issue #1146).
-	// Off by default, and pointless with the automatic product creation, which it would always pre-empt.
+	// Off by default, and pointless with the automatic product creation, which it would always preempt.
 	if (!getDolGlobalString("EINVOICING_PRODUCTS_AUTO_GENERATION")) {
 		$item = $formSetup->newItem('EINVOICING_DEFAULT_PRODUCT_CATCHALL')->setAsYesNo();
 		$item->helpText = $langs->transnoentities('EINVOICING_DEFAULT_PRODUCT_CATCHALL_HELP');
@@ -205,7 +209,7 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 		// product already chosen survives while the option is off.
 		$item = $formSetup->newItem('EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID')->setAsProduct();
 		$item->helpText = $langs->transnoentities('EINVOICING_DEFAULT_PRODUCT_CATCHALL_ID_HELP');
-		$item->cssClass = 'minwidth500';
+		$item->cssClass = 'minwidth300 maxwidth500 widthcentpercentminusx';
 		$item->setValueFromPostCallBack(function () use ($item) {
 			if (!GETPOSTISSET($item->confKey)) {
 				return 0;
@@ -251,6 +255,7 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 	$item->helpText = $langs->transnoentities('EINVOICING_THIRDPARTIES_AUTO_GENERATION_HELP');
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
+	$item->fieldParams['warningifon'] = 1;
 
 	// Setup conf to enable complete third party information when receiving an invoice from from PDP
 	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_COMPLETE_INFO')->setAsYesNo();

@@ -79,9 +79,9 @@ class modStancer extends DolibarrModules
 		$this->editor_url = 'https://cap-rel.fr';
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '2.0.24';
+		$this->version = '2.0.26';
 		// Url to the file with your last numberversion of this module.
-		// The four parameters are required (~/docs/MODULE.md point 13): m the module,
+		// The four parameters are required (capdoc:MODULE.md point 13): m the module,
 		// v its installed version, d the Dolibarr version of the instance
 		$this->url_last_version = "https://cap-rel.fr/dolibarr/ver.php?m=" . $this->rights_class . "&v=" . $this->version . "&d=" . DOL_VERSION;
 
@@ -631,6 +631,9 @@ class modStancer extends DolibarrModules
 		} else {
 			dol_syslog("stancer ****************** Stancer SQL UPDATE OK", LOG_DEBUG);
 		}
+		if (!$this->checkDeclaredTables('/stancer/sql/')) {
+			return -1;
+		}
 		dol_syslog("stancer ****************** Stancer after SQL", LOG_DEBUG);
 
 		// Create extrafields during init
@@ -760,7 +763,7 @@ class modStancer extends DolibarrModules
 		// The memcached PHP extension is optional and absent from the static
 		// analysis environment, hence the class_exists() guard and the
 		// suppressions: the class is only touched when it really exists.
-		// Only the server Dolibarr itself caches into is flushed (~/docs/MEMCACHED.md),
+		// Only the server Dolibarr itself caches into is flushed (capdoc:MEMCACHED.md),
 		// never a local memcached shared with other applications.
 		// $conf->memcached->enabled rather than isModEnabled(), absent before Dolibarr 16
 		if (!empty($conf->memcached->enabled) && class_exists('Memcached')) {
@@ -857,5 +860,49 @@ class modStancer extends DolibarrModules
 	{
 		$sql = array();
 		return $this->_remove($sql, $options);
+	}
+
+	/**
+	 * Check that every table declared in a sql/ directory exists.
+	 *
+	 * run_sql() tolerates a failing CREATE TABLE, so _load_tables() can report
+	 * success while a table is missing: the module would then be activated
+	 * without it and fail far from the cause.
+	 *
+	 * @param	string	$reldir	Directory given to _load_tables(), e.g. '/mymodule/sql/'
+	 * @return	bool			True when every declared table exists, false otherwise (error set and logged)
+	 */
+	private function checkDeclaredTables($reldir)
+	{
+		$schemadir = dol_buildpath($reldir, 0);
+		if (!is_dir($schemadir)) {
+			$this->error = 'SQL directory not found: '.$reldir;
+			dol_syslog(get_class($this).'::checkDeclaredTables '.$this->error, LOG_ERR);
+			return false;
+		}
+
+		$missing = array();
+		foreach (glob(rtrim($schemadir, '/').'/llx_*.sql') ?: array() as $file) {
+			if (substr($file, -8) === '.key.sql') {
+				continue;
+			}
+			$content = preg_replace('/--[^\n]*/', '', (string) file_get_contents($file));
+			if (!preg_match_all('/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?`?llx_(\w+)`?/i', $content, $matches)) {
+				continue;
+			}
+			foreach ($matches[1] as $name) {
+				// Portable probe: DDLListTables() sends SHOW TABLES, which SQLite refuses
+				if (!$this->db->query("SELECT COUNT(*) FROM ".MAIN_DB_PREFIX.$this->db->sanitize($name)." WHERE 1 = 0")) {
+					$missing[] = MAIN_DB_PREFIX.$name;
+				}
+			}
+		}
+		if (!empty($missing)) {
+			$this->error = 'Tables not created: '.implode(', ', $missing);
+			dol_syslog(get_class($this).'::checkDeclaredTables '.$this->error, LOG_ERR);
+			return false;
+		}
+
+		return true;
 	}
 }

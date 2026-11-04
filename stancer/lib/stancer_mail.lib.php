@@ -148,6 +148,23 @@ function stancerGetMailTemplate($formmail, $modele, $outputlangs, $templatetypes
 require_once DOL_DOCUMENT_ROOT . '/core/class/html.formmail.class.php';
 
 /**
+ * Element type an agenda event of this object is stored with
+ *
+ * ActionComm::create() rewrites 'facture' into 'invoice', 'commande' into 'order'
+ * and 'contrat' into 'contract' before the INSERT: a lookup through getActions()
+ * with $object->element finds nothing for these objects.
+ *
+ * @param   CommonObject  $object  Object the event is attached to
+ * @return  string                 Value stored in llx_actioncomm.elementtype
+ */
+function stancerActionCommElementType($object)
+{
+	$map = array('facture' => 'invoice', 'commande' => 'order', 'contrat' => 'contract');
+	$element = (is_object($object) && isset($object->element)) ? (string) $object->element : '';
+	return isset($map[$element]) ? $map[$element] : $element;
+}
+
+/**
  * Record an agenda event, linked to the given object so it shows on its events tab
  *
  * @param   object   $object              Object the event is attached to (fk_element + elementtype)
@@ -197,6 +214,170 @@ function stancerAddActionComm($object, $actioncode, $label, $description, $posta
 	$actioncomm->elementtype  = $object->element;
 	$actioncomm->extraparams  = dol_trunc($extraparams, 250);
 	$actioncomm->create($user);
+}
+
+/**
+ * Stancer statuses meaning that a payment attempt did not bring the money
+ *
+ * @return  string[]  API statuses
+ */
+function stancerPaymentFailureStatuses()
+{
+	return array('refused', 'failed', 'expired', 'disputed');
+}
+
+/**
+ * Readable reason of a failed Stancer payment, built from its API data
+ *
+ * @param   array|false  $paymentData  Payment as returned by the Stancer API
+ * @return  string                     SEPA reject reason, 3-D Secure status, or empty string
+ */
+function stancerPaymentFailureMessage($paymentData)
+{
+	if (!is_array($paymentData)) {
+		return '';
+	}
+	$method = isset($paymentData['method']) ? (string) $paymentData['method'] : '';
+	$response = isset($paymentData['response']) ? (string) $paymentData['response'] : '';
+	if ($method == 'sepa' && $response !== '') {
+		return stancerGetSepaResponseMessage($response);
+	}
+	$authStatus = (isset($paymentData['auth']) && is_array($paymentData['auth']) && isset($paymentData['auth']['status'])) ? (string) $paymentData['auth']['status'] : '';
+	if (in_array($authStatus, array('unavailable', 'failed', 'declined', 'expired'), true)) {
+		return '3-D Secure ' . $authStatus;
+	}
+	return '';
+}
+
+/**
+ * Time a Stancer payment failed at, when the API data tells it
+ *
+ * A card is refused while the customer pays, so the creation time of the payment
+ * is the time of the failure. A SEPA reject, an expiry or a dispute happens days
+ * later and the payment carries no date for it.
+ *
+ * @param   array|false  $paymentData  Payment as returned by the Stancer API
+ * @return  int|null                   Timestamp, null when unknown
+ */
+function stancerPaymentFailureDate($paymentData)
+{
+	if (!is_array($paymentData)) {
+		return null;
+	}
+	$method = isset($paymentData['method']) ? (string) $paymentData['method'] : '';
+	$status = isset($paymentData['status']) ? (string) $paymentData['status'] : '';
+	if ($method == 'card' && in_array($status, array('refused', 'failed'), true) && !empty($paymentData['created'])) {
+		$date = stancerApiDate($paymentData['created']);
+		if ($date instanceof DateTime) {
+			return $date->getTimestamp();
+		}
+	}
+	return null;
+}
+
+/**
+ * Record a failed Stancer payment on an invoice, from the payment API data
+ *
+ * @param   CommonObject  $object       Invoice the payment was for (any other object is skipped)
+ * @param   string        $paymentId    Stancer payment id (paym_xxx)
+ * @param   array         $paymentData  Payment as returned by the Stancer API
+ * @param   int|null      $datep        Time of the failure, null to read it from $paymentData (now when unknown)
+ * @return  int                         See stancerAddPaymentResultEvent()
+ */
+function stancerAddPaymentFailureEvent($object, $paymentId, $paymentData, $datep = null)
+{
+	$status = isset($paymentData['status']) ? (string) $paymentData['status'] : '';
+	$code = isset($paymentData['response']) ? (string) $paymentData['response'] : '';
+	if ($datep === null) {
+		$datep = stancerPaymentFailureDate($paymentData);
+	}
+	return stancerAddPaymentResultEvent($object, false, (string) $paymentId, $status, $code, stancerPaymentFailureMessage($paymentData), $datep);
+}
+
+/**
+ * Record the result of a Stancer payment on an invoice, following the Dolibarr
+ * convention of automatic debits (AC_PAYMENT_STRIPE_OK / AC_PAYMENT_STRIPE_KO):
+ * AC_PAYMENT_STANCER_OK or AC_PAYMENT_STANCER_KO, once per Stancer payment and
+ * invoice. Other modules read these codes (e.g. to space debit retries or to
+ * close a contract after repeated failures). Like in core, only invoices carry
+ * them: orders, proposals and other objects are skipped.
+ *
+ * @param   CommonObject  $object     Invoice the payment was for
+ * @param   bool          $success    true for a successful payment, false for a failed one
+ * @param   string        $paymentId  Stancer payment id (paym_xxx), stored in ref_ext as deduplication key
+ * @param   string        $status     Stancer status of the payment
+ * @param   string        $code       Stancer response code
+ * @param   string        $message    Readable reason of the failure
+ * @param   int|null      $datep      Time of the result at Stancer, null when unknown (now is used)
+ * @return  int                       1 created, 0 skipped (not an invoice or already recorded), -1 on error
+ */
+function stancerAddPaymentResultEvent($object, $success, $paymentId, $status = '', $code = '', $message = '', $datep = null)
+{
+	global $db, $user, $langs;
+
+	$actioncode = $success ? 'PAYMENT_STANCER_OK' : 'PAYMENT_STANCER_KO';
+	if (!is_object($object) || !isset($object->element) || $object->element !== 'facture' || empty($object->id)) {
+		$kind = (is_object($object) && isset($object->element)) ? $object->element : gettype($object);
+		dol_syslog("stancerAddPaymentResultEvent $actioncode skipped for payment $paymentId: object is not an invoice ($kind)", LOG_DEBUG);
+		return 0;
+	}
+	if (empty($paymentId)) {
+		dol_syslog("stancerAddPaymentResultEvent $actioncode not recorded on invoice " . $object->ref . ": no Stancer payment id", LOG_ERR);
+		return -1;
+	}
+
+	$sql = "SELECT COUNT(*) AS nb FROM " . MAIN_DB_PREFIX . "actioncomm";
+	$sql .= " WHERE code = 'AC_" . $db->escape($actioncode) . "'";
+	$sql .= " AND fk_element = " . ((int) $object->id) . " AND elementtype = 'invoice'";
+	$sql .= " AND ref_ext = '" . $db->escape($paymentId) . "'";
+	$resql = $db->query($sql);
+	if (!$resql) {
+		dol_syslog("stancerAddPaymentResultEvent $actioncode deduplication query failed for invoice " . $object->ref . ": " . $db->lasterror(), LOG_ERR);
+		return -1;
+	}
+	$row = $db->fetch_object($resql);
+	if ($row && (int) $row->nb > 0) {
+		dol_syslog("stancerAddPaymentResultEvent $actioncode already recorded for payment $paymentId on invoice " . $object->ref . ", skip", LOG_DEBUG);
+		return 0;
+	}
+
+	$langs->load('stancer@stancer');
+	$when = empty($datep) ? dol_now() : (int) $datep;
+	$extraparams = '';
+	if (!$success) {
+		$extraparams = implode(' - ', array_filter(array((string) $status, (string) $code, (string) $message), 'strlen'));
+	}
+
+	$actioncomm = new ActionComm($db);
+	$actioncomm->type_code    = 'AC_OTH_AUTO';
+	$actioncomm->code         = 'AC_' . $actioncode;
+	$actioncomm->label        = $success
+		? $langs->transnoentitiesnoconv('StancerPaymentResultOkLabel', (string) $object->ref)
+		: $langs->transnoentitiesnoconv('StancerPaymentResultKoLabel', (string) $object->ref, (string) $status);
+	$actioncomm->note_private = $langs->transnoentitiesnoconv('StancerPaymentResultDesc', $paymentId, (string) $status) . ($extraparams !== '' ? "\n" . $extraparams : '');
+	$actioncomm->fk_project   = $object->fk_project;
+	$actioncomm->datep        = $when;
+	$actioncomm->datef        = $when;
+	$actioncomm->percentage   = -1;
+	// Only invoices get past the guard above, and Facture declares socid
+	// @phan-suppress-next-line PhanUndeclaredProperty
+	$actioncomm->socid        = $object->socid;
+	$actioncomm->authorid     = (int) $user->id;
+	$actioncomm->userownerid  = (int) $user->id;
+	$actioncomm->elementid    = (int) $object->id;
+	// @phan-suppress-next-line PhanDeprecatedProperty  ActionComm::create() only reads fk_element up to Dolibarr 18, both fields must be fed
+	$actioncomm->fk_element   = (int) $object->id;
+	// What ActionComm::create() stores for a Facture, set as is so the lookups above match
+	$actioncomm->elementtype  = 'invoice';
+	$actioncomm->ref_ext      = $paymentId;
+	$actioncomm->extraparams  = dol_trunc($extraparams, 250);
+	$res = $actioncomm->create($user);
+	if ($res <= 0) {
+		dol_syslog("stancerAddPaymentResultEvent $actioncode creation failed for payment $paymentId on invoice " . $object->ref . ": " . $actioncomm->error . ' ' . implode(', ', $actioncomm->errors), LOG_ERR);
+		return -1;
+	}
+	dol_syslog("stancerAddPaymentResultEvent $actioncode recorded for payment $paymentId on invoice " . $object->ref . " (status=$status)");
+	return 1;
 }
 
 /**
@@ -311,6 +492,53 @@ function stancerSendMail($to, $subject, $message, $isForCustomer = false, $cc = 
 	return -1;
 }
 
+
+/**
+ * Files other modules join to the mail of an invoice, after the invoice
+ * itself, such as the consumption statement of a reseller's invoice
+ * (smartmakersaasbilling). The mail goes to the customer only: what is
+ * joined here never passes through the e-invoicing access points.
+ *
+ * Modules answer the hook invoiceMailAttachments of the context
+ * stancerinvoicemail with the paths of their files under a key of their
+ * own (results = array('mymodule' => array($path))): the hook manager
+ * merges the answers of the modules by key.
+ *
+ * @param	CommonObject	$object	Invoice mailed
+ * @return	string[]				Paths of existing files
+ */
+function stancerInvoiceMailAttachments($object)
+{
+	global $db, $hookmanager;
+
+	if (!is_object($object) || ($object->element ?? '') !== 'facture') {
+		return array();
+	}
+	if (!is_object($hookmanager)) {
+		require_once DOL_DOCUMENT_ROOT . '/core/class/hookmanager.class.php';
+		$hookmanager = new HookManager($db);
+	}
+	$hookmanager->initHooks(array('stancerinvoicemail'));
+	$action = '';
+	$parameters = array();
+	$reshook = $hookmanager->executeHooks('invoiceMailAttachments', $parameters, $object, $action);
+	if ($reshook < 0) {
+		dol_syslog('stancerInvoiceMailAttachments a module failed to give its files for invoice ' . ($object->ref ?? '?') . ': ' . $hookmanager->error . ' ' . implode(',', (array) $hookmanager->errors), LOG_ERR);
+	}
+	$paths = array();
+	foreach ((array) $hookmanager->resArray as $module => $files) {
+		foreach ((array) $files as $path) {
+			if (!is_string($path) || !dol_is_file($path)) {
+				dol_syslog('stancerInvoiceMailAttachments ' . $module . ' gave a file that does not exist for invoice ' . ($object->ref ?? '?') . ', not joined: ' . json_encode($path), LOG_WARNING);
+				continue;
+			}
+			if (!in_array($path, $paths, true)) {
+				$paths[] = $path;
+			}
+		}
+	}
+	return $paths;
+}
 
 /**
  * send mail with invoice ($object) attached
@@ -465,6 +693,14 @@ function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $force
 			$listofmimes = array(dol_mimetype($file));
 		} else {
 			dol_syslog('stancerSendInvoiceMailModele no pdf found in ' . $mailctx['diroutput'] . '/' . $object->ref . ', mail will be sent without attachment', LOG_WARNING);
+		}
+	}
+	// The files other modules join to the invoice, after it
+	foreach (stancerInvoiceMailAttachments($object) as $extra) {
+		if (!in_array($extra, $listofpaths, true)) {
+			$listofpaths[] = $extra;
+			$listofnames[] = basename($extra);
+			$listofmimes[] = dol_mimetype($extra);
 		}
 	}
 	dol_syslog('stancerSendInvoiceMailModele fichier(s) joint(s) : ' . json_encode($listofpaths));

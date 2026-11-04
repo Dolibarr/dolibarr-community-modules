@@ -176,6 +176,14 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$item->cssClass = 'minwidth500';
 	$item->fieldParams['forcereload'] = 1;
 
+	if (getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
+		$item = $formSetup->newItem('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')->setAsYesNo();
+		$item->helpText = $langs->transnoentities('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS').'<br>'.$langs->transnoentities('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS2');
+		$item->defaultFieldValue = '0';
+		$item->cssClass = 'minwidth500';
+		$item->fieldParams['warningifon'] = 1;
+	}
+
 	// Setup conf to enable third-party validation via government APIs (SIREN via data.gouv.fr and VAT via VIES)
 	$item = $formSetup->newItem('EINVOICING_ENABLE_API_VALIDATION')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_ENABLE_API_VALIDATION_HELP');
@@ -189,7 +197,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	// stays the reference.
 	$item = $formSetup->newItem('EINVOICING_BR_CHECK')->setAsSelect(array(
 		'nocheck' => $langs->transnoentities('EINVOICING_BR_CHECK_NOCHECK'),
-		'warning_only' => $langs->transnoentities('EINVOICING_BR_CHECK_WARNING_ONLY'),
+		'warning_only' => $langs->transnoentities('EINVOICING_BR_CHECK_WARNING_ONLY').' ('.$langs->trans("Recommended").')',
 		'blocking' => $langs->transnoentities('EINVOICING_BR_CHECK_BLOCKING'),
 	));
 	$item->helpText = $langs->transnoentities('EINVOICING_BR_CHECK_HELP');
@@ -208,7 +216,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 		if ($hasValidator) {
 			$item = $formSetup->newItem('EINVOICING_AP_PRECHECK')->setAsSelect(array(
 				'nocheck' => $langs->transnoentities('EINVOICING_AP_PRECHECK_NOCHECK'),
-				'manuel' => $langs->transnoentities('EINVOICING_AP_PRECHECK_MANUEL'),
+				'manuel' => $langs->transnoentities('EINVOICING_AP_PRECHECK_MANUEL').' ('.$langs->trans("Recommended").')',
 				'auto' => $langs->transnoentities('EINVOICING_AP_PRECHECK_AUTO'),
 			));
 			$item->helpText = $langs->transnoentities('EINVOICING_AP_PRECHECK_HELP');
@@ -216,24 +224,6 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 			$item->cssClass = 'minwidth500';
 		}
 	}
-
-
-	if (getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
-		$item = $formSetup->newItem('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')->setAsYesNo();
-		$item->helpText = $langs->transnoentities('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS').'<br>'.$langs->transnoentities('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS2');
-		$item->defaultFieldValue = '0';
-		$item->cssClass = 'minwidth500';
-		$item->fieldParams['warningifon'] = 1;
-	}
-
-	// Setup conf to choose to block generation/send of an invoice if no routing ID is found for the third party otherwise use SIREN
-	/* Option no more useful due to other added option that are more accurate, but we can still use it as hidden option
-	$item = $formSetup->newItem('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_BLOCK_INVOICE_NO_ROUTING_ID_HELP');
-	$item->defaultFieldValue = '0';
-	$item->cssClass = 'minwidth500';
-	$item->fieldParams['forcereload'] = 0;
-	*/
 
 	// Setup conf to check the recipient reachability in the Approved Platforms directory (annuaire PA) before
 	// sending, and surface it on the invoice card. On by default. A read-only directory lookup: it never blocks.
@@ -297,6 +287,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 		$item->helpText = $langs->transnoentities('EINVOICING_AUTO_SEND_ON_GENERATION_HELP');
 		$item->defaultFieldValue = '0';
 		$item->cssClass = 'minwidth500';
+		$item->fieldParams['warningifon'] = 1;
 	}
 
 	// Setup conf for maximum e-invoice file size (warning if exceeded)
@@ -346,7 +337,7 @@ if (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP')) {
 	$conf->global->EINVOICING_TELL_CUSTOMER_PAYMENT_RECEIVED = $langs->trans("Mandatory");
 	$item = $formSetup->newItem('EINVOICING_TELL_CUSTOMER_PAYMENT_RECEIVED');
 	$item->helpText = $langs->trans('EINVOICING_TELL_CUSTOMER_PAYMENT_RECEIVED_HELP');
-	$item->fieldInputOverride = $langs->trans("Mandatory");
+	$item->fieldOverride = '<span class="opacitymedium">'.$langs->trans("Mandatory").'</span>';
 	//$item->enabled = 0;
 	$item->cssClass = 'opacitymedium';
 
