@@ -4088,6 +4088,11 @@ class CIIProtocol extends AbstractProtocol
 			$fileext = static::INVOICE_FILE_EXTENSION;
 		}
 		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . (empty($suffix) ? '' : '_' . $suffix) . '.' . $fileext);
+		// Prefixed with the reference of the invoice as the upload form does by default, so the validation
+		// renames it with the final reference. A file saved without the prefix before #1174 keeps its name.
+		if (!getDolGlobalString('MAIN_DISABLE_SUGGEST_REF_AS_PREFIX') && !getDolGlobalString('MAIN_DOC_UPLOAD_NOT_RENAME_BY_DEFAULT') && !file_exists($upload_dir . '/' . $filename)) {
+			$filename = dol_sanitizeFileName($supplierInvoice->ref) . '-' . $filename;
+		}
 
 		$dest_path = $upload_dir . '/' . $filename;
 
@@ -5488,7 +5493,7 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
-	 * Suffix an embedded attachment is stored under, in the <ref_supplier>_<suffix>.<ext> naming of the other imported files.
+	 * Suffix an embedded attachment is stored under, in the <ref>-<ref_supplier>_<suffix>.<ext> naming of the other imported files.
 	 *
 	 * @param  string   $filename		Name of the attachment, without extension
 	 * @param  string   $extension		Its extension
