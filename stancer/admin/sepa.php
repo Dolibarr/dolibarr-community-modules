@@ -109,6 +109,9 @@ $item = $formSetup->newItem('STANCER_AUTO_SEPA_ONLY_FOR_CONTRACTS')->setAsYesNo(
 $item = $formSetup->newItem('STANCER_SEPA_GROUP_SAME_DAY')->setAsYesNo();
 $item->helpText = $langs->transnoentities('STANCER_SEPA_GROUP_SAME_DAYTooltip');
 
+$item = $formSetup->newItem('STANCER_SEPA_SIGNED_SWITCH_TEMPLATES')->setAsYesNo();
+$item->helpText = $langs->transnoentities('STANCER_SEPA_SIGNED_SWITCH_TEMPLATESTooltip');
+
 
 $warningSepa = false;
 if (isset($conf->uptosign) && $conf->uptosign->enabled) {

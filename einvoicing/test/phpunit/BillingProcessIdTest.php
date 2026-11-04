@@ -182,4 +182,51 @@ class BillingProcessIdTest extends CommonClassTest
 
 		$this->assertSame('B4', $protocol->getBillingProcessID($invoice, 0.0));
 	}
+
+	/**
+	 * A refunded credit note is in the already-paid frame, whatever the sign of its total.
+	 *
+	 * @return void
+	 */
+	public function testRefundedCreditNoteUsesTheAlreadyPaidFrame()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$invoice = $this->makeInvoice(Facture::STATUS_CLOSED, -35.34, [1]);
+		$invoice->type = Facture::TYPE_CREDIT_NOTE;
+
+		$this->assertSame('S2', $protocol->getBillingProcessID($invoice, 35.34));
+	}
+
+	/**
+	 * A SQL error on the payments (int -1) is not a refund of 1.00 (float -1.0).
+	 *
+	 * @return void
+	 */
+	public function testPaymentReadErrorKeepsTheInitialFrame()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+
+		$invoice = new class ($db) extends Facture {
+			/**
+			 * @param	int		$multicurrency	Unused
+			 * @return	int						SQL error
+			 */
+			public function getSommePaiement($multicurrency = 0)
+			{
+				return -1;
+			}
+		};
+		$invoice->status     = Facture::STATUS_CLOSED;
+		$invoice->statut     = Facture::STATUS_CLOSED;
+		$invoice->close_code = '';
+		$invoice->total_ttc  = 1.0;
+		$invoice->lines      = [];
+
+		$this->assertSame('B1', $protocol->getBillingProcessID($invoice));
+	}
 }

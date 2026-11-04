@@ -1,33 +1,37 @@
 ---
-title: "Stancer 2.0.24 : relancer un paiement par carte refusé, et un module plus sûr"
-summary: "Le lien de paiement s'envoie depuis une commande ou une facture et permet de payer à nouveau après un refus. La version apporte aussi une série de correctifs de sécurité : contrôles d'accès, pages publiques, journaux et multi-société."
+title: "Stancer 2.0.26 : vos clients passent au prélèvement dès qu'ils signent leur mandat SEPA"
+summary: "À la signature du mandat SEPA, les factures modèles du client passent en prélèvement, y compris celles réglées par carte. Les paiements Stancer apparaissent aussi dans les événements des factures, et un client qui n'a laissé qu'un mobile peut payer en ligne."
 type: release
-version: "2.0.24"
-focus: security
+version: "2.0.26"
+focus: feature_major
 maturity: stable
 compat_status: declared
 locale: fr_FR
 ---
 
-## Encaisser malgré un premier refus
+## Du paiement par carte au prélèvement, sans ressaisie
 
-Le module Stancer encaisse vos clients par carte bancaire et par prélèvement SEPA directement depuis Dolibarr. Cette version s'attaque au cas qui coûte le plus cher : le paiement par carte refusé.
+Le module Stancer encaisse vos clients par carte bancaire et par prélèvement SEPA directement depuis Dolibarr. Le paiement par carte d'un abonnement reste fragile : une carte arrive en fin de validité, un paiement est refusé, et les frais sont plus élevés que ceux d'un prélèvement.
 
-- Un bouton **Envoyer le lien de paiement** sur les commandes et les factures envoie au client le lien de paiement en ligne, à son adresse ou à celle de l'un de ses contacts.
-- Ce lien reste valable après un refus : il démarre une nouvelle tentative, et la page de retour explique au client ce qui s'est passé.
-- Pour une carte qui ne parvient pas à s'authentifier, le paiement sans 3-D Secure peut être autorisé sur un document précis, avec traçabilité de l'autorisation.
+Avec cette version, dès que le client signe son mandat SEPA :
 
-## Une mise à jour de sécurité
+- le mandat signé devient son mandat par défaut, même s'il en avait déjà un ;
+- toutes ses factures modèles passent en prélèvement sur le compte bancaire Stancer, y compris celles qu'il réglait par carte, et les factures de ses contrats suivent ;
+- le mode de paiement du tiers ne change pas : une facture ponctuelle garde le mode que vous choisissez.
 
-Une revue complète du module a conduit à durcir de nombreux points :
+La bascule se fait à la signature électronique par UptoSign, ou d'un clic sur le bouton **Mandat signé** pour un mandat signé sur papier. Chaque bascule est tracée dans l'agenda du tiers. L'option est désactivée par défaut.
 
-- droit d'écriture et jeton de sécurité exigés pour toute action qui débite, rembourse ou enregistre un paiement ;
-- montant des factures, commandes et devis toujours calculé par Dolibarr, jamais repris du lien ;
-- pages publiques de carte et d'IBAN protégées par la clé de sécurité des paiements en ligne ;
-- aucune donnée de carte ni clé de sécurité dans les journaux, certificat de l'API Stancer vérifié ;
-- paiements, remboursements et contestations cloisonnés par société.
+## Un suivi plus lisible
 
-Plusieurs corrections l'accompagnent, dont l'envoi des emails de validation de facture différés, qui ne partaient plus.
+- Chaque paiement Stancer encaissé, refusé, échoué ou contesté apparaît une seule fois dans les événements de la facture, comme les prélèvements Stripe.
+- Les autres modules peuvent s'appuyer sur l'événement de refus pour espacer les relances ou suspendre un service.
+- L'administrateur reçoit un seul email par paiement en échec, et non plus un à chaque synchronisation.
+
+## Des clients joignables sur leur seul mobile
+
+Un client qui n'a laissé qu'un numéro de mobile peut payer un devis, une commande ou une facture avec Stancer, y compris depuis un département d'outre-mer.
+
+Plusieurs corrections accompagnent cette version, dont une facture payée à nouveau après un prélèvement rejeté, qui reste désormais classée payée.
 
 ## Essayez-le
 
@@ -37,6 +41,6 @@ module : [dolitest.fr/stancer](https://dolitest.fr/stancer/)
 
 ## Mise à jour
 
-Après avoir remplacé les fichiers, désactivez puis réactivez le module pour appliquer les nouvelles contraintes de la base de données.
+Remplacez les fichiers du module, aucune autre étape n'est nécessaire.
 
 Documentation : [doc.cap-rel.fr/stancer](https://doc.cap-rel.fr/stancer/)

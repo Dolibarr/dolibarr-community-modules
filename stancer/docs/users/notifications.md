@@ -58,6 +58,10 @@ Plusieurs emails sont configurables pour le cycle de vie SEPA :
 |--------|-------------|
 | Email d'erreur de paiement | Email envoyé au client et/ou à l'administrateur en cas d'échec de paiement |
 
+Quand le client revient sur la page de paiement après un refus de Stancer (statut refusé, échoué, expiré ou contesté), il reçoit cet email à chaque tentative refusée. Une simple erreur de communication avec Stancer, qui ne dit rien du paiement, n'en déclenche pas.
+
+L'administrateur n'est prévenu qu'une fois par paiement et par statut d'un paiement en erreur, même si la synchronisation quotidienne le retrouve plusieurs jours de suite.
+
 ## Emails de rejet SEPA
 
 Lorsqu'un prélèvement SEPA est rejeté, le module envoie automatiquement un email au client (si configuré dans l'onglet SEPA) et à l'adresse configurée dans le champ **Email de notification SEPA**.
@@ -87,6 +91,12 @@ Fonctionnement avec un délai > 0 :
 - Si rien n'est fait, l'envoi automatique est déclenché par la [tâche planifiée](/stancer/taches-automatiques) dédiée (exécutée toutes les heures).
 
 > **Astuce :** une vue "Envois de factures programmés" est disponible dans le tableau de bord Stancer pour suivre les factures dont l'envoi est encore en attente. Les échéances dépassées y apparaissent en rouge.
+
+### Les pièces que d'autres modules joignent à la facture
+
+L'email joint la facture PDF, puis les fichiers que d'autres modules demandent de joindre à cette facture. Par exemple, le module de facturation des abonnements SaaS joint le relevé de consommation détaillé de la facture d'un revendeur. Ces pièces partent au seul client, par cet email : elles ne passent pas par les plateformes agréées de la facturation électronique.
+
+Pour un développeur, un module les fournit par le hook `invoiceMailAttachments`, dans le contexte `stancerinvoicemail` : il rend les chemins de ses fichiers sous une clé à son nom (`$this->results = array('monmodule' => array($chemin))`). Un fichier absent est ignoré et journalisé.
 
 ## Relances automatiques
 
