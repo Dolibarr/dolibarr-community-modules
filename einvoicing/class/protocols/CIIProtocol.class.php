@@ -1863,6 +1863,10 @@ class CIIProtocol extends AbstractProtocol
 				}
 			}
 
+			//Always identify lines that are created by the eInvoicing module
+			//There can another case with buildRoundingLine that carries BT-114
+			$line->special_code=SupplierInvoiceHelper::LINE_EINVOICE_IMPORTED;
+
 			$supplierInvoice->lines[] = $line;
 
 			if (!$mergeLineCharges) {
@@ -4234,6 +4238,10 @@ class CIIProtocol extends AbstractProtocol
 			$line->tva_tx = (float) ($parsedLine['rateApplicablePercent'] ?? 0);
 			$line->product_type = 1;	// A charge is a service, never a stocked good
 			$line->remise_percent = 0;
+
+			//Always identify lines that are created by the eInvoicing module
+			//There can another case with buildRoundingLine that carries BT-114
+			$line->special_code=SupplierInvoiceHelper::LINE_EINVOICE_IMPORTED;
 
 			$chargeLines[] = $line;
 		}
