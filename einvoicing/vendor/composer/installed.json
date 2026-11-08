@@ -468,17 +468,17 @@
         },
         {
             "name": "horstoeko/zugferd",
-            "version": "v1.0.134",
-            "version_normalized": "1.0.134.0",
+            "version": "v1.0.135",
+            "version_normalized": "1.0.135.0",
             "source": {
                 "type": "git",
                 "url": "https://github.com/horstoeko/zugferd.git",
-                "reference": "3ced2116cecb5cfb950c4441066338cd71044337"
+                "reference": "b5e2dcc24b5e1b5d5288fd22176923d1c639471e"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/horstoeko/zugferd/zipball/3ced2116cecb5cfb950c4441066338cd71044337",
-                "reference": "3ced2116cecb5cfb950c4441066338cd71044337",
+                "url": "https://api.github.com/repos/horstoeko/zugferd/zipball/b5e2dcc24b5e1b5d5288fd22176923d1c639471e",
+                "reference": "b5e2dcc24b5e1b5d5288fd22176923d1c639471e",
                 "shasum": ""
             },
             "require": {
@@ -513,7 +513,7 @@
                 "phpunit/phpunit": "^9.6",
                 "rector/rector": "^2"
             },
-            "time": "2026-10-29T09:21:40+00:00",
+            "time": "2026-11-08T15:28:54+00:00",
             "type": "package",
             "installation-source": "dist",
             "autoload": {
@@ -543,7 +543,7 @@
             ],
             "support": {
                 "issues": "https://github.com/horstoeko/zugferd/issues",
-                "source": "https://github.com/horstoeko/zugferd/tree/v1.0.134"
+                "source": "https://github.com/horstoeko/zugferd/tree/v1.0.135"
             },
             "install-path": "../horstoeko/zugferd"
         },
