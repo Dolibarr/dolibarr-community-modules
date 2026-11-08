@@ -951,17 +951,18 @@ class HelloAssoMemberUtils
 		if (!$error) {
 			$member->invoice = $invoice;
 
-			$outputlangs = $langs;
 			$newlang = (!empty($member->default_lang) ? $member->default_lang : '');
 			if (getDolGlobalInt('MAIN_MULTILANGS') && empty($newlang)) {
 				$newlang = $customer->default_lang;
 			}
-			if (!empty($newlang)) {
-				$outputlangs = new Translate("", $GLOBALS['conf']);
-				$outputlangs->setDefaultLang($newlang);
+			if (empty($newlang) && $langs instanceof Translate) {
+				$newlang = $langs->defaultlang;
 			}
+			$outputlangs = new Translate("", $GLOBALS['conf']);
+			$outputlangs->setDefaultLang($newlang);
+			$outputlangs->loadLangs(array("main", "bills", "products"));
 			$invoice->fetch($invoice->id);
-			$invoice->generateDocument($invoice->model_pdf, $outputlangs);
+			$invoice->generateDocument((string) $invoice->model_pdf, $outputlangs);
 		}
 
 		return ($error ? -1 : 1);
