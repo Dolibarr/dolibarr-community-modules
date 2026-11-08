@@ -151,35 +151,23 @@ if (!empty($flowid)) {
 		if (!is_object($provider)) {
 			$loaderror = $langs->trans("FailedToGetProvider", getDolGlobalString('EINVOICING_PDP'));
 		} else {
-			// Get the invoice of the flow. We ask the 'Converted' document, like the synchronization does,
-			// because the 'Original' one may use a syntax we are not able to parse (UBL...).
-			$flowResponse = $provider->fetchFlowData($flowid, 'Converted', 'get_flow_for_product_mapping');
+			// Read the flow the way the synchronization does (Converted, then Original, then ReadableView),
+			// or a flow it imports stays unreadable here, e.g. on a CLIENT_NOT_CONFIGURED account (#1230).
+			$xmlData = null;
+			try {
+				$xmlData = $provider->fetchFlowXml($flowid, false);
+			} catch (Exception $e) {
+				$loaderror = $langs->trans("FailedToGetFlowContent", $flowid).' - '.$e->getMessage();
+			}
 
-			if (empty($flowResponse['status_code']) || $flowResponse['status_code'] != 200) {
-				$loaderror = $langs->trans("FailedToGetFlowContent", $flowid).(empty($flowResponse['errorMessage']) ? '' : ' - '.$flowResponse['errorMessage']);
-			} else {
-				$flowContent = $flowResponse['response'];
-
+			if (empty($loaderror)) {
 				$protocolManager = new ProtocolManager($db);
-				$detectedProtocol = $protocolManager->detectProtocolFromContent($flowContent);
+				$detectedProtocol = empty($xmlData) ? '' : $protocolManager->detectProtocolFromContent($xmlData);
 				$protocol = empty($detectedProtocol) ? null : $protocolManager->getProtocol($detectedProtocol);
 
 				if (!is_object($protocol)) {
 					$loaderror = $langs->trans("FailedToDetectProtocolOfFlow", $flowid);
 				} else {
-					// A Factur-X document is a PDF embedding the XML, so we may have to extract it first.
-					$xmlData = method_exists($protocol, 'extractXmlFromFileContent') ? $protocol->extractXmlFromFileContent($flowContent) : $flowContent;
-
-					// The extracted content is a pure XML (CII for a Factur-X PDF), so we may have to
-					// switch to the protocol able to parse it.
-					$detectedXmlProtocol = $protocolManager->detectProtocolFromContent($xmlData);
-					if (!empty($detectedXmlProtocol) && $detectedXmlProtocol != $detectedProtocol) {
-						$xmlProtocol = $protocolManager->getProtocol($detectedXmlProtocol);
-						if (is_object($xmlProtocol)) {
-							$protocol = $xmlProtocol;
-						}
-					}
-
 					try {
 						$parsedHeader = $protocol->parseInvoiceHeader($xmlData);
 						$parsedLines = $protocol->parseInvoiceLines($xmlData);
