@@ -1528,6 +1528,16 @@ class CIIProtocol extends AbstractProtocol
 				}
 			}
 
+			// A correction whose invoice is not there yet waits for it; an invoice gives its source to the
+			// corrections that waited for it (#1234).
+			if (empty($supplierInvoice->fk_facture_source)) {
+				$this->linkOrAwaitCorrectedInvoice($supplierInvoice, $correctedInvoice, $return_messages);
+			}
+			$linkRes = $this->linkWaitingCorrections($supplierInvoice, $return_messages);
+			if ($linkRes < 0) {
+				return ['res' => -1, 'message' => implode("\n", $return_messages)];
+			}
+
 			// Keep the order reference the supplier declared (BT-13) whether or not it matches an
 			// order of Dolibarr, so the invoice can be reconciled by hand when it does not. See issue #603.
 			$this->_saveImportedBuyerOrderReference($supplierInvoice, $parsedHeader['orderReference'] ?? '');
@@ -1537,16 +1547,6 @@ class CIIProtocol extends AbstractProtocol
 			$orderLinkMessage = $this->_linkSupplierInvoiceToPurchaseOrder($supplierInvoice, $socId, $parsedHeader['orderReference'] ?? '');
 			if ($orderLinkMessage !== '') {
 				$return_messages[] = $orderLinkMessage;
-			}
-
-			// A correction whose invoice is not there yet waits for it; an invoice gives its source to the
-			// corrections that waited for it (#1234).
-			if (empty($supplierInvoice->fk_facture_source)) {
-				$this->linkOrAwaitCorrectedInvoice($supplierInvoice, $correctedInvoice, $return_messages);
-			}
-			$linkRes = $this->linkWaitingCorrections($supplierInvoice, $return_messages);
-			if ($linkRes < 0) {
-				return ['res' => -1, 'message' => implode("\n", $return_messages)];
 			}
 
 			// --------------------------------------------------
