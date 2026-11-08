@@ -4,6 +4,8 @@
 
 NEW Better log for debug
 
+NEW #1201 Bill complementary donations made with a membership (option HELLOASSO_MEMBER_DONATION_PRODUCT) and no more report donation items as members with missing name
+
 ## 2.0
 
 NEW HelloAsso add call to API when testing connection
