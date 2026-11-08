@@ -153,16 +153,16 @@ if (!empty($flowid)) {
 		} else {
 			// Read the flow the way the synchronization does (Converted, then Original, then ReadableView),
 			// or a flow it imports stays unreadable here, e.g. on a CLIENT_NOT_CONFIGURED account (#1230).
-			$xmlData = null;
+			$xmlData = '';
 			try {
-				$xmlData = $provider->fetchFlowXml($flowid, false);
+				$xmlData = (string) $provider->fetchFlowXml($flowid, false);
 			} catch (Exception $e) {
 				$loaderror = $langs->trans("FailedToGetFlowContent", $flowid).' - '.$e->getMessage();
 			}
 
 			if (empty($loaderror)) {
 				$protocolManager = new ProtocolManager($db);
-				$detectedProtocol = empty($xmlData) ? '' : $protocolManager->detectProtocolFromContent($xmlData);
+				$detectedProtocol = ($xmlData === '') ? '' : $protocolManager->detectProtocolFromContent($xmlData);
 				$protocol = empty($detectedProtocol) ? null : $protocolManager->getProtocol($detectedProtocol);
 
 				if (!is_object($protocol)) {
