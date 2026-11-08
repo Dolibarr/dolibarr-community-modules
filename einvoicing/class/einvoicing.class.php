@@ -634,6 +634,12 @@ class EInvoicing
 	const EXTRAFIELD_IMPORTED_DISCOUNTS = 'import_discount_ids';
 
 	/**
+	 * Name, into llx_einvoicing_extrafields, of the invoice (BT-25) a received credit note or replacement
+	 * invoice corrects while that invoice is not in Dolibarr yet: importing it later sets the link (#1234).
+	 */
+	const EXTRAFIELD_AWAITED_SOURCE_REF = 'import_awaited_source_ref';
+
+	/**
 	 * Name, into llx_einvoicing_extrafields, of the buyer reference (BT-10): a reference owned by the
 	 * buyer, used to route the invoice inside its own organisation (business unit, service reference,
 	 * internal mailbox...). A plain EN 16931 core term, unrelated to the public sector, so it is kept
