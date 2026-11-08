@@ -265,6 +265,34 @@ class EInvoicing
 		self::STATUS_ERROR               => 'EInvStatusError',			// Error in generation by Dolibarr
 	];
 
+	/**
+	 * Badge of each status, among the badges of the core theme, so a list tells at a glance what moves
+	 * normally, what waits for the seller and what is blocked (#1227).
+	 */
+	const STATUS_BADGE_TYPES = [
+		self::STATUS_UNKNOWN             => 'status0',		// Not in the e-invoicing flow yet
+		self::STATUS_NOT_GENERATED       => 'status0',
+		self::STATUS_GENERATED           => 'status1b',		// Waiting on the seller side or its AP
+		self::STATUS_AWAITING_VALIDATION => 'status1b',
+		self::STATUS_AWAITING_ACK        => 'status1b',
+		self::STATUS_DEPOSITED           => 'status4b',		// Accepted by the network, progressing
+		self::STATUS_ISSUED              => 'status4b',
+		self::STATUS_RECEIVED            => 'status4b',
+		self::STATUS_AVAILABLE           => 'status4b',
+		self::STATUS_TAKEN_OVER          => 'status4b',
+		self::STATUS_COMPLETED           => 'status4b',		// Back in progress after a suspension
+		self::STATUS_APPROVED            => 'status4',		// Positive outcome
+		self::STATUS_PAYMENT_SENT        => 'status4',
+		self::STATUS_PAID                => 'status6',		// Closed, like a paid invoice of the core
+		self::STATUS_PARTIALLY_APPROVED  => 'status1',		// Seller action expected
+		self::STATUS_DISPUTED            => 'status1',
+		self::STATUS_SUSPENDED           => 'status1',
+		self::STATUS_REFUSED             => 'status8',		// Blocking or terminal failure
+		self::STATUS_REJECTED            => 'status8',
+		self::STATUS_ERROR               => 'status8',
+		self::STATUS_IGNORE              => 'status5',		// Out of scope
+	];
+
 
 	// All reasons with their details (Used when sending supplier invoices status: Refused, Disputed, Suspended, Partially Approved)
 	const REASONS = [
@@ -879,6 +907,21 @@ class EInvoicing
 		return $langs->transnoentitiesnoconv(
 			self::STATUS_LABEL_KEYS[$code] ?? 'EInvStatusUnknown'
 		);
+	}
+
+	/**
+	 * Status as a badge of the core, its full label as tooltip, the way the lists of the core show theirs.
+	 *
+	 * @param int|string 	$code				Code
+	 * @param string	 	$elementType		Element the status is carried by ('facture', 'invoice_supplier'), when known
+	 * @param string		$recipientRoles		RoleCodes the status was addressed to ('SE', 'SE,BY'), when known
+	 * @return string							HTML of the badge
+	 */
+	public function getStatusBadge($code, $elementType = '', $recipientRoles = '')
+	{
+		$label = $this->getStatusLabel($code, $elementType, $recipientRoles);
+
+		return dolGetStatus($label, '', '', self::STATUS_BADGE_TYPES[(int) $code] ?? 'status0', 5);
 	}
 
 	/**
