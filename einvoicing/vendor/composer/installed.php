@@ -83,9 +83,9 @@
             'dev_requirement' => false,
         ),
         'horstoeko/zugferd' => array(
-            'pretty_version' => 'v1.0.123',
-            'version' => '1.0.123.0',
-            'reference' => '79354388b286dd2c3a53025ca570c9039b74460a',
+            'pretty_version' => 'v1.0.134',
+            'version' => '1.0.134.0',
+            'reference' => '3ced2116cecb5cfb950c4441066338cd71044337',
             'type' => 'package',
             'install_path' => __DIR__ . '/../horstoeko/zugferd',
             'aliases' => array(),

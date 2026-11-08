@@ -11,9 +11,14 @@ class AllowanceChargeReasonCodeType
 {
 
     /**
-     * @var string $__value
+     * @var string|null $__value
      */
     private $__value = null;
+
+    /**
+     * @var string|null $listID
+     */
+    private $listID = null;
 
     /**
      * Construct
@@ -29,7 +34,7 @@ class AllowanceChargeReasonCodeType
      * Gets or sets the inner value
      *
      * @param  string $value
-     * @return string
+     * @return string|null
      */
     public function value()
     {
@@ -47,5 +52,27 @@ class AllowanceChargeReasonCodeType
     public function __toString()
     {
         return strval($this->__value);
+    }
+
+    /**
+     * Gets as listID
+     *
+     * @return string|null
+     */
+    public function getListID()
+    {
+        return $this->listID;
+    }
+
+    /**
+     * Sets a new listID
+     *
+     * @param  string $listID
+     * @return self
+     */
+    public function setListID($listID)
+    {
+        $this->listID = $listID;
+        return $this;
     }
 }

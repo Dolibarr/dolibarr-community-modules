@@ -11,22 +11,27 @@ class LineTradeAgreementType
 {
 
     /**
-     * @var \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType $sellerOrderReferencedDocument
+     * @var \horstoeko\zugferd\entities\extended\ram\TradeDeliveryTermsType|null $applicableTradeDeliveryTerms
+     */
+    private $applicableTradeDeliveryTerms = null;
+
+    /**
+     * @var \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType|null $sellerOrderReferencedDocument
      */
     private $sellerOrderReferencedDocument = null;
 
     /**
-     * @var \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType $buyerOrderReferencedDocument
+     * @var \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType|null $buyerOrderReferencedDocument
      */
     private $buyerOrderReferencedDocument = null;
 
     /**
-     * @var \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType $quotationReferencedDocument
+     * @var \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType|null $quotationReferencedDocument
      */
     private $quotationReferencedDocument = null;
 
     /**
-     * @var \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType $contractReferencedDocument
+     * @var \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType|null $contractReferencedDocument
      */
     private $contractReferencedDocument = null;
 
@@ -38,14 +43,19 @@ class LineTradeAgreementType
     ];
 
     /**
-     * @var \horstoeko\zugferd\entities\extended\ram\TradePriceType $grossPriceProductTradePrice
+     * @var \horstoeko\zugferd\entities\extended\ram\TradePriceType|null $grossPriceProductTradePrice
      */
     private $grossPriceProductTradePrice = null;
 
     /**
-     * @var \horstoeko\zugferd\entities\extended\ram\TradePriceType $netPriceProductTradePrice
+     * @var \horstoeko\zugferd\entities\extended\ram\TradePriceType|null $netPriceProductTradePrice
      */
     private $netPriceProductTradePrice = null;
+
+    /**
+     * @var \horstoeko\zugferd\entities\extended\ram\TradePartyType|null $itemSellerTradeParty
+     */
+    private $itemSellerTradeParty = null;
 
     /**
      * @var \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType[] $ultimateCustomerOrderReferencedDocument
@@ -55,9 +65,31 @@ class LineTradeAgreementType
     ];
 
     /**
+     * Gets as applicableTradeDeliveryTerms
+     *
+     * @return \horstoeko\zugferd\entities\extended\ram\TradeDeliveryTermsType|null
+     */
+    public function getApplicableTradeDeliveryTerms()
+    {
+        return $this->applicableTradeDeliveryTerms;
+    }
+
+    /**
+     * Sets a new applicableTradeDeliveryTerms
+     *
+     * @param  \horstoeko\zugferd\entities\extended\ram\TradeDeliveryTermsType|null $applicableTradeDeliveryTerms
+     * @return self
+     */
+    public function setApplicableTradeDeliveryTerms(?\horstoeko\zugferd\entities\extended\ram\TradeDeliveryTermsType $applicableTradeDeliveryTerms = null)
+    {
+        $this->applicableTradeDeliveryTerms = $applicableTradeDeliveryTerms;
+        return $this;
+    }
+
+    /**
      * Gets as sellerOrderReferencedDocument
      *
-     * @return \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType
+     * @return \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType|null
      */
     public function getSellerOrderReferencedDocument()
     {
@@ -67,7 +99,7 @@ class LineTradeAgreementType
     /**
      * Sets a new sellerOrderReferencedDocument
      *
-     * @param  \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType $sellerOrderReferencedDocument
+     * @param  \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType|null $sellerOrderReferencedDocument
      * @return self
      */
     public function setSellerOrderReferencedDocument(?\horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType $sellerOrderReferencedDocument = null)
@@ -79,7 +111,7 @@ class LineTradeAgreementType
     /**
      * Gets as buyerOrderReferencedDocument
      *
-     * @return \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType
+     * @return \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType|null
      */
     public function getBuyerOrderReferencedDocument()
     {
@@ -89,7 +121,7 @@ class LineTradeAgreementType
     /**
      * Sets a new buyerOrderReferencedDocument
      *
-     * @param  \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType $buyerOrderReferencedDocument
+     * @param  \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType|null $buyerOrderReferencedDocument
      * @return self
      */
     public function setBuyerOrderReferencedDocument(?\horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType $buyerOrderReferencedDocument = null)
@@ -101,7 +133,7 @@ class LineTradeAgreementType
     /**
      * Gets as quotationReferencedDocument
      *
-     * @return \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType
+     * @return \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType|null
      */
     public function getQuotationReferencedDocument()
     {
@@ -111,7 +143,7 @@ class LineTradeAgreementType
     /**
      * Sets a new quotationReferencedDocument
      *
-     * @param  \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType $quotationReferencedDocument
+     * @param  \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType|null $quotationReferencedDocument
      * @return self
      */
     public function setQuotationReferencedDocument(?\horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType $quotationReferencedDocument = null)
@@ -123,7 +155,7 @@ class LineTradeAgreementType
     /**
      * Gets as contractReferencedDocument
      *
-     * @return \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType
+     * @return \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType|null
      */
     public function getContractReferencedDocument()
     {
@@ -133,7 +165,7 @@ class LineTradeAgreementType
     /**
      * Sets a new contractReferencedDocument
      *
-     * @param  \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType $contractReferencedDocument
+     * @param  \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType|null $contractReferencedDocument
      * @return self
      */
     public function setContractReferencedDocument(?\horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType $contractReferencedDocument = null)
@@ -189,7 +221,7 @@ class LineTradeAgreementType
     /**
      * Sets a new additionalReferencedDocument
      *
-     * @param  \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType[] $additionalReferencedDocument
+     * @param  \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType[]|null $additionalReferencedDocument
      * @return self
      */
     public function setAdditionalReferencedDocument(?array $additionalReferencedDocument = null)
@@ -201,7 +233,7 @@ class LineTradeAgreementType
     /**
      * Gets as grossPriceProductTradePrice
      *
-     * @return \horstoeko\zugferd\entities\extended\ram\TradePriceType
+     * @return \horstoeko\zugferd\entities\extended\ram\TradePriceType|null
      */
     public function getGrossPriceProductTradePrice()
     {
@@ -211,7 +243,7 @@ class LineTradeAgreementType
     /**
      * Sets a new grossPriceProductTradePrice
      *
-     * @param  \horstoeko\zugferd\entities\extended\ram\TradePriceType $grossPriceProductTradePrice
+     * @param  \horstoeko\zugferd\entities\extended\ram\TradePriceType|null $grossPriceProductTradePrice
      * @return self
      */
     public function setGrossPriceProductTradePrice(?\horstoeko\zugferd\entities\extended\ram\TradePriceType $grossPriceProductTradePrice = null)
@@ -223,7 +255,7 @@ class LineTradeAgreementType
     /**
      * Gets as netPriceProductTradePrice
      *
-     * @return \horstoeko\zugferd\entities\extended\ram\TradePriceType
+     * @return \horstoeko\zugferd\entities\extended\ram\TradePriceType|null
      */
     public function getNetPriceProductTradePrice()
     {
@@ -233,12 +265,34 @@ class LineTradeAgreementType
     /**
      * Sets a new netPriceProductTradePrice
      *
-     * @param  \horstoeko\zugferd\entities\extended\ram\TradePriceType $netPriceProductTradePrice
+     * @param  \horstoeko\zugferd\entities\extended\ram\TradePriceType|null $netPriceProductTradePrice
      * @return self
      */
-    public function setNetPriceProductTradePrice(\horstoeko\zugferd\entities\extended\ram\TradePriceType $netPriceProductTradePrice)
+    public function setNetPriceProductTradePrice(?\horstoeko\zugferd\entities\extended\ram\TradePriceType $netPriceProductTradePrice = null)
     {
         $this->netPriceProductTradePrice = $netPriceProductTradePrice;
+        return $this;
+    }
+
+    /**
+     * Gets as itemSellerTradeParty
+     *
+     * @return \horstoeko\zugferd\entities\extended\ram\TradePartyType|null
+     */
+    public function getItemSellerTradeParty()
+    {
+        return $this->itemSellerTradeParty;
+    }
+
+    /**
+     * Sets a new itemSellerTradeParty
+     *
+     * @param  \horstoeko\zugferd\entities\extended\ram\TradePartyType|null $itemSellerTradeParty
+     * @return self
+     */
+    public function setItemSellerTradeParty(?\horstoeko\zugferd\entities\extended\ram\TradePartyType $itemSellerTradeParty = null)
+    {
+        $this->itemSellerTradeParty = $itemSellerTradeParty;
         return $this;
     }
 
@@ -289,7 +343,7 @@ class LineTradeAgreementType
     /**
      * Sets a new ultimateCustomerOrderReferencedDocument
      *
-     * @param  \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType[] $ultimateCustomerOrderReferencedDocument
+     * @param  \horstoeko\zugferd\entities\extended\ram\ReferencedDocumentType[]|null $ultimateCustomerOrderReferencedDocument
      * @return self
      */
     public function setUltimateCustomerOrderReferencedDocument(?array $ultimateCustomerOrderReferencedDocument = null)

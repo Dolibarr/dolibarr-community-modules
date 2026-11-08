@@ -1,0 +1,24 @@
+horstoeko\zugferd\entities\extended\ram\FinancialAdjustmentType:
+    properties:
+        reason:
+            expose: true
+            access_type: public_method
+            serialized_name: Reason
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getReason
+                setter: setReason
+            type: horstoeko\zugferd\entities\extended\udt\TextType
+        actualAmount:
+            expose: true
+            access_type: public_method
+            serialized_name: ActualAmount
+            xml_element:
+                cdata: false
+                namespace: 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100'
+            accessor:
+                getter: getActualAmount
+                setter: setActualAmount
+            type: horstoeko\zugferd\entities\extended\udt\AmountType

@@ -1,0 +1,12 @@
+horstoeko\zugferd\entities\extended\ram\FinancialAdjustmentType:
+    properties:
+        reason:
+            -
+                NotNull:
+                    groups:
+                        - xsd_rules
+        actualAmount:
+            -
+                NotNull:
+                    groups:
+                        - xsd_rules

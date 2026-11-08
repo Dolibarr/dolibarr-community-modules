@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is a part of horstoeko/zugferd.
  *
@@ -9,31 +11,32 @@
 
 namespace horstoeko\zugferd;
 
-use Throwable;
-use SimpleXMLElement;
-use horstoeko\zugferd\ZugferdProfiles;
 use horstoeko\zugferd\exception\ZugferdUnknownProfileException;
 use horstoeko\zugferd\exception\ZugferdUnknownProfileIdException;
 use horstoeko\zugferd\exception\ZugferdUnknownXmlContentException;
+use SimpleXMLElement;
+use Throwable;
 
 /**
  * Class representing the profile resolver
  *
  * @category Zugferd
- * @package  Zugferd
  * @author   D. Erling <horstoeko@erling.com.de>
  * @license  https://opensource.org/licenses/MIT MIT
- * @link     https://github.com/horstoeko/zugferd
+ * @see      https://github.com/horstoeko/zugferd
+ *
+ * @phpstan-import-type ZugferdProfileDefinition from ZugferdProfiles
  */
 class ZugferdProfileResolver
 {
     /**
      * Resolve profile id and profile definition by the content of $xmlContent
      *
-     * @param  string $xmlContent
-     * @return array
-     * @throws ZugferdUnknownXmlContentException
+     * @param  string                               $xmlContent
+     * @return array{int, ZugferdProfileDefinition}
+     *
      * @throws ZugferdUnknownProfileException
+     * @throws ZugferdUnknownXmlContentException
      */
     public static function resolve(string $xmlContent): array
     {
@@ -42,9 +45,10 @@ class ZugferdProfileResolver
         try {
             libxml_clear_errors();
             $xmldocument = new SimpleXMLElement($xmlContent);
-            $xmldocument->registerXPathNamespace("rsm", "urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100");
-            $xmldocument->registerXPathNamespace("ram", "urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100");
+            $xmldocument->registerXPathNamespace('rsm', 'urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100');
+            $xmldocument->registerXPathNamespace('ram', 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100');
             $typeelement = $xmldocument->xpath('/rsm:CrossIndustryInvoice/rsm:ExchangedDocumentContext/ram:GuidelineSpecifiedDocumentContextParameter/ram:ID');
+
             if (libxml_get_last_error()) {
                 throw new ZugferdUnknownXmlContentException();
             }
@@ -60,16 +64,16 @@ class ZugferdProfileResolver
         }
 
         foreach (ZugferdProfiles::PROFILEDEF as $profile => $profiledef) {
-            if ($typeelement[0] == $profiledef["contextparameter"]) {
+            if ((string) $typeelement[0] === $profiledef['contextparameter']) {
                 return [$profile, $profiledef];
             }
 
-            if (in_array($typeelement[0], $profiledef['alternativecontextparameters'])) {
+            if (in_array((string) $typeelement[0], $profiledef['alternativecontextparameters'], true)) {
                 return [$profile, $profiledef];
             }
         }
 
-        throw new ZugferdUnknownProfileException((string)$typeelement[0]);
+        throw new ZugferdUnknownProfileException((string) $typeelement[0]);
     }
 
     /**
@@ -77,32 +81,35 @@ class ZugferdProfileResolver
      *
      * @param  string $xmlContent
      * @return int
-     * @throws ZugferdUnknownXmlContentException
+     *
      * @throws ZugferdUnknownProfileException
+     * @throws ZugferdUnknownXmlContentException
      */
     public static function resolveProfileId(string $xmlContent): int
     {
-        return static::resolve($xmlContent)[0];
+        return self::resolve($xmlContent)[0];
     }
 
     /**
      * Resolve profile definition by the content of $xmlContent
      *
-     * @param  string $xmlContent
-     * @return array
-     * @throws ZugferdUnknownXmlContentException
+     * @param  string                   $xmlContent
+     * @return ZugferdProfileDefinition
+     *
      * @throws ZugferdUnknownProfileException
+     * @throws ZugferdUnknownXmlContentException
      */
     public static function resolveProfileDef(string $xmlContent): array
     {
-        return static::resolve($xmlContent)[1];
+        return self::resolve($xmlContent)[1];
     }
 
     /**
      * Resolve profile id and profile definition by it's id
      *
-     * @param  int $profileId
-     * @return array
+     * @param  int                                  $profileId
+     * @return array{int, ZugferdProfileDefinition}
+     *
      * @throws ZugferdUnknownProfileIdException
      */
     public static function resolveById(int $profileId): array
@@ -117,13 +124,14 @@ class ZugferdProfileResolver
     /**
      * Resolve profile profile definition by it's id
      *
-     * @param  int $profileId
-     * @return array
+     * @param  int                      $profileId
+     * @return ZugferdProfileDefinition
+     *
      * @throws ZugferdUnknownProfileIdException
      */
     public static function resolveProfileDefById(int $profileId): array
     {
-        $resolved = static::resolveById($profileId);
+        $resolved = self::resolveById($profileId);
 
         return $resolved[1];
     }
