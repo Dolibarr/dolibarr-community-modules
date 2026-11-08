@@ -1539,6 +1539,16 @@ class CIIProtocol extends AbstractProtocol
 				$return_messages[] = $orderLinkMessage;
 			}
 
+			// A correction whose invoice is not there yet waits for it; an invoice gives its source to the
+			// corrections that waited for it (#1234).
+			if (empty($supplierInvoice->fk_facture_source)) {
+				$this->linkOrAwaitCorrectedInvoice($supplierInvoice, $correctedInvoice, $return_messages);
+			}
+			$linkRes = $this->linkWaitingCorrections($supplierInvoice, $return_messages);
+			if ($linkRes < 0) {
+				return ['res' => -1, 'message' => implode("\n", $return_messages)];
+			}
+
 			// --------------------------------------------------
 			// Create supplier invoice lines
 			// --------------------------------------------------
@@ -1733,16 +1743,6 @@ class CIIProtocol extends AbstractProtocol
 				}
 			} else {
 				dol_syslog("Temporary 'readable pdf file' not found for attachment", LOG_ERR);
-			}
-
-			// A correction whose invoice is not there yet waits for it; an invoice gives its source to the
-			// corrections that waited for it (#1234).
-			if (empty($supplierInvoice->fk_facture_source)) {
-				$this->linkOrAwaitCorrectedInvoice($supplierInvoice, $correctedInvoice, $return_messages);
-			}
-			$linkRes = $this->linkWaitingCorrections($supplierInvoice, $return_messages);
-			if ($linkRes < 0) {
-				return ['res' => -1, 'message' => implode("\n", $return_messages)];
 			}
 
 			// TODO : Save receivedFile in supplier invoice attachments
