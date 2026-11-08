@@ -1829,7 +1829,10 @@ class EInvoicing
 		// e-invoicing for eligible (FR) invoices. Preselect the qualified default instead: "To generate / STATUS_NOT_GENERATED" for invoices that must be managed,
 		// "Do not manage" otherwise.
 		if ($mode == 'create' || $action == 'create') {
-			if (GETPOSTISSET('seteinvoicestatus')) {
+			// When the thirdparty is selected, card.php reloads the form and posts the status that was shown. Keep it only if
+			// the user changed it himself (einvoicestatus_userset, set by the js below): otherwise it was the default computed
+			// for the previous (often empty) thirdparty and the default must be computed again for the selected one.
+			if (GETPOSTISSET('seteinvoicestatus') && GETPOSTINT('einvoicestatus_userset')) {
 				$currentStatusInfo['code'] = GETPOSTINT('seteinvoicestatus');
 			} else {
 				// At creation the hook receives a blank Facture object: its socid is NOT set yet (the
@@ -1934,7 +1937,7 @@ class EInvoicing
 			$arrayofeinvoicestatus = $this->getEinvoiceStatusOptions(0, 0, 0, ($action == 'create' ? 1 : 0), 0, ((empty($currentStatusInfo['code']) && $action != 'create') ? 0 : 1), ($action != 'create' ? 1 : 0));
 
 			// If we create a credit note from another invoice, if original invoice has a status to ignore einvoicing, we propagate it by default to the new credit note to create
-			if (!GETPOSTISSET('seteinvoicestatus') && $action == 'create' && GETPOSTINT('fac_avoir') > 0 && GETPOSTINT('type') == Facture::TYPE_CREDIT_NOTE) {
+			if ((!GETPOSTISSET('seteinvoicestatus') || !GETPOSTINT('einvoicestatus_userset')) && $action == 'create' && GETPOSTINT('fac_avoir') > 0 && GETPOSTINT('type') == Facture::TYPE_CREDIT_NOTE) {
 				$tmpinvoicesrc = new Facture($this->db);
 				// A source we cannot read tells us nothing: leave the default the qualification rules just computed.
 				if ($tmpinvoicesrc->fetch(GETPOSTINT('fac_avoir')) > 0) {
@@ -1946,6 +1949,11 @@ class EInvoicing
 			}
 
 			$resprints .=  $form->selectarray("seteinvoicestatus", $arrayofeinvoicestatus, $currentStatusInfo['code'], 0, 0, 0, '', 1);
+			if ($action == 'create') {
+				// Flag a choice made by the user, so it is kept when the form is reloaded (see above)
+				$resprints .=  '<input type="hidden" name="einvoicestatus_userset" id="einvoicestatus_userset" value="' . (GETPOSTINT('einvoicestatus_userset') ? 1 : 0) . '">';
+				$resprints .=  '<script>jQuery(document).ready(function() { jQuery("#seteinvoicestatus").on("change", function() { jQuery("#einvoicestatus_userset").val(1); }); });</script>';
+			}
 			if ($action != 'create') {
 				$resprints .=  '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
 				$resprints .=  '</form>';
