@@ -837,6 +837,14 @@ class CIIProtocol extends AbstractProtocol
 					return false;
 				}
 
+				//Always identify lines that are created by the eInvoicing module with extraparams
+				$supplierInvoice->lines[$i]->id=$idligne;
+				$supplierInvoice->lines[$i]->extraparams=json_encode(array("OriginModuleId"=>SupplierInvoiceHelper::EINVOICING_EXTRAPARAMS));
+				$resSetExtraParams = $supplierInvoice->lines[$i]->setExtraParameters();
+				if ($resSetExtraParams < 0) {
+					return false;
+				}
+
 				// The core forces every line of a credit note negative (issue #1077). Each line gets back
 				// the sign the document gives it, relative to the sign of the credit note itself.
 				$lineSign = SupplierInvoiceHelper::creditNoteLineSign($supplierInvoice->lines[$i], $documentSign);
@@ -1862,10 +1870,6 @@ class CIIProtocol extends AbstractProtocol
 					$line->desc = trim(dol_concatdesc($line->desc, $chargesDescription));
 				}
 			}
-
-			//Always identify lines that are created by the eInvoicing module
-			//There can another case with buildRoundingLine that carries BT-114
-			$line->special_code=SupplierInvoiceHelper::LINE_EINVOICE_IMPORTED;
 
 			$supplierInvoice->lines[] = $line;
 
@@ -4239,10 +4243,6 @@ class CIIProtocol extends AbstractProtocol
 			$line->product_type = 1;	// A charge is a service, never a stocked good
 			$line->remise_percent = 0;
 
-			//Always identify lines that are created by the eInvoicing module
-			//There can another case with buildRoundingLine that carries BT-114
-			$line->special_code=SupplierInvoiceHelper::LINE_EINVOICE_IMPORTED;
-
 			$chargeLines[] = $line;
 		}
 
@@ -4872,7 +4872,6 @@ class CIIProtocol extends AbstractProtocol
 		$line->tva_tx = 0;
 		$line->product_type = 1;	// A rounding is no stocked good
 		$line->remise_percent = 0;
-		$line->special_code = SupplierInvoiceHelper::EINVOICING_SPECIAL_CODE_ROUNDING_LINE;
 
 		return $line;
 	}
