@@ -5,6 +5,7 @@
  * Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
  * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
  * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
+ * Copyright (C) 2026       Alexandre Spangaro          <alexandre@inovea-conseil.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -43,7 +44,7 @@ class modEInvoicing extends DolibarrModules
 	 */
 	public function __construct($db)
 	{
-		global $conf;
+		global $conf, $langs;
 
 		$this->db = $db;
 
@@ -272,7 +273,19 @@ class modEInvoicing extends DolibarrModules
 		 );
 		 */
 		/* BEGIN MODULEBUILDER DICTIONARIES */
-		$this->dictionaries = array();
+		$this->dictionaries = array(
+			'langs' => 'einvoicing@einvoicing',
+			'tabname' => array(MAIN_DB_PREFIX.'c_einvoicing_untdid4451',),
+			'tablib' => array('EInvoicingUntdidDictionary',),
+			'tabsql' => array('SELECT f.rowid as rowid, f.code, f.label, f.active FROM '.MAIN_DB_PREFIX.'c_einvoicing_untdid4451 as f'),
+			'tabsqlsort' => array('code ASC',),
+			'tabfield' => array('code,label'),
+			'tabfieldvalue' => array('code,label'),
+			'tabfieldinsert' => array('code,label'),
+			'tabrowid' => array('rowid'),
+			'tabcond' => array(isModEnabled('einvoicing')),
+			'tabhelp' => array(array('code' => $langs->trans('CodeTooltipHelpEInvoicing')))
+		);
 		/* END MODULEBUILDER DICTIONARIES */
 
 		// Boxes/Widgets

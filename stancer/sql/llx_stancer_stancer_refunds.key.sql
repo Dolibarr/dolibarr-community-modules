@@ -15,11 +15,11 @@
 
 
 -- BEGIN MODULEBUILDER INDEXES
-ALTER TABLE llx_stancer_stancer_refunds ADD INDEX idx_stancer_stancer_refunds_rowid (rowid);
-ALTER TABLE llx_stancer_stancer_refunds ADD INDEX idx_stancer_stancer_refunds_refund_id (refund_id);
-ALTER TABLE llx_stancer_stancer_refunds ADD INDEX idx_stancer_stancer_refunds_payment_id (payment_id);
-ALTER TABLE llx_stancer_stancer_refunds ADD INDEX idx_stancer_stancer_refunds_status (status);
-ALTER TABLE llx_stancer_stancer_refunds ADD INDEX idx_stancer_stancer_refunds_fk_soc (fk_soc);
+CREATE INDEX idx_stancer_stancer_refunds_rowid ON llx_stancer_stancer_refunds (rowid);
+CREATE INDEX idx_stancer_stancer_refunds_refund_id ON llx_stancer_stancer_refunds (refund_id);
+CREATE INDEX idx_stancer_stancer_refunds_payment_id ON llx_stancer_stancer_refunds (payment_id);
+CREATE INDEX idx_stancer_stancer_refunds_status ON llx_stancer_stancer_refunds (status);
+CREATE INDEX idx_stancer_stancer_refunds_fk_soc ON llx_stancer_stancer_refunds (fk_soc);
 ALTER TABLE llx_stancer_stancer_refunds ADD CONSTRAINT llx_stancer_stancer_refunds_fk_user_creat FOREIGN KEY (fk_user_creat) REFERENCES llx_user(rowid) ON DELETE SET NULL;
 -- END MODULEBUILDER INDEXES
 
@@ -27,4 +27,4 @@ ALTER TABLE llx_stancer_stancer_refunds ADD CONSTRAINT llx_stancer_stancer_refun
 
 --ALTER TABLE llx_stancer_stancer_refunds ADD CONSTRAINT llx_stancer_stancer_refunds_fk_field FOREIGN KEY (fk_field) REFERENCES llx_stancer_myotherobject(rowid);
 
-ALTER TABLE llx_stancer_stancer_refunds ADD UNIQUE INDEX uk_stancer_stancer_refunds_refund_id (entity, refund_id);
+CREATE UNIQUE INDEX uk_stancer_stancer_refunds_refund_id ON llx_stancer_stancer_refunds (entity, refund_id);

@@ -1871,7 +1871,8 @@ class EInvoicing
 						document.cookie = "DOLUSER_COLLAPSE_facture_treinvoicingseparator=1; path=' . $_SERVER["PHP_SELF"] . '";';
 			}
 		}
-		$resprints .= 'jQuery("#treinvoicing").click(function(){
+		$resprints .= 'jQuery("#treinvoicing").click(function(e){
+			       if (jQuery(e.target).closest("a").length > 0) { return; }	// Do not toggle when clicking on a link inside the row, like the history calendar picto
 			       console.log("We click on collapse/uncollapse to hide/show .treinvoicingseparator");
 			       jQuery(".treinvoicing_collapseseparator").toggle(100, function(){
 			           if (jQuery(".treinvoicing_collapseseparator").is(":hidden")) {
@@ -2285,7 +2286,8 @@ class EInvoicing
 			}
 		}
 		$resprints .= '
-			   jQuery("#treinvoicing").click(function(){
+			   jQuery("#treinvoicing").click(function(e){
+			       if (jQuery(e.target).closest("a").length > 0) { return; }	// Do not toggle when clicking on a link inside the row, like the history calendar picto
 			       console.log("We click on collapse/uncollapse to hide/show .treinvoicingseparator");
 			       jQuery(".treinvoicing_collapseseparator").toggle(100, function(){
 			           if (jQuery(".treinvoicing_collapseseparator").is(":hidden")) {

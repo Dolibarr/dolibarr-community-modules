@@ -466,6 +466,9 @@ STANCER_PAYMENT_REMINDER_MAILTYPE_MONTHLYTooltip = Template used for subsequent 
 STANCER_PAYMENT_REMINDER_SCHEDULE = Reminder schedule (days after failure)
 STANCER_PAYMENT_REMINDER_SCHEDULETooltip = Comma-separated list of days after payment failure to send each reminder. Default: 7,14,44,74,104,134,164 (D+7 soft, D+14 hard, then monthly up to about 6 months)
 StancerPaymentFailedReopenTitle = Invoice %s reopened following a Stancer payment failure
+StancerPaymentResultOkLabel = Stancer payment succeeded for invoice %s
+StancerPaymentResultKoLabel = Stancer payment failed for invoice %s (%s)
+StancerPaymentResultDesc = Stancer payment %s, status %s
 StancerPaymentFailedReopenReason = Stancer payment failed (status=%s, id=%s) -- invoice reopened automatically
 STANCER_PAYMENT_REMINDER_ADMIN_SUMMARY = Send a reminder summary to the administrator
 STANCER_PAYMENT_REMINDER_ADMIN_SUMMARYTooltip = The administrator will receive a summary email of reminders sent during each scheduled task execution
@@ -476,6 +479,7 @@ StancerRemindersSentList = Reminders sent successfully
 StancerRemindersErrorList = Errors while sending reminders
 StancerdoCheckInvoicesPaidResultMessageA = One invoice has been marked as paid successfully out of a total of %s qualified invoice(s) %s.
 StancerdoCheckInvoicesPaidResultMessageAP = %s invoices have been marked as paid successfully out of a total of %s qualified invoices %s.
+StancerdoCheckInvoicesPaidFailedMessage = %s invoice(s) could not be marked as paid although fully paid: %s
 STANCER_CB_AS_PAID = Mark invoice as paid immediately upon positive Stancer return without waiting for final confirmation
 STANCER_CB_AS_PAIDTooltip = If you enable this option, your customer's invoice will be marked as paid upon the first pre-validation response from Stancer. Warning: this information may be contradicted a few days later if the payment is rejected by your customer's bank. See the <a href="https://doc.cap-rel.fr/projet_stancer/des_le_retour_de_pre-acceptation_du_paiement_cb">documentation for more details</a>
 StancerNo3dsFieldLabel = Card payment without 3-D Secure
@@ -537,7 +541,7 @@ STANCER_PROPAL_TITLE = Quote payments
 STANCER_AUTO_INVOICE_ON_PROPAL_PAID = Automatically create an invoice when a quote is paid
 STANCER_AUTO_INVOICE_ON_PROPAL_PAIDTooltip = If this option is enabled, an invoice will be automatically created and validated when a customer pays a quote via Stancer
 StancerPropalPaymentLink = Stancer payment link
-StancerPropalPaymentLinkNeedEmail = The third party record has no email address; one is required to initiate a payment via Stancer!
+StancerPropalPaymentLinkNeedEmail = Neither the third party nor its contacts have an email address or a mobile number (for instance +33 6...), one of them is required to initiate a payment via Stancer!
 
 # Supplier invoice payment matching
 StancerBankAccountNotConfigured = Stancer bank account is not configured
@@ -847,3 +851,17 @@ StancerErrSepa = The Stancer SEPA direct debit failed
 StancerErrCard = The Stancer card payment failed
 StancerErrSepaRequest = Error on the Stancer SEPA payment request: %s
 StancerErrCardRequest = Error on the Stancer card payment request: %s
+STANCER_SEPA_SIGNED_SWITCH_TEMPLATES = Switch template invoices to direct debit as soon as the SEPA mandate is signed
+STANCER_SEPA_SIGNED_SWITCH_TEMPLATESTooltip = When the customer signs the mandate (UpToSign electronic signature or "Mandate signed" button of the Stancer tab of the thirdparty), this mandate becomes the default one and every template invoice of the thirdparty switches to direct debit on the Stancer bank account, card payments included. The payment mode of the thirdparty is not changed: a one-off invoice keeps the chosen mode.
+StancerSepaSignedEventLabel = SEPA mandate %s signed: template invoices switched to direct debit
+StancerSepaSignedEventTemplates = Template invoices switched to direct debit: %s
+StancerSepaSignedEventNoTemplate = No template invoice to switch to direct debit
+StancerSepaMandateSigned = Mandate signed
+StancerSepaMandateSignedHelp = Use it when the customer signed this mandate outside the electronic signature: the mandate becomes the default one and the template invoices of the thirdparty switch to direct debit
+StancerSepaSignedDone = Mandate %s used by default, template invoices switched to direct debit: %s
+StancerSepaSignedDoneNoTemplate = Mandate %s used by default, no template invoice to switch to direct debit
+StancerSepaSignedNotStancer = This mandate is not registered on Stancer, the module cannot debit it
+StancerSepaSignedDisabled = Switching template invoices to direct debit on signature is disabled in the SEPA setup of the module
+StancerSepaSignedError = Switching to direct debit failed: %s
+StancerMailSubjectSepaSignedSwitchError = SEPA mandate signed by %s: template invoices not switched to direct debit
+StancerMailSepaSignedSwitchError = <p>Customer %s just signed the SEPA mandate, but the template invoices could not switch to direct debit (%s).</p><p>Fix the cause, then use the "Mandate signed" button of the Stancer tab of the thirdparty.</p>

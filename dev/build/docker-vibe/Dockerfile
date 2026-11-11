@@ -22,6 +22,7 @@ RUN apt-get update \
 		iptables \
 		jq \
 		libglib2.0-bin \
+        libportaudio2 \
         memcached \
 		mariadb-client \
 		mariadb-server \
@@ -43,6 +44,7 @@ RUN apt-get update \
 		python3 \
 		python3-pip \
 		shellcheck \
+		sox \
 		sshpass \
 		sudo \
 		time \
