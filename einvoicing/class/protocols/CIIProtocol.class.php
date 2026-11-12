@@ -839,7 +839,7 @@ class CIIProtocol extends AbstractProtocol
 
 				//Always identify lines that are created by the eInvoicing module with extraparams
 				$supplierInvoice->lines[$i]->id=$idligne;
-				$supplierInvoice->lines[$i]->extraparams=json_encode(array("OriginModuleId"=>SupplierInvoiceHelper::EINVOICING_EXTRAPARAMS));
+				$supplierInvoice->lines[$i]->extraparams=array("OriginModuleId"=>SupplierInvoiceHelper::EINVOICING_EXTRAPARAMS);
 				$resSetExtraParams = $supplierInvoice->lines[$i]->setExtraParameters();
 				if ($resSetExtraParams < 0) {
 					return false;
