@@ -2483,8 +2483,7 @@ class EInvoicing
 		}
 
 		dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
-		dol_include_once('einvoicing/class/utils/SupplierOrderLineImporter.class.php');
-		if (SupplierOrderLineImporter::isEligibleInvoice($object)) {
+		if (SupplierInvoiceHelper::isEInvoice((int) $object->id)) {
 			$comparison = SupplierInvoiceHelper::checkPaHeaderTotals($object, false);
 			$resprints .= '<tr class="treinvoicing_collapseseparator">';
 			$resprints .= '<td>'.$langs->trans('PaTotalsOnInvoice').'</td>';
