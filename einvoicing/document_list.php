@@ -193,6 +193,7 @@ if ($showthirdpartycol) {
 // Initialize array of search criteria
 $search_all = trim(GETPOST('search_all', 'alphanohtml'));
 $search_thirdparty = trim(GETPOST('search_thirdparty', 'alphanohtml'));
+$search_exclude_lc = GETPOSTINT('search_exclude_lc');
 $search = array();
 foreach ($object->fields as $key => $val) {
 	if ($key == 'recap' || $key == 'thirdparty') {
@@ -205,6 +206,10 @@ foreach ($object->fields as $key => $val) {
 		$search[$key.'_dtstart'] = dol_mktime(0, 0, 0, GETPOSTINT('search_'.$key.'_dtstartmonth'), GETPOSTINT('search_'.$key.'_dtstartday'), GETPOSTINT('search_'.$key.'_dtstartyear'));
 		$search[$key.'_dtend'] = dol_mktime(23, 59, 59, GETPOSTINT('search_'.$key.'_dtendmonth'), GETPOSTINT('search_'.$key.'_dtendday'), GETPOSTINT('search_'.$key.'_dtendyear'));
 	}
+}
+
+if (!empty($search['flow_type']) && preg_match('/LC$/', $search['flow_type'])) {
+	$search_exclude_lc = 0;
 }
 
 // List of fields to search into when doing a "search in all"
@@ -321,6 +326,7 @@ if (empty($reshook)) {
 		}
 		$search_all = '';
 		$toselect = array();
+		$search_exclude_lc = 0;
 		$search_array_options = array();
 	}
 	if (GETPOST('button_removefilter_x', 'alpha') || GETPOST('button_removefilter.x', 'alpha') || GETPOST('button_removefilter', 'alpha')
@@ -512,6 +518,12 @@ foreach ($search as $key => $val) {
 			}
 			$mode_search = 2;
 		}
+		if ((strpos($field_spec['type'], 'integer:') === 0) || (strpos($field_spec['type'], 'sellist:') === 0) || !empty($field_spec['arrayofkeyval'])) {
+			if ($search[$key] == '-1' || ($search[$key] === '0' && (empty($field_spec['arrayofkeyval']) || !array_key_exists('0', $field_spec['arrayofkeyval'])))) {
+				$search[$key] = '';
+			}
+			$mode_search = ($object->isInt($field_spec) ? 2 : 3);
+		}
 		if ($field_spec['type'] === 'boolean') {
 			$mode_search = 1;
 			if ($search[$key] == '-1') {
@@ -543,6 +555,9 @@ foreach ($search as $key => $val) {
 }
 if ($search_all) {
 	$sql .= natural_search(array_keys($fieldstosearchall), $search_all);
+}
+if (!empty($search_exclude_lc)) {
+	$sql .= " AND (t.flow_type IS NULL OR t.flow_type NOT LIKE '%LC')";
 }
 /*
 // If the internal user must only see his customers, force searching by him
@@ -700,6 +715,9 @@ foreach ($search as $key => $val) {
 	} elseif ($search[$key] != '') {
 		$param .= '&search_'.$key.'='.urlencode($search[$key]);
 	}
+}
+if (!empty($search_exclude_lc)) {
+	$param .= '&search_exclude_lc=1';
 }
 // Add $param from extra fields
 if ($search_thirdparty != '') {
@@ -1191,6 +1209,14 @@ foreach ($object->fields as $key => $val) {
 			} else {
 				print $form->multiselectarray('search_'.$key, $val['arrayofkeyval'], (isset($search[$key]) ? $search[$key] : ''), 0, 0, 'maxwidth100'.($key == 'status' ? ' search_status width100 onrightofpage' : ''), 1);
 			}
+			if ($key == 'flow_type') {
+				print '<div class="nowrap" style="margin-top: 4px;">';
+				print '<label for="search_exclude_lc" class="valignmiddle cursorpointer" title="'.dol_escape_htmltag($langs->trans('EInvoiceExcludeLifecycleFlows')).'">';
+				print '<input type="checkbox" id="search_exclude_lc" name="search_exclude_lc" value="1" class="valignmiddle"'.(!empty($search_exclude_lc) ? ' checked="checked"' : '').' onchange="this.form.submit()">';
+				print ' <span class="opacitymedium small">'.$langs->trans('EInvoiceExcludeLCShort').'</span>';
+				print '</label>';
+				print '</div>';
+			}
 		} elseif ((strpos($val['type'], 'integer:') === 0) || (strpos($val['type'], 'sellist:') === 0)) {
 			print $object->showInputField($val, $key, (isset($search[$key]) ? $search[$key] : ''), '', '', 'search_', $cssforfield.' maxwidth250', 1);
 		} elseif (preg_match('/^(date|timestamp|datetime)/', $val['type'])) {
@@ -1432,6 +1458,10 @@ while ($i < $imaxinloop) {
 					print img_picto($label, $picto, 'class="paddingrightonly"');
 					print $label;
 					print '</span>';
+				} elseif ($key == 'flow_type') {
+					$flowType = (string) $object->flow_type;
+					$valLabel = $val['arrayofkeyval'][$flowType] ?? ($flowType !== '' ? $langs->trans($flowType) : '');
+					print dol_escape_htmltag($valLabel);
 				} elseif ($key == 'status') {
 					print $object->getLibStatut(5);
 				} elseif ($key == 'rowid') {

@@ -442,6 +442,12 @@ VATOnDebitsMention=Option for the payment of VAT on debits
 CurrentAP=Current access point: %s
 CreatedManually=Created manually
 DevTools=Dev tools
+FlowTypeCustomerInvoice=Customer invoice
+FlowTypeCustomerInvoiceLC=Customer invoice lifecycle
+FlowTypeSupplierInvoice=Supplier invoice
+FlowTypeSupplierInvoiceLC=Supplier invoice lifecycle
+EInvoiceExcludeLCShort=Hide LC
+EInvoiceExcludeLifecycleFlows=Hide lifecycle flows (LC)
 
 # Generation page of the developer tools (admin/setup_devtools.php)
 MyCompany=My company

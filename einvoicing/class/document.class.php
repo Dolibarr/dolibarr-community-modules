@@ -1,8 +1,9 @@
 <?php
-/* Copyright (C) 2017       Laurent Destailleur      <eldy@users.sourceforge.net>
- * Copyright (C) 2023-2025  Frédéric France          <frederic.france@free.fr>
- * Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
- * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
+/* Copyright (C) 2017       Laurent Destailleur         <eldy@users.sourceforge.net>
+ * Copyright (C) 2023-2025  Frédéric France             <frederic.france@free.fr>
+ * Copyright (C) 2025       SuperAdmin                  <daoud.mouhamed@gmail.com>
+ * Copyright (C) 2026       MDW                         <mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2026       Alexandre Spangaro          <alexandre@inovea-conseil.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -258,6 +259,13 @@ class Document extends CommonObject
 		if (!isModEnabled('multicompany') && isset($this->fields['entity'])) {
 			$this->fields['entity']['enabled'] = 0;
 		}
+
+		$this->fields['flow_type']['arrayofkeyval'] = array(
+			'CustomerInvoice' => 'FlowTypeCustomerInvoice',
+			'CustomerInvoiceLC' => 'FlowTypeCustomerInvoiceLC',
+			'SupplierInvoice' => 'FlowTypeSupplierInvoice',
+			'SupplierInvoiceLC' => 'FlowTypeSupplierInvoiceLC',
+		);
 
 		// Unset fields that are disabled
 		foreach ($this->fields as $key => $val) {
