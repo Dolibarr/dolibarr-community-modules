@@ -53,6 +53,11 @@ class SupplierInvoiceHelper
 	const EINVOICING_SPECIAL_CODE_ROUNDING_LINE = 95020;
 
 	/**
+	 * Store in extraparams to marking the lines that are created by eInvoice Supplier invoice import
+	 */
+	const EINVOICING_EXTRAPARAMS = 95020;
+
+	/**
 	 * BT-114 of a received document, the amount that rounds its total to what is due.
 	 *
 	 * @param	array<string,mixed>	$parsedHeader	Header data of the received document
