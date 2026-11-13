@@ -1,8 +1,9 @@
 <?php
-/* Copyright (C) 2017       Laurent Destailleur      <eldy@users.sourceforge.net>
- * Copyright (C) 2023-2025  Frédéric France          <frederic.france@free.fr>
- * Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
- * Copyright (C) 2026		MDW							<mdeweerd@users.noreply.github.com>
+/* Copyright (C) 2017       Laurent Destailleur         <eldy@users.sourceforge.net>
+ * Copyright (C) 2023-2025  Frédéric France             <frederic.france@free.fr>
+ * Copyright (C) 2025       SuperAdmin                  <daoud.mouhamed@gmail.com>
+ * Copyright (C) 2026       MDW                         <mdeweerd@users.noreply.github.com>
+ * Copyright (C) 2026       Alexandre Spangaro          <alexandre@inovea-conseil.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -137,7 +138,7 @@ class Document extends CommonObject
 		"provider" => array("type" => "varchar(50)", "label" => "AccessPoint", "langfile" => "einvoicing@einvoicing", "enabled" => "1", 'position' => 5, 'notnull' => 1, "visible" => "-1", "comment" => "EInvoice Platform provider"),
 		"flow_id" => array("type" => "varchar(255)", "label" => "flow_id", "enabled" => "1", 'position' => 10, 'notnull' => 0, "visible" => "1", "comment" => "EInvoice flow UUID", "csslist" => "tdoverflowmax100"),
 		"call_id" => array("type" => "varchar(50)", "label" => "TransactionID", "enabled" => "1", 'position' => 20, 'notnull' => 0, "visible" => "1", "comment" => "Reference to the original call", "csslist" => "tdoverflowmax100"),
-		"flow_type" => array("type" => "varchar(255)", "label" => "flow_type", "enabled" => "1", 'position' => 40, 'notnull' => 0, "visible" => "1", "comment" => "Flow type ('sync', 'CustomerInvoice', 'Manual...', etc.)"),
+		"flow_type" => array("type" => "varchar(255)", "label" => "flow_type", "enabled" => "1", 'position' => 40, 'notnull' => 0, "visible" => "1", "arrayofkeyval" => array("CustomerInvoice" => "FlowTypeCustomerInvoice", "CustomerInvoiceLC" => "FlowTypeCustomerInvoiceLC", "SupplierInvoice" => "FlowTypeSupplierInvoice", "SupplierInvoiceLC" => "FlowTypeSupplierInvoiceLC"), "comment" => "Flow type ('sync', 'CustomerInvoice', 'Manual...', etc.)"),
 		"flow_direction" => array("type" => "varchar(10)", "label" => "flow_direction", "enabled" => "1", 'position' => 50, 'notnull' => 0, "visible" => "1", "comment" => "In or Out", 'csslist' => 'center'),
 		"flow_syntax" => array("type" => "varchar(50)", "label" => "flow_syntax", "enabled" => "1", 'position' => 60, 'notnull' => 0, "visible" => "-1", "comment" => "Document syntax (Factur-X, CII, UBL, etc.)"),
 		"flow_profile" => array("type" => "varchar(50)", "label" => "flow_profile", "enabled" => "1", 'position' => 70, 'notnull' => 0, "visible" => "-1", "comment" => "Profile used (Basic, Cius, etc.)"),
