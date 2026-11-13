@@ -1346,6 +1346,15 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				// --- Fetch received documents (Einvoice)
 				$document->fk_element_type = 'invoice_supplier';
 
+				// Reception of supplier invoices is disabled: record the flow without importing it.
+				if (einvoicingReceptionDisabled()) {
+					$document->fk_element_id = 0;
+					$returnRes = 1;
+					$returnMessage = "Skipped SupplierInvoice flow " . $flowId . " (reception is disabled)";
+					dol_syslog(__METHOD__ . " " . $returnMessage, LOG_INFO, 0, "_einvoicing");
+					break;
+				}
+
 				// AFNOR XP Z12-013: a supplier invoice to book is an INCOMING flow (issued by the
 				// platform to us). An outgoing/errored "SupplierInvoice" flow is NOT a received
 				// invoice and must not be imported as a facture fournisseur — otherwise lifecycle
