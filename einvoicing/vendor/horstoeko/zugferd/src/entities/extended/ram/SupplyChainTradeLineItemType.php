@@ -11,34 +11,34 @@ class SupplyChainTradeLineItemType
 {
 
     /**
-     * @var \horstoeko\zugferd\entities\extended\ram\DocumentLineDocumentType $associatedDocumentLineDocument
+     * @var \horstoeko\zugferd\entities\extended\ram\DocumentLineDocumentType|null $associatedDocumentLineDocument
      */
     private $associatedDocumentLineDocument = null;
 
     /**
-     * @var \horstoeko\zugferd\entities\extended\ram\TradeProductType $specifiedTradeProduct
+     * @var \horstoeko\zugferd\entities\extended\ram\TradeProductType|null $specifiedTradeProduct
      */
     private $specifiedTradeProduct = null;
 
     /**
-     * @var \horstoeko\zugferd\entities\extended\ram\LineTradeAgreementType $specifiedLineTradeAgreement
+     * @var \horstoeko\zugferd\entities\extended\ram\LineTradeAgreementType|null $specifiedLineTradeAgreement
      */
     private $specifiedLineTradeAgreement = null;
 
     /**
-     * @var \horstoeko\zugferd\entities\extended\ram\LineTradeDeliveryType $specifiedLineTradeDelivery
+     * @var \horstoeko\zugferd\entities\extended\ram\LineTradeDeliveryType|null $specifiedLineTradeDelivery
      */
     private $specifiedLineTradeDelivery = null;
 
     /**
-     * @var \horstoeko\zugferd\entities\extended\ram\LineTradeSettlementType $specifiedLineTradeSettlement
+     * @var \horstoeko\zugferd\entities\extended\ram\LineTradeSettlementType|null $specifiedLineTradeSettlement
      */
     private $specifiedLineTradeSettlement = null;
 
     /**
      * Gets as associatedDocumentLineDocument
      *
-     * @return \horstoeko\zugferd\entities\extended\ram\DocumentLineDocumentType
+     * @return \horstoeko\zugferd\entities\extended\ram\DocumentLineDocumentType|null
      */
     public function getAssociatedDocumentLineDocument()
     {
@@ -60,7 +60,7 @@ class SupplyChainTradeLineItemType
     /**
      * Gets as specifiedTradeProduct
      *
-     * @return \horstoeko\zugferd\entities\extended\ram\TradeProductType
+     * @return \horstoeko\zugferd\entities\extended\ram\TradeProductType|null
      */
     public function getSpecifiedTradeProduct()
     {
@@ -82,7 +82,7 @@ class SupplyChainTradeLineItemType
     /**
      * Gets as specifiedLineTradeAgreement
      *
-     * @return \horstoeko\zugferd\entities\extended\ram\LineTradeAgreementType
+     * @return \horstoeko\zugferd\entities\extended\ram\LineTradeAgreementType|null
      */
     public function getSpecifiedLineTradeAgreement()
     {
@@ -92,10 +92,10 @@ class SupplyChainTradeLineItemType
     /**
      * Sets a new specifiedLineTradeAgreement
      *
-     * @param  \horstoeko\zugferd\entities\extended\ram\LineTradeAgreementType $specifiedLineTradeAgreement
+     * @param  \horstoeko\zugferd\entities\extended\ram\LineTradeAgreementType|null $specifiedLineTradeAgreement
      * @return self
      */
-    public function setSpecifiedLineTradeAgreement(\horstoeko\zugferd\entities\extended\ram\LineTradeAgreementType $specifiedLineTradeAgreement)
+    public function setSpecifiedLineTradeAgreement(?\horstoeko\zugferd\entities\extended\ram\LineTradeAgreementType $specifiedLineTradeAgreement = null)
     {
         $this->specifiedLineTradeAgreement = $specifiedLineTradeAgreement;
         return $this;
@@ -104,7 +104,7 @@ class SupplyChainTradeLineItemType
     /**
      * Gets as specifiedLineTradeDelivery
      *
-     * @return \horstoeko\zugferd\entities\extended\ram\LineTradeDeliveryType
+     * @return \horstoeko\zugferd\entities\extended\ram\LineTradeDeliveryType|null
      */
     public function getSpecifiedLineTradeDelivery()
     {
@@ -114,10 +114,10 @@ class SupplyChainTradeLineItemType
     /**
      * Sets a new specifiedLineTradeDelivery
      *
-     * @param  \horstoeko\zugferd\entities\extended\ram\LineTradeDeliveryType $specifiedLineTradeDelivery
+     * @param  \horstoeko\zugferd\entities\extended\ram\LineTradeDeliveryType|null $specifiedLineTradeDelivery
      * @return self
      */
-    public function setSpecifiedLineTradeDelivery(\horstoeko\zugferd\entities\extended\ram\LineTradeDeliveryType $specifiedLineTradeDelivery)
+    public function setSpecifiedLineTradeDelivery(?\horstoeko\zugferd\entities\extended\ram\LineTradeDeliveryType $specifiedLineTradeDelivery = null)
     {
         $this->specifiedLineTradeDelivery = $specifiedLineTradeDelivery;
         return $this;
@@ -126,7 +126,7 @@ class SupplyChainTradeLineItemType
     /**
      * Gets as specifiedLineTradeSettlement
      *
-     * @return \horstoeko\zugferd\entities\extended\ram\LineTradeSettlementType
+     * @return \horstoeko\zugferd\entities\extended\ram\LineTradeSettlementType|null
      */
     public function getSpecifiedLineTradeSettlement()
     {
