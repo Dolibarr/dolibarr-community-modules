@@ -74,6 +74,7 @@ require_once DOL_DOCUMENT_ROOT.'/core/class/html.formsetup.class.php';
 require_once __DIR__.'/../lib/einvoicing.lib.php';
 require_once __DIR__.'/../class/providers/PDPProviderManager.class.php';
 require_once __DIR__.'/../class/protocols/ProtocolManager.class.php';
+require_once __DIR__.'/../class/utils/CredentialStorage.class.php';
 require_once __DIR__.'/../class/einvoicing.class.php';
 
 
@@ -349,6 +350,53 @@ if (GETPOST('error')) {
 }
 
 
+// Encrypt the credentials this installation still stores in clear, on explicit demand.
+if ($action == 'encryptcredentials' && $provider instanceof AbstractPDPProvider) {
+	$credentialstorage = new CredentialStorage($db);
+	$credentialentity = getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP") ? getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP") : $conf->entity;
+
+	$inventory = $credentialstorage->inventory($provider, $credentialentity);
+
+	// A platform that does not answer before the change cannot tell anything about it after, so it
+	// only decides the outcome when it answers here.
+	$answeredbefore = (bool) $provider->getAccessToken();
+
+	$encrypted = $credentialstorage->encryptInPlace($credentialstorage->inClear($inventory, false), $credentialentity);
+	if ($encrypted < 0) {
+		setEventMessages($langs->trans('EInvoicingCredentialsEncryptFailed'), null, 'errors');
+	} else {
+		// Read the constants again: what the platform is asked with must come from the database as it
+		// is now, not from the values this request loaded before they were encrypted.
+		$conf->setValues($db);
+		$checkedprovider = $PDPManager->getProvider(getDolGlobalString('EINVOICING_PDP'));
+
+		if ($answeredbefore && $checkedprovider instanceof AbstractPDPProvider && !$checkedprovider->getAccessToken()) {
+			$credentialstorage->restore($credentialstorage->inClear($inventory, false), $credentialentity);
+			$conf->setValues($db);
+			setEventMessages($langs->trans('EInvoicingCredentialsPlatformRefused'), null, 'errors');
+		} else {
+			// The token rows are read again: asking for a token above has just rewritten them.
+			$tokenprovider = ($checkedprovider instanceof AbstractPDPProvider) ? $checkedprovider : $provider;
+			$encrypted += max(0, $credentialstorage->encryptInPlace($credentialstorage->inClear($credentialstorage->inventory($tokenprovider, $credentialentity), true), $credentialentity));
+
+			$message = $answeredbefore ? 'EInvoicingCredentialsEncrypted' : 'EInvoicingCredentialsEncryptedNoCheck';
+			setEventMessages($langs->trans($message, $encrypted), null, 'mesgs');
+
+			$leftinclear = $credentialstorage->inClear($credentialstorage->inventory($tokenprovider, $credentialentity));
+			if (!empty($leftinclear)) {
+				$labels = array();
+				foreach ($leftinclear as $item) {
+					$labels[] = $item['label'];
+				}
+				setEventMessages($langs->trans('EInvoicingCredentialsLeftInClear', implode(', ', $labels)), null, 'warnings');
+			}
+		}
+	}
+
+	header("Location: ".$_SERVER["PHP_SELF"]);
+	exit;
+}
+
 if (GETPOST('accesstoken') && $provider instanceof AbstractPDPProvider) {
 	// We are in the return of an OAUT proxy authorize+token callback
 
@@ -463,6 +511,10 @@ if (!empty($provider) && !empty($formSetup2->items)) {
 
 if ($stringwarning) {
 	print $stringwarning;
+}
+
+if (!empty($formSetup2->items) && $provider instanceof AbstractPDPProvider && !getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
+	print pdpCredentialsInClearWarning($provider, $db, $conf->entity);
 }
 
 if (!empty($formSetup2->items)) {
