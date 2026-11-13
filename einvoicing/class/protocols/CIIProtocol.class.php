@@ -1085,6 +1085,112 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
+	 * The supplier invoice a credit note or a replacement invoice corrects, read from its BT-25.
+	 *
+	 * @param	int|string				$type			Dolibarr type of the received document
+	 * @param	array<string,mixed>		$parsedHeader	Header of the received document
+	 * @param	int						$socId			Vendor of the document
+	 * @return	array{ref:string,id:int}				ref: the BT-25, '' when there is none to follow; id: > 0 found, 0 not found, < 0 lookup failure
+	 */
+	protected function findCorrectedSupplierInvoice($type, $parsedHeader, $socId)
+	{
+		$result = array('ref' => '', 'id' => 0);
+
+		if (!in_array((int) $type, array(FactureFournisseur::TYPE_CREDIT_NOTE, FactureFournisseur::TYPE_REPLACEMENT), true) || empty($parsedHeader['invoiceRefDocs']) || !is_array($parsedHeader['invoiceRefDocs'])) {
+			return $result;
+		}
+
+		$firstRefDoc = reset($parsedHeader['invoiceRefDocs']);
+		$result['ref'] = !empty($firstRefDoc['IssuerAssignedID']) ? trim((string) $firstRefDoc['IssuerAssignedID']) : '';
+		if ($result['ref'] !== '') {
+			$result['id'] = SupplierInvoiceHelper::findIdByRef($result['ref'], (int) $socId);
+		}
+
+		return $result;
+	}
+
+	/**
+	 * Give a recorded correction with no source the invoice its BT-25 names, or remember that BT-25 so
+	 * the invoice gives it when it is imported (#1234). Never blocking: the link is a convenience.
+	 *
+	 * @param	FactureFournisseur			$invoice			Credit note or replacement invoice, already recorded
+	 * @param	array{ref:string,id:int}	$correctedInvoice	What findCorrectedSupplierInvoice() returned
+	 * @param	string[]					$return_messages	Messages of the import, completed here
+	 * @return	void
+	 */
+	protected function linkOrAwaitCorrectedInvoice($invoice, $correctedInvoice, &$return_messages)
+	{
+		global $db, $user;
+
+		if ($correctedInvoice['ref'] === '' || $correctedInvoice['id'] < 0) {
+			return;
+		}
+
+		$einvoicing = new EInvoicing($db);
+		if ($correctedInvoice['id'] > 0) {
+			if ($invoice->setValueFrom('fk_facture_source', $correctedInvoice['id'], '', null, 'int', '', $user) > 0) {
+				$invoice->fk_facture_source = $correctedInvoice['id'];
+				$einvoicing->insertOrUpdateExtraField($invoice->id, $invoice->element, EInvoicing::EXTRAFIELD_AWAITED_SOURCE_REF, '');
+				$return_messages[] = 'Linked to its source invoice ' . dol_escape_htmltag($correctedInvoice['ref']);
+			}
+		} elseif ($einvoicing->insertOrUpdateExtraField($invoice->id, $invoice->element, EInvoicing::EXTRAFIELD_AWAITED_SOURCE_REF, $correctedInvoice['ref']) < 0) {
+			dol_syslog(__METHOD__ . ' Failed to record the awaited source of supplier invoice id=' . $invoice->id . ': ' . implode(', ', $einvoicing->errors), LOG_WARNING);
+		}
+	}
+
+	/**
+	 * Give its source to every correction of the same vendor that waited for this invoice (#1234).
+	 *
+	 * Only when the reference names this invoice and no other one: findIdByRef() is the same lookup
+	 * the import of the correction would have made.
+	 *
+	 * @param	FactureFournisseur	$invoice			Supplier invoice just created
+	 * @param	string[]			$return_messages	Messages of the import, completed here
+	 * @return	int									-1 on a database error, else the number of corrections linked
+	 */
+	protected function linkWaitingCorrections($invoice, &$return_messages)
+	{
+		global $db, $user;
+
+		$ref = trim((string) $invoice->ref_supplier);
+		if ($ref === '' || empty($invoice->socid) || SupplierInvoiceHelper::findIdByRef($ref, (int) $invoice->socid) != $invoice->id) {
+			return 0;
+		}
+
+		$sql = "SELECT f.rowid FROM " . $db->prefix() . "einvoicing_extrafields AS e";
+		$sql .= " INNER JOIN " . $db->prefix() . "facture_fourn AS f ON f.rowid = e.element_id";
+		$sql .= " WHERE e.element_type = '" . $db->escape($invoice->element) . "'";
+		$sql .= " AND e.name = '" . $db->escape(EInvoicing::EXTRAFIELD_AWAITED_SOURCE_REF) . "'";
+		$sql .= " AND e.value = '" . $db->escape($ref) . "'";
+		$sql .= " AND f.fk_soc = " . ((int) $invoice->socid);
+		$sql .= " AND f.entity IN (" . $db->sanitize(getEntity('facture_fourn')) . ")";
+		$sql .= " AND f.rowid <> " . ((int) $invoice->id);
+		$sql .= " AND f.type IN (" . ((int) FactureFournisseur::TYPE_CREDIT_NOTE) . ", " . ((int) FactureFournisseur::TYPE_REPLACEMENT) . ")";
+		$sql .= " AND (f.fk_facture_source IS NULL OR f.fk_facture_source = 0)";
+		$resql = $db->query($sql);
+		if (!$resql) {
+			$return_messages[] = 'Failed to look for the credit notes waiting for this invoice: ' . $db->lasterror();
+			return -1;
+		}
+		$ids = array();
+		while ($obj = $db->fetch_object($resql)) {
+			$ids[] = (int) $obj->rowid;
+		}
+		$db->free($resql);
+
+		$einvoicing = new EInvoicing($db);
+		foreach ($ids as $id) {
+			$correction = new FactureFournisseur($db);
+			if ($correction->fetch($id) > 0 && $correction->setValueFrom('fk_facture_source', $invoice->id, '', null, 'int', '', $user) > 0) {
+				$einvoicing->insertOrUpdateExtraField($id, $correction->element, EInvoicing::EXTRAFIELD_AWAITED_SOURCE_REF, '');
+				$return_messages[] = 'Supplier invoice ' . dol_escape_htmltag((string) $correction->ref) . ' (' . dol_escape_htmltag((string) $correction->ref_supplier) . ') now corrects this invoice';
+			}
+		}
+
+		return count($ids);
+	}
+
+	/**
 	 * Build the supplier invoice from a received CII document written to a per-call working file.
 	 * The temp-file lifecycle is owned by createSupplierInvoiceFromSource() (the public wrapper).
 	 * The vendor synchronization runs in its own transaction, opened and closed here. The invoice
@@ -1269,6 +1375,13 @@ class CIIProtocol extends AbstractProtocol
 				$return_messages[] = 'Failed to link the existing supplier invoice to the flow: ' . implode(', ', $einvoicing->errors);
 			}
 
+			// A correction recorded with no source (imported before its invoice, or keyed in by hand) gets
+			// it now if its BT-25 resolves, or keeps waiting for it (#1234).
+			if (empty($supplierInvoice->fk_facture_source)) {
+				$correctedInvoice = $this->findCorrectedSupplierInvoice($supplierInvoice->type, $parsedHeader, (int) $socId);
+				$this->linkOrAwaitCorrectedInvoice($supplierInvoice, $correctedInvoice, $return_messages);
+			}
+
 			// Supplier invoice already found but may be that documents are downloaded or were removed
 			// Save documents in supplier invoice attachments if they do not exists yet.
 			$this->storeEmbeddedAttachments($supplierInvoice, $sourceXml, $file, $tempFile, $return_messages);
@@ -1347,19 +1460,13 @@ class CIIProtocol extends AbstractProtocol
 		// For credit notes and replacement invoices, link to the source invoice via fk_facture_source
 		// (BT-25). A replacement invoice (BT-3 = 384) corrects the invoice it references just as a credit
 		// note cancels it, and Dolibarr stores that source in the same field for both.
-		if (in_array($supplierInvoice->type, array(FactureFournisseur::TYPE_CREDIT_NOTE, FactureFournisseur::TYPE_REPLACEMENT)) && !empty($parsedHeader['invoiceRefDocs']) && is_array($parsedHeader['invoiceRefDocs'])) {
-			$firstRefDoc = reset($parsedHeader['invoiceRefDocs']);
-			$refSourceSupplier = !empty($firstRefDoc['IssuerAssignedID']) ? (string) $firstRefDoc['IssuerAssignedID'] : '';
-			if ($refSourceSupplier !== '') {
-				$sourceInvoiceId = SupplierInvoiceHelper::findIdByRef($refSourceSupplier, (int) $socId);
-				if ($sourceInvoiceId > 0) {
-					$supplierInvoice->fk_facture_source = $sourceInvoiceId;
-					dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Linked to source invoice id=' . $supplierInvoice->fk_facture_source, LOG_DEBUG);
-				} else {
-					// Not found, ambiguous or database error: leave fk_facture_source empty rather than link the wrong invoice
-					dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Source invoice ref_supplier="' . $refSourceSupplier . '" not resolved (code ' . $sourceInvoiceId . ') for ' . ($parsedHeader['documentno'] ?? ''), LOG_WARNING);
-				}
-			}
+		$correctedInvoice = $this->findCorrectedSupplierInvoice($supplierInvoice->type, $parsedHeader, (int) $socId);
+		if ($correctedInvoice['id'] > 0) {
+			$supplierInvoice->fk_facture_source = $correctedInvoice['id'];
+			dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Linked to source invoice id=' . $supplierInvoice->fk_facture_source, LOG_DEBUG);
+		} elseif ($correctedInvoice['ref'] !== '') {
+			// Not found, ambiguous or database error: leave fk_facture_source empty rather than link the wrong invoice
+			dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource Source invoice ref_supplier="' . $correctedInvoice['ref'] . '" not resolved (code ' . $correctedInvoice['id'] . ') for ' . ($parsedHeader['documentno'] ?? ''), LOG_WARNING);
 		}
 
 
@@ -1419,6 +1526,16 @@ class CIIProtocol extends AbstractProtocol
 				if ($einvoicing->insertOrUpdateExtraField($supplierInvoiceId, $supplierInvoice->element, EInvoicing::EXTRAFIELD_IMPORTED_DISCOUNTS, implode(',', $globalDiscountIds)) < 0) {
 					return ['res' => -1, 'message' => 'Failed to record the discounts of supplier invoice ' . $supplierInvoiceId . ': ' . implode(', ', $einvoicing->errors)];
 				}
+			}
+
+			// A correction whose invoice is not there yet waits for it; an invoice gives its source to the
+			// corrections that waited for it (#1234).
+			if (empty($supplierInvoice->fk_facture_source)) {
+				$this->linkOrAwaitCorrectedInvoice($supplierInvoice, $correctedInvoice, $return_messages);
+			}
+			$linkRes = $this->linkWaitingCorrections($supplierInvoice, $return_messages);
+			if ($linkRes < 0) {
+				return ['res' => -1, 'message' => implode("\n", $return_messages)];
 			}
 
 			// Keep the order reference the supplier declared (BT-13) whether or not it matches an
