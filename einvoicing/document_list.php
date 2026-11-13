@@ -1449,7 +1449,8 @@ while ($i < $imaxinloop) {
 					print $label;
 					print '</span>';
 				} elseif ($key == 'flow_type') {
-					$valLabel = $val['arrayofkeyval'][$object->flow_type] ?? $langs->trans($object->flow_type);
+					$flowType = (string) $object->flow_type;
+					$valLabel = $val['arrayofkeyval'][$flowType] ?? ($flowType !== '' ? $langs->trans($flowType) : '');
 					print dol_escape_htmltag($valLabel);
 				} elseif ($key == 'status') {
 					print $object->getLibStatut(5);
