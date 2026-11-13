@@ -208,6 +208,10 @@ foreach ($object->fields as $key => $val) {
 	}
 }
 
+if (!empty($search['flow_type']) && preg_match('/LC$/', $search['flow_type'])) {
+	$search_exclude_lc = 0;
+}
+
 // List of fields to search into when doing a "search in all"
 $fieldstosearchall = array();
 // foreach ($object->fields as $key => $val) {
@@ -513,6 +517,12 @@ foreach ($search as $key => $val) {
 				$search[$key] = '';
 			}
 			$mode_search = 2;
+		}
+		if ((strpos($field_spec['type'], 'integer:') === 0) || (strpos($field_spec['type'], 'sellist:') === 0) || !empty($field_spec['arrayofkeyval'])) {
+			if ($search[$key] == '-1' || ($search[$key] === '0' && (empty($field_spec['arrayofkeyval']) || !array_key_exists('0', $field_spec['arrayofkeyval'])))) {
+				$search[$key] = '';
+			}
+			$mode_search = ($object->isInt($field_spec) ? 2 : 3);
 		}
 		if ($field_spec['type'] === 'boolean') {
 			$mode_search = 1;
