@@ -249,6 +249,41 @@ class AbstractPDPProviderTest extends CommonClassTest
 	}
 
 	/**
+	 * A status we sent on a supplier invoice can be listed by the platform before it gets its type:
+	 * it must still be linked to that invoice, not shown as an unknown customer invoice "NOTFOUND".
+	 *
+	 * @return	void
+	 */
+	public function testAnUntypedFlowWeSentOnASupplierInvoiceIsASupplierInvoiceStatus()
+	{
+		global $db, $conf;
+
+		$savedProvider = getDolGlobalString('EINVOICING_PDP');
+		$conf->global->EINVOICING_PDP = 'ESALINK';
+		$flowId = 'untyped-lc-' . uniqid();
+
+		try {
+			$this->assertGreaterThan(0, (new EInvoicing($db))->storeStatusMessage(1, 'invoice_supplier', 205, '', 'out', $flowId), (string) $db->lasterror());
+
+			$provider = (new ReflectionClass('TestPDPProvider'))->newInstanceWithoutConstructor();
+			$provider->db = $db;
+			$method = new ReflectionMethod('AbstractPDPProvider', 'resolveFlowType');
+			$method->setAccessible(true);
+
+			$resolved = $method->invoke($provider, $flowId, null);
+			$typed = $method->invoke($provider, $flowId, 'CustomerInvoice');
+			$unknown = $method->invoke($provider, 'not-sent-by-us-' . uniqid(), null);
+		} finally {
+			$db->query("DELETE FROM " . $db->prefix() . "einvoicing_lifecycle_msg WHERE flow_id = '" . $db->escape($flowId) . "'");
+			$conf->global->EINVOICING_PDP = $savedProvider;
+		}
+
+		$this->assertSame('SupplierInvoiceLC', $resolved);
+		$this->assertSame('CustomerInvoice', $typed, 'A type given by the platform is never replaced');
+		$this->assertNull($unknown, 'A flow we never sent keeps its missing type');
+	}
+
+	/**
 	 * A binary payload is base64-encoded, and what is stored of it decodes: the trace is cut on a
 	 * 4-character boundary, not in the middle of an encoded group.
 	 *

@@ -1278,7 +1278,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 		$document->call_id              = $call_id;		// Call id for unitary fetch
 		$document->flow_id              = $flowId;
 		$document->tracking_idref       = $flowData['trackingId'] ?? (getDolGlobalString('EINVOICING_PDP', 'REF').' '.$flowId);
-		$document->flow_type            = $flowData['flowType'] ?? null;
+		$document->flow_type            = $this->resolveFlowType($flowId, $flowData['flowType'] ?? null);
 		$document->flow_direction       = $flowData['flowDirection'] ?? null;
 		$document->flow_syntax          = $flowData['flowSyntax'] ?? null;
 		$document->flow_profile         = $flowData['flowProfile'] ?? null;
