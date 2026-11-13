@@ -2326,7 +2326,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
 				$currentStatusDetails = $obj->pdp_syncstatus ? $einvoicing->getStatusLabel($obj->pdp_syncstatus, 'facture', $obj->pdp_lcrecipients ?? '') : '';
 				print '<td class="center tdoverflowmax100" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
-				print $currentStatusDetails;
+				print $obj->pdp_syncstatus ? $einvoicing->getStatusBadge($obj->pdp_syncstatus, 'facture', $obj->pdp_lcrecipients ?? '') : '';
 				print '</td>';
 				if (isset($parameters['i']) && empty($parameters['i'])) {
 					$parameters['totalarray']['nbfield']++;
@@ -2351,7 +2351,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			$einvoicing = new EInvoicing($db);
 			$currentStatusDetails = $obj->pdp_lcstatus ? $einvoicing->getStatusLabel((int) $obj->pdp_lcstatus, 'invoice_supplier') : '-';
 			print '<td class="center tdoverflowmax100" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
-			print $currentStatusDetails;
+			print $obj->pdp_lcstatus ? $einvoicing->getStatusBadge((int) $obj->pdp_lcstatus, 'invoice_supplier') : '-';
 			print '</td>';
 			if (isset($parameters['i']) && empty($parameters['i'])) {
 				$parameters['totalarray']['nbfield']++;
