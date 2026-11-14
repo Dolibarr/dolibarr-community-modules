@@ -132,6 +132,13 @@ if (getDolGlobalInt("HELLOASSO_FORM_CREATE_THIRDPARTY")) {
 $item = $formSetup->newItem('HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS')->setAsSelect($complementaryarray);
 $item->helpText = $langs->transnoentities('HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS_HELP');
 $item->defaultFieldValue = '0';
+
+if (isModEnabled('product') || isModEnabled('service')) {
+	$item = $formSetup->newItem('HELLOASSO_MEMBER_DONATION_PRODUCT')->setAsProduct();
+	$item->nameText = $langs->transnoentities('HelloassoMemberDonationProduct');
+	$item->helpText = $langs->transnoentities('HelloassoMemberDonationProductHelp');
+	$item->defaultFieldValue = '';
+}
 $setupnotempty += count($formSetup->items);
 
 $dirmodels = array_merge(array('/'), (array) $conf->modules_parts['models']);
@@ -301,6 +308,11 @@ echo '<br>'.$langs->trans("HelloAssoExplanatoryText3");
 echo '</div><br><br>';
 
 print load_fiche_titre($langs->trans("HelloAssoFormParameters"), '', '');
+// Donations must not be booked on the membership fees product (and its accounting account)
+$donationproductid = getDolGlobalInt('HELLOASSO_MEMBER_DONATION_PRODUCT');
+if ($donationproductid > 0 && $donationproductid == getDolGlobalInt('ADHERENT_PRODUCT_ID_FOR_SUBSCRIPTIONS')) {
+	print info_admin($langs->trans("HelloAssoDonationProductSameAsSubscriptionProduct"), 0, 0, 'warning');
+}
 print $formSetup->generateOutput(true, true);
 print '<br>';
 
