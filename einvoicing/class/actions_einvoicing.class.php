@@ -1711,6 +1711,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		if (in_array('invoicelist', $contexts, true) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
 			// Add fields to invoice list
+			$arrayfields['pdp_provider'] = array(
+				'label' => 'einvoicingSourceTitle',
+				'checked' => 1,
+				'position' => 899,
+				'enabled' => '1',
+				'perms' => '1'
+			);
 			$arrayfields['einvoicegenerated'] = array(
 				'label' => 'EInvoiceFile',
 				'checked' => -1,
@@ -1720,6 +1727,23 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			);
 			$arrayfields['pdp_syncstatus'] = array(
 				'label' => 'PDPSyncStatus',
+				'checked' => 1,
+				'position' => 901,
+				'enabled' => '1',
+				'perms' => '1'
+			);
+		}
+
+		if (in_array('supplierinvoicelist', $contexts, true) && !einvoicingReceptionDisabled()) {
+			$arrayfields['pdp_provider'] = array(
+				'label' => 'einvoicingSourceTitle',
+				'checked' => 1,
+				'position' => 900,
+				'enabled' => '1',
+				'perms' => '1'
+			);
+			$arrayfields['pdp_lcstatus'] = array(
+				'label' => 'einvoicingInvoiceStatus',
 				'checked' => 1,
 				'position' => 901,
 				'enabled' => '1',
@@ -2092,22 +2116,29 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			);
 
 			// AP platform
-			print '<td class="liste_titre">';
-			print $form->selectarray(
-				'search_pdplinked',
-				$listofoptions,
-				GETPOST('search_pdplinked', 'alpha'),
-				-2,
-				0,
-				0,
-				'',
-				0,
-				0,
-				0,
-				'',
-				'width100 '
-			);
-			print '</td>';
+			if (empty($parameters['arrayfields']['pdp_provider']) || !empty($parameters['arrayfields']['pdp_provider']['checked'])) {
+				print '<td class="liste_titre">';
+				print $form->selectarray(
+					'search_pdplinked',
+					$listofoptions,
+					GETPOST('search_pdplinked', 'alpha'),
+					-2,
+					0,
+					0,
+					'',
+					0,
+					0,
+					0,
+					'',
+					'width100 '
+				);
+				print '</td>';
+			}
+
+			// E-invoice file: no filter, but the cell keeps the filters under their own column
+			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+				print '<td class="liste_titre"></td>';
+			}
 
 			// E-invoice status
 			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
@@ -2150,41 +2181,45 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			);
 
 			// AP platform
-			print '<td class="liste_titre">';
-			print $form->selectarray(
-				'search_pdplinked',
-				$listofoptions,
-				GETPOST('search_pdplinked', 'alpha'),
-				-2,
-				0,
-				0,
-				'',
-				0,
-				0,
-				0,
-				'',
-				'width100 '
-			);
-			print '</td>';
+			if (empty($parameters['arrayfields']['pdp_provider']) || !empty($parameters['arrayfields']['pdp_provider']['checked'])) {
+				print '<td class="liste_titre">';
+				print $form->selectarray(
+					'search_pdplinked',
+					$listofoptions,
+					GETPOST('search_pdplinked', 'alpha'),
+					-2,
+					0,
+					0,
+					'',
+					0,
+					0,
+					0,
+					'',
+					'width100 '
+				);
+				print '</td>';
+			}
 
 			// E-invoice status of the supplier invoice into the Access Point system
-			$einvoicing = new EInvoicing($db);
-			print '<td class="liste_titre pdp_lcstatus">';
-			print $form->selectarray(
-				'search_pdp_lcstatus',
-				$einvoicing->getEinvoiceStatusOptions(0, 1),
-				GETPOST('search_pdp_lcstatus', 'alpha'),
-				-2,
-				0,
-				0,
-				'',
-				0,
-				0,
-				0,
-				'',
-				'width100 '
-			);
-			print '</td>';
+			if (empty($parameters['arrayfields']['pdp_lcstatus']) || !empty($parameters['arrayfields']['pdp_lcstatus']['checked'])) {
+				$einvoicing = new EInvoicing($db);
+				print '<td class="liste_titre pdp_lcstatus">';
+				print $form->selectarray(
+					'search_pdp_lcstatus',
+					$einvoicing->getEinvoiceStatusOptions(0, 1),
+					GETPOST('search_pdp_lcstatus', 'alpha'),
+					-2,
+					0,
+					0,
+					'',
+					0,
+					0,
+					0,
+					'',
+					'width100 '
+				);
+				print '</td>';
+			}
 		}
 
 
@@ -2230,7 +2265,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				return 0;
 			}
 
-			print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingSourceTitle'));
+			if (empty($parameters['arrayfields']['pdp_provider']) || !empty($parameters['arrayfields']['pdp_provider']['checked'])) {
+				print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingSourceTitle'));
+			}
 
 			// Einvoice generated or not
 			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
@@ -2245,8 +2282,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		// Supplier invoice list, Product list, Soc list
 		if (in_array('supplierinvoicelist', $contexts) && !einvoicingReceptionDisabled()) {
-			print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingSourceTitle'));
-			print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingInvoiceStatus'), '', '', '', $parameters['param'] ?? '', '', '', '', 'center ');
+			if (empty($parameters['arrayfields']['pdp_provider']) || !empty($parameters['arrayfields']['pdp_provider']['checked'])) {
+				print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingSourceTitle'));
+			}
+			if (empty($parameters['arrayfields']['pdp_lcstatus']) || !empty($parameters['arrayfields']['pdp_lcstatus']['checked'])) {
+				print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingInvoiceStatus'), '', '', '', $parameters['param'] ?? '', '', '', '', 'center ');
+			}
 		}
 
 		if (in_array('thirdpartylist', $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
@@ -2299,13 +2340,15 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 			$obj = $parameters['obj'];
 
-			print '<td class="tdoverflowmax100">';
-			if ($obj->pdplink_id) {
-				print dolPrintHTML($obj->pdp_provider);
-			}
-			print '</td>';
-			if (isset($parameters['i']) && empty($parameters['i'])) {
-				$parameters['totalarray']['nbfield']++;
+			if (empty($parameters['arrayfields']['pdp_provider']) || !empty($parameters['arrayfields']['pdp_provider']['checked'])) {
+				print '<td class="tdoverflowmax100">';
+				if ($obj->pdplink_id) {
+					print dolPrintHTML($obj->pdp_provider);
+				}
+				print '</td>';
+				if (isset($parameters['i']) && empty($parameters['i'])) {
+					$parameters['totalarray']['nbfield']++;
+				}
 			}
 
 			// E-invoice generation status
@@ -2338,23 +2381,27 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		if (in_array('supplierinvoicelist', $contexts) && !einvoicingReceptionDisabled()) {
 			$obj = $parameters['obj'];
 
-			print '<td class="tdoverflowmax100">';
-			if ($obj->pdplink_id) {
-				print dolPrintHTML($obj->pdp_provider);
-			}
-			print '</td>';
-			if (isset($parameters['i']) && empty($parameters['i'])) {
-				$parameters['totalarray']['nbfield']++;
+			if (empty($parameters['arrayfields']['pdp_provider']) || !empty($parameters['arrayfields']['pdp_provider']['checked'])) {
+				print '<td class="tdoverflowmax100">';
+				if ($obj->pdplink_id) {
+					print dolPrintHTML($obj->pdp_provider);
+				}
+				print '</td>';
+				if (isset($parameters['i']) && empty($parameters['i'])) {
+					$parameters['totalarray']['nbfield']++;
+				}
 			}
 
 			// E-invoice status of the supplier invoice into the Access Point system
-			$einvoicing = new EInvoicing($db);
-			$currentStatusDetails = $obj->pdp_lcstatus ? $einvoicing->getStatusLabel((int) $obj->pdp_lcstatus, 'invoice_supplier') : '-';
-			print '<td class="center tdoverflowmax100" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
-			print $obj->pdp_lcstatus ? $einvoicing->getStatusBadge((int) $obj->pdp_lcstatus, 'invoice_supplier') : '-';
-			print '</td>';
-			if (isset($parameters['i']) && empty($parameters['i'])) {
-				$parameters['totalarray']['nbfield']++;
+			if (empty($parameters['arrayfields']['pdp_lcstatus']) || !empty($parameters['arrayfields']['pdp_lcstatus']['checked'])) {
+				$einvoicing = new EInvoicing($db);
+				$currentStatusDetails = $obj->pdp_lcstatus ? $einvoicing->getStatusLabel((int) $obj->pdp_lcstatus, 'invoice_supplier') : '-';
+				print '<td class="center tdoverflowmax100" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
+				print $obj->pdp_lcstatus ? $einvoicing->getStatusBadge((int) $obj->pdp_lcstatus, 'invoice_supplier') : '-';
+				print '</td>';
+				if (isset($parameters['i']) && empty($parameters['i'])) {
+					$parameters['totalarray']['nbfield']++;
+				}
 			}
 		}
 
