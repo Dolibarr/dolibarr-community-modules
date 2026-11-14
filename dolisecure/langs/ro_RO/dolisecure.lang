@@ -4,81 +4,81 @@
 # Generic
 #
 ModuleDoliSecureName = DoliSecure
-ModuleDoliSecureDesc = Checks that the installed Dolibarr version is not affected by any known vulnerability (CVE) and shows an indicator, visible to administrators only, on the home page
-DoliSecureDescription = Checks that the installed Dolibarr version is not affected by any known vulnerability (CVE) and shows an indicator, visible to administrators only, on the home page
+ModuleDoliSecureDesc = Verifică dacă versiunea Dolibarr instalată nu este afectată de nicio vulnerabilitate cunoscută (CVE) și afișează un indicator, vizibil doar administratorilor, pe pagina principală
+DoliSecureDescription = Verifică dacă versiunea Dolibarr instalată nu este afectată de nicio vulnerabilitate cunoscută (CVE) și afișează un indicator, vizibil doar administratorilor, pe pagina principală
 
 #
 # Admin page
 #
-DoliSecureSetup = DoliSecure setup
-Settings = Settings
-DoliSecureSetupPage = This module periodically checks the installed Dolibarr version against the NVD (NIST) vulnerability database and shows an indicator, visible to administrators only, on the home page.
-DOLISECURE_CACHE_DELAY_HOURS = Delay before next check (hours)
-DOLISECURE_CACHE_DELAY_HOURSTooltip = Number of hours the last result is reused before a new online check is performed
-DOLISECURE_SHOW_OK_BANNER = Show indicator even when no vulnerability is found
-DOLISECURE_SHOW_OK_BANNERTooltip = If enabled, a green indicator is shown on the home page even when no vulnerability is detected
-DOLISECURE_SEND_ADMIN_ALERT = Send an email to administrators on vulnerability
-DOLISECURE_SEND_ADMIN_ALERTTooltip = An email is sent automatically when a new vulnerability is detected (only once as long as the set of vulnerabilities does not change)
-DOLISECURE_ALERT_EMAIL = Alert recipient(s) (optional)
-DOLISECURE_ALERT_EMAILTooltip = Comma-separated list of email addresses. Leave empty to automatically notify all active users flagged as administrator
+DoliSecureSetup = Configurarea DoliSecure
+Settings = Setări
+DoliSecureSetupPage = Acest modul verifică periodic versiunea Dolibarr instalată în baza de date a vulnerabilităților NVD (NIST) și afișează un indicator, vizibil doar administratorilor, pe pagina principală.
+DOLISECURE_CACHE_DELAY_HOURS = Întârziere înainte de următoarea verificare (ore)
+DOLISECURE_CACHE_DELAY_HOURSTooltip = Numărul de ore în care ultimul rezultat este reutilizat înainte de efectuarea unei noi verificări online
+DOLISECURE_SHOW_OK_BANNER = Afișează indicatorul chiar și atunci când nu se găsește nicio vulnerabilitate
+DOLISECURE_SHOW_OK_BANNERTooltip = Dacă este activat, un indicator verde este afișat pe pagina principală chiar și atunci când nu este detectată nicio vulnerabilitate
+DOLISECURE_SEND_ADMIN_ALERT = Trimiteți un e-mail administratorilor despre vulnerabilitate
+DOLISECURE_SEND_ADMIN_ALERTTooltip = Un e-mail este trimis automat atunci când este detectată o nouă vulnerabilitate (o singură dată, atâta timp cât setul de vulnerabilități nu se modifică)
+DOLISECURE_ALERT_EMAIL = Destinatar(i) alertei (opțional)
+DOLISECURE_ALERT_EMAILTooltip = Listă de adrese de e-mail separate prin virgulă. Lăsați câmpul gol pentru a notifica automat toți utilizatorii activi marcați ca administratori.
 
 #
 # Status / report
 #
-DoliSecureStatus = Security status
-DoliSecureInstalledVersion = Installed version
-DoliSecureLastCheck = Last check
-DoliSecureCheckNow = Check now
-DoliSecureVulnerable = %s known vulnerabilit(y/ies) found
-DoliSecureOk = No known vulnerability
-DoliSecureCheckError = Check failed (%s)
-DoliSecureNeverChecked = Never checked yet
-DoliSecureCveList = Vulnerabilities found
+DoliSecureStatus = Starea de securitate
+DoliSecureInstalledVersion = Versiunea instalată
+DoliSecureLastCheck = Ultima verificare
+DoliSecureCheckNow = Verifică acum
+DoliSecureVulnerable = %s a fost găsită o vulnerabilitate cunoscută
+DoliSecureOk = Nicio vulnerabilitate cunoscută
+DoliSecureCheckError = Verificare eșuată (%s)
+DoliSecureNeverChecked = Nu a fost verificat încă
+DoliSecureCveList = Vulnerabilități descoperite
 DoliSecureCveId = CVE
-DoliSecureSeverity = Severity
-DoliSecureFixedIn = Fixed in
-DoliSecurePublished = Published on
-DoliSecureSeeOnNvd = See on NVD
-DoliSecureSeeDetails = See details
-DoliSecureSeeSetupPage = See the DoliSecure module's setup page for more information.
-DoliSecureVulnerabilityFound = %s known vulnerabilit(y/ies) affect the installed Dolibarr version %s
-DoliSecureNoVulnerability = No known vulnerability for the installed Dolibarr version %s
-DoliSecureNoVulnerabilityLong = The installed Dolibarr version was not affected by any known vulnerability (CVE) at the time of the last check.
+DoliSecureSeverity = Severitate
+DoliSecureFixedIn = Fixat în
+DoliSecurePublished = Publicat pe
+DoliSecureSeeOnNvd = Vezi pe NVD
+DoliSecureSeeDetails = Vedeți detaliile
+DoliSecureSeeSetupPage = Consultați pagina de configurare a modulului DoliSecure pentru mai multe informații.
+DoliSecureVulnerabilityFound = %s vulnerabilitatea (e/e) cunoscută afectează versiunea Dolibarr instalată %s
+DoliSecureNoVulnerability = Nu există nicio vulnerabilitate cunoscută pentru versiunea instalată de Dolibarr %s
+DoliSecureNoVulnerabilityLong = Versiunea instalată de Dolibarr nu a fost afectată de nicio vulnerabilitate cunoscută (CVE) la momentul ultimei verificări.
 
 #
 # Alert email
 #
-DoliSecureAlertMailSubject = [DoliSecure] Dolibarr %s: %s known vulnerabilit(y/ies) found
-DoliSecureAlertMailIntro = The DoliSecure module has detected that the Dolibarr version %s installed on this server is affected by at least one known vulnerability (CVE):
-DoliSecureAlertMailOutro = Please plan to upgrade Dolibarr or apply the relevant patches as soon as possible. This email was sent automatically by the DoliSecure module.
-DoliSecureFixedInVersion = Fixed in Dolibarr version %s (or a later version).
-DoliSecureFixedVersionUnknown = Fixed version not reported by the source: check the CVE page above.
+DoliSecureAlertMailSubject = [DoliSecure] Dolibarr %s: %s a fost găsită o vulnerabilitate cunoscută.
+DoliSecureAlertMailIntro = Modulul DoliSecure a detectat că versiunea Dolibarr %s instalată pe acest server este afectată de cel puțin o vulnerabilitate cunoscută (CVE):
+DoliSecureAlertMailOutro = Vă rugăm să planificați actualizarea Dolibarr sau aplicarea patch-urilor relevante cât mai curând posibil. Acest e-mail a fost trimis automat de modulul DoliSecure.
+DoliSecureFixedInVersion = Remediat în versiunea Dolibarr %s (sau o versiune ulterioară).
+DoliSecureFixedVersionUnknown = Versiunea corectată nu a fost raportată de sursă: consultați pagina CVE de mai sus.
 
 #
 # About page
 #
-About = About
-DoliSecureAbout = About DoliSecure
-DoliSecureAboutPage = DoliSecure about page
+About = Despre
+DoliSecureAbout = Despre DoliSecure
+DoliSecureAboutPage = Pagina despre DoliSecure
 
 #
 # Home page / top menu
 #
-DoliSecureArea = Dolibarr security
+DoliSecureArea = Securitate Dolibarr
 
 #
 # Home page widget
 #
-DoliSecureBoxTitle = Dolibarr security (CVE)
+DoliSecureBoxTitle = Securitatea Dolibarr (CVE)
 
 #
 # Cross-promotion
 #
-DoliSecureDiscoverOtherModules = More modules by Joliciel are available on %s.
+DoliSecureDiscoverOtherModules = Mai multe module de la Joliciel sunt disponibile pe %s.
 
 #
 # About page - Joliciel / Dolistore promotion
 #
-DoliSecureAboutJolicielTitle = Joliciel, Dolibarr module publisher
-DoliSecureAboutJolicielText = Joliciel designs and publishes complementary modules for Dolibarr ERP & CRM, including DoliSecure, available on DoliStore.com, the official Dolibarr marketplace. Find the up-to-date list of all Joliciel modules on that page: security, integrations, everyday productivity...
-DoliSecureAboutJolicielCta = Discover Joliciel modules on DoliStore.com
+DoliSecureAboutJolicielTitle = Joliciel, editor de modul Dolibarr
+DoliSecureAboutJolicielText = Joliciel proiectează și publică module complementare pentru Dolibarr ERP & CRM, inclusiv DoliSecure, disponibile pe DoliStore.com, platforma oficială Dolibarr. Găsiți lista actualizată a tuturor modulelor Joliciel pe această pagină: securitate, integrări, productivitate zilnică...
+DoliSecureAboutJolicielCta = Descoperiți modulele Joliciel pe DoliStore.com
