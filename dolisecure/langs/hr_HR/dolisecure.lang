@@ -32,7 +32,7 @@ DoliSecureCheckNow = Check now
 DoliSecureVulnerable = %s known vulnerabilit(y/ies) found
 DoliSecureOk = No known vulnerability
 DoliSecureCheckError = Check failed (%s)
-DoliSecureNeverChecked = Never checked yet
+DoliSecureNeverChecked = Not checked yet
 DoliSecureCveList = Vulnerabilities found
 DoliSecureCveId = CVE
 DoliSecureSeverity = Severity
@@ -80,5 +80,5 @@ DoliSecureDiscoverOtherModules = More modules by Joliciel are available on %s.
 # About page - Joliciel / Dolistore promotion
 #
 DoliSecureAboutJolicielTitle = Joliciel, Dolibarr module publisher
-DoliSecureAboutJolicielText = Joliciel designs and publishes complementary modules for Dolibarr ERP & CRM, including DoliSecure, available on DoliStore.com, the official Dolibarr marketplace. Find the up-to-date list of all Joliciel modules on that page: security, integrations, everyday productivity...
+DoliSecureAboutJolicielText = Joliciel designs and publishes complementary modules for Dolibarr ERP & CRM, including DoliSecure, available on DoliStore.com, the official Dolibarr marketplace. Find the up-to-date list of all Joliciel modules on this page: security, integrations, everyday productivity...
 DoliSecureAboutJolicielCta = Discover Joliciel modules on DoliStore.com

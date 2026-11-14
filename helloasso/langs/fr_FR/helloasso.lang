@@ -46,7 +46,7 @@ HELLOASSO_CLIENT_ORGANISATION=Nom de l'organisation pour le mode de production
 HELLOASSO_CLIENT_ORGANISATION_HELP=Nom de l'organisation pour le mode production. Doit correspondre au nom défini dans le compte HelloAsso.
 HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS=Compte bancaire pour les paiements
 HELLOASSO_SHOW_ONLINE_PAYMENTS=Afficher la page de paiement en ligne
-HELLOASSO_STANDAR_BTN = Activez le style graphique HelloAsso pour le bouton de paiement (casse la cohérence du look Dolibarr)
+HELLOASSO_STANDAR_BTN = Activez le style graphique HelloAsso pour le bouton de paiement
 HELLOASSO_STANDAR_BTN_HELP = Activez cette option pour charger le fichier CSS HelloAsso, qui remplace le style par défaut de Dolibarr par un design harmonisé avec l'identité visuelle de HelloAsso (boutons, couleurs, etc.).
 
 ExampleOfTestCreditCardHelloAsso=Des exemples de cartes de crédit de test sont disponibles à cette URL :
