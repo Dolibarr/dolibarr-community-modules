@@ -73,6 +73,7 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           LABEL: ${{ env.LABEL }}
           REPO: ${{ github.repository }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           set -euo pipefail
 
@@ -118,7 +119,10 @@ jobs:
           # A PR must impact only one module
           MODULE_COUNT=$(echo "$FINAL" | grep -c . || true)
 
-          if [ "$MODULE_COUNT" -gt 1 ]; then
+          # A PR to synchronize translations from Transifex is allowed to modify several modules.
+          if [ "$MODULE_COUNT" -gt 1 ] && printf '%s' "$PR_TITLE" | grep -Fiq 'transifex sync'; then
+            echo "The PR title contains 'transifex sync', so modification of several modules is allowed."
+          elif [ "$MODULE_COUNT" -gt 1 ]; then
             echo "::error::A PR must impact one module at once"
             echo "Detected modified modules:"
             echo "$FINAL"
