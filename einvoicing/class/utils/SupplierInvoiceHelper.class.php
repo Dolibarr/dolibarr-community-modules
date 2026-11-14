@@ -257,6 +257,32 @@ class SupplierInvoiceHelper
 	}
 
 	/**
+	 * Sum the VAT breakdown (BG-23) of a received document per rate, the way an invoice groups its lines.
+	 * A category O group carries no rate (BR-48) and stands at 0; groups sharing a rate (E and Z at 0,
+	 * or one per exemption reason) are added up, since the invoice holds one total per rate (issue #1248).
+	 *
+	 * @param	array<int,array<string,mixed>>	$taxBreakdown	The taxBreakdown entries of a parsed header
+	 * @return	array<string,array{basisAmount:float,calculatedAmount:float}>	Amounts by rate, keyed as price2num() writes it
+	 */
+	public static function vatBreakdownByRate(array $taxBreakdown): array
+	{
+		$byRate = array();
+		foreach ($taxBreakdown as $tax) {
+			if (($tax['typeCode'] ?? '') !== 'VAT') {
+				continue;
+			}
+			$rate = (string) price2num((float) ($tax['rateApplicablePercent'] ?? 0));
+			if (!isset($byRate[$rate])) {
+				$byRate[$rate] = array('basisAmount' => 0.0, 'calculatedAmount' => 0.0);
+			}
+			$byRate[$rate]['basisAmount'] += (float) ($tax['basisAmount'] ?? 0);
+			$byRate[$rate]['calculatedAmount'] += (float) ($tax['calculatedAmount'] ?? 0);
+		}
+
+		return $byRate;
+	}
+
+	/**
 	 * Whether two amounts differ by no more than the EXTENDED profile of the document tolerates.
 	 *
 	 * @param	float					$amount1		The amount of the invoice
@@ -372,24 +398,22 @@ class SupplierInvoiceHelper
 			}
 
 			$dolSupplierInvoiceVatDetails = $details['vat_by_rate'];
-			foreach ($parsedHeader['taxBreakdown'] as $taxDetailsByRate) {
-				if ($taxDetailsByRate['typeCode'] === 'VAT') {
-					$currentRate = (string) $taxDetailsByRate['rateApplicablePercent'];
-					if (array_key_exists($currentRate, $dolSupplierInvoiceVatDetails)) {
-						$dolVatAmount = $dolSupplierInvoiceVatDetails[$currentRate]['vat_amount'];
-						$dolVatBasis = $dolSupplierInvoiceVatDetails[$currentRate]['vat_basis_amount'];
+			foreach (self::vatBreakdownByRate($parsedHeader['taxBreakdown']) as $currentRate => $taxDetailsByRate) {
+				$currentRate = (string) $currentRate;
+				if (array_key_exists($currentRate, $dolSupplierInvoiceVatDetails)) {
+					$dolVatAmount = $dolSupplierInvoiceVatDetails[$currentRate]['vat_amount'];
+					$dolVatBasis = $dolSupplierInvoiceVatDetails[$currentRate]['vat_basis_amount'];
 
-						if (!self::areAmountsEqual($dolVatBasis, $taxDetailsByRate['basisAmount'])
-							&& !self::withinExtendedTolerance($dolVatBasis, $taxDetailsByRate['basisAmount'], $parsedHeader, $currentRate)) {
-							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatBasisDifference', $currentRate, $taxDetailsByRate['basisAmount'], $dolVatBasis);
-						}
-						if (!self::areAmountsEqual($dolVatAmount, $taxDetailsByRate['calculatedAmount'])
-							&& !self::withinExtendedTolerance($dolVatAmount, $taxDetailsByRate['calculatedAmount'], $parsedHeader, $currentRate)) {
-							$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatRateDifference', $currentRate, $taxDetailsByRate['calculatedAmount'], $dolVatAmount);
-						}
-					} else {
-						$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatRateNotFound', $currentRate);
+					if (!self::areAmountsEqual($dolVatBasis, $taxDetailsByRate['basisAmount'])
+						&& !self::withinExtendedTolerance($dolVatBasis, $taxDetailsByRate['basisAmount'], $parsedHeader, $currentRate)) {
+						$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatBasisDifference', $currentRate, $taxDetailsByRate['basisAmount'], $dolVatBasis);
 					}
+					if (!self::areAmountsEqual($dolVatAmount, $taxDetailsByRate['calculatedAmount'])
+						&& !self::withinExtendedTolerance($dolVatAmount, $taxDetailsByRate['calculatedAmount'], $parsedHeader, $currentRate)) {
+						$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatRateDifference', $currentRate, $taxDetailsByRate['calculatedAmount'], $dolVatAmount);
+					}
+				} else {
+					$amountErrors[$calculationRule][] = $langs->trans('SupplierInvoiceComparisonVatRateNotFound', $currentRate);
 				}
 			}
 
