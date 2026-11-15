@@ -324,6 +324,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	{
 		global $db, $langs, $user;
 
+		// Buttons are only for customer and supplier invoices
+		if (!is_object($object) || !in_array($object->element, ['facture', 'invoice_supplier'])) {
+			return 0;
+		}
+
 		$langs->load("einvoicing@einvoicing");
 		$einvoicing = new EInvoicing($db);
 		$checkConfig = $einvoicing->checkModulePrerequisites();
