@@ -265,6 +265,34 @@ class EInvoicing
 		self::STATUS_ERROR               => 'EInvStatusError',			// Error in generation by Dolibarr
 	];
 
+	/**
+	 * Badge of each status, among the badges of the core theme, so a list tells at a glance what moves
+	 * normally, what waits for the seller and what is blocked (#1227).
+	 */
+	const STATUS_BADGE_TYPES = [
+		self::STATUS_UNKNOWN             => 'status0',		// Not in the e-invoicing flow yet
+		self::STATUS_NOT_GENERATED       => 'status0',
+		self::STATUS_GENERATED           => 'status1b',		// Waiting on the seller side or its AP
+		self::STATUS_AWAITING_VALIDATION => 'status1b',
+		self::STATUS_AWAITING_ACK        => 'status1b',
+		self::STATUS_DEPOSITED           => 'status4b',		// Accepted by the network, progressing
+		self::STATUS_ISSUED              => 'status4b',
+		self::STATUS_RECEIVED            => 'status4b',
+		self::STATUS_AVAILABLE           => 'status4b',
+		self::STATUS_TAKEN_OVER          => 'status4b',
+		self::STATUS_COMPLETED           => 'status4b',		// Back in progress after a suspension
+		self::STATUS_APPROVED            => 'status4',		// Positive outcome
+		self::STATUS_PAYMENT_SENT        => 'status4',
+		self::STATUS_PAID                => 'status6',		// Closed, like a paid invoice of the core
+		self::STATUS_PARTIALLY_APPROVED  => 'status1',		// Seller action expected
+		self::STATUS_DISPUTED            => 'status1',
+		self::STATUS_SUSPENDED           => 'status1',
+		self::STATUS_REFUSED             => 'status8',		// Blocking or terminal failure
+		self::STATUS_REJECTED            => 'status8',
+		self::STATUS_ERROR               => 'status8',
+		self::STATUS_IGNORE              => 'status5',		// Out of scope
+	];
+
 
 	// All reasons with their details (Used when sending supplier invoices status: Refused, Disputed, Suspended, Partially Approved)
 	const REASONS = [
@@ -615,6 +643,15 @@ class EInvoicing
 	const EXTRAFIELD_BUYER_REFERENCE = 'buyer_reference';
 
 	/**
+	 * Name, into llx_einvoicing_extrafields, of the role the seller issues a services invoice under:
+	 * CONTRACTOR_ROLE_SUBCONTRACTOR (BT-23 = S5) or CONTRACTOR_ROLE_COCONTRACTOR (S6). Nothing else in an
+	 * invoice says it, and the same company invoices both directly and as a subcontractor (issue #946).
+	 */
+	const EXTRAFIELD_CONTRACTOR_ROLE = 'contractor_role';
+	const CONTRACTOR_ROLE_SUBCONTRACTOR = 'subcontractor';
+	const CONTRACTOR_ROLE_COCONTRACTOR = 'cocontractor';
+
+	/**
 	 * Name, into llx_einvoicing_extrafields (element_type 'societe'), of the per-supplier override of
 	 * EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION. '1' forces the behaviour on for that supplier, '0'
 	 * forces it off, no row inherits the global default. See shouldMergeLineChargesIntoDescription().
@@ -879,6 +916,21 @@ class EInvoicing
 		return $langs->transnoentitiesnoconv(
 			self::STATUS_LABEL_KEYS[$code] ?? 'EInvStatusUnknown'
 		);
+	}
+
+	/**
+	 * Status as a badge of the core, its full label as tooltip, the way the lists of the core show theirs.
+	 *
+	 * @param int|string 	$code				Code
+	 * @param string	 	$elementType		Element the status is carried by ('facture', 'invoice_supplier'), when known
+	 * @param string		$recipientRoles		RoleCodes the status was addressed to ('SE', 'SE,BY'), when known
+	 * @return string							HTML of the badge
+	 */
+	public function getStatusBadge($code, $elementType = '', $recipientRoles = '')
+	{
+		$label = $this->getStatusLabel($code, $elementType, $recipientRoles);
+
+		return dolGetStatus($label, '', '', self::STATUS_BADGE_TYPES[(int) $code] ?? 'status0', 5);
 	}
 
 	/**
@@ -1708,6 +1760,16 @@ class EInvoicing
 			$baseErrors[] = $langs->trans("FxCheckErrorLinesWithNoName", implode(', ', $linesWithNoName));
 		}
 
+		// S5/S6 only exist for a services invoice: refused here rather than sent silently as B1/M1 (issue #946).
+		if ($invoice->element == 'facture' && $invoice->id > 0
+			&& (string) $this->getExtraFieldValue($invoice->id, $invoice->element, self::EXTRAFIELD_CONTRACTOR_ROLE) !== '') {
+			dol_include_once('einvoicing/class/protocols/CIIProtocol.class.php');
+			$protocol = new CIIProtocol($this->db);
+			if ($protocol->getBillingFramePrefix($invoice) !== 'S') {
+				$baseErrors[] = $langs->trans("FxCheckErrorContractorRoleNotServices");
+			}
+		}
+
 		if (!empty($baseErrors)) {
 			$res = -1;
 			$message .= '<br> Error: ' . implode('<br> Error: ', $baseErrors);
@@ -2103,6 +2165,34 @@ class EInvoicing
 				$resprints .= '</td>';
 				$resprints .= '</tr>';
 			}
+		}
+
+		// Role the invoice is issued under (BT-23 S5/S6, issue #946). Customer invoices only.
+		if ($object->element == 'facture' && $object->id > 0) {
+			$currentRole = (string) $this->getExtraFieldValue($object->id, $object->element, self::EXTRAFIELD_CONTRACTOR_ROLE);
+			$roleOptions = array(
+				'' => $langs->trans("EInvoiceContractorRoleNone"),
+				self::CONTRACTOR_ROLE_SUBCONTRACTOR => $langs->trans("EInvoiceContractorRoleSubcontractor"),
+				self::CONTRACTOR_ROLE_COCONTRACTOR => $langs->trans("EInvoiceContractorRoleCocontractor"),
+			);
+			$resprints .= '<tr class="treinvoicing_collapseseparator">';
+			$resprints .= '<td>';
+			$resprints .= $form->editfieldkey($form->textwithpicto($langs->trans("EInvoiceContractorRole"), $langs->trans("EInvoiceContractorRoleHelp")), 'einvoice_contractor_role', '', $object, (int) $editenable);
+			$resprints .= '</td>';
+			$resprints .= '<td>';
+			if ($action == 'editeinvoice_contractor_role' && $editenable) {
+				$resprints .= '<form name="setcontractorrole" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
+				$resprints .= '<input type="hidden" name="token" value="' . newToken() . '">';
+				$resprints .= '<input type="hidden" name="action" value="setcontractorrole">';
+				$resprints .= '<input type="hidden" name="page_y" value="page_y">';
+				$resprints .= $form->selectarray('einvoice_contractor_role', $roleOptions, $currentRole, 0, 0, 0, '', 0);
+				$resprints .= '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
+				$resprints .= '</form>';
+			} elseif (isset($roleOptions[$currentRole]) && $currentRole !== '') {
+				$resprints .= dol_escape_htmltag($roleOptions[$currentRole]);
+			}
+			$resprints .= '</td>';
+			$resprints .= '</tr>';
 		}
 
 		// Buyer reference (BT-10): the reference the buyer uses to route the invoice inside its own

@@ -1569,6 +1569,29 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
+	 * Type of a flow, completed when the platform lists it before typing it: a status we sent on a
+	 * supplier invoice is recognised by its flow id, recorded when it was sent.
+	 *
+	 * @param	string		$flowId		Flow ID (UUID)
+	 * @param	?string		$flowType	Flow type given by the platform
+	 * @return	?string					Flow type to process the flow with
+	 */
+	protected function resolveFlowType($flowId, $flowType)
+	{
+		if (!empty($flowType)) {
+			return $flowType;
+		}
+
+		dol_include_once('einvoicing/class/einvoicing.class.php');
+		$sentStatus = (new EInvoicing($this->db))->fetchStatusMessages($flowId);
+		if (is_array($sentStatus) && ($sentStatus['element_type'] ?? '') === 'invoice_supplier') {
+			return 'SupplierInvoiceLC';
+		}
+
+		return $flowType;
+	}
+
+	/**
 	 * Rank of a flow type to order flows sharing the same updatedAt: an invoice comes before the
 	 * lifecycle statuses about it (the platform issues its 202 at the very instant it receives the invoice).
 	 *
