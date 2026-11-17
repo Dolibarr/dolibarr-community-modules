@@ -806,7 +806,8 @@ class CIIProtocol extends AbstractProtocol
 				$idligne = $this->db->last_insert_id(MAIN_DB_PREFIX.'facture_fourn_det');
 				$rang++;
 
-				$res = $supplierInvoice->updateline(
+				/** @phan-suppress-next-line PhanParamTooMany */
+				$res = $supplierInvoice->updateline(	// @phpstan-ignore arguments.count (skip_update_price only exists on newer cores, an older one ignores it)
 					$idligne,
 					/** @phan-suppress-next-line PhanDeprecatedProperty */
 					$supplierInvoice->lines[$i]->desc ? $supplierInvoice->lines[$i]->desc : $supplierInvoice->lines[$i]->description,
@@ -830,7 +831,8 @@ class CIIProtocol extends AbstractProtocol
 					$supplierInvoice->lines[$i]->multicurrency_subprice,
 					/** @phan-suppress-next-line PhanUndeclaredProperty */
 					$supplierInvoice->lines[$i]->ref_supplier,
-					$rang
+					$rang,
+					1
 				);
 
 				if ($res < 0) {
@@ -848,16 +850,14 @@ class CIIProtocol extends AbstractProtocol
 			}
 		}
 
-		// updateline() totalled the header before the signs were restored: total it again when one moved
-		$moved = 0;
 		foreach ($lineIdsBySign as $sign => $lineIds) {
-			$res = $this->setCreditNoteLinesSign($lineIds, $sign);
-			if ($res < 0) {
+			if ($this->setCreditNoteLinesSign($lineIds, $sign) < 0) {
 				return false;
 			}
-			$moved += $res;
 		}
-		if ($moved > 0 && $supplierInvoice->update_price(1, 'auto', 0, $supplierInvoice->thirdparty) < 0) {
+
+		// updateline() left the totals alone: total once, after the signs of a credit note are restored
+		if (!empty($supplierInvoice->lines) && $supplierInvoice->update_price(1, 'auto', 0, $supplierInvoice->thirdparty) < 0) {
 			return false;
 		}
 
