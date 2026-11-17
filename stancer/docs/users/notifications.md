@@ -81,7 +81,7 @@ Le module peut envoyer la facture par email au client dès sa validation, quel q
 |-----------|-------------|
 | Envoyer la facture par mail à la validation | Active l'envoi automatique à chaque validation |
 | Modèle d'email | Modèle Dolibarr utilisé pour l'envoi |
-| Délai avant envoi automatique (en heures) | Nombre d'heures à attendre après la validation. 0 = envoi immédiat. Valeur typique : 24 (envoi le lendemain si personne n'a rien fait) |
+| Délai avant envoi automatique (en heures) | Nombre d'heures à attendre après la validation. 0 = envoi au prochain passage de la tâche planifiée (dans l'heure), une fois la facture dotée de son numéro définitif et de son PDF. Valeur typique : 24 (envoi le lendemain si personne n'a rien fait) |
 
 Fonctionnement avec un délai > 0 :
 

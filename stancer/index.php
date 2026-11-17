@@ -306,11 +306,13 @@ if ($resql) {
 
 // --- Pending invoice validation mails (auto-send scheduled but not yet fired) ---
 $pendingValidationMails = array();
-if (getDolGlobalString('STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE', '') != '' && (int) getDolGlobalString('STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_DELAY', '0') > 0) {
-	$sqlPending = "SELECT a.id, a.fk_element, a.socid, a.datep, a.label";
+// Every validation mail goes through this queue, whatever the delay (0 included).
+if (getDolGlobalString('STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE', '') != '') {
+	$sqlPending = "SELECT a.id, a.fk_element, a.fk_soc AS socid, a.datep, a.label";
 	$sqlPending .= " FROM " . MAIN_DB_PREFIX . "actioncomm AS a";
 	$sqlPending .= " WHERE a.code = 'AC_BILL_VALIDATE_PENDING'";
-	$sqlPending .= " AND a.percentage < 100";
+	// The column is percent; percentage is only the ActionComm property name.
+	$sqlPending .= " AND a.percent < 100";
 	$sqlPending .= " AND a.elementtype = 'invoice'";
 	$sqlPending .= " AND a.entity IN (" . getEntity('actioncomm') . ")";
 	$sqlPending .= " ORDER BY a.datep ASC";
@@ -320,6 +322,8 @@ if (getDolGlobalString('STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE', '') != '' && (
 		while ($objP = $db->fetch_object($resPending)) {
 			$pendingValidationMails[] = $objP;
 		}
+	} else {
+		dol_syslog("stancer index: cannot list pending validation mails: " . $db->lasterror(), LOG_ERR);
 	}
 }
 
