@@ -40,6 +40,9 @@ env:
   # actionlint reads the workflow files themselves: expressions, contexts, action inputs, matrix
   # keys. Pinned, so an upstream release never turns this job red on its own.
   ACTIONLINT_VERSION: 1.7.7
+  # What phpcs never reads. One list, used by both phpcs runs and by the filter of the pull request
+  # files: a pull request whose PHP files are all in here leaves phpcs nothing, and phpcs fails on that.
+  PHPCS_IGNORE: '*/tx/*,*/vendor/*,dev/tools/phan/*'
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -92,8 +95,21 @@ jobs:
             grep -E '\.php$' "$FILES" | while IFS= read -r file; do
               [ -f "$file" ] && printf '%s\n' "$file"
             done > changed-php.txt || true
-            if [ -s changed-php.txt ]; then
+            # phpcs matches an --ignore pattern anywhere in the path, hence the leading "*/".
+            IFS=, read -ra ignore <<< "$PHPCS_IGNORE"
+            while IFS= read -r file; do
+              for pattern in "${ignore[@]}"; do
+                pattern="${pattern#\*}"
+                # shellcheck disable=SC2254 # the pattern is a glob on purpose
+                case "/$file" in */${pattern#/}) continue 2 ;; esac
+              done
+              printf '%s\n' "$file"
+            done < changed-php.txt > phpcs-files.txt
+            if [ -s phpcs-files.txt ]; then
               echo "mode=list" >> "$GITHUB_OUTPUT"
+            elif [ -s changed-php.txt ]; then
+              echo "mode=excluded" >> "$GITHUB_OUTPUT"
+              echo "Every PHP file changed is one phpcs ignores ($PHPCS_IGNORE)."
             else
               echo "mode=none" >> "$GITHUB_OUTPUT"
               echo "No PHP file changed."
@@ -105,10 +121,10 @@ jobs:
 
       - name: Run PHPCS
         if: ${{ steps.scope.outputs.mode == 'all' }}
-        run: phpcs -q --report=checkstyle --standard=dev/setup/codesniffer/ruleset.xml --extensions=php --ignore=*/tx/*,*/vendor/*,dev/tools/phan/* . | cs2pr --graceful-warnings
+        run: phpcs -q --report=checkstyle --standard=dev/setup/codesniffer/ruleset.xml --extensions=php --ignore="$PHPCS_IGNORE" . | cs2pr --graceful-warnings
       - name: Run PHPCS on the files of the pull request
         if: ${{ steps.scope.outputs.mode == 'list' }}
-        run: phpcs -q --report=checkstyle --standard=dev/setup/codesniffer/ruleset.xml --extensions=php --ignore=*/tx/*,*/vendor/*,dev/tools/phan/* --file-list=changed-php.txt | cs2pr --graceful-warnings
+        run: phpcs -q --report=checkstyle --standard=dev/setup/codesniffer/ruleset.xml --extensions=php --ignore="$PHPCS_IGNORE" --file-list=phpcs-files.txt | cs2pr --graceful-warnings
       - name: Run VarDump Check
         run: var-dump-check --extensions php --tracy --exclude */vendor/* .
       - name: Run Parallel Lint

@@ -48,6 +48,14 @@ class HelloAssoMemberUtils
 	public $error;
 	public $errors = array();
 	public $nbPosts = 0;
+	/**
+	 * @var int Number of HelloAsso orders whose complementary donation(s) were billed
+	 */
+	public $nbDonations = 0;
+	/**
+	 * @var array<int,array<int,stdClass>> HelloAsso items of type "Donation", indexed by HelloAsso order id
+	 */
+	public $helloasso_donations = array();
 	public $errorPosts = array();
 	public $output = "";
 	private $helloasso_tokens = array();
@@ -183,6 +191,9 @@ class HelloAssoMemberUtils
 				if ($this->nbPosts == 0 && $nberrors == 0) {
 					$mesg = $langs->transnoentities("HelloAssoMembersNoNewMembers");
 				}
+				if ($this->nbDonations > 0) {
+					$mesg .= "<br>".$langs->transnoentities("HelloAssoMembersDonationsAdded", (string) $this->nbDonations);
+				}
 				setEventMessages($mesg, null, 'mesgs');
 				if ($nberrors > 0 || $error) {
 					setEventMessages($langs->trans("HelloAssoMembersError", $nberrors), null, "errors");
@@ -194,6 +205,9 @@ class HelloAssoMemberUtils
 				if ($this->nbPosts == 0 && $nberrors == 0) {
 					$mesg = $langs->transnoentities("HelloAssoMembersNoNewMembers");
 				} else {
+					if ($this->nbDonations > 0) {
+						$mesg .= "<br>".$langs->transnoentities("HelloAssoMembersDonationsAdded", (string) $this->nbDonations);
+					}
 					$mesg .= "<br>".$langs->trans("HelloAssoMembersError", $nberrors).": ". implode(",", $this->errors);
 				}
 				$this->output = $mesg;
@@ -258,11 +272,16 @@ class HelloAssoMemberUtils
 		$result = $ret["content"];
 		$helloassoformdata = json_decode($result);
 
+		$donationproductid = getDolGlobalInt('HELLOASSO_MEMBER_DONATION_PRODUCT');
+		$donationsprocessed = array();
+
 		$helloasso_members = $this->helloasso_members;
 		foreach ($helloasso_members as $key => $newmember) {
 			$db->begin();
 			$error = 0;
 			$this->errors = array();
+			$orderid = (int) (isset($newmember->order->id) ? $newmember->order->id : 0);
+			$orderhasdonation = false;
 			$date_start_subscription = dol_stringtotime($newmember->order->meta->createdAt);
 			$member = new Adherent($db);
 			$membertype = new AdherentType($db);
@@ -415,6 +434,14 @@ class HelloAssoMemberUtils
 									$subscriptioncomplementaryaction = "none";
 									break;
 							}
+							// Complementary donation(s) of the same HelloAsso order, billed once per order (on its first member processed)
+							$donationamounts = array();
+							if ($donationproductid > 0 && $orderid > 0 && !empty($this->helloasso_donations[$orderid]) && empty($donationsprocessed[$orderid])) {
+								$donationamounts = $this->getDonationAmountsByPayment($newmember, $this->helloasso_donations[$orderid]);
+								if (empty($donationamounts)) {
+									dol_syslog(get_class($this)."::helloassoPostMembersToDolibarr donation of order ".$orderid." could not be matched to a payment of member item ".$newmember->id, LOG_WARNING);
+								}
+							}
 							foreach ($newmember->payments as $payment) {
 								$paymentmethod = "";
 								switch ($payment->paymentMeans) {
@@ -443,12 +470,34 @@ class HelloAssoMemberUtils
 									$paymentamount = min($payment->amount / 100, $amount);
 								}
 
-								if ($paymentamount > 0) {
-									$result = $member->subscriptionComplementaryActions($subscriptionid, $subscriptioncomplementaryaction, $bankaccountid, (int) $date_start_subscription, $payment->date, $paymentmethod, $label, $paymentamount, '');
+								$donationamount = (!empty($donationamounts[$payment->id]) ? $donationamounts[$payment->id] : 0);
+
+								if ($donationamount > 0 && in_array($subscriptioncomplementaryaction, array('invoiceonly', 'bankviainvoice'))) {
+									// One invoice with membership fee line + donation line, paid with the full amount
+									$donationlabel = $langs->transnoentitiesnoconv("HelloAssoMemberDonationLabel", $payment->id);
+									$result = $this->createSubscriptionInvoiceWithDonation($member, $subscriptionid, $subscriptioncomplementaryaction, $bankaccountid, (int) $date_start_subscription, $payment->date, $paymentmethod, $label, $paymentamount, $donationamount, $donationproductid, $donationlabel);
 									if ($result <= 0) {
-										$this->error = $member->error;
-										$this->errors = array_merge($member->errors, $this->errors);
 										$error++;
+									} else {
+										$orderhasdonation = true;
+									}
+								} else {
+									if ($paymentamount > 0) {
+										$result = $member->subscriptionComplementaryActions($subscriptionid, $subscriptioncomplementaryaction, $bankaccountid, (int) $date_start_subscription, $payment->date, $paymentmethod, $label, $paymentamount, '');
+										if ($result <= 0) {
+											$this->error = $member->error;
+											$this->errors = array_merge($member->errors, $this->errors);
+											$error++;
+										}
+									}
+									if (!$error && $donationamount > 0 && $subscriptioncomplementaryaction == 'bankdirect' && $bankaccountid > 0) {
+										$donationlabel = $langs->transnoentitiesnoconv("HelloAssoMemberDonationLabel", $payment->id);
+										$result = $this->addDonationBankLine($member, $bankaccountid, $payment->date, $paymentmethod, $donationlabel, $donationamount);
+										if ($result <= 0) {
+											$error++;
+										} else {
+											$orderhasdonation = true;
+										}
 									}
 								}
 							}
@@ -478,10 +527,24 @@ class HelloAssoMemberUtils
 			if ($error) {
 				$db->rollback();
 				$this->errorPosts[] = array("member" => $newmember, "error" => $this->error, "errors" => $this->errors);
-			} elseif ($dryrun) {
-				$db->rollback();
 			} else {
-				$db->commit();
+				if ($dryrun) {
+					$db->rollback();
+				} else {
+					$db->commit();
+				}
+				if ($orderhasdonation) {
+					// Donation is billed only once per order, even if the order contains several members
+					$donationsprocessed[$orderid] = 1;
+					$this->nbDonations++;
+				}
+			}
+		}
+
+		// Donations whose order has no membership item processed in this run are not billed
+		foreach ($this->helloasso_donations as $orderid => $donations) {
+			if (empty($donationsprocessed[$orderid])) {
+				dol_syslog(get_class($this)."::helloassoPostMembersToDolibarr donation(s) of HelloAsso order ".$orderid." not billed (no membership item processed for this order)", LOG_WARNING);
 			}
 		}
 		return $this->nbPosts;
@@ -522,6 +585,8 @@ class HelloAssoMemberUtils
 		$param = $parambase.$paramfrom;
 		$nbpages = 0;
 		$arraymembers = array();
+		$arraydonations = array();
+		$donationproductid = getDolGlobalInt('HELLOASSO_MEMBER_DONATION_PRODUCT');
 		// Loop to have all pages
 		while ($nbpages < $maxmemberpages) {
 			$urlformemebers = "https://".urlencode($this->helloasso_url)."/v5/organizations/".urlencode($assoslug)."/forms/Membership/".urlencode($formslug).'/items'.$param;
@@ -560,27 +625,29 @@ class HelloAssoMemberUtils
 				break;
 			}
 			foreach ($json->data as $key => $member) {
+				// Complementary donation added during the membership checkout: it has no "user" object
+				// (only a "payer"), so it must not be handled as a member.
+				if (isset($member->type) && $member->type === 'Donation') {
+					if ($donationproductid <= 0) {
+						dol_syslog(get_class($this)."::helloassoGetMembers skip donation item id=".(isset($member->id) ? $member->id : '')." (HELLOASSO_MEMBER_DONATION_PRODUCT not set)", LOG_DEBUG);
+						continue;
+					}
+					if (empty($member->order->id)) {
+						dol_syslog(get_class($this)."::helloassoGetMembers skip donation item id=".(isset($member->id) ? $member->id : '')." (no order id)", LOG_WARNING);
+						continue;
+					}
+					if ($this->isItemToProcess($member, $helloasso_date_last_fetch, $helloasso_date_last_fetch_tms)) {
+						$arraydonations[(int) $member->order->id][] = $member;
+					}
+					continue;
+				}
 				if (empty($member->user->firstName) || empty($member->user->lastName)) {
 					$this->error = $langs->trans("ErrorHelloassoMissingFirstNameOrLastName");
 					$this->errorPosts[] = array("member" => $member, "error" => $this->error);
 					continue;
 				}
-				if ($helloasso_date_last_fetch == "") {
+				if ($this->isItemToProcess($member, $helloasso_date_last_fetch, $helloasso_date_last_fetch_tms)) {
 					$arraymembers[] = $member;
-					continue;
-				}
-				$date_pay_tms = dol_stringtotime($member->order->date);
-				if ($date_pay_tms > $helloasso_date_last_fetch_tms) {
-					$arraymembers[] = $member;
-					continue;
-				}
-				if ($member->payments[0]->type == "Offline") {
-					$memeberdate = dol_stringtotime($member->order->date);
-					$updatedtime = dol_stringtotime($member->order->meta->updatedAt);
-					if ($memeberdate == dol_get_first_hour($updatedtime) && $updatedtime > $helloasso_date_last_fetch_tms) {
-						$arraymembers[] = $member;
-						continue;
-					}
 				}
 			}
 			// No pagination for dryrun
@@ -592,7 +659,352 @@ class HelloAssoMemberUtils
 			$nbpages++;
 		}
 		$this->helloasso_members = $arraymembers;
+		$this->helloasso_donations = $arraydonations;
 		return count($this->helloasso_members);
+	}
+
+	/**
+	 * Return true if a HelloAsso item must be processed according to the date of last fetch
+	 *
+	 * @param stdClass      $item                           HelloAsso item (membership or donation)
+	 * @param string        $helloasso_date_last_fetch      Date of last member fetch ('' if none)
+	 * @param int           $helloasso_date_last_fetch_tms  Timestamp of last member fetch
+	 *
+	 * @return bool
+	 */
+	private function isItemToProcess($item, $helloasso_date_last_fetch, $helloasso_date_last_fetch_tms)
+	{
+		if ($helloasso_date_last_fetch == "") {
+			return true;
+		}
+		$date_pay_tms = dol_stringtotime($item->order->date);
+		if ($date_pay_tms > $helloasso_date_last_fetch_tms) {
+			return true;
+		}
+		if (!empty($item->payments[0]->type) && $item->payments[0]->type == "Offline") {
+			$updatedtime = dol_stringtotime($item->order->meta->updatedAt);
+			if ($date_pay_tms == dol_get_first_hour($updatedtime) && $updatedtime > $helloasso_date_last_fetch_tms) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * Compute, for each payment of a membership item, the part of the complementary donation(s)
+	 * of the same HelloAsso order paid by this payment.
+	 * Donation shares not matching any payment of the membership item are put on its first payment,
+	 * so the full amount paid on HelloAsso is recorded.
+	 *
+	 * @param stdClass                  $newmember      HelloAsso membership item
+	 * @param array<int,stdClass>       $donations      HelloAsso donation items of the same order
+	 *
+	 * @return array<int|string,float>  Donation amount (in currency unit) indexed by HelloAsso payment id
+	 */
+	public function getDonationAmountsByPayment($newmember, $donations)
+	{
+		$sharesbypayment = array();
+		$total = 0;
+		foreach ($donations as $donation) {
+			$donationamount = (isset($donation->amount) ? $donation->amount : (isset($donation->initialAmount) ? $donation->initialAmount : 0));
+			$total += $donationamount;
+			if (empty($donation->payments)) {
+				continue;
+			}
+			foreach ($donation->payments as $payment) {
+				if (isset($payment->shareAmount)) {
+					$share = $payment->shareAmount;
+				} elseif (count($donation->payments) == 1) {
+					$share = $donationamount;
+				} else {
+					continue;
+				}
+				$sharesbypayment[$payment->id] = (isset($sharesbypayment[$payment->id]) ? $sharesbypayment[$payment->id] : 0) + $share;
+			}
+		}
+
+		$result = array();
+		$matched = 0;
+		$firstpaymentid = null;
+		if (!empty($newmember->payments)) {
+			foreach ($newmember->payments as $payment) {
+				if ($firstpaymentid === null) {
+					$firstpaymentid = $payment->id;
+				}
+				if (!empty($sharesbypayment[$payment->id])) {
+					$result[$payment->id] = $sharesbypayment[$payment->id];
+					$matched += $sharesbypayment[$payment->id];
+				}
+			}
+		}
+		$leftover = $total - $matched;
+		if ($leftover > 0 && $firstpaymentid !== null) {
+			$result[$firstpaymentid] = (isset($result[$firstpaymentid]) ? $result[$firstpaymentid] : 0) + $leftover;
+		}
+
+		// Convert cents into currency unit
+		foreach ($result as $paymentid => $cents) {
+			$result[$paymentid] = (float) price2num($cents / 100, 'MT');
+		}
+		return $result;
+	}
+
+	/**
+	 * Return the VAT rate to use on a membership subscription invoice line (same rule as Dolibarr core).
+	 *
+	 * @param int       $idprodsubscription     Id of product used for subscriptions
+	 * @return string|float|int
+	 */
+	private function getSubscriptionVatRate($idprodsubscription)
+	{
+		global $mysoc;
+
+		$vattouse = 0;
+		if (getDolGlobalString('ADHERENT_VAT_FOR_SUBSCRIPTIONS') == 'defaultforfoundationcountry') {
+			$vattouse = get_default_tva($mysoc, $mysoc, $idprodsubscription);
+		} elseif (getDolGlobalInt('ADHERENT_VAT_FOR_SUBSCRIPTIONS') > 0) {
+			$sql = "SELECT t.taux as vat_default_rate, t.code as vat_default_code";
+			$sql .= " FROM ".MAIN_DB_PREFIX."c_tva as t";
+			$sql .= " WHERE t.active > 0";
+			$sql .= " AND t.entity IN (".getEntity('c_tva').")";
+			$sql .= " AND t.rowid = ".((int) getDolGlobalInt('ADHERENT_VAT_FOR_SUBSCRIPTIONS'));
+			$resql = $this->db->query($sql);
+			if ($resql) {
+				$obj = $this->db->fetch_object($resql);
+				if ($obj) {
+					$vattouse = $obj->vat_default_rate.($obj->vat_default_code ? ' ('.$obj->vat_default_code.')' : '');
+				}
+				$this->db->free($resql);
+			}
+		}
+		return $vattouse;
+	}
+
+	/**
+	 * Create (and pay if requested) the invoice of a membership subscription with an extra line
+	 * for the complementary donation made in the same HelloAsso order.
+	 * This is the equivalent of Adherent::subscriptionComplementaryActions() for options
+	 * 'invoiceonly' and 'bankviainvoice', with one more invoice line.
+	 *
+	 * @param Adherent  $member             Member
+	 * @param int       $subscriptionid     Id of subscription
+	 * @param string    $option             'invoiceonly' or 'bankviainvoice'
+	 * @param int       $accountid          Id of bank account
+	 * @param int       $datesubscription   Date of subscription
+	 * @param int|string $paymentdate       Date of payment
+	 * @param string    $operation          Payment mode code ('CB', 'VIR', ...)
+	 * @param string    $label              Label of membership line / payment
+	 * @param float     $amount             Amount of membership fee (tax included)
+	 * @param float     $donationamount     Amount of donation (tax included)
+	 * @param int       $donationproductid  Id of product/service used for donations
+	 * @param string    $donationlabel      Label of donation line
+	 *
+	 * @return int      >0 if OK, <0 if KO
+	 */
+	public function createSubscriptionInvoiceWithDonation($member, $subscriptionid, $option, $accountid, $datesubscription, $paymentdate, $operation, $label, $amount, $donationamount, $donationproductid, $donationlabel)
+	{
+		global $user, $langs, $mysoc;
+
+		require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/facture.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/compta/facture/class/paymentterm.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/compta/paiement/class/paiement.class.php';
+		require_once DOL_DOCUMENT_ROOT.'/product/class/product.class.php';
+
+		$error = 0;
+		dol_syslog(get_class($this)."::createSubscriptionInvoiceWithDonation subscriptionid=".$subscriptionid." option=".$option." amount=".$amount." donationamount=".$donationamount, LOG_DEBUG);
+
+		if (!($member->socid > 0)) {
+			$langs->load("errors");
+			$this->error = $langs->trans("ErrorMemberNotLinkedToAThirpartyLinkOrCreateFirst");
+			$this->errors[] = $this->error;
+			return -1;
+		}
+
+		$donationproduct = new Product($this->db);
+		if ($donationproduct->fetch($donationproductid) <= 0) {
+			$this->error = $langs->trans("ErrorHelloAssoDonationProductNotFound", (string) $donationproductid);
+			$this->errors[] = $this->error;
+			return -1;
+		}
+
+		$customer = new Societe($this->db);
+		if ($customer->fetch($member->socid) <= 0) {
+			$this->error = $customer->error;
+			$this->errors = array_merge($this->errors, $customer->errors);
+			return -1;
+		}
+
+		// Create draft invoice
+		$invoice = new Facture($this->db);
+		$invoice->type = Facture::TYPE_STANDARD;
+		$invoice->cond_reglement_id = $customer->cond_reglement_id;
+		if (empty($invoice->cond_reglement_id)) {
+			$paymenttermstatic = new PaymentTerm($this->db);
+			$invoice->cond_reglement_id = $paymenttermstatic->getDefaultId();
+			if (empty($invoice->cond_reglement_id)) {
+				$this->error = 'ErrorNoPaymentTermRECEPFound';
+				$this->errors[] = $this->error;
+				return -1;
+			}
+		}
+		$invoice->socid = $member->socid;
+		if (!empty($customer->fk_account)) {
+			$invoice->fk_account = $customer->fk_account;
+		} elseif (getDolGlobalString('FACTURE_RIB_NUMBER')) {
+			$invoice->fk_account = getDolGlobalInt('FACTURE_RIB_NUMBER');
+		}
+		if (!empty($customer->mode_reglement_id)) {
+			$invoice->mode_reglement_id = $customer->mode_reglement_id;
+		}
+		$invoice->date = dol_now();
+		$invoice->linked_objects['subscription'] = $subscriptionid;
+
+		$result = $invoice->create($user);
+		if ($result <= 0) {
+			$this->error = $invoice->error;
+			$this->errors = array_merge($this->errors, $invoice->errors);
+			$error++;
+		}
+
+		// Line 1: membership fee
+		if (!$error) {
+			$idprodsubscription = 0;
+			if (getDolGlobalString('ADHERENT_PRODUCT_ID_FOR_SUBSCRIPTIONS') && (isModEnabled("product") || isModEnabled("service"))) {
+				$idprodsubscription = getDolGlobalInt('ADHERENT_PRODUCT_ID_FOR_SUBSCRIPTIONS');
+			}
+			$vattouse = $this->getSubscriptionVatRate($idprodsubscription);
+			// @phan-suppress-next-line PhanPluginSuspiciousParamPosition
+			$result = $invoice->addline($label, 0, 1, $vattouse, 0, 0, $idprodsubscription, 0, $datesubscription, '', 0, 0, 0, 'TTC', $amount, 1);
+			if ($result <= 0) {
+				$this->error = $invoice->error;
+				$this->errors = array_merge($this->errors, $invoice->errors);
+				$error++;
+			}
+		}
+
+		// Line 2: complementary donation
+		if (!$error) {
+			$vatdonation = get_default_tva($mysoc, $customer, $donationproduct->id);
+			// @phan-suppress-next-line PhanPluginSuspiciousParamPosition
+			$result = $invoice->addline($donationlabel, 0, 1, $vatdonation, 0, 0, $donationproduct->id, 0, '', '', 0, 0, 0, 'TTC', $donationamount, (int) $donationproduct->type);
+			if ($result <= 0) {
+				$this->error = $invoice->error;
+				$this->errors = array_merge($this->errors, $invoice->errors);
+				$error++;
+			}
+		}
+
+		if (!$error) {
+			$result = $invoice->validate($user);
+			if ($result <= 0) {
+				$this->error = $invoice->error;
+				$this->errors = array_merge($this->errors, $invoice->errors);
+				$error++;
+			}
+		}
+
+		// Payment of the full amount (membership fee + donation) into the HelloAsso bank account
+		if (!$error && $option == 'bankviainvoice' && $accountid) {
+			$amounts = array();
+			$amounts[$invoice->id] = (float) price2num($amount + $donationamount, 'MT');
+
+			$paiement = new Paiement($this->db);
+			$paiement->datepaye = $paymentdate;
+			$paiement->amounts = $amounts;
+			$paiement->paiementcode = $operation;
+			$paiement->paiementid = dol_getIdFromCode($this->db, $operation, 'c_paiement', 'code', 'id', 1);
+			$paiement->num_payment = '';
+			$paiement->note_public = $label;
+
+			$paiement_id = $paiement->create($user);
+			if (!($paiement_id > 0)) {
+				$this->error = $paiement->error;
+				$this->errors = array_merge($this->errors, $paiement->errors);
+				$error++;
+			}
+
+			$bank_line_id = 0;
+			if (!$error) {
+				$bank_line_id = $paiement->addPaymentToBank($user, 'payment', '(SubscriptionPayment)', $accountid, '', '');
+				if (!($bank_line_id > 0)) {
+					$this->error = $paiement->error;
+					$this->errors = array_merge($this->errors, $paiement->errors);
+					$error++;
+				}
+			}
+
+			if (!$error && $bank_line_id > 0) {
+				$sql = "UPDATE ".MAIN_DB_PREFIX."subscription SET fk_bank=".((int) $bank_line_id);
+				$sql .= " WHERE rowid=".((int) $subscriptionid);
+				if (!$this->db->query($sql)) {
+					$this->error = $this->db->lasterror();
+					$this->errors[] = $this->error;
+					$error++;
+				}
+			}
+
+			if (!$error) {
+				$invoice->setPaid($user);
+			}
+		}
+
+		if (!$error) {
+			$member->invoice = $invoice;
+
+			$newlang = (!empty($member->default_lang) ? $member->default_lang : '');
+			if (getDolGlobalInt('MAIN_MULTILANGS') && empty($newlang)) {
+				$newlang = $customer->default_lang;
+			}
+			if (empty($newlang) && $langs instanceof Translate) {
+				$newlang = $langs->defaultlang;
+			}
+			$outputlangs = new Translate("", $GLOBALS['conf']);
+			$outputlangs->setDefaultLang($newlang);
+			$outputlangs->loadLangs(array("main", "bills", "products"));
+			$invoice->fetch($invoice->id);
+			$invoice->generateDocument((string) $invoice->model_pdf, $outputlangs);
+		}
+
+		return ($error ? -1 : 1);
+	}
+
+	/**
+	 * Record the complementary donation directly into the bank account (option 'bankdirect')
+	 *
+	 * @param Adherent  $member             Member
+	 * @param int       $accountid          Id of bank account
+	 * @param int|string $paymentdate       Date of payment
+	 * @param string    $operation          Payment mode code ('CB', 'VIR', ...)
+	 * @param string    $label              Label of bank line
+	 * @param float     $donationamount     Amount of donation
+	 *
+	 * @return int      >0 if OK, <0 if KO
+	 */
+	public function addDonationBankLine($member, $accountid, $paymentdate, $operation, $label, $donationamount)
+	{
+		global $user, $langs;
+
+		require_once DOL_DOCUMENT_ROOT.'/compta/bank/class/account.class.php';
+
+		$acct = new Account($this->db);
+		if ($acct->fetch($accountid) <= 0) {
+			$this->error = $acct->error;
+			$this->errors = array_merge($this->errors, $acct->errors);
+			return -1;
+		}
+		$insertid = $acct->addline($paymentdate, $operation, $label, $donationamount, '', 0, $user);
+		if ($insertid <= 0) {
+			$this->error = $acct->error;
+			$this->errors = array_merge($this->errors, $acct->errors);
+			return -1;
+		}
+		$res = $acct->add_url_line($insertid, $member->id, DOL_URL_ROOT.'/adherents/card.php?rowid=', $member->getFullName($langs), 'member');
+		if ($res <= 0) {
+			$this->error = $acct->error;
+			$this->errors = array_merge($this->errors, $acct->errors);
+			return -1;
+		}
+		return 1;
 	}
 
 	/**

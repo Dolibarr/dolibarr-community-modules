@@ -200,7 +200,7 @@ if ($object->id > 0) {
 			print '<td class="nowraponall">'.dol_print_date($evt['date_creation'], 'dayhour').'</td>';
 			print '<td>'.dol_escape_htmltag((string) $evt['provider']).'</td>';
 			print '<td class="center" title="'.dol_escape_htmltag($isOut ? $langs->trans('EInvDirectionOut') : $langs->trans('EInvDirectionIn')).'">'.($isOut ? img_picto($langs->trans('EInvDirectionOut'), 'sign-out', 'class="paddingright"') : img_picto($langs->trans('EInvDirectionIn'), 'sign-in-alt', 'class="paddingright"')).dol_escape_htmltag(strtoupper((string) $evt['direction'])).'</td>';
-			print '<td>'.dol_escape_htmltag($einvoicing->getStatusLabel((int) $evt['lc_status'], $elementType, (string) $evt['lc_recipient_roles']));
+			print '<td>'.$einvoicing->getStatusBadge((int) $evt['lc_status'], $elementType, (string) $evt['lc_recipient_roles']);
 			if (!empty($evt['lc_reason_code'])) {
 				// Translated: the bare MDT-108 code says nothing to a reader, and a rejection is required
 				// to carry one (XP Z12-014 annex A 2.2 and 2.4). The code stays in the tooltip.
