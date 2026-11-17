@@ -110,6 +110,8 @@ if (floatval(DOL_VERSION) > 16.0) {
 	$formSetup->newItem('STANCER_CB_ORDER_PARTIAL_PAY')->setAsYesNo();
 	$formSetup->newItem('STANCER_CB_PROPAL_PARTIAL_PAY')->setAsYesNo();
 }
+// The deposit invoice of the captured amount is built by the module itself, on every version
+$formSetup->newItem('STANCER_DEPOSIT_FROM_CAPTURED_AMOUNT')->setAsYesNo();
 /*
  * Actions
  */
