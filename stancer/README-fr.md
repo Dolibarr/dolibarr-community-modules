@@ -4,7 +4,10 @@
 
 Encaissez vos clients par carte bancaire et par prélèvement SEPA directement
 depuis Dolibarr, avec la plateforme de paiement française
-[Stancer](https://www.stancer.com/).
+[Stancer](https://www.stancer.com/?mtm_campaign=Dolibarr&mtm_source=Dolibarr).
+
+Essayez-le sur un Dolibarr installé en moins de 20 secondes, avec vos clés de
+test Stancer : [dolitry.fr/stancer](https://dolitry.fr/stancer/)
 
 - **Paiement par carte bancaire** : lien de paiement en ligne envoyé au client
   depuis une facture, une commande ou un devis, page de paiement sécurisée

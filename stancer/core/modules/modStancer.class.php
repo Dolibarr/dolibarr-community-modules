@@ -79,7 +79,7 @@ class modStancer extends DolibarrModules
 		$this->editor_url = 'https://cap-rel.fr';
 
 		// Possible values for version are: 'development', 'experimental', 'dolibarr', 'dolibarr_deprecated', 'experimental_deprecated' or a version string like 'x.y.z'
-		$this->version = '2.0.26';
+		$this->version = '2.0.28';
 		// Url to the file with your last numberversion of this module.
 		// The four parameters are required (capdoc:MODULE.md point 13): m the module,
 		// v its installed version, d the Dolibarr version of the instance
