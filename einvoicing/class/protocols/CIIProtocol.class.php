@@ -1779,12 +1779,7 @@ class CIIProtocol extends AbstractProtocol
 				// Not for a default routing product: it is a catch-all, so gluing the vendor reference of
 				// the line onto it would make every next invoice match it instead of the real product.
 				if ($productId > 0 && $productMatchType != 'defaultrouting' && trim((string) ($parsedLine['prodsellerid'] ?? '')) !== '') {
-					$supplierPriceEntries[] = [
-						'productId' => $productId,
-						'unitPrice' => $this->resolveLineUnitPrice($parsedLine),
-						'refFourn'  => (string) $parsedLine['prodsellerid'],
-						'tvaTx'     => (float) ($parsedLine['rateApplicablePercent'] ?? 0),
-					];
+					$this->collectSupplierPriceEntry($supplierPriceEntries, (int) $productId, $parsedLine);
 				}
 			}
 
@@ -1906,6 +1901,25 @@ class CIIProtocol extends AbstractProtocol
 
 		return ['res' => 1];
 	}
+
+	/**
+	 * Keep one supplier price entry per product and vendor reference, the last line read winning.
+	 *
+	 * @param	array<string,array{productId:int,unitPrice:float,refFourn:string,tvaTx:float}>	$entries	The entries collected so far
+	 * @param	int																			$productId	Product the line is billed on
+	 * @param	array<string,mixed>															$parsedLine	The parsed line
+	 */
+	protected function collectSupplierPriceEntry(array &$entries, int $productId, array $parsedLine): void
+	{
+		$refFourn = (string) $parsedLine['prodsellerid'];
+		$entries[$productId . '|' . $refFourn] = [
+			'productId' => $productId,
+			'unitPrice' => $this->resolveLineUnitPrice($parsedLine),
+			'refFourn'  => $refFourn,
+			'tvaTx'     => (float) ($parsedLine['rateApplicablePercent'] ?? 0),
+		];
+	}
+
 	/**
 	 * Postpone the flow because a line points at an invoice this Dolibarr does not hold while the document
 	 * declares an amount already paid.
