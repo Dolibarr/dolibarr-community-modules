@@ -82,7 +82,7 @@ The module can email the invoice to the customer as soon as it is validated, wha
 |---------|-------------|
 | Email the invoice at validation | Enables automatic sending at each validation |
 | Email template | Dolibarr template used for sending |
-| Delay before automatic sending (in hours) | Number of hours to wait after validation. 0 = immediate sending. Typical value: 24 (sending the next day if nobody did anything) |
+| Delay before automatic sending (in hours) | Number of hours to wait after validation. 0 = sent at the next run of the scheduled job (within the hour), once the invoice has its definitive number and PDF. Typical value: 24 (sending the next day if nobody did anything) |
 
 How it works with a delay > 0:
 

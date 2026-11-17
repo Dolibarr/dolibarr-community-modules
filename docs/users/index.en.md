@@ -7,7 +7,9 @@ source_hash: "50d413b1"
 
 # Stancer for Dolibarr
 
-The Stancer module integrates the [Stancer](https://www.stancer.com/) payment platform into your Dolibarr ERP. It allows you to collect payments from your customers by **credit card** and by **SEPA direct debit**, directly from your invoices, orders and quotes.
+The Stancer module integrates the [Stancer](https://www.stancer.com/?mtm_campaign=Dolibarr&mtm_source=Dolibarr) payment platform into your Dolibarr ERP. It allows you to collect payments from your customers by **credit card** and by **SEPA direct debit**, directly from your invoices, orders and quotes.
+
+Try it on a Dolibarr installed in less than 20 seconds, with your Stancer test keys: [dolitry.fr/stancer](https://dolitry.fr/stancer/)
 
 ## Main features
 
@@ -56,7 +58,7 @@ The Stancer module integrates the [Stancer](https://www.stancer.com/) payment pl
 
 - **Dolibarr** version 15.0 or higher
 - **PHP** version 7.4 or higher
-- A **Stancer account** with your API keys (sign up on [stancer.com](https://www.stancer.com/))
+- A **Stancer account** with your API keys (sign up on [stancer.com](https://www.stancer.com/?mtm_campaign=Dolibarr&mtm_source=Dolibarr))
 - The **Bank** and **Direct debit** modules enabled in Dolibarr
 
 ## Getting started

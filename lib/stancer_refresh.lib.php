@@ -120,6 +120,91 @@ function stancerRemoveOldDraftPayments()
 	return $output;
 }
 
+/**
+ * Tell whether the daily job StancerCheckPay (Stancer::doScheduledJob) can run.
+ * It is the only one to record the payments whose customer never came back on
+ * the return page after paying, and it is installed disabled.
+ *
+ * @return  int  1 active, 0 inactive (scheduled jobs module off, job missing or disabled), -1 on SQL error
+ */
+function stancerScheduledCheckPayIsActive()
+{
+	global $db, $conf;
+
+	if (!stancerIsModEnabled('cron')) {
+		dol_syslog("stancerScheduledCheckPayIsActive scheduled jobs module is off", LOG_DEBUG);
+		return 0;
+	}
+	$sql = "SELECT status FROM " . MAIN_DB_PREFIX . "cronjob";
+	$sql .= " WHERE objectname = 'Stancer' AND methodename = 'doScheduledJob'";
+	$sql .= " AND entity IN (0, " . ((int) $conf->entity) . ")";
+	$resql = $db->query($sql);
+	if (!$resql) {
+		dol_syslog("stancerScheduledCheckPayIsActive cannot read the scheduled jobs: " . $db->lasterror(), LOG_ERR);
+		return -1;
+	}
+	while ($obj = $db->fetch_object($resql)) {
+		if ((int) $obj->status === 1) {
+			return 1;
+		}
+	}
+	dol_syslog("stancerScheduledCheckPayIsActive job Stancer::doScheduledJob missing or disabled", LOG_DEBUG);
+
+	return 0;
+}
+
+/**
+ * Bill, from the scheduled job, a payment captured on an order or a proposal
+ * whose customer never came back on the return page: same invoice, payment and
+ * bank line as that page (see stancerProcessOriginPayment()), and nothing when the
+ * return page already did it.
+ *
+ * @param   Commande|Propal   $origin             Order or proposal named by the payment tag
+ * @param   Stancer_payments  $localPayment       Local row of the payment
+ * @param   array             $paymentData        Payment as returned by the Stancer API
+ * @param   int               $date               Payment date (bank date of the payment)
+ * @param   int               $paymentTypeId      Dolibarr payment type id
+ * @param   bool              $sendNotifications  False: no email to the customer
+ * @param   string            $errorMessage       What was done, or why it failed
+ * @return  int                                   0 billed now, -1 nothing billed (already billed, proposal without automatic invoice), < -1 on error
+ */
+function stancerRefreshBillOriginPayment($origin, $localPayment, $paymentData, $date, $paymentTypeId, $sendNotifications, &$errorMessage)
+{
+	global $conf;
+
+	$paymentId = (string) $localPayment->stancer_id;
+	if (!stancerReturnObjectMatchesPayment($origin, $localPayment)) {
+		$errorMessage = "stancerRefreshBillOriginPayment REFUSE: " . $origin->element . " " . $origin->ref . " does not belong to payment " . $paymentId;
+		dol_syslog($errorMessage, LOG_ERR);
+		return -20;
+	}
+
+	$invoice = null;
+	$messages = array();
+	$res = stancerProcessOriginPayment($origin, array(
+		'payment_id' => $paymentId,
+		'amount' => (float) $paymentData['amount'] / 100,
+		'currency' => stancerResolveReturnCurrency('', $paymentData, $localPayment, $conf->currency),
+		'date' => $date,
+		'payment_type_id' => $paymentTypeId,
+		'partial' => stancerResolveReturnPartialPayment($localPayment),
+		'ipaddress' => '127.0.0.1',
+		'notify' => $sendNotifications,
+	), $invoice, $messages);
+	$errorMessage = implode(' | ', $messages);
+	if ($res > 0) {
+		dol_syslog("stancerRefreshBillOriginPayment payment " . $paymentId . " billed on invoice " . $invoice->ref . " of " . $origin->ref, LOG_INFO);
+		return 0;
+	}
+	if ($res == 0) {
+		dol_syslog("stancerRefreshBillOriginPayment payment " . $paymentId . " of " . $origin->ref . ": nothing to bill (" . $errorMessage . ")", LOG_DEBUG);
+		return -1;
+	}
+	dol_syslog("stancerRefreshBillOriginPayment payment " . $paymentId . " of " . $origin->ref . " not billed (" . $res . "): " . $errorMessage, LOG_ERR);
+
+	return -21;
+}
+
 
 /** re télécharge tous les paiements et fais le job
  *  à partir de la liste stockée dans dolibarr
@@ -623,7 +708,14 @@ function stancerRefreshAllPaymentsFromDolibarr($userMessage = true, $lastrun = n
 			dol_syslog("stancerRefreshAllPaymentsFromDolibarr $paymentId add payment on object");
 			$errorMessage = "";
 
-			$error = stancerAddPaymentOnObject($obj, $data, $errorMessage);
+			if ($obj->element == 'commande' || $obj->element == 'propal') {
+				// The customer never came back on the return page: bill the order or the
+				// proposal exactly as that page would have. stancerAddPaymentOnObject() only
+				// knows invoices and would post on the invoice whose id is the order's.
+				$error = stancerRefreshBillOriginPayment($obj, $sploc, $paymentData, $datebank->getTimestamp(), (int) $paymentTypeId, $sendNotifications, $errorMessage);
+			} else {
+				$error = stancerAddPaymentOnObject($obj, $data, $errorMessage);
+			}
 			$amountEur = number_format($amount / 100, 2);
 			$urlObj = stancerObjectUrlForMail($obj);
 			$message = $paymentId . ";" . $urlObj . ";" . $amountEur . "€;" . $errorMessage . ';';

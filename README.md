@@ -3,7 +3,10 @@
 ## Features
 
 Collect card payments and SEPA direct debits straight from Dolibarr, with the
-French payment platform [Stancer](https://www.stancer.com/).
+French payment platform [Stancer](https://www.stancer.com/?mtm_campaign=Dolibarr&mtm_source=Dolibarr).
+
+Try it on a Dolibarr installed in less than 20 seconds, with your Stancer test
+keys: [dolitry.fr/stancer](https://dolitry.fr/stancer/)
 
 - **Card payment**: online payment link sent to the customer from an invoice,
   an order or a proposal, secure payment page (3-D Secure), deposit on orders

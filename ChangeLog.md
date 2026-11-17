@@ -1,5 +1,14 @@
 # CHANGELOG STANCER FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 2.0.28 -- 2026-11-17
+
+Never email a customer a draft invoice, only the validated one with its final number and PDF
+Get warned when scheduled direct debits stop because SEPA was switched off in the setup
+Never bill an order or a quote twice, nor keep an invoice without its payment after a failure
+Get orders and quotes billed by the nightly task when the customer never came back after paying
+Bill the amount actually collected as a deposit invoice on orders and quotes, as an option
+Get warned in the setup while the nightly payment check task is disabled
+
 ## 2.0.26 -- 2026-11-03
 
 Switch template invoices to SEPA direct debit as soon as the customer signs the mandate

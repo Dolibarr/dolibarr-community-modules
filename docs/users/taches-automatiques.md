@@ -23,6 +23,10 @@ Cette tâche effectue la même opération que le bouton "Rafraîchir" des listes
 3. Récupère les nouveaux reversements.
 4. Supprime les brouillons de paiement obsolètes.
 
+Quand un client a payé une commande ou un devis sans revenir sur le site (onglet fermé, retour de 3-D Secure interrompu), c'est cette tâche qui crée la facture et enregistre le règlement, exactement comme l'aurait fait la page de retour. Un paiement déjà enregistré n'est jamais repris une seconde fois.
+
+> **Important :** cette tâche est installée désactivée. Tant qu'elle ne tourne pas, ces paiements restent encaissés chez Stancer sans facture ni règlement dans Dolibarr. En mode production, la page de configuration du module affiche un avertissement tant qu'elle est inactive.
+
 **Fréquence recommandée** : quotidienne (une fois par jour). La tâche est configurée par défaut pour s'exécuter à une heure aléatoire entre 0h et 6h.
 
 > **Conseil :** si vous traitez un volume important de paiements, vous pouvez augmenter la fréquence à plusieurs fois par jour. Pour un usage modéré, une exécution quotidienne suffit.
@@ -41,6 +45,15 @@ Le processus est le suivant :
 4. Enregistre le résultat (succès ou erreur).
 
 **Fréquence recommandée** : quotidienne.
+
+Chaque passage affiche le nombre de factures examinées, pour le prélèvement SEPA et pour la carte. Une sortie qui dit "désactivé" signifie que ce mode de paiement est coupé dans la configuration Stancer.
+
+La tâche se termine en erreur, avec la raison dans sa sortie, dans deux cas :
+
+- le prélèvement SEPA (ou le paiement par carte) est désactivé dans la configuration alors que des factures attendent ce mode de paiement sur le compte Stancer : elles ne seraient jamais encaissées ;
+- les factures à encaisser ne peuvent pas être sélectionnées, par exemple parce que le compte bancaire Stancer n'est pas choisi dans la configuration.
+
+L'onglet SEPA de la configuration affiche aussi un avertissement quand le prélèvement SEPA est désactivé alors que des mandats SEPA Stancer existent.
 
 > **Important :** cette tâche respecte les paramètres de configuration SEPA (délai de notification, restriction aux contrats, montant de basculement CB/SEPA). Vérifiez votre [configuration SEPA](/stancer/sepa) avant de l'activer.
 
@@ -66,7 +79,7 @@ Cette tâche envoie des emails de relance aux clients dont le paiement a échou�
 
 **Nom de la tâche** : StancerSendPendingValidationMails
 
-Cette tâche envoie automatiquement par email les factures validées dont le délai de carence est dépassé, sauf si elles ont été envoyées manuellement entre-temps. Elle ne fait rien si l'option **Envoyer la facture par mail à la validation** n'est pas activée ou si le délai est à 0 (envoi immédiat sans différé).
+Cette tâche envoie automatiquement par email les factures validées dont le délai de carence est dépassé, sauf si elles ont été envoyées manuellement entre-temps. Elle ne fait rien si l'option **Envoyer la facture par mail à la validation** n'est pas activée. Avec un délai à 0, c'est elle qui envoie la facture à son prochain passage : un mail parti au moment même de la validation porterait encore la référence et le PDF provisoires.
 
 À chaque exécution, la tâche :
 
