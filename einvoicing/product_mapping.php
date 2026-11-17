@@ -358,7 +358,7 @@ if ($socidfromdocument > 0) {
 	$vendorfromdocument = new Societe($db);
 	if ($vendorfromdocument->fetch($socidfromdocument) > 0) {
 		if ($socid == $socidfromdocument) {
-			print '<div class="opacitymedium paddingtop">'.$langs->trans("VendorIdentifiedFromTheDocument").' '.$vendorfromdocument->getNomUrl(1).'</div>';
+			print '<div class="paddingtop"><span class="opacitymedium">'.$langs->trans("VendorIdentifiedFromTheDocument").'</span> '.$vendorfromdocument->getNomUrl(1).'</div>';
 		} else {
 			print '<div class="warning paddingtop">'.$langs->trans("VendorDiffersFromTheDocument").' '.$vendorfromdocument->getNomUrl(1).'</div>';
 		}
