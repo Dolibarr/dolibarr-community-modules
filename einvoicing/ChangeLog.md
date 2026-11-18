@@ -5,7 +5,7 @@ IMPORTANT: After each version upgrade, you must disable and enable the module so
 
 
 
-## 1.4_atm
+## UNRELEASED
 
 Backports on top of the 1.4.0 release (tag einvoicing_1.4.0), for the ATM instances that need a fix not yet merged upstream.
 
