@@ -97,6 +97,28 @@ class SupplierInvoiceHelper
 	}
 
 	/**
+	 * Gap between BT-112 and BT-109 plus BT-110 that an EXTENDED profile tolerates (BR-FREXT-CO-15).
+	 *
+	 * A vendor pricing VAT included rounds the three totals apart: 9.99 gives 8.33 and 1.67.
+	 *
+	 * @param	array<string,mixed>	$parsedHeader	Header data of the received document
+	 * @return	float								BT-112 - BT-109 - BT-110, 0 when the totals add up or the gap exceeds the tolerance
+	 */
+	public static function extendedGrandTotalGap(array $parsedHeader): float
+	{
+		if (!isset($parsedHeader['grandTotalAmount'], $parsedHeader['taxBasisTotalAmount'], $parsedHeader['taxTotalAmount'])) {
+			return 0.0;
+		}
+
+		$gap = round((float) $parsedHeader['grandTotalAmount'] - (float) $parsedHeader['taxBasisTotalAmount'] - (float) $parsedHeader['taxTotalAmount'], 2);
+		if (abs($gap) < 0.005 || abs($gap) > self::extendedTolerance($parsedHeader) + 0.0001) {
+			return 0.0;
+		}
+
+		return $gap;
+	}
+
+	/**
 	 * Sign that turns the amounts of a supplier invoice into those of the document it was imported from.
 	 *
 	 * Dolibarr stores a credit note negative and the document announces it positive, unless its issuer

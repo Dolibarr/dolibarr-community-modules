@@ -813,4 +813,75 @@ class ImportVatCalculationModeTest extends CommonClassTest
 			'a total that is not the one of the document is still reported'
 		);
 	}
+
+	/**
+	 * The ticket shape: an EXTENDED document of one line pricing VAT included, BT-112 9.99 for 8.33 + 1.67.
+	 *
+	 * @return array<string,mixed>
+	 */
+	private function grandTotalGapHeader(): array
+	{
+		return array(
+			'guidelineId' => 'urn:cen.eu:en16931:2017#conformant#urn:factur-x.eu:1p0:extended',
+			'taxBasisTotalAmount' => 8.33,
+			'taxTotalAmount' => 1.67,
+			'grandTotalAmount' => 9.99,
+			'duePayableAmount' => 9.99,
+			'toleranceItemCount' => 1,
+		);
+	}
+
+	/**
+	 * The cent BR-FREXT-CO-15 tolerates between BT-112 and BT-109 + BT-110 is the gap to carry.
+	 *
+	 * @return void
+	 */
+	public function testAnExtendedGrandTotalOneCentOffItsSumsIsTheGap()
+	{
+		$this->assertEquals(-0.01, SupplierInvoiceHelper::extendedGrandTotalGap($this->grandTotalGapHeader()));
+	}
+
+	/**
+	 * A gap beyond a cent per item is no rounding.
+	 *
+	 * @return void
+	 */
+	public function testAGrandTotalGapBeyondTheToleranceIsNone()
+	{
+		$header = $this->grandTotalGapHeader();
+		$header['grandTotalAmount'] = 9.98;
+
+		$this->assertSame(0.0, SupplierInvoiceHelper::extendedGrandTotalGap($header));
+	}
+
+	/**
+	 * Outside an EXTENDED profile BR-CO-15 tolerates nothing.
+	 *
+	 * @return void
+	 */
+	public function testAGrandTotalGapOutsideTheExtendedProfileIsNone()
+	{
+		$header = $this->grandTotalGapHeader();
+		$header['guidelineId'] = 'urn:cen.eu:en16931:2017';
+
+		$this->assertSame(0.0, SupplierInvoiceHelper::extendedGrandTotalGap($header));
+	}
+
+	/**
+	 * The gap is carried out of every taxable base, on a line every per-rate comparison skips.
+	 *
+	 * @return void
+	 */
+	public function testTheGapIsCarriedOnARoundingLine()
+	{
+		global $db;
+
+		$method = new ReflectionMethod(CIIProtocol::class, 'newRoundingLine');
+		$method->setAccessible(true);
+		$line = $method->invokeArgs(new CIIProtocol($db), array(-0.01));
+
+		$this->assertEquals(-0.01, $line->subprice);
+		$this->assertEquals(0, $line->tva_tx);
+		$this->assertTrue(SupplierInvoiceHelper::isRoundingLine($line));
+	}
 }

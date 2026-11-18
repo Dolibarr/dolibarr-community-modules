@@ -4513,6 +4513,10 @@ class CIIProtocol extends AbstractProtocol
 			return;
 		}
 
+		if ($this->carryExtendedGrandTotalGap($invoice, $parsedHeader, $announcedTva, $announcedTtc, $return_messages)) {
+			return;
+		}
+
 		SupplierInvoiceHelper::flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc);
 
 		$langs->load('einvoicing@einvoicing');
@@ -4574,6 +4578,48 @@ class CIIProtocol extends AbstractProtocol
 		$langs->load('einvoicing@einvoicing');
 		$return_messages[] = $langs->trans('EInvoiceImportVatRoundedPerLine', price2num($tva, 'MT'), price2num($announcedTva, 'MT'));
 		dol_syslog(__METHOD__ . ' Invoice ' . $supplierInvoiceId . ' keeps the VAT rounded per line (' . $tva . '), its EXTENDED document announcing ' . $announcedTva . ' rounded per rate', LOG_DEBUG);
+
+		return true;
+	}
+
+	/**
+	 * Carry on a rounding line the gap an EXTENDED document tolerates between BT-112 and BT-109 plus BT-110.
+	 *
+	 * Only an invoice that already totals BT-110 and BT-112 less that gap gets the line: any other
+	 * difference is a line read wrong, and it stays reported.
+	 *
+	 * @param	FactureFournisseur	$invoice			The invoice the import has just built
+	 * @param	array<string,mixed>	$parsedHeader		Header data of the received document
+	 * @param	float				$announcedTva		BT-110 of the document
+	 * @param	float				$announcedTtc		What the invoice is expected to total
+	 * @param	array<int,string>	$return_messages	Messages of the import, completed here
+	 * @return	bool									True when the invoice now totals what the document announces
+	 */
+	protected function carryExtendedGrandTotalGap(FactureFournisseur $invoice, array $parsedHeader, $announcedTva, $announcedTtc, array &$return_messages): bool
+	{
+		global $langs;
+
+		$gap = SupplierInvoiceHelper::extendedGrandTotalGap($parsedHeader);
+		if ($gap == 0.0 || !SupplierInvoiceHelper::totalsAgreeWithDocument($invoice, $announcedTva, (float) $announcedTtc - $gap)) {
+			return false;
+		}
+
+		if (!$this->writeRoundingLine((int) $invoice->id, $this->newRoundingLine($gap), $parsedHeader)) {
+			return false;
+		}
+		if ($invoice->fetch((int) $invoice->id) <= 0) {
+			dol_syslog(__METHOD__ . ' Cannot reload invoice id=' . $invoice->id . ' after carrying its grand total gap', LOG_ERR);
+			return false;
+		}
+		if (!SupplierInvoiceHelper::totalsAgreeWithDocument($invoice, $announcedTva, $announcedTtc)) {
+			return false;
+		}
+
+		SupplierInvoiceHelper::clearTotalsMismatch((int) $invoice->id);
+
+		$langs->load('einvoicing@einvoicing');
+		$return_messages[] = $langs->trans('EInvoiceImportGrandTotalGapCarried', price2num($announcedTtc, 'MT'), price2num($gap, 'MT'));
+		dol_syslog(__METHOD__ . ' Invoice ' . $invoice->id . ' carries the gap of ' . $gap . ' its EXTENDED document announces between BT-112 and BT-109 + BT-110', LOG_DEBUG);
 
 		return true;
 	}
@@ -4778,24 +4824,14 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	protected function createRoundingLine($supplierInvoiceId, array $parsedHeader, array &$return_messages): array
 	{
-		global $db, $langs;
+		global $langs;
 
 		$roundingLine = $this->buildRoundingLine($parsedHeader);
 		if ($roundingLine === null) {
 			return ['res' => 1];
 		}
 
-		// Same writer as the document level charges: FactureFournisseur::addline() moved between the
-		// supported cores, and the invoice is handed only the line to add.
-		$carrier = new FactureFournisseur($db);
-		if ($carrier->fetch((int) $supplierInvoiceId) <= 0) {
-			return ['res' => -1, 'message' => 'Failed to reload the supplier invoice to add the rounding amount of its document'];
-		}
-		// The core documents that property as CommonInvoiceLine[] while its own writer fills it with
-		// SupplierInvoiceLine, which extends CommonObjectLine. Same assignment as the charge lines above.
-		$carrier->lines = array($roundingLine);	// @phpstan-ignore assign.propertyType
-
-		if (!$this->createSupplierInvoiceLinesIntoDatabase($carrier, SupplierInvoiceHelper::announcedTotalTtc($parsedHeader))) {
+		if (!$this->writeRoundingLine((int) $supplierInvoiceId, $roundingLine, $parsedHeader)) {
 			return ['res' => -1, 'message' => 'Failed to add the rounding amount of the received document as an invoice line'];
 		}
 
@@ -4803,6 +4839,32 @@ class CIIProtocol extends AbstractProtocol
 		$return_messages[] = $langs->trans('EInvoiceImportRoundingLineAdded', price2num($roundingLine->subprice, 'MT'));
 
 		return ['res' => 1];
+	}
+
+	/**
+	 * Add a rounding line to a supplier invoice being imported.
+	 *
+	 * @param	int						$supplierInvoiceId	Id of the invoice being imported
+	 * @param	SupplierInvoiceLine		$roundingLine		The line to add
+	 * @param	array<string,mixed>		$parsedHeader		Header data of the received document
+	 * @return	bool										True on success
+	 */
+	protected function writeRoundingLine(int $supplierInvoiceId, SupplierInvoiceLine $roundingLine, array $parsedHeader): bool
+	{
+		global $db;
+
+		// Same writer as the document level charges: FactureFournisseur::addline() moved between the
+		// supported cores, and the invoice is handed only the line to add.
+		$carrier = new FactureFournisseur($db);
+		if ($carrier->fetch($supplierInvoiceId) <= 0) {
+			dol_syslog(__METHOD__ . ' Cannot reload invoice id=' . $supplierInvoiceId . ' to add a rounding line', LOG_ERR);
+			return false;
+		}
+		// The core documents that property as CommonInvoiceLine[] while its own writer fills it with
+		// SupplierInvoiceLine, which extends CommonObjectLine. Same assignment as the charge lines above.
+		$carrier->lines = array($roundingLine);	// @phpstan-ignore assign.propertyType
+
+		return $this->createSupplierInvoiceLinesIntoDatabase($carrier, SupplierInvoiceHelper::announcedTotalTtc($parsedHeader));
 	}
 
 	/**
@@ -4817,19 +4879,30 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	protected function buildRoundingLine(array $parsedHeader)
 	{
-		global $db, $langs;
-
 		$rounding = SupplierInvoiceHelper::documentRoundingAmount($parsedHeader);
 		if (abs($rounding) < 0.005) {
 			return null;
 		}
+
+		return $this->newRoundingLine($rounding);
+	}
+
+	/**
+	 * A line out of every taxable base, marked so that every per-rate comparison leaves it out.
+	 *
+	 * @param	float	$amount		Amount of the line, with the sign of the document
+	 * @return	SupplierInvoiceLine
+	 */
+	protected function newRoundingLine(float $amount): SupplierInvoiceLine
+	{
+		global $db, $langs;
 
 		$langs->load('einvoicing@einvoicing');
 
 		$line = new SupplierInvoiceLine($db);
 		$line->desc = $langs->transnoentitiesnoconv('EInvoicingRoundingAmount');
 		$line->qty = 1;
-		$line->subprice = $rounding;
+		$line->subprice = $amount;
 		$line->tva_tx = 0;
 		$line->product_type = 1;	// A rounding is no stocked good
 		$line->remise_percent = 0;

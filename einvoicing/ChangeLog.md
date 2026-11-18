@@ -5,6 +5,12 @@ IMPORTANT: After each version upgrade, you must disable and enable the module so
 
 
 
+## 1.4_atm
+
+Backports on top of the 1.4.0 release (tag einvoicing_1.4.0), for the ATM instances that need a fix not yet merged upstream.
+
+- FIX: [einvoicing] A received EXTENDED document whose total including VAT (BT-112) is a cent off its net total plus its VAT, as BR-FREXT-CO-15 allows, is imported at the amount due with a rounding line, so the invoice no longer stays blocked at validation (not yet proposed upstream, ATM ticket DA028982)
+
 ## 1.4.0
 
 - FIX: [einvoicing] A received line one cent off its price is imported at its amount
