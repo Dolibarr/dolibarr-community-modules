@@ -1577,4 +1577,25 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 		$this->assertEquals(1.0, SupplierInvoiceHelper::announcedTotalTtc(array('grandTotalAmount' => 1.0, 'duePayableAmount' => 1.01)), 'one cent is a contradiction');
 		$this->assertEquals(3.3, SupplierInvoiceHelper::announcedTotalTtc(array('grandTotalAmount' => 1.1 + 2.2, 'duePayableAmount' => 3.3)), 'float noise is none');
 	}
+
+	/**
+	 * A category O group without rate stands at 0, and groups sharing a rate are summed (issue #1248).
+	 *
+	 * @return	void
+	 */
+	public function testTheVatBreakdownIsSummedPerRate()
+	{
+		$byRate = SupplierInvoiceHelper::vatBreakdownByRate(array(
+			array('typeCode' => 'VAT', 'categoryCode' => 'O', 'rateApplicablePercent' => null, 'basisAmount' => 50.0, 'calculatedAmount' => 0.0),
+			array('typeCode' => 'VAT', 'categoryCode' => 'E', 'rateApplicablePercent' => 0.0, 'basisAmount' => 30.0, 'calculatedAmount' => 0.0),
+			array('typeCode' => 'VAT', 'categoryCode' => 'S', 'rateApplicablePercent' => 20.0, 'basisAmount' => 100.0, 'calculatedAmount' => 20.0),
+			array('typeCode' => 'VAT', 'categoryCode' => 'S', 'rateApplicablePercent' => 5.5, 'basisAmount' => 10.0, 'calculatedAmount' => 0.55),
+			array('typeCode' => 'OTHER', 'rateApplicablePercent' => 20.0, 'basisAmount' => 999.0, 'calculatedAmount' => 99.0),
+		));
+
+		$this->assertSame(array('0', '20', '5.5'), array_map('strval', array_keys($byRate)), 'keyed as price2num() writes the rates of the invoice');
+		$this->assertEquals(80.0, $byRate['0']['basisAmount'], 'O without rate and E at 0 are one total');
+		$this->assertEquals(100.0, $byRate['20']['basisAmount'], 'a tax other than VAT is left out');
+		$this->assertEquals(0.55, $byRate['5.5']['calculatedAmount']);
+	}
 }
