@@ -1027,7 +1027,15 @@ class ActionsHelloAsso extends CommonHookActions  // @phan-suppress-current-line
 			$sortorder = $parameters["sortorder"];  // @phan-suppress-current-line SqlInjection
 			if (!empty($arrayfields["hmember.status"]['checked'])) {
 				$this->resprints = getTitleFieldOfList($arrayfields['hmember.status']['label'], 0, $_SERVER["PHP_SELF"], 'hmember.statut', '', $param, '', $sortfield, $sortorder);
-				$parameters["totalarray"]['nbfield']++;
+				if (isset($parameters["totalarray"])) {
+					$parameters["totalarray"]['nbfield']++;
+				} else {
+					// societe/list.php does not pass totalarray to this hook, so we update the page variable used for colspan of kanban view
+					global $totalarray;
+					if (is_array($totalarray) && isset($totalarray['nbfield'])) {
+						$totalarray['nbfield']++;
+					}
+				}
 			}
 			return 1;
 		}
@@ -1062,6 +1070,9 @@ class ActionsHelloAsso extends CommonHookActions  // @phan-suppress-current-line
 				} else {
 					$this->resprints = '<td class="center nowraponall">';
 					$this->resprints .= '</td>';
+				}
+				if (empty($parameters["i"]) && isset($parameters["totalarray"])) {
+					$parameters["totalarray"]['nbfield']++;
 				}
 			}
 			return 1;
