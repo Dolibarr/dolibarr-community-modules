@@ -109,13 +109,23 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 							$messagecss = '';
 							$message = '';
 
+							// An error returned by this hook makes generateDocument() fail, and the caller drops what it
+							// was doing: Paiement::create() refuses the payment, so does the reject of a direct debit, and
+							// BonPrelevement::set_infocredit() leaves the lines of the order waiting, without the button to
+							// record a reject. What EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS cancels is the validation:
+							// only the rebuild that follows a validation in this request may fail. Any other rebuild (a
+							// payment, a direct debit order credited, a reject, the Generate button, a mass action, a job)
+							// reports the failure as a warning and keeps the document.
+							$rebuildAfterValidation = EInvoicing::isInvoiceValidatedInThisRequest($invoiceObject->id);
+							$cancelIfFails = getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS') && $rebuildAfterValidation;
+
 							// Check configuration
 							$result = $einvoicing->checkRequiredinformations($invoiceObject);
 							if ($result['res'] < 0) {			// Technical error case
 								$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $result['message'];
 								dol_syslog(__METHOD__ . " " . $message);
 
-								if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+								if ($cancelIfFails) {
 									// Add more conditions like thirdparty nature to avoid blocking invoice creation for non FR companies
 									// or for thirdparties that are not subject to E-invoicing obligation
 									$messagecss = 'errors';
@@ -166,7 +176,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 								$message = $langs->trans("InvoiceNotgeneratedDueToConfigurationIssues") . ': <br>' . $langs->trans("CheckPdpConfiguration");
 								dol_syslog(__METHOD__ . " No e-invoicing protocol for EINVOICING_PROTOCOL='" . $usedProtocols . "'", LOG_WARNING);
 
-								if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+								if ($cancelIfFails) {
 									setEventMessages($message, array(), 'errors');
 									$this->errors[] = $message;
 									return -1;
@@ -250,12 +260,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 								// reports a success; and $object->warnings is displayed by the "Generate document"
 								// button alone, from 24, never on the validation path. So say it here, except
 								// where the core prints it on its own already: ->errors, from 23 up.
-								if ((float) DOL_VERSION < 23 || !getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
-									$failcss = getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS') ? 'errors' : 'warnings';
+								if ((float) DOL_VERSION < 23 || !$cancelIfFails) {
+									$failcss = $cancelIfFails ? 'errors' : 'warnings';
 									setEventMessages($langs->trans("EInvoiceNotGenerated"), $protocol->errors, $failcss);
 								}
 
-								if (getDolGlobalString('EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS')) {
+								if ($cancelIfFails) {
 									// If einvoice fails here, it must be always an error
 									$this->errors = array_merge($this->errors, $protocol->errors);
 									return -1;
@@ -271,7 +281,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 									// place only, core/actions_builddoc.inc.php, which has it from 24. So up to 23 the
 									// failure is raised as an error - the only channel that reaches the screen there -
 									// with the warnings collected above merged in, so that none of them is dropped.
-									if ((float) DOL_VERSION < 24) {
+									// Only after a validation though: HookManager answers -1 as soon as ->errors is not empty,
+									// which fails a payment exactly like a blocking error; there the message set above suffices.
+									if ((float) DOL_VERSION < 24 && $rebuildAfterValidation) {
 										$this->errors = array_merge($this->errors, $this->warnings, $protocol->errors);
 										$this->warnings = array();
 									} else {
@@ -280,7 +292,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 										$this->warnings = array_merge($this->warnings, $protocol->errors);	// We want to return the error as a warning.
 									}
 
-									return 0;	// We are in case where EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS is off, we must not return an error.
+									return 0;	// We are in case where the failure must not cancel anything (option off, or no validation in this request).
 								}
 							}
 						}
