@@ -176,6 +176,52 @@ class AbstractPDPProviderTest extends CommonClassTest
 	}
 
 	/**
+	 * EINVOICING_SAVE_ALWAYS_ALSO (#980): the Original is kept beside the imported Converted, the readable
+	 * view of a Factur-X is fetched on 'original+readable' only, and EINVOICING_PREFER_ORIGINAL reads as
+	 * 'original' instead of driving the import.
+	 *
+	 * @return	void
+	 */
+	public function testSaveAlwaysAlsoKeepsTheOriginalBesideTheConverted()
+	{
+		global $conf;
+
+		$saved = array(getDolGlobalString('EINVOICING_SAVE_ALWAYS_ALSO'), getDolGlobalString('EINVOICING_PREFER_ORIGINAL'));
+		$provider = (new ReflectionClass('TestPDPProvider'))->newInstanceWithoutConstructor();
+		$others = new ReflectionMethod('AbstractPDPProvider', 'fetchOtherReceivedFormats');
+		$others->setAccessible(true);
+		$readable = new ReflectionMethod('AbstractPDPProvider', 'wantsReadableView');
+		$readable->setAccessible(true);
+		$imported = array('doc_type' => 'Converted', 'documents' => array('Converted' => '<cii/>', 'Original' => '%PDF-1.7'));
+
+		try {
+			$conf->global->EINVOICING_SAVE_ALWAYS_ALSO = '';
+			$conf->global->EINVOICING_PREFER_ORIGINAL = '';
+			$this->assertSame('', AbstractPDPProvider::getSaveAlwaysAlso());
+			$this->assertSame(array(), $others->invoke($provider, 'flow', $imported), 'Off by default');
+			$this->assertFalse($readable->invoke($provider, 'FACTURX'), 'A Factur-X is already readable');
+			$this->assertTrue($readable->invoke($provider, 'CII'));
+
+			$conf->global->EINVOICING_PREFER_ORIGINAL = '1';
+			$this->assertSame('original', AbstractPDPProvider::getSaveAlwaysAlso(), 'The former option reads as original');
+
+			$conf->global->EINVOICING_SAVE_ALWAYS_ALSO = 'original';
+			$this->assertSame(array('Original' => '%PDF-1.7'), $others->invoke($provider, 'flow', $imported), 'Already fetched, not asked twice');
+			$this->assertSame(array(), $others->invoke($provider, 'flow', array('doc_type' => 'Original', 'documents' => array())), 'An imported Original is already kept');
+			$this->assertFalse($readable->invoke($provider, 'FACTURX'));
+
+			$conf->global->EINVOICING_SAVE_ALWAYS_ALSO = 'original+readable';
+			$this->assertTrue($readable->invoke($provider, 'FACTURX'), 'Asked even for a Factur-X');
+
+			$conf->global->EINVOICING_SAVE_ALWAYS_ALSO = 'anything';
+			$this->assertSame('', AbstractPDPProvider::getSaveAlwaysAlso(), 'An unknown value keeps nothing more');
+		} finally {
+			$conf->global->EINVOICING_SAVE_ALWAYS_ALSO = $saved[0];
+			$conf->global->EINVOICING_PREFER_ORIGINAL = $saved[1];
+		}
+	}
+
+	/**
 	 * Call the protected makeStorableDebugPayload() of AbstractPDPProvider.
 	 *
 	 * @param	string|null	$payload	Payload as the provider received it

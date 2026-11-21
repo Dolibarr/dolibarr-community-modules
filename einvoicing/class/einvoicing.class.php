@@ -1034,15 +1034,16 @@ class EInvoicing
 	 * Get the path of the CII XML received for a supplier invoice, if there is one to read.
 	 *
 	 * The file is the one the reception saved beside the supplier invoice, so the naming is the one of
-	 * CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment(): <ref supplier>_einvoice.xml, prefixed
-	 * with the reference of the invoice unless it was received before #1174 or the prefix is disabled,
-	 * in the directory of the invoice. A document received in Factur-X is a PDF, which Dolibarr
-	 * previews on its own and which is not concerned here.
+	 * CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment(): <ref supplier>_einvoice.xml, or
+	 * _original.xml for the Original kept beside it on option, prefixed with the reference of the invoice
+	 * unless it was received before #1174 or the prefix is disabled, in the directory of the invoice.
+	 * A document received in Factur-X is a PDF, which Dolibarr previews on its own.
 	 *
 	 * @param 	FactureFournisseur 	$supplierInvoice 	Supplier invoice the document was received for.
+	 * @param	string				$suffix				'original' for the Original kept on option, '' for the imported document.
 	 * @return 	string									Full path of the XML, empty string if there is none.
 	 */
-	public function getSupplierEInvoiceXmlFilePath($supplierInvoice)
+	public function getSupplierEInvoiceXmlFilePath($supplierInvoice, $suffix = '')
 	{
 		global $conf;
 
@@ -1050,9 +1051,15 @@ class EInvoicing
 			return '';
 		}
 
+		if ($suffix === '') {
+			$suffix = 'einvoice';
+		} elseif (!in_array($suffix, array('einvoice', 'original'), true)) {
+			return '';
+		}
+
 		$base = $conf->fournisseur->dir_output . '/facture/';
 		$ref = dol_sanitizeFileName($supplierInvoice->ref);
-		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . '_einvoice.xml');
+		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . '_' . $suffix . '.xml');
 
 		$dir = $base . get_exdir($supplierInvoice->id, 2, 0, 0, $supplierInvoice, 'invoice_supplier') . $ref;
 		foreach (array($ref . '-' . $filename, $filename) as $name) {
