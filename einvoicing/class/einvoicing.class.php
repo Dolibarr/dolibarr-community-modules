@@ -627,6 +627,12 @@ class EInvoicing
 	const EXTRAFIELD_BUYER_ORDER_REFERENCE = 'buyer_order_reference';
 
 	/**
+	 * Name, into llx_einvoicing_extrafields, of the despatch advice reference (BT-16) forced on one
+	 * invoice. When empty, the reference of the shipment linked to the invoice is used.
+	 */
+	const EXTRAFIELD_DESPATCH_ADVICE_REFERENCE = 'despatch_advice_reference';
+
+	/**
 	 * Name, into llx_einvoicing_extrafields, of the discounts the import created for the document level
 	 * allowances (BG-20) of a received invoice, comma separated. An import made again deletes them before
 	 * creating them anew: only freed, they would stay available as credit on the vendor.
@@ -2230,6 +2236,35 @@ class EInvoicing
 				$resprints .= dol_escape_htmltag($currentBuyerReference);
 			} elseif ($customerBuyerReference !== '') {
 				$resprints .= '<span class="opacitymedium">' . $langs->trans("EInvoiceBuyerReferenceCustomerDefault") . ' (' . dol_escape_htmltag($customerBuyerReference) . ')</span>';
+			}
+			$resprints .= '</td>';
+			$resprints .= '</tr>';
+		}
+
+		// Despatch advice reference (BT-16, issue #1151): the shipment linked to the invoice, unless one is
+		// forced here. Stored into llx_einvoicing_extrafields, like the buyer reference above.
+		if (($object->element == 'facture' || $object->element == 'invoice') && $object->id > 0) {
+			$currentDespatchAdvice = (string) $this->getExtraFieldValue($object->id, $object->element, self::EXTRAFIELD_DESPATCH_ADVICE_REFERENCE);
+			$resprints .= '<tr class="treinvoicing_collapseseparator">';
+			$resprints .= '<td>';
+			$resprints .= $form->editfieldkey($form->textwithpicto($langs->trans("EInvoiceDespatchAdviceReference"), $langs->trans("EInvoiceDespatchAdviceReferenceHelp")), 'einvoice_despatch_advice', '', $object, (int) $editenable);
+			$resprints .= '</td>';
+			$resprints .= '<td>';
+			if ($action == 'editeinvoice_despatch_advice' && $editenable) {
+				$resprints .= '<form name="setdespatchadvice" action="' . $_SERVER["PHP_SELF"] . '?id=' . $object->id . '" method="post">';
+				$resprints .= '<input type="hidden" name="token" value="' . newToken() . '">';
+				$resprints .= '<input type="hidden" name="action" value="setdespatchadvice">';
+				$resprints .= '<input type="hidden" name="page_y" value="page_y">';
+				$resprints .= '<input type="text" name="einvoice_despatch_advice" class="minwidth200" maxlength="255" value="' . dol_escape_htmltag($currentDespatchAdvice) . '">';
+				$resprints .= '<input type="submit" class="button button-edit smallpaddingimp reposition" value="' . $langs->trans('Modify') . '">';
+				$resprints .= '</form>';
+			} elseif (trim($currentDespatchAdvice) !== '') {
+				$resprints .= dol_escape_htmltag($currentDespatchAdvice);
+			} else {
+				$linkedDespatchAdvice = $this->getDespatchAdviceReference($object, 0);
+				if ($linkedDespatchAdvice !== '') {
+					$resprints .= '<span class="opacitymedium">' . dol_escape_htmltag($linkedDespatchAdvice) . '</span>';
+				}
 			}
 			$resprints .= '</td>';
 			$resprints .= '</tr>';
@@ -3889,6 +3924,53 @@ class EInvoicing
 		}
 
 		return (bool) getDolGlobalInt('EINVOICING_MERGE_LINE_CHARGES_INTO_DESCRIPTION');
+	}
+
+	/**
+	 * Despatch advice reference (BT-16) of an invoice: the one forced on the invoice, or else the reference
+	 * of the first validated shipment linked to it, directly or through its orders. A draft shipment has no
+	 * final reference yet and is skipped.
+	 *
+	 * @param	Facture	$invoice	Customer invoice
+	 * @param	int		$withforced	1 to return the reference forced on the invoice when there is one
+	 * @return	string				Reference, '' when there is none
+	 */
+	public function getDespatchAdviceReference($invoice, $withforced = 1)
+	{
+		if ((int) $invoice->id <= 0) {
+			return '';
+		}
+		if ($withforced) {
+			$forced = trim((string) $this->getExtraFieldValue($invoice->id, $invoice->element, self::EXTRAFIELD_DESPATCH_ADVICE_REFERENCE));
+			if ($forced !== '') {
+				return $forced;
+			}
+		}
+
+		// One query, run on each card display. As fetchObjectLinked(), nothing comes from a disabled module
+		// (isModEnabled('shipping'/'order') does not exist before Dolibarr 19). fk_statut -1 is cancelled.
+		if (!getDolGlobalInt('MAIN_MODULE_EXPEDITION')) {
+			return '';
+		}
+		$sql = "SELECT e.ref FROM " . MAIN_DB_PREFIX . "expedition as e";
+		$sql .= " WHERE e.entity IN (" . getEntity('expedition') . ") AND e.fk_statut > 0 AND e.ref <> ''";
+		$sql .= " AND e.rowid IN (SELECT fk_target FROM " . MAIN_DB_PREFIX . "element_element WHERE fk_source = " . ((int) $invoice->id) . " AND sourcetype = 'facture' AND targettype = 'shipping'";
+		$sql .= " UNION SELECT fk_source FROM " . MAIN_DB_PREFIX . "element_element WHERE fk_target = " . ((int) $invoice->id) . " AND targettype = 'facture' AND sourcetype = 'shipping'";
+		if (getDolGlobalInt('MAIN_MODULE_COMMANDE')) {	// Shipments of the orders linked to the invoice
+			$sql .= " UNION SELECT fk_target FROM " . MAIN_DB_PREFIX . "element_element WHERE sourcetype = 'commande' AND targettype = 'shipping' AND fk_source IN (SELECT fk_source FROM " . MAIN_DB_PREFIX . "element_element WHERE fk_target = " . ((int) $invoice->id) . " AND targettype = 'facture' AND sourcetype = 'commande' UNION SELECT fk_target FROM " . MAIN_DB_PREFIX . "element_element WHERE fk_source = " . ((int) $invoice->id) . " AND sourcetype = 'facture' AND targettype = 'commande')";
+			$sql .= " UNION SELECT fk_source FROM " . MAIN_DB_PREFIX . "element_element WHERE targettype = 'commande' AND sourcetype = 'shipping' AND fk_target IN (SELECT fk_source FROM " . MAIN_DB_PREFIX . "element_element WHERE fk_target = " . ((int) $invoice->id) . " AND targettype = 'facture' AND sourcetype = 'commande' UNION SELECT fk_target FROM " . MAIN_DB_PREFIX . "element_element WHERE fk_source = " . ((int) $invoice->id) . " AND sourcetype = 'facture' AND targettype = 'commande')";
+		}
+		$sql .= ")";
+		$sql .= " ORDER BY e.ref ASC" . $this->db->plimit(1);
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' ' . $this->db->lasterror(), LOG_ERR);
+			return '';
+		}
+		$obj = $this->db->fetch_object($resql);
+		$this->db->free($resql);
+
+		return $obj ? trim((string) $obj->ref) : '';
 	}
 
 
