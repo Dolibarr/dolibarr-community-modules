@@ -3947,33 +3947,30 @@ class EInvoicing
 			}
 		}
 
-		dol_include_once('/commande/class/commande.class.php');
-		dol_include_once('/expedition/class/expedition.class.php');
-
-		$invoice->fetchObjectLinked();
-		$shipmentIds = (isset($invoice->linkedObjectsIds['shipping']) && is_array($invoice->linkedObjectsIds['shipping'])) ? array_values($invoice->linkedObjectsIds['shipping']) : array();
-		if (isset($invoice->linkedObjectsIds['commande']) && is_array($invoice->linkedObjectsIds['commande'])) {
-			foreach ($invoice->linkedObjectsIds['commande'] as $orderId) {
-				$order = new Commande($this->db);
-				if ($order->fetch((int) $orderId) > 0) {
-					$order->fetchObjectLinked();
-					if (isset($order->linkedObjectsIds['shipping']) && is_array($order->linkedObjectsIds['shipping'])) {
-						$shipmentIds = array_merge($shipmentIds, array_values($order->linkedObjectsIds['shipping']));
-					}
-				}
-			}
+		// One query, run on each card display. As fetchObjectLinked(), nothing comes from a disabled module
+		// (isModEnabled('shipping'/'order') does not exist before Dolibarr 19). fk_statut -1 is cancelled.
+		if (!getDolGlobalInt('MAIN_MODULE_EXPEDITION')) {
+			return '';
 		}
-
-		$refs = array();
-		foreach (array_unique($shipmentIds) as $shipmentId) {
-			$shipment = new Expedition($this->db);
-			if ($shipment->fetch((int) $shipmentId) > 0 && (int) $shipment->status > 0 && trim((string) $shipment->ref) !== '') {
-				$refs[] = trim((string) $shipment->ref);
-			}
+		$sql = "SELECT e.ref FROM " . MAIN_DB_PREFIX . "expedition as e";
+		$sql .= " WHERE e.entity IN (" . getEntity('expedition') . ") AND e.fk_statut > 0 AND e.ref <> ''";
+		$sql .= " AND e.rowid IN (SELECT fk_target FROM " . MAIN_DB_PREFIX . "element_element WHERE fk_source = " . ((int) $invoice->id) . " AND sourcetype = 'facture' AND targettype = 'shipping'";
+		$sql .= " UNION SELECT fk_source FROM " . MAIN_DB_PREFIX . "element_element WHERE fk_target = " . ((int) $invoice->id) . " AND targettype = 'facture' AND sourcetype = 'shipping'";
+		if (getDolGlobalInt('MAIN_MODULE_COMMANDE')) {	// Shipments of the orders linked to the invoice
+			$sql .= " UNION SELECT fk_target FROM " . MAIN_DB_PREFIX . "element_element WHERE sourcetype = 'commande' AND targettype = 'shipping' AND fk_source IN (SELECT fk_source FROM " . MAIN_DB_PREFIX . "element_element WHERE fk_target = " . ((int) $invoice->id) . " AND targettype = 'facture' AND sourcetype = 'commande' UNION SELECT fk_target FROM " . MAIN_DB_PREFIX . "element_element WHERE fk_source = " . ((int) $invoice->id) . " AND sourcetype = 'facture' AND targettype = 'commande')";
+			$sql .= " UNION SELECT fk_source FROM " . MAIN_DB_PREFIX . "element_element WHERE targettype = 'commande' AND sourcetype = 'shipping' AND fk_target IN (SELECT fk_source FROM " . MAIN_DB_PREFIX . "element_element WHERE fk_target = " . ((int) $invoice->id) . " AND targettype = 'facture' AND sourcetype = 'commande' UNION SELECT fk_target FROM " . MAIN_DB_PREFIX . "element_element WHERE fk_source = " . ((int) $invoice->id) . " AND sourcetype = 'facture' AND targettype = 'commande')";
 		}
-		sort($refs);
+		$sql .= ")";
+		$sql .= " ORDER BY e.ref ASC" . $this->db->plimit(1);
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' ' . $this->db->lasterror(), LOG_ERR);
+			return '';
+		}
+		$obj = $this->db->fetch_object($resql);
+		$this->db->free($resql);
 
-		return empty($refs) ? '' : $refs[0];
+		return $obj ? trim((string) $obj->ref) : '';
 	}
 
 

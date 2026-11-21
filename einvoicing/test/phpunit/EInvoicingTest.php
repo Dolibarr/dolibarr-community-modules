@@ -117,4 +117,47 @@ class EInvoicingTest extends CommonClassTest
 			$einvoicing->insertOrUpdateExtraField($invoice->id, 'facture', EInvoicing::EXTRAFIELD_CONTRACTOR_ROLE, '');
 		}
 	}
+
+	/**
+	 * The despatch advice (BT-16) is the first validated shipment linked to the invoice, directly or through
+	 * its order; a draft or cancelled one is skipped, and a disabled module gives nothing (issue #1151).
+	 *
+	 * @return void
+	 */
+	public function testDespatchAdviceIsTheFirstValidatedLinkedShipment()
+	{
+		global $conf, $db;
+
+		require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+
+		$invoice = new Facture($db);
+		$invoice->id = 990001151;
+		$orderId = 990001188;
+		$prefix = 'T1188-' . uniqid();
+		$links = array();
+		foreach (array('0' => 0, '1' => -1, 'B' => 1, 'A' => 2) as $suffix => $status) {
+			$db->query("INSERT INTO " . MAIN_DB_PREFIX . "expedition (ref, entity, fk_soc, fk_statut) VALUES ('" . $prefix . '-' . $suffix . "', " . ((int) $conf->entity) . ", 1, " . $status . ")");
+			$shipmentId = $db->last_insert_id(MAIN_DB_PREFIX . "expedition");
+			$links[] = ($suffix === 'A') ? array('commande', $orderId, 'shipping', $shipmentId) : array('shipping', $shipmentId, 'facture', $invoice->id);
+		}
+		$links[] = array('commande', $orderId, 'facture', $invoice->id);
+		foreach ($links as $link) {
+			$this->assertTrue((bool) $db->query("INSERT INTO " . MAIN_DB_PREFIX . "element_element (sourcetype, fk_source, targettype, fk_target) VALUES ('" . $link[0] . "', " . ((int) $link[1]) . ", '" . $link[2] . "', " . ((int) $link[3]) . ")"), (string) $db->lasterror());
+		}
+
+		$einvoicing = new EInvoicing($db);
+		$saved = array(getDolGlobalString('MAIN_MODULE_EXPEDITION'), getDolGlobalString('MAIN_MODULE_COMMANDE'));
+		try {
+			$conf->global->MAIN_MODULE_EXPEDITION = 1;
+			$conf->global->MAIN_MODULE_COMMANDE = 1;
+			$this->assertSame($prefix . '-A', $einvoicing->getDespatchAdviceReference($invoice, 0), 'Found through the order; the draft and the cancelled ones are skipped');
+			$conf->global->MAIN_MODULE_COMMANDE = 0;
+			$this->assertSame($prefix . '-B', $einvoicing->getDespatchAdviceReference($invoice, 0), 'Orders off: only the direct link is left');
+			$conf->global->MAIN_MODULE_EXPEDITION = 0;
+			$this->assertSame('', $einvoicing->getDespatchAdviceReference($invoice, 0), 'Shipments off: nothing');
+		} finally {
+			$conf->global->MAIN_MODULE_EXPEDITION = $saved[0];
+			$conf->global->MAIN_MODULE_COMMANDE = $saved[1];
+		}
+	}
 }
