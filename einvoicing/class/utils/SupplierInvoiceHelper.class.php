@@ -1491,4 +1491,136 @@ class SupplierInvoiceHelper
 
 		return round($amount, (int) $roundPrecision);
 	}
+
+	/**
+	 * Compare the three header totals of a Dolibarr supplier invoice with those of the e-invoice
+	 * received from the Access Point (HT, VAT, TTC). Used to refuse validation of a received
+	 * invoice whose amounts no longer match the document the platform transmitted.
+	 *
+	 * Unlike checkDolInvoiceAndEInvoiceConsistency(), this only looks at the three totals: it does
+	 * not compare VAT by rate, and it does not try to guess the rounding mode. Those extras are
+	 * what made the optional consistency check unreliable.
+	 *
+	 * When the XML is missing or cannot be parsed, the comparison is reported as unavailable
+	 * rather than as a mismatch: blocking validation on a document we cannot read would freeze
+	 * invoices whose XML was never stored, for a reason that has nothing to do with the amounts.
+	 *
+	 * @param	FactureFournisseur	$dolSupplierInvoice	The Dolibarr invoice to compare
+	 * @param	bool				$fetchXmlIfEmpty	Whether to ask the Access Point for the XML when the local copy is empty
+	 * @return	array{identical:bool,unavailable:bool,errors:string[],pa:?array{total_ht:float,total_tva:float,total_ttc:float},doli:array{total_ht:float,total_tva:float,total_ttc:float}}
+	 */
+	public static function checkPaHeaderTotals(FactureFournisseur $dolSupplierInvoice, $fetchXmlIfEmpty = false)
+	{
+		global $db, $langs;
+
+		$doli = array(
+			'total_ht' => (float) $dolSupplierInvoice->total_ht,
+			'total_tva' => (float) $dolSupplierInvoice->total_tva,
+			'total_ttc' => (float) $dolSupplierInvoice->total_ttc,
+		);
+
+		$unavailable = array(
+			'identical' => true,
+			'unavailable' => true,
+			'errors' => array(),
+			'pa' => null,
+			'doli' => $doli,
+		);
+
+		try {
+			$xmlData = self::getXmlData((int) $dolSupplierInvoice->id, (bool) $fetchXmlIfEmpty);
+		} catch (Exception $e) {
+			dol_syslog(__METHOD__ . ' ' . $e->getMessage(), LOG_WARNING, 0, '_einvoicing');
+			return $unavailable;
+		}
+
+		if (!isset($xmlData) || $xmlData === '') {
+			return $unavailable;
+		}
+
+		$protocolManager = new ProtocolManager($db);
+		$detectedProtocolName = $protocolManager->detectProtocolFromContent($xmlData);
+		if (!isset($detectedProtocolName)) {
+			return $unavailable;
+		}
+		$protocol = $protocolManager->getProtocol($detectedProtocolName);
+		$parsedHeader = $protocol->parseInvoiceHeader($xmlData);
+
+		$pa = array(
+			'total_ht' => (float) ($parsedHeader['taxBasisTotalAmount'] ?? 0),
+			'total_tva' => (float) ($parsedHeader['taxTotalAmount'] ?? 0),
+			'total_ttc' => (float) ($parsedHeader['grandTotalAmount'] ?? 0),
+		);
+
+		$isCreditNote = ((int) $dolSupplierInvoice->type == FactureFournisseur::TYPE_CREDIT_NOTE);
+		$langs->load('einvoicing@einvoicing');
+
+		return self::compareThreeTotals($doli['total_ht'], $doli['total_tva'], $doli['total_ttc'], $pa['total_ht'], $pa['total_tva'], $pa['total_ttc'], $isCreditNote);
+	}
+
+	/**
+	 * Compare three pairs of amounts (HT, VAT, TTC), accepting a difference of up to one cent.
+	 * A credit note stores negative totals in Dolibarr and positive ones in the e-invoice: the
+	 * Dolibarr side is compared in absolute value.
+	 *
+	 * @param	float	$doliHt			Dolibarr total excluding VAT
+	 * @param	float	$doliTva		Dolibarr VAT total
+	 * @param	float	$doliTtc		Dolibarr total including VAT
+	 * @param	float	$paHt			Access Point total excluding VAT
+	 * @param	float	$paTva			Access Point VAT total
+	 * @param	float	$paTtc			Access Point total including VAT
+	 * @param	bool	$isCreditNote	True when the Dolibarr amounts are those of a credit note
+	 * @return	array{identical:bool,unavailable:bool,errors:string[],pa:array{total_ht:float,total_tva:float,total_ttc:float},doli:array{total_ht:float,total_tva:float,total_ttc:float}}
+	 */
+	public static function compareThreeTotals($doliHt, $doliTva, $doliTtc, $paHt, $paTva, $paTtc, $isCreditNote = false)
+	{
+		global $langs;
+
+		$doli = array(
+			'total_ht' => (float) $doliHt,
+			'total_tva' => (float) $doliTva,
+			'total_ttc' => (float) $doliTtc,
+		);
+		$pa = array(
+			'total_ht' => (float) $paHt,
+			'total_tva' => (float) $paTva,
+			'total_ttc' => (float) $paTtc,
+		);
+
+		$compareHt = $isCreditNote ? abs($doli['total_ht']) : $doli['total_ht'];
+		$compareTva = $isCreditNote ? abs($doli['total_tva']) : $doli['total_tva'];
+		$compareTtc = $isCreditNote ? abs($doli['total_ttc']) : $doli['total_ttc'];
+
+		$errors = array();
+		if (!self::areAmountsWithinOneCent($compareHt, $pa['total_ht'])) {
+			$errors[] = $langs->trans('SupplierInvoiceComparisonTotalVatExclDifference', $pa['total_ht'], $doli['total_ht']);
+		}
+		if (!self::areAmountsWithinOneCent($compareTva, $pa['total_tva'])) {
+			$errors[] = $langs->trans('SupplierInvoiceComparisonTotalVatDifference', $pa['total_tva'], $doli['total_tva']);
+		}
+		if (!self::areAmountsWithinOneCent($compareTtc, $pa['total_ttc'])) {
+			$errors[] = $langs->trans('SupplierInvoiceComparisonTotalVatInclDifference', $pa['total_ttc'], $doli['total_ttc']);
+		}
+
+		return array(
+			'identical' => (count($errors) == 0),
+			'unavailable' => false,
+			'errors' => $errors,
+			'pa' => $pa,
+			'doli' => $doli,
+		);
+	}
+
+	/**
+	 * Compare invoice totals while accepting a difference of at most one cent.
+	 *
+	 * @param float $amount1 The first amount to compare
+	 * @param float $amount2 The second amount to compare
+	 * @return bool Whether the amounts differ by no more than one cent
+	 */
+	private static function areAmountsWithinOneCent($amount1, $amount2): bool
+	{
+		// The small epsilon keeps an exact cent difference within the limit despite binary float representation.
+		return abs((float) $amount1 - (float) $amount2) <= 0.010000001;
+	}
 }

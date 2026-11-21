@@ -104,6 +104,7 @@ alltime
 blacklists
 confirmactionxxx
 ConfirmActionXxx
+paHt
 
 # String in french text to keep
 signifiant
