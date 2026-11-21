@@ -806,7 +806,8 @@ class CIIProtocol extends AbstractProtocol
 				$idligne = $this->db->last_insert_id(MAIN_DB_PREFIX.'facture_fourn_det');
 				$rang++;
 
-				$res = $supplierInvoice->updateline(
+				/** @phan-suppress-next-line PhanParamTooMany */
+				$res = $supplierInvoice->updateline(	// @phpstan-ignore arguments.count (skip_update_price only exists on newer cores, an older one ignores it)
 					$idligne,
 					/** @phan-suppress-next-line PhanDeprecatedProperty */
 					$supplierInvoice->lines[$i]->desc ? $supplierInvoice->lines[$i]->desc : $supplierInvoice->lines[$i]->description,
@@ -830,7 +831,8 @@ class CIIProtocol extends AbstractProtocol
 					$supplierInvoice->lines[$i]->multicurrency_subprice,
 					/** @phan-suppress-next-line PhanUndeclaredProperty */
 					$supplierInvoice->lines[$i]->ref_supplier,
-					$rang
+					$rang,
+					1
 				);
 
 				if ($res < 0) {
@@ -848,16 +850,14 @@ class CIIProtocol extends AbstractProtocol
 			}
 		}
 
-		// updateline() totalled the header before the signs were restored: total it again when one moved
-		$moved = 0;
 		foreach ($lineIdsBySign as $sign => $lineIds) {
-			$res = $this->setCreditNoteLinesSign($lineIds, $sign);
-			if ($res < 0) {
+			if ($this->setCreditNoteLinesSign($lineIds, $sign) < 0) {
 				return false;
 			}
-			$moved += $res;
 		}
-		if ($moved > 0 && $supplierInvoice->update_price(1, 'auto', 0, $supplierInvoice->thirdparty) < 0) {
+
+		// updateline() left the totals alone: total once, after the signs of a credit note are restored
+		if (!empty($supplierInvoice->lines) && $supplierInvoice->update_price(1, 'auto', 0, $supplierInvoice->thirdparty) < 0) {
 			return false;
 		}
 
@@ -1779,12 +1779,7 @@ class CIIProtocol extends AbstractProtocol
 				// Not for a default routing product: it is a catch-all, so gluing the vendor reference of
 				// the line onto it would make every next invoice match it instead of the real product.
 				if ($productId > 0 && $productMatchType != 'defaultrouting' && trim((string) ($parsedLine['prodsellerid'] ?? '')) !== '') {
-					$supplierPriceEntries[] = [
-						'productId' => $productId,
-						'unitPrice' => $this->resolveLineUnitPrice($parsedLine),
-						'refFourn'  => (string) $parsedLine['prodsellerid'],
-						'tvaTx'     => (float) ($parsedLine['rateApplicablePercent'] ?? 0),
-					];
+					$this->collectSupplierPriceEntry($supplierPriceEntries, (int) $productId, $parsedLine);
 				}
 			}
 
@@ -1906,6 +1901,25 @@ class CIIProtocol extends AbstractProtocol
 
 		return ['res' => 1];
 	}
+
+	/**
+	 * Keep one supplier price entry per product and vendor reference, the last line read winning.
+	 *
+	 * @param	array<string,array{productId:int,unitPrice:float,refFourn:string,tvaTx:float}>	$entries	The entries collected so far
+	 * @param	int																			$productId	Product the line is billed on
+	 * @param	array<string,mixed>															$parsedLine	The parsed line
+	 */
+	protected function collectSupplierPriceEntry(array &$entries, int $productId, array $parsedLine): void
+	{
+		$refFourn = (string) $parsedLine['prodsellerid'];
+		$entries[$productId . '|' . $refFourn] = [
+			'productId' => $productId,
+			'unitPrice' => $this->resolveLineUnitPrice($parsedLine),
+			'refFourn'  => $refFourn,
+			'tvaTx'     => (float) ($parsedLine['rateApplicablePercent'] ?? 0),
+		];
+	}
+
 	/**
 	 * Postpone the flow because a line points at an invoice this Dolibarr does not hold while the document
 	 * declares an amount already paid.
