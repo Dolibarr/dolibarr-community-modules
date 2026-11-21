@@ -19,8 +19,7 @@ CREATE TABLE llx_c_einvoicing_untdid4451 (
 	code varchar(3) NOT NULL,
 	label varchar(80) NOT NULL,
 	active tinyint NOT NULL DEFAULT 0,
-	position integer NOT NULL DEFAULT 0,
-	UNIQUE KEY uk_einvoicing_untdid4451_code (code)
+	position integer NOT NULL DEFAULT 0
 ) ENGINE=innodb;
 
 INSERT INTO llx_c_einvoicing_untdid4451 (code, label, active, position) VALUES
@@ -424,5 +423,4 @@ INSERT INTO llx_c_einvoicing_untdid4451 (code, label, active, position) VALUES
 	('TRR', 'EInvoicingUntdid4451TRR', 0, 398),
 	('TXD', 'EInvoicingUntdid4451TXD', 1, 399),
 	('WHI', 'EInvoicingUntdid4451WHI', 0, 400),
-	('ZZZ', 'EInvoicingUntdid4451ZZZ', 1, 401)
-ON DUPLICATE KEY UPDATE code = VALUES(code);
+	('ZZZ', 'EInvoicingUntdid4451ZZZ', 1, 401);
