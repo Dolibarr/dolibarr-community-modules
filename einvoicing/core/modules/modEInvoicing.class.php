@@ -187,6 +187,8 @@ class modEInvoicing extends DolibarrModules
 			3 => array('EINVOICING_SYNC_MARGIN_TIME_HOURS', 'chaine', '12', '0'),
 			4 => array('EINVOICING_FLOWS_SYNC_CALL_SIZE', 'chaine', '100', '0'),
 			5 => array('EINVOICING_PROTOCOL', 'chaine', 'CII', '0'),
+			// Transifex project carrying the translations of this module, used by the translation admin page to build its links
+			6 => array('EINVOICING_TRANSIFEX_PROJECT', 'chaine', 'dolibarr-association/dolibarr-community-modules', '0'),
 		);
 
 		// Some keys to add into the overwriting translation tables
@@ -397,7 +399,7 @@ class modEInvoicing extends DolibarrModules
 			'url' => '/einvoicing/document_list.php?mainmenu=billing&leftmenu=einvoicing',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1001,
-			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
+			'enabled' => 'isModEnabled("einvoicing") && preg_match(\'/^(einvoicing|all)/\', $leftmenu) && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
 			'perms' => '$user->hasRight("einvoicing", "write")',
 			'target' => '',
 			'user' => 2,
@@ -414,7 +416,7 @@ class modEInvoicing extends DolibarrModules
 			'url' => '/einvoicing/product_mapping.php?mainmenu=billing&leftmenu=einvoicing',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1002,
-			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE") && !getDolGlobalString("EINVOICING_DISABLE_SYNC_AP_TO_DOLI")',
+			'enabled' => 'isModEnabled("einvoicing") && preg_match(\'/^(einvoicing|all)/\', $leftmenu) && !getDolGlobalString("EINVOICING_ONLY_GENERATE") && !getDolGlobalString("EINVOICING_DISABLE_SYNC_AP_TO_DOLI")',
 			'perms' => '$user->hasRight("einvoicing", "write")',
 			'target' => '',
 			'user' => 2,
@@ -431,7 +433,7 @@ class modEInvoicing extends DolibarrModules
 			'url' => '/einvoicing/vendorref_list.php?mainmenu=billing&leftmenu=einvoicing',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1003,
-			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE") && !getDolGlobalString("EINVOICING_DISABLE_SYNC_AP_TO_DOLI")',
+			'enabled' => 'isModEnabled("einvoicing") && preg_match(\'/^(einvoicing|all)/\', $leftmenu) && !getDolGlobalString("EINVOICING_ONLY_GENERATE") && !getDolGlobalString("EINVOICING_DISABLE_SYNC_AP_TO_DOLI")',
 			'perms' => '$user->hasRight("einvoicing", "read")',
 			'target' => '',
 			'user' => 2,
@@ -448,7 +450,7 @@ class modEInvoicing extends DolibarrModules
 			'url' => '/einvoicing/sync_pending_list.php?mainmenu=billing&leftmenu=einvoicing',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1004,
-			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE") && getDolGlobalInt("EINVOICING_ENABLE_MANUAL_ACTION_QUEUE")',
+			'enabled' => 'isModEnabled("einvoicing") && preg_match(\'/^(einvoicing|all)/\', $leftmenu) && !getDolGlobalString("EINVOICING_ONLY_GENERATE") && getDolGlobalInt("EINVOICING_ENABLE_MANUAL_ACTION_QUEUE")',
 			'perms' => '$user->hasRight("einvoicing", "read")',
 			'target' => '',
 			'user' => 2,
@@ -482,7 +484,7 @@ class modEInvoicing extends DolibarrModules
 			'url' => '/einvoicing/call_list.php?mainmenu=billing&leftmenu=einvoicing',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1003,
-			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
+			'enabled' => 'isModEnabled("einvoicing") && preg_match(\'/^(einvoicing|all)/\', $leftmenu) && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
 			'perms' => '$user->hasRight("einvoicing", "read")',
 			'target' => '',
 			'user' => 2,
