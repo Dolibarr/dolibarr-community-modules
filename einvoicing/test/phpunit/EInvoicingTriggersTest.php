@@ -22,8 +22,9 @@
  *      \brief      PHPUnit test for the triggers of the module: DOCUMENT_DELETE and
  *                  BILL_SUPPLIER_DELETE, which refuse a deletion the module must protect, the gates
  *                  of the payment status (212) PAYMENT_CUSTOMER_CREATE shares with the invoice card, and
- *                  COMPANY_MODIFY, which stores the default product of a vendor.
- *                  Covers issues #766, #791, #1050 and the delete guard of a received e-invoice.
+ *                  COMPANY_MODIFY, which stores the default product of a vendor, and the line
+ *                  triggers that carry the buyer's order line (BT-132) from an order line to its invoice line.
+ *                  Covers issues #766, #791, #1050, #1192 and the delete guard of a received e-invoice.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -40,6 +41,7 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 require_once $dolibarrHtdocs . '/master.inc.php';
 require_once DOL_DOCUMENT_ROOT . '/fourn/class/fournisseur.facture.class.php';
 require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+require_once DOL_DOCUMENT_ROOT . '/commande/class/commande.class.php';
 require_once DOL_DOCUMENT_ROOT . '/societe/class/societe.class.php';
 require_once DOL_DOCUMENT_ROOT . '/product/class/product.class.php';
 require_once DOL_DOCUMENT_ROOT . '/user/class/user.class.php';
@@ -976,5 +978,157 @@ class EInvoicingTriggersTest extends CommonClassTest
 
 		$einvoicing = new EInvoicing($db);
 		$this->assertSame(2, $einvoicing->countSentStatusMessages(self::CASH_IN_ELEMENT_ID, 'facture', 212));
+	}
+
+	/**
+	 * Fake rowids of an order line and of an invoice line, never reached by the lines of the test base
+	 */
+	const BT132_ORDER_LINE_ID = 990001192;
+	const BT132_INVOICE_LINE_ID = 990011192;
+
+	/**
+	 * Run a line trigger of BT-132 (issue #1192), with the field posted or not.
+	 *
+	 * @param	string			$action		Trigger code
+	 * @param	CommonObjectLine	$line		Order line or invoice line
+	 * @param	string|null		$posted		Value posted for einvoice_buyer_order_line_id, null to not post it
+	 * @return	void
+	 */
+	private function runLineTrigger($action, $line, $posted = null)
+	{
+		global $db, $user, $langs, $conf;
+
+		unset($_POST['einvoice_buyer_order_line_id']);
+		if ($posted !== null) {
+			$_POST['einvoice_buyer_order_line_id'] = $posted;
+		}
+		$trigger = new InterfaceEInvoicingTriggers($db);
+		$this->assertGreaterThanOrEqual(0, $trigger->runTrigger($action, $line, $user, $langs, $conf), implode(', ', $trigger->errors));
+		unset($_POST['einvoice_buyer_order_line_id']);
+	}
+
+	/**
+	 * Buyer's order line stored by the module for a line.
+	 *
+	 * @param	int		$lineId			Rowid of the line
+	 * @param	string	$elementType	'commandedet' or 'facturedet'
+	 * @return	string|null				Value, null when nothing is stored
+	 */
+	private function storedBuyerOrderLine($lineId, $elementType)
+	{
+		global $db;
+
+		$einvoicing = new EInvoicing($db);
+
+		return $einvoicing->getExtraFieldValue($lineId, $elementType, EInvoicing::EXTRAFIELD_BUYER_ORDER_LINE_ID);
+	}
+
+	/**
+	 * The value entered on an order line is kept, a save without the field leaves it, an empty one deletes it.
+	 *
+	 * @return void
+	 */
+	public function testTheOrderLineFormStoresTheBuyerOrderLine()
+	{
+		global $db;
+
+		$line = new OrderLine($db);
+		$line->id = self::BT132_ORDER_LINE_ID;
+
+		$this->runLineTrigger('LINEORDER_INSERT', $line, ' 0010 ');
+		$this->assertSame('0010', $this->storedBuyerOrderLine(self::BT132_ORDER_LINE_ID, 'commandedet'));
+		$this->runLineTrigger('LINEORDER_MODIFY', $line, null);
+		$this->assertSame('0010', $this->storedBuyerOrderLine(self::BT132_ORDER_LINE_ID, 'commandedet'), 'A save that does not post the field (API, clone) must leave it');
+		$this->runLineTrigger('LINEORDER_MODIFY', $line, '');
+		$this->assertNull($this->storedBuyerOrderLine(self::BT132_ORDER_LINE_ID, 'commandedet'));
+	}
+
+	/**
+	 * An invoice line made from an order line takes its buyer's order line, by the card ('commande') or by
+	 * Facture::create() with lines that keep their origin ('commandedet'); one made from a proposal line takes nothing.
+	 *
+	 * @return void
+	 */
+	public function testAnInvoiceLineMadeFromAnOrderLineTakesItsBuyerOrderLine()
+	{
+		global $db;
+
+		$orderLine = new OrderLine($db);
+		$orderLine->id = self::BT132_ORDER_LINE_ID;
+		$this->runLineTrigger('LINEORDER_INSERT', $orderLine, '0020');
+
+		foreach (array('commande' => '0020', 'commandedet' => '0020', 'propal' => null) as $origin => $expected) {
+			$invoiceLine = new FactureLigne($db);
+			$invoiceLine->id = self::BT132_INVOICE_LINE_ID;
+			$invoiceLine->origin = $origin;
+			$invoiceLine->origin_id = self::BT132_ORDER_LINE_ID;
+			$this->runLineTrigger('LINEBILL_DELETE', $invoiceLine);
+			$this->runLineTrigger('LINEBILL_INSERT', $invoiceLine);
+			$this->assertSame($expected, $this->storedBuyerOrderLine(self::BT132_INVOICE_LINE_ID, 'facturedet'), 'Origin ' . $origin);
+		}
+
+		// Free entry on the invoice line: it wins over the order line, and stays editable
+		$invoiceLine->origin = 'commande';
+		$this->runLineTrigger('LINEBILL_DELETE', $invoiceLine);
+		$this->runLineTrigger('LINEBILL_INSERT', $invoiceLine, '0030');
+		$this->assertSame('0030', $this->storedBuyerOrderLine(self::BT132_INVOICE_LINE_ID, 'facturedet'), 'A value entered on the invoice line must win');
+		$this->runLineTrigger('LINEBILL_MODIFY', $invoiceLine, '0040');
+		$this->assertSame('0040', $this->storedBuyerOrderLine(self::BT132_INVOICE_LINE_ID, 'facturedet'));
+
+		$this->runLineTrigger('LINEBILL_DELETE', $invoiceLine);
+		$this->assertNull($this->storedBuyerOrderLine(self::BT132_INVOICE_LINE_ID, 'facturedet'), 'Deleting the invoice line must delete its value');
+		$this->runLineTrigger('LINEORDER_DELETE', $orderLine);
+		$this->assertNull($this->storedBuyerOrderLine(self::BT132_ORDER_LINE_ID, 'commandedet'), 'Deleting the order line must delete its value');
+	}
+
+	/**
+	 * An invoice made by Facture::createFromOrder() (automatic billing, API), whose lines carry no origin,
+	 * takes the buyer's order line of the matching order line; deleting the invoice and the order deletes
+	 * what the module stored on their lines.
+	 *
+	 * @return void
+	 */
+	public function testAnInvoiceMadeByCreateFromOrderTakesTheBuyerOrderLines()
+	{
+		global $db;
+
+		if (!getDolGlobalInt('MAIN_MODULE_COMMANDE')) {	// isModEnabled('order') does not exist before Dolibarr 19
+			$this->markTestSkipped('The Orders module is off on this instance');
+		}
+		$author = $this->author();
+		$thirdparty = new Societe($db);
+		$thirdparty->name = 'Customer of the BT-132 test';
+		$thirdparty->country_code = 'FR';
+		$thirdparty->client = 1;
+		$thirdparty->code_client = 'auto';
+		$socid = $thirdparty->create($author);
+		$this->assertGreaterThan(0, $socid, 'Could not create the customer of the test: ' . $thirdparty->error);
+
+		$order = new Commande($db);
+		$order->socid = $socid;
+		$order->date = dol_now();
+		$order->date_commande = dol_now();
+		$this->assertGreaterThan(0, $order->create($author), 'Could not create the order of the test: ' . $order->error);
+		$order->addline('Line with a buyer order line', 100, 1, 20);
+		$order->addline('Line without', 50, 2, 20);
+		$order->fetch($order->id);
+		$einvoicing = new EInvoicing($db);
+		$einvoicing->insertOrUpdateExtraField((int) $order->lines[0]->id, 'commandedet', EInvoicing::EXTRAFIELD_BUYER_ORDER_LINE_ID, '0010');
+
+		$invoice = new Facture($db);
+		$this->assertGreaterThan(0, $invoice->createFromOrder($order, $author), 'Could not create the invoice of the test: ' . $invoice->error);
+		$invoice->fetch($invoice->id);
+		$lineWithValue = 0;
+		foreach ($invoice->lines as $line) {
+			if ($line->desc == 'Line with a buyer order line') {
+				$lineWithValue = (int) $line->id;
+			}
+		}
+		$this->assertSame(array($lineWithValue => '0010'), $einvoicing->getBuyerOrderLineIds($invoice));
+
+		$invoice->delete($author);
+		$order->delete($author);
+		$this->assertNull($this->storedBuyerOrderLine($lineWithValue, 'facturedet'), 'Deleting the invoice must delete the value of its lines');
+		$this->assertNull($this->storedBuyerOrderLine((int) $order->lines[0]->id, 'commandedet'), 'Deleting the order must delete the value of its lines');
 	}
 }
