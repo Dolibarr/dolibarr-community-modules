@@ -837,6 +837,14 @@ class CIIProtocol extends AbstractProtocol
 					return false;
 				}
 
+				//Always identify lines that are created by the eInvoicing module with extraparams
+				$supplierInvoice->lines[$i]->id=$idligne;
+				$supplierInvoice->lines[$i]->extraparams=array("OriginModuleId"=>(string) SupplierInvoiceHelper::EINVOICING_EXTRAPARAMS);
+				$resSetExtraParams = $supplierInvoice->lines[$i]->setExtraParameters();
+				if ($resSetExtraParams < 0) {
+					return false;
+				}
+
 				// The core forces every line of a credit note negative (issue #1077). Each line gets back
 				// the sign the document gives it, relative to the sign of the credit note itself.
 				$lineSign = SupplierInvoiceHelper::creditNoteLineSign($supplierInvoice->lines[$i], $documentSign);
