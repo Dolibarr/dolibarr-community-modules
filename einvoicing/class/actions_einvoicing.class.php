@@ -3063,7 +3063,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				return 0;
 			}
 			$targets = array();
-			foreach (array('einvoice', 'original', 'converted') as $format) {
+			foreach (array('einvoice', 'original') as $format) {
 				$targets['_'.$format.'.xml'] = array('&element=supplier&format='.$format, $format);
 			}
 		} elseif (in_array('invoicedocument', $contexts, true)) {

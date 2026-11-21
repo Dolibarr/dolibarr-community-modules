@@ -95,7 +95,7 @@ $id = GETPOSTINT('id');
 $mode = GETPOST('mode', 'aZ09');
 // 'supplier' reads the document received for a supplier invoice, otherwise the one sent to a customer
 $element = GETPOST('element', 'aZ09');
-// For a supplier invoice, the other format to show ('original', 'converted'), checked against a fixed list
+// For a supplier invoice, 'original' shows the Original kept on option, checked against a fixed list
 $format = GETPOST('format', 'aZ09');
 
 // 'diag' reads the document of the last incoming invoice that could not be processed

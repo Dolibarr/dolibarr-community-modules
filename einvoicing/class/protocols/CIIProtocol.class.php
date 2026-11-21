@@ -4117,10 +4117,10 @@ class CIIProtocol extends AbstractProtocol
 
 
 	/**
-	 * Keep the other formats of the received flow as attached files of the supplier invoice.
+	 * Keep the Original of the received flow as an attached file of the supplier invoice.
 	 *
 	 * The imported document stays <ref_supplier>_einvoice.<ext>, the format agreed with the access point.
-	 * The others are added beside it as <ref_supplier>_original.<ext> or <ref_supplier>_converted.<ext>.
+	 * The Original is added beside it as <ref_supplier>_original.<ext> (EINVOICING_SAVE_ALWAYS_ALSO).
 	 *
 	 * @param	FactureFournisseur		$supplierInvoice	The imported supplier invoice
 	 * @param	array<string,string>	$otherFormats		Raw documents by docType, see AbstractPDPProvider::fetchOtherReceivedFormats()
@@ -4133,7 +4133,7 @@ class CIIProtocol extends AbstractProtocol
 
 		foreach ($otherFormats as $docType => $content) {
 			$content = (string) $content;
-			if ($content === '' || !in_array($docType, array('Original', 'Converted'), true)) {
+			if ($content === '' || $docType !== 'Original') {
 				continue;
 			}
 
@@ -5610,8 +5610,8 @@ class CIIProtocol extends AbstractProtocol
 	 */
 	protected function embeddedAttachmentSuffix(string $filename, string $extension, int $rank, array $storednames): string
 	{
-		// The received document, its other formats and its readable view are stored after, under these names, and would overwrite it.
-		$reserved = in_array(dol_strtolower($filename), array('einvoice', 'original', 'converted', dol_strtolower(getDolGlobalString('EINVOICING_PDP', 'PDP'))), true);
+		// The received document, its Original and its readable view are stored after, under these names, and would overwrite it.
+		$reserved = in_array(dol_strtolower($filename), array('einvoice', 'original', dol_strtolower(getDolGlobalString('EINVOICING_PDP', 'PDP'))), true);
 		if ($reserved || in_array($filename . '.' . $extension, $storednames, true)) {
 			return $filename . '_' . ($rank + 1);
 		}

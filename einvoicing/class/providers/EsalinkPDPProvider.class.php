@@ -1404,7 +1404,7 @@ class EsalinkPDPProvider extends AbstractPDPProvider
 				// Getting it is optional, so a failure does not stop the import - but it is traced: the call
 				// is logged like any other, and the reason is said out loud instead of being dropped (#980).
 				$readableViewFile = null;
-				if ($detectedProtocol != 'FACTURX') {
+				if ($this->wantsReadableView($detectedProtocol)) {
 					$flowResponse = $this->fetchFlowData($flowId, 'ReadableView', 'get_readable_view_for_invoice');
 					if ($flowResponse['status_code'] != 200) {
 						dol_syslog(__METHOD__ . " No readable view for flowId " . $flowId . ": HTTP " . $flowResponse['status_code'] . (empty($flowResponse['errorMessage']) ? '' : ' - ' . $flowResponse['errorMessage']) . ". The supplier invoice is imported without it.", LOG_WARNING, 0, '_einvoicing');
