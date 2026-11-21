@@ -4932,7 +4932,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param	float	$amount		Amount of the line, with the sign of the document
 	 * @return	SupplierInvoiceLine
 	 */
-	protected function newRoundingLine(float $amount): SupplierInvoiceLine
+	protected function newRoundingLine(float $amount)
 	{
 		global $db, $langs;
 
