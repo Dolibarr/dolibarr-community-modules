@@ -653,12 +653,15 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		// Add button to change the entity (multi-company) of a supplier invoice (we test context invoicesuppliercard but also main for old versions of module)
 		if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE') && isModEnabled('multicompany') && in_array($object->element, ['invoice_supplier'])
-			&& !empty($object->id) && $user->hasRight('fournisseur', 'facture', 'creer') && preg_match('/invoicesuppliercard|main/', $parameters['currentcontext'] ?? '')) {
+			&& !empty($object->id) && preg_match('/invoicesuppliercard|main/', $parameters['currentcontext'] ?? '')) {
 			// isEditable() only exists since Dolibarr 23 and answers a negative code when refused. Before, same
 			// rule as the core card offers "Modify" with: no payment and not dispatched in bookkeeping.
 			$editable = method_exists($object, 'isEditable') ? ($object->isEditable() > 0)
 				: ($object->getSommePaiement() == 0 && $object->getVentilExportCompta() == 0);
-			if ($editable) {
+			if (!$user->hasRight('fournisseur', 'facture', 'creer')) {
+				print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('NotEnoughPermissions')) . '">'
+					. $langs->trans('ChangeEntity') . '</span>';
+			} elseif ($editable) {
 				print '<a class="butAction" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?id=' . $object->id . '&action=change_entity&token=' . newToken() . '">'
 					. $langs->trans('ChangeEntity') . '</a>';
 			} else {
@@ -1177,6 +1180,45 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					}
 					return 0;
 				}
+			}
+
+			// Record on the vendor the payment account the received document announces (BT-84/85/86).
+			// Only ever on this explicit confirmation: the import itself writes nothing of the kind.
+			if ($action == 'confirm_einvoice_addpayeeban' && GETPOST('confirm') == 'yes') {
+				dol_include_once('einvoicing/class/utils/PayeeBankAccountHelper.class.php');
+				/** @var FactureFournisseur $object */
+
+				if (!getDolGlobalInt('EINVOICING_THIRDPARTIES_ADD_PAYEE_BANK_ACCOUNT')) {
+					setEventMessages($langs->trans('EInvoicePayeeAccountAddNotEnabled'), array(), 'errors');
+					return 0;
+				}
+				if (!PayeeBankAccountHelper::userCanAddAccount($user)) {
+					setEventMessages($langs->trans('NotEnoughPermissions'), array(), 'errors');
+					return 0;
+				}
+
+				// Read the document again rather than trust the posted values: only what it really
+				// announces may be recorded on the vendor
+				$payeeAccounts = PayeeBankAccountHelper::announcedAccounts($db, $object);
+				$payeeAccountIdx = GETPOSTINT('payeeaccount');
+				if (!isset($payeeAccounts[$payeeAccountIdx])) {
+					setEventMessages($langs->trans('EInvoicePayeeAccountNotFound'), array(), 'errors');
+					return 0;
+				}
+
+				$addError = '';
+				$resadd = PayeeBankAccountHelper::addAccountToThirdparty($db, $user, (int) $object->socid, $payeeAccounts[$payeeAccountIdx], (string) $object->ref_supplier, $addError);
+				if ($resadd > 0) {
+					setEventMessages($langs->trans('EInvoicePayeeAccountAdded', dol_escape_htmltag($payeeAccounts[$payeeAccountIdx]['iban'])), array(), 'mesgs');
+				} elseif ($resadd == 0) {
+					setEventMessages($langs->trans('EInvoicePayeeAccountAlreadyKnown', dol_escape_htmltag($payeeAccounts[$payeeAccountIdx]['iban'])), array(), 'warnings');
+				} else {
+					$this->errors[] = $addError;
+					setEventMessages($langs->trans('EInvoicePayeeAccountAddFailed', dol_escape_htmltag($addError)), array(), 'errors');
+					return -1;
+				}
+
+				return 0;
 			}
 		}
 
@@ -1761,6 +1803,41 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				);
 				$this->resprints .= $formconfirm;
 			}
+
+			// Confirmation before recording on the vendor the account the received document announces.
+			// It defaults to "no": a bank account read from an incoming document is what an invoice
+			// fraud carries too, so the user has to say it is the right one.
+			if ($action == 'einvoice_addpayeeban') {
+				dol_include_once('einvoicing/class/utils/PayeeBankAccountHelper.class.php');
+				'@phan-var-force FactureFournisseur $object';
+				/** @var FactureFournisseur $object */
+
+				$payeeAccounts = PayeeBankAccountHelper::announcedAccounts($db, $object);
+				$payeeAccountIdx = GETPOSTINT('payeeaccount');
+				if (isset($payeeAccounts[$payeeAccountIdx]) && PayeeBankAccountHelper::addAccountOffered($user)) {
+					$form = new Form($db);
+
+					$object->fetch_thirdparty();
+					$vendorName = is_object($object->thirdparty) ? $object->thirdparty->name : '';
+
+					// Escaped before reaching trans(): the IBAN and the reference are written by the sender
+					$question = $langs->trans('EInvoicePayeeAccountAddConfirm', dol_escape_htmltag($payeeAccounts[$payeeAccountIdx]['iban']), dol_escape_htmltag($vendorName), dol_escape_htmltag((string) $object->ref_supplier));
+					$question .= '<br><br>' . $langs->trans('EInvoicePayeeAccountFraudWarning');
+
+					$formconfirm = $form->formconfirm(
+						$_SERVER["PHP_SELF"] . '?id=' . ((int) $object->id) . '&action=confirm_einvoice_addpayeeban&payeeaccount=' . ((int) $payeeAccountIdx),
+						$langs->trans('EInvoicePayeeAccountAdd'),
+						$question,
+						'confirm_einvoice_addpayeeban',
+						'',
+						'no',
+						1,
+						360
+					);
+
+					$this->resprints .= $formconfirm;
+				}
+			}
 		}
 
 		return 0;
@@ -1824,6 +1901,120 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		return 0;
 	}
 
+
+	/**
+	 * Field of the buyer's order line (BT-132, issue #1192) into the form adding a line to a customer order
+	 * or to a customer invoice (free entry, for an invoice not made from an order).
+	 *
+	 * @param	array<string,mixed>	$parameters		Hook parameters
+	 * @param	CommonObject		$object			Order or invoice the line is added to
+	 * @param	string				$action			Current action
+	 * @param	HookManager			$hookmanager	Hook manager
+	 * @return	int									0, the standard form goes on
+	 */
+	public function formCreateProductOptions($parameters, $object, &$action, $hookmanager)
+	{
+		$this->resprints = '';
+		if (self::buyerOrderLineIdApplies($object)) {
+			$this->resprints = self::buyerOrderLineIdInput(GETPOST('einvoice_buyer_order_line_id', 'alphanohtml'));
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Field of the buyer's order line (BT-132, issue #1192) into the form editing a line of a customer order
+	 * or invoice. The template does not print ->resPrint for this hook: the field is printed here.
+	 *
+	 * @param	array<string,mixed>	$parameters		Hook parameters, with the line edited into 'line'
+	 * @param	CommonObject		$object			Order or invoice of the line
+	 * @param	string				$action			Current action
+	 * @param	HookManager			$hookmanager	Hook manager
+	 * @return	int									0, the standard form goes on
+	 */
+	public function formEditProductOptions($parameters, $object, &$action, $hookmanager)
+	{
+		global $db;
+
+		$line = $parameters['line'] ?? null;
+		if (self::buyerOrderLineIdApplies($object) && is_object($line) && (int) $line->id > 0) {
+			$einvoicing = new EInvoicing($db);
+			$value = GETPOSTISSET('einvoice_buyer_order_line_id') ? GETPOST('einvoice_buyer_order_line_id', 'alphanohtml') : (string) $einvoicing->getExtraFieldValue((int) $line->id, $object->element == 'commande' ? 'commandedet' : 'facturedet', EInvoicing::EXTRAFIELD_BUYER_ORDER_LINE_ID);
+			print self::buyerOrderLineIdInput($value);
+		}
+
+		return 0;
+	}
+
+	// phpcs:disable PEAR.NamingConventions.ValidFunctionName.ScopeNotCamelCaps
+	/**
+	 * Buyer's order line (BT-132, issue #1192) under the description of a line of an order or an invoice.
+	 * The hook exists from Dolibarr 22: before, the value is seen into the line edit form.
+	 *
+	 * @param	array<string,mixed>	$parameters		Hook parameters, with the line shown into 'line'
+	 * @param	CommonObject		$object			Order or invoice of the line
+	 * @param	string				$action			Current action
+	 * @param	HookManager			$hookmanager	Hook manager
+	 * @return	int									0, the standard view goes on
+	 */
+	public function objectLineView_BeforeProductExtrafield($parameters, $object, &$action, $hookmanager)
+	{
+		global $db, $langs;
+
+		$this->resprints = '';
+		$line = $parameters['line'] ?? null;
+		if (!self::buyerOrderLineIdApplies($object) || !is_object($line) || (int) $line->id <= 0) {
+			return 0;
+		}
+		// One query for all the lines of the object, not one per line shown
+		static $cache = array();
+		$key = $object->element . '-' . (int) $object->id;
+		if (!isset($cache[$key])) {
+			$einvoicing = new EInvoicing($db);
+			$cache[$key] = $einvoicing->getBuyerOrderLineIds($object);
+		}
+		if (($cache[$key][(int) $line->id] ?? '') !== '') {
+			$langs->load('einvoicing@einvoicing');
+			$this->resprints = '<br><span class="opacitymedium">' . $langs->trans('EInvoiceBuyerOrderLineId') . ' :</span> ' . dol_escape_htmltag($cache[$key][(int) $line->id]);
+		}
+
+		return 0;
+	}
+	// phpcs:enable
+
+	/**
+	 * Whether the buyer's order line (BT-132) is shown on the lines of this object: a customer order or invoice.
+	 *
+	 * @param	mixed	$object			Object of the hook
+	 * @return	bool
+	 */
+	private static function buyerOrderLineIdApplies($object)
+	{
+		if (!is_object($object) || empty($object->element) || !in_array($object->element, array('commande', 'facture'), true)) {
+			return false;
+		}
+
+		return !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || getDolGlobalString('EINVOICING_ONLY_GENERATE');
+	}
+
+	/**
+	 * Input of the buyer's order line (BT-132), for the line forms of an order or an invoice.
+	 *
+	 * @param	string	$value	Value to show
+	 * @return	string			HTML
+	 */
+	private static function buyerOrderLineIdInput($value)
+	{
+		global $form, $langs;
+
+		$langs->load('einvoicing@einvoicing');
+		$label = $langs->trans('EInvoiceBuyerOrderLineId');
+		if (is_object($form)) {
+			$label = $form->textwithpicto($label, $langs->trans('EInvoiceBuyerOrderLineIdHelp'));
+		}
+
+		return '<div class="einvoicebuyerorderline paddingtop">' . $label . ' <input type="text" name="einvoice_buyer_order_line_id" class="width100" maxlength="255" value="' . dol_escape_htmltag((string) $value) . '"></div>';
+	}
 
 	/**
 	 * Complete the $arrayfields with custom fields to be able to use them in list views (like thirdparty or invoice list)
@@ -2769,7 +2960,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 			$urlparam = '';
 		} elseif ($modulepart == 'facture_fournisseur') {
-			// Received from a supplier: <ref supplier>_einvoice.xml, the name
+			// Received from a supplier: <ref>-<ref supplier>_einvoice.xml, the name
 			// CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment() gives the file it saves
 			if (!$user->hasRight('fournisseur', 'facture', 'lire') || substr($relativepath, -13) !== '_einvoice.xml') {
 				return 0;

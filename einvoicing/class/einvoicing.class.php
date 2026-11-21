@@ -665,6 +665,12 @@ class EInvoicing
 	const EXTRAFIELD_SELLER_ID_BY_BUYER = 'seller_id_by_buyer';
 
 	/**
+	 * Name, into llx_einvoicing_extrafields, of the line of the buyer's purchase order a line bills: entered
+	 * on the order line ('commandedet'), copied to the invoice line ('facturedet') and sent as BT-132.
+	 */
+	const EXTRAFIELD_BUYER_ORDER_LINE_ID = 'buyer_order_line_id';
+
+	/**
 	 * ISO/IEC 6523 scheme identifier of the French routing code ("code de routage"), the scheme the
 	 * Chorus Pro "code service exécutant" is declared under as BT-46 by BR-FR-CPRO-11 and
 	 * BR-FR-CPRO-13 of XP Z12-012. Not to be confused with 0225 (e-invoice address) nor with 0002 /
@@ -1028,9 +1034,10 @@ class EInvoicing
 	 * Get the path of the CII XML received for a supplier invoice, if there is one to read.
 	 *
 	 * The file is the one the reception saved beside the supplier invoice, so the naming is the one of
-	 * CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment(): the reference of the supplier names
-	 * the file, and the reference of the invoice names its directory. A document received in Factur-X
-	 * is a PDF, which Dolibarr previews on its own and which is not concerned here.
+	 * CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment(): <ref supplier>_einvoice.xml, prefixed
+	 * with the reference of the invoice unless it was received before #1174 or the prefix is disabled,
+	 * in the directory of the invoice. A document received in Factur-X is a PDF, which Dolibarr
+	 * previews on its own and which is not concerned here.
 	 *
 	 * @param 	FactureFournisseur 	$supplierInvoice 	Supplier invoice the document was received for.
 	 * @return 	string									Full path of the XML, empty string if there is none.
@@ -1047,9 +1054,11 @@ class EInvoicing
 		$ref = dol_sanitizeFileName($supplierInvoice->ref);
 		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . '_einvoice.xml');
 
-		$path = $base . get_exdir($supplierInvoice->id, 2, 0, 0, $supplierInvoice, 'invoice_supplier') . $ref . '/' . $filename;
-		if (is_readable($path)) {
-			return $path;
+		$dir = $base . get_exdir($supplierInvoice->id, 2, 0, 0, $supplierInvoice, 'invoice_supplier') . $ref;
+		foreach (array($ref . '-' . $filename, $filename) as $name) {
+			if (is_readable($dir . '/' . $name)) {
+				return $dir . '/' . $name;
+			}
 		}
 
 		return '';
@@ -2332,7 +2341,7 @@ class EInvoicing
 	 */
 	public function supplierInvoiceCardBlock($object, $mode = '', $parameters = array())
 	{
-		global $langs, $form;
+		global $langs, $form, $user;
 		global $action;
 
 		$resprints = '';
@@ -2424,6 +2433,50 @@ class EInvoicing
 			$resprints .= '<tr class="treinvoicing_collapseseparator">';
 			$resprints .= '<td>' . $form->textwithpicto($langs->trans("EInvoiceBuyerOrderReference"), $langs->trans("EInvoiceBuyerOrderReferenceHelp")) . '</td>';
 			$resprints .= '<td>' . dolPrintHTML($buyerOrderReference) . '</td>';
+			$resprints .= '</tr>';
+		}
+
+		// Payment account the received document says the invoice must be paid to (BT-84/85/86). The
+		// import writes it nowhere: an IBAN carried by an incoming invoice is also what an invoice fraud
+		// carries, so it is only shown, compared with the accounts of the vendor, and added on a click.
+		dol_include_once('einvoicing/class/utils/PayeeBankAccountHelper.class.php');
+		$payeeAccounts = PayeeBankAccountHelper::announcedAccounts($this->db, $object);
+		if (!empty($payeeAccounts)) {
+			$langs->load("banks");	// BIC and IbanNotValid belong to the core dictionary of bank accounts
+			$knownAccounts = PayeeBankAccountHelper::thirdpartyAccounts($this->db, (int) $object->socid);
+			$canaddaccount = PayeeBankAccountHelper::addAccountOffered($user);
+
+			$resprints .= '<tr class="treinvoicing_collapseseparator">';
+			$resprints .= '<td>' . $form->textwithpicto($langs->trans("EInvoicePayeeAccount"), $langs->trans("EInvoicePayeeAccountHelp")) . '</td>';
+			$resprints .= '<td>';
+			foreach ($payeeAccounts as $idx => $payeeAccount) {
+				$resprints .= '<div' . ($idx ? ' class="paddingtop"' : '') . '>';
+				// dol_escape_htmltag(), not dolPrintHTML(): these values come from a document written
+				// outside, and the card shows them as they are written, not as markup
+				$resprints .= '<span class="nowraponall">' . dol_escape_htmltag($payeeAccount['iban']) . '</span>';
+				if (!PayeeBankAccountHelper::ibanLooksValid($this->db, $payeeAccount['iban'])) {
+					$resprints .= ' ' . img_picto($langs->trans("IbanNotValid"), 'warning');
+				}
+				if (!empty($payeeAccount['bic'])) {
+					$resprints .= ' <span class="opacitymedium small">' . $langs->trans("BIC") . ' ' . dol_escape_htmltag($payeeAccount['bic']) . '</span>';
+				}
+				if (!empty($payeeAccount['accountName'])) {
+					$resprints .= ' <span class="opacitymedium small">' . dol_escape_htmltag($payeeAccount['accountName']) . '</span>';
+				}
+				$resprints .= '<br>';
+
+				if (PayeeBankAccountHelper::isKnownAccount($payeeAccount, $knownAccounts)) {
+					$resprints .= '<span class="opacitymedium small">' . $langs->trans("EInvoicePayeeAccountKnown") . '</span>';
+				} else {
+					$resprints .= '<span class="small">' . img_picto('', 'warning', 'class="pictofixedwidth"') . $langs->trans("EInvoicePayeeAccountUnknown") . '</span>';
+					if ($canaddaccount && $object->socid > 0) {
+						$url = $_SERVER["PHP_SELF"] . '?id=' . ((int) $object->id) . '&action=einvoice_addpayeeban&payeeaccount=' . ((int) $idx) . '&token=' . newToken();
+						$resprints .= ' <a class="butAction small smallpaddingimp" href="' . dol_escape_htmltag($url) . '">' . $langs->trans("EInvoicePayeeAccountAdd") . '</a>';
+					}
+				}
+				$resprints .= '</div>';
+			}
+			$resprints .= '</td>';
 			$resprints .= '</tr>';
 		}
 
@@ -3645,6 +3698,112 @@ class EInvoicing
 		}
 
 		return $exists ? 1 : $this->db->last_insert_id($this->db->prefix() . "einvoicing_extrafields");
+	}
+
+	/**
+	 * Delete what the module stores on the lines of an order or an invoice being deleted: the core deletes
+	 * them without the line triggers.
+	 *
+	 * @param	string	$elementType	'commandedet' or 'facturedet'
+	 * @param	int		$parentId		Id of the order or of the invoice
+	 * @return	int						>0 if OK, <0 if KO
+	 */
+	public function deleteLineExtraFields($elementType, $parentId)
+	{
+		$sql = "DELETE FROM " . $this->db->prefix() . "einvoicing_extrafields";
+		if ($elementType == 'commandedet') {
+			$sql .= " WHERE element_type = 'commandedet' AND element_id IN (SELECT rowid FROM " . $this->db->prefix() . "commandedet WHERE fk_commande = " . ((int) $parentId) . ")";
+		} else {
+			$sql .= " WHERE element_type = 'facturedet' AND element_id IN (SELECT rowid FROM " . $this->db->prefix() . "facturedet WHERE fk_facture = " . ((int) $parentId) . ")";
+		}
+		if (!$this->db->query($sql)) {
+			$this->errors[] = $this->db->lasterror();
+			return -1;
+		}
+
+		return 1;
+	}
+
+	/**
+	 * Give the lines of an invoice made from an order the buyer's order line (BT-132) of their order line.
+	 * For Facture::createFromOrder() (automatic billing, API), whose lines carry no origin and not always the
+	 * rank of the order: an invoice line takes the value of the only order line of same description, product,
+	 * quantity and unit price. Lines that already have a value, or match none or several, are left as they are.
+	 *
+	 * @param	int		$invoiceId	Id of the invoice
+	 * @param	int		$orderId	Id of the order it was made from
+	 * @return	int					Number of lines filled, <0 if KO
+	 */
+	public function copyBuyerOrderLineIdsFromOrder($invoiceId, $orderId)
+	{
+		$sql = "SELECT fd.rowid as invoiceline, x.value";
+		$sql .= " FROM " . $this->db->prefix() . "facturedet as fd";
+		$sql .= " INNER JOIN " . $this->db->prefix() . "commandedet as cd ON cd.fk_commande = " . ((int) $orderId);
+		$sql .= " AND COALESCE(cd.fk_product, 0) = COALESCE(fd.fk_product, 0) AND cd.qty = fd.qty AND cd.subprice = fd.subprice";
+		$sql .= " AND COALESCE(cd.description, '') = COALESCE(fd.description, '')";
+		$sql .= " INNER JOIN " . $this->db->prefix() . "einvoicing_extrafields as x ON x.element_type = 'commandedet' AND x.element_id = cd.rowid AND x.name = '" . $this->db->escape(self::EXTRAFIELD_BUYER_ORDER_LINE_ID) . "'";
+		$sql .= " LEFT JOIN " . $this->db->prefix() . "einvoicing_extrafields as y ON y.element_type = 'facturedet' AND y.element_id = fd.rowid AND y.name = '" . $this->db->escape(self::EXTRAFIELD_BUYER_ORDER_LINE_ID) . "'";
+		$sql .= " WHERE fd.fk_facture = " . ((int) $invoiceId) . " AND y.rowid IS NULL";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->errors[] = $this->db->lasterror();
+			return -1;
+		}
+		$values = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$values[(int) $obj->invoiceline][] = (string) $obj->value;
+		}
+		$this->db->free($resql);
+
+		$nb = 0;
+		foreach ($values as $lineId => $found) {
+			if (count($found) == 1 && trim($found[0]) !== '') {
+				if ($this->insertOrUpdateExtraField($lineId, 'facturedet', self::EXTRAFIELD_BUYER_ORDER_LINE_ID, trim($found[0])) < 0) {
+					return -1;
+				}
+				$nb++;
+			}
+		}
+
+		return $nb;
+	}
+
+	/**
+	 * Lines of the buyer's purchase order the lines of an order or an invoice bill (BT-132), in one query.
+	 *
+	 * @param	CommonObject		$object		Customer order or invoice, with its lines
+	 * @return	array<int,string>				Buyer's order line by rowid of the line, lines without one left out
+	 */
+	public function getBuyerOrderLineIds($object)
+	{
+		$elementType = ($object->element == 'commande') ? 'commandedet' : 'facturedet';
+		$lineIds = array();
+		foreach ((array) $object->lines as $line) {
+			if ((int) $line->id > 0) {
+				$lineIds[] = (int) $line->id;
+			}
+		}
+		if (empty($lineIds)) {
+			return array();
+		}
+
+		$sql = "SELECT element_id, value FROM " . $this->db->prefix() . "einvoicing_extrafields";
+		$sql .= " WHERE element_type = '" . $this->db->escape($elementType) . "' AND name = '" . $this->db->escape(self::EXTRAFIELD_BUYER_ORDER_LINE_ID) . "'";
+		$sql .= " AND element_id IN (" . $this->db->sanitize(implode(',', $lineIds)) . ")";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			dol_syslog(__METHOD__ . ' ' . $this->db->lasterror(), LOG_ERR);
+			return array();
+		}
+		$ids = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			if (trim((string) $obj->value) !== '') {
+				$ids[(int) $obj->element_id] = trim((string) $obj->value);
+			}
+		}
+		$this->db->free($resql);
+
+		return $ids;
 	}
 
 	/**

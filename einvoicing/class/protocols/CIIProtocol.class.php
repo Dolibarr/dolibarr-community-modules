@@ -2502,6 +2502,52 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
+	 * Read the payment accounts the document says the invoice must be paid to (BG-17: BT-84 IBAN,
+	 * BT-85 account name, BT-86 BIC).
+	 *
+	 * parseInvoiceHeader() keeps the first one only, where a document may carry one
+	 * ram:SpecifiedTradeSettlementPaymentMeans per account. Accounts without an IBAN are skipped:
+	 * nothing else in there identifies an account well enough to be compared or recorded.
+	 *
+	 * @param  string $rawContent										Raw XML content of the document
+	 * @return array<int,array{iban:string,bic:string,accountName:string}>	One entry per account, in document order
+	 */
+	public function parsePayeeBankAccounts(string $rawContent)
+	{
+		list(, $xpath) = $this->initXPath($rawContent);
+
+		$accounts = array();
+		$seen = array();
+
+		$nodes = $xpath->query('/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:SpecifiedTradeSettlementPaymentMeans');
+		if (!$nodes) {
+			return $accounts;
+		}
+
+		foreach ($nodes as $node) {
+			$iban = (string) $this->getXPathValue($xpath, 'ram:PayeePartyCreditorFinancialAccount/ram:IBANID', $node);
+			if ($iban === '') {
+				continue;
+			}
+
+			// The same account is often repeated once per payment means
+			$key = strtoupper(preg_replace('/[^0-9A-Za-z]/', '', $iban));
+			if (isset($seen[$key])) {
+				continue;
+			}
+			$seen[$key] = 1;
+
+			$accounts[] = array(
+				'iban' => $iban,
+				'bic' => (string) $this->getXPathValue($xpath, 'ram:PayeeSpecifiedCreditorFinancialInstitution/ram:BICID', $node),
+				'accountName' => (string) $this->getXPathValue($xpath, 'ram:PayeePartyCreditorFinancialAccount/ram:AccountName', $node),
+			);
+		}
+
+		return $accounts;
+	}
+
+	/**
 	 * Parse all invoice line items from CII XML.
 	 *
 	 * @param  string $rawContent Raw file content
@@ -3392,6 +3438,14 @@ class CIIProtocol extends AbstractProtocol
 		$price = $doc->createElement('ram:SpecifiedLineTradeAgreement');
 		$el->appendChild($price);
 
+		// BT-132, the line of the buyer's order (BT-13) this line bills. Absent from the BASIC schema, and
+		// EN 16931 allows its LineID only: the order itself is the one of the header.
+		if ($this->isEn16931Profile($profile) && trim((string) ($line['buyerorderlineid'] ?? '')) !== '') {
+			$orderLine = $doc->createElement('ram:BuyerOrderReferencedDocument');
+			$orderLine->appendChild($doc->createElement('ram:LineID', einvoicingXmlText(trim((string) $line['buyerorderlineid']))));
+			$price->appendChild($orderLine);
+		}
+
 		// This section seems not required.
 		// It can be used if the price base is including tax (TTC) and without discount (= Catalog public unit price for individual customers)
 		if (isset($line['grosspriceamount'])) {
@@ -4096,6 +4150,11 @@ class CIIProtocol extends AbstractProtocol
 			$fileext = static::INVOICE_FILE_EXTENSION;
 		}
 		$filename = dol_sanitizeFileName($supplierInvoice->ref_supplier . (empty($suffix) ? '' : '_' . $suffix) . '.' . $fileext);
+		// Prefixed with the reference of the invoice as the upload form does by default, so the validation
+		// renames it with the final reference. A file saved without the prefix before #1174 keeps its name.
+		if (!getDolGlobalString('MAIN_DISABLE_SUGGEST_REF_AS_PREFIX') && !getDolGlobalString('MAIN_DOC_UPLOAD_NOT_RENAME_BY_DEFAULT') && !file_exists($upload_dir . '/' . $filename)) {
+			$filename = dol_sanitizeFileName($supplierInvoice->ref) . '-' . $filename;
+		}
 
 		$dest_path = $upload_dir . '/' . $filename;
 
@@ -5496,7 +5555,7 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
-	 * Suffix an embedded attachment is stored under, in the <ref_supplier>_<suffix>.<ext> naming of the other imported files.
+	 * Suffix an embedded attachment is stored under, in the <ref>-<ref_supplier>_<suffix>.<ext> naming of the other imported files.
 	 *
 	 * @param  string   $filename		Name of the attachment, without extension
 	 * @param  string   $extension		Its extension
