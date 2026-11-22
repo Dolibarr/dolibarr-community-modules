@@ -81,7 +81,8 @@ $ref = GETPOST('ref', 'alpha');
 $action = GETPOST('action', 'aZ09');
 $confirm = GETPOST('confirm', 'alpha');
 
-// Security check: these files are documents of the invoice, so the rights are the ones of its Documents tab
+// Security check: these files are documents of the invoice, so the rights are the ones of its Documents tab.
+// The page exists only behind the hidden option EINVOICING_EMBED_ATTACHED_FILES (no setup page entry on purpose).
 if (!isModEnabled('einvoicing') || !getDolGlobalInt('EINVOICING_EMBED_ATTACHED_FILES')) {
 	accessforbidden('Option EINVOICING_EMBED_ATTACHED_FILES not enabled');
 }

@@ -554,6 +554,8 @@ class CIIProtocol extends AbstractProtocol
 		dol_delete_file($xmlfile);
 
 		$profile = $this->getBuildXmlProfile($object);
+		// Hidden option EINVOICING_EMBED_ATTACHED_FILES (no setup page entry on purpose): it shows the
+		// "E-invoice attachments" tab, whose ticked files are embedded as supporting documents (BG-24)
 		if (getDolGlobalInt('EINVOICING_EMBED_ATTACHED_FILES')) {
 			$invoiceData['_attachedFiles'] = $this->collectAttachedFiles($invoice, $profile);
 		}
