@@ -67,6 +67,22 @@ Si le module UptoSign est installé et activé dans votre Dolibarr, deux options
 
 > **Note :** la signature électronique par UptoSign nécessite que le mandat ait un seul signataire. Si plusieurs signataires sont détectés, un avertissement est affiché.
 
+## Passage des factures modèles en prélèvement à la signature
+
+L'option **Passer les factures modèles en prélèvement dès que le mandat SEPA est signé** (désactivée par défaut) bascule les paiements récurrents d'un client sur le prélèvement dès qu'il a signé son mandat :
+
+- le mandat signé devient le mandat par défaut du tiers, c'est donc lui qui est prélevé, même si le client avait un ancien mandat ;
+- toutes les factures modèles du tiers passent en mode de paiement "Prélèvement" sur le compte bancaire Stancer, y compris celles qui étaient réglées par carte. Les factures générées ensuite, y compris celles des contrats liés à ces modèles, sont donc prélevées automatiquement.
+
+Le mode de paiement du tiers n'est pas modifié : une facture ponctuelle que vous créez à la main garde le mode de paiement que vous choisissez. Les factures déjà émises ne sont pas modifiées non plus.
+
+Le passage se fait :
+
+- automatiquement quand le client signe le mandat par UptoSign (le module UptoSign doit signaler la signature des mandats, ce que font ses versions récentes) ;
+- à la main avec le bouton **Mandat signé** de l'onglet Stancer du tiers, quand le mandat a été signé sur papier ou que la signature électronique n'est pas utilisée. Ce bouton sert aussi à passer en prélèvement une facture modèle créée après la signature.
+
+Chaque passage est tracé par un événement dans l'agenda du tiers, avec la liste des factures modèles modifiées. Si le passage automatique échoue (compte bancaire Stancer non configuré par exemple), un email est envoyé à l'adresse de notification IBAN : corrigez la cause puis utilisez le bouton **Mandat signé**.
+
 ## Email de notification IBAN
 
 Le champ **Email de notification IBAN** permet de recevoir un email à chaque fois qu'un client enregistre un nouvel IBAN. Saisissez l'adresse email qui recevra ces notifications.
@@ -142,5 +158,6 @@ L'onglet Stancer sur la fiche d'un tiers affiche les mandats SEPA en cours et pe
 - Voir l'IBAN enregistré (partiellement masqué)
 - Copier le lien public de saisie d'IBAN pour l'envoyer au client
 - Supprimer un mandat SEPA
+- Déclarer un mandat signé avec le bouton **Mandat signé**, qui passe les factures modèles du tiers en prélèvement (voir plus haut, visible quand l'option est activée)
 
 ![Onglet Stancer sur la fiche tiers avec la section mandat SEPA et le lien de saisie d'IBAN](screenshots/tiers-onglet-stancer-sepa.webp)

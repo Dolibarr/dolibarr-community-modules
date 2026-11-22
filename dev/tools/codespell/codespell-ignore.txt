@@ -107,3 +107,4 @@ ConfirmActionXxx
 
 # String in french text to keep
 signifiant
+Caf

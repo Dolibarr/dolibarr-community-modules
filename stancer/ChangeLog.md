@@ -1,5 +1,29 @@
 # CHANGELOG STANCER FOR [DOLIBARR ERP CRM](https://www.dolibarr.org)
 
+## 2.0.28 -- 2026-11-17
+
+Never email a customer a draft invoice, only the validated one with its final number and PDF
+Get warned when scheduled direct debits stop because SEPA was switched off in the setup
+Never bill an order or a quote twice, nor keep an invoice without its payment after a failure
+Get orders and quotes billed by the nightly task when the customer never came back after paying
+Bill the amount actually collected as a deposit invoice on orders and quotes, as an option
+Get warned in the setup while the nightly payment check task is disabled
+
+## 2.0.26 -- 2026-11-03
+
+Switch template invoices to SEPA direct debit as soon as the customer signs the mandate
+Join to the invoice email the files other modules attach, as a reseller consumption statement
+See each refused, failed or disputed Stancer payment once in the invoice events
+See each successful Stancer payment in the invoice events, as Stripe debits do
+Let other modules space retries or suspend services from AC_PAYMENT_STANCER_KO
+Mail the administrator only once about a failed payment, not on every daily refresh
+Send the customer failure email and the KO trigger when a card payment is refused
+Pay a quote, an order or an invoice with Stancer when the customer only left a mobile
+Reach overseas customers on their mobile, even when their thirdparty country is France
+Keep invoices paid again after a failed SEPA debit closed, instead of "started" with 0 left
+See in the scheduled job result which fully paid invoices could not be classified paid
+Read clearer English labels and messages across the module (thanks to contrib from Laurent)
+
 ## 2.0.24 -- 2026-09-24
 
 Send the payment link from an order or an invoice (thanks to contrib from Axel)

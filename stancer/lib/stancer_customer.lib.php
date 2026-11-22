@@ -361,13 +361,61 @@ function stancerBuildCardAnchorData($socid, $customerID, $objname, $country_code
 }
 
 /**
+ * Numbering plan of the French overseas departments.
+ *
+ * They share the French national plan: their numbers are written 0xxx like
+ * the mainland ones, and the first four digits tell the territory and whether
+ * the line is a mobile. Dolibarr ships them as regions of France, not as
+ * countries, so the thirdparty country says "France" and only the number
+ * itself can tell that "0692..." is to be dialed "+262 692...".
+ *
+ * @return array<string, array{0:string, 1:bool}> National prefix => dialing code, mobile line.
+ */
+function stancerFrenchOverseasPlan()
+{
+	return array(
+		// La Réunion
+		'0262' => array('262', false),
+		'0263' => array('262', false),
+		'0692' => array('262', true),
+		'0693' => array('262', true),
+		// Mayotte
+		'0269' => array('262', false),
+		'0639' => array('262', true),
+		// Guadeloupe, Saint-Barthélemy, Saint-Martin
+		'0590' => array('590', false),
+		'0690' => array('590', true),
+		'0691' => array('590', true),
+		// Guyane
+		'0594' => array('594', false),
+		'0694' => array('594', true),
+		// Martinique
+		'0596' => array('596', false),
+		'0696' => array('596', true),
+		'0697' => array('596', true),
+	);
+}
+
+/**
  * Turn a phone number into the international form Stancer expects.
  *
  * Stancer only accepts a mobile in international form ("+33..."). Dolibarr
- * stores what the user typed, most often a French national number with spaces
- * or dots, which the raw comparison "does it start with a + ?" rejects. The
- * conversion assumes France for a national number, which is what the
- * ZIPAUTOFILL/company country already assumes elsewhere in Dolibarr.
+ * stores what the user typed, most often a national number with spaces or
+ * dots, which the raw comparison "does it start with a + ?" rejects. A
+ * national number is read in the country of the thirdparty, France when it
+ * has none, which is what the company country already assumes elsewhere in
+ * Dolibarr.
+ *
+ * Only the countries whose national numbers start with a trunk 0 are
+ * converted: the 0 is replaced by the dialing code. Elsewhere (Italy, Spain,
+ * Portugal...) a national number cannot be told from a mistyped one, so it is
+ * refused rather than sent wrong. The same trunk 0 typed after the dialing
+ * code ("+33 (0)6...") is removed.
+ *
+ * Mainland France and its overseas departments share one plan: a French
+ * national number gets the dialing code its prefix belongs to (see
+ * stancerFrenchOverseasPlan()), whatever the thirdparty country, and an
+ * overseas number written with +33 is moved to its own dialing code.
  *
  * @param  string $phone       Number as stored in Dolibarr.
  * @param  string $countryCode Country of the thirdparty, ISO 3166-1 alpha-2.
@@ -375,6 +423,20 @@ function stancerBuildCardAnchorData($socid, $customerID, $objname, $country_code
  */
 function stancerNormalizePhone($phone, $countryCode = 'FR')
 {
+	// Countries of the French plan: ten digits, dialing code given by the prefix.
+	$frenchPlanCountries = array('FR', 'RE', 'YT', 'GP', 'MQ', 'GF', 'BL', 'MF');
+	// Dialing code, and national length (0 when it varies) of the other
+	// countries whose national numbers carry a trunk 0.
+	$trunkCountries = array(
+		'BE' => array('32', 0),
+		'CH' => array('41', 10),
+		'DE' => array('49', 0),
+		'AT' => array('43', 0),
+		'NL' => array('31', 10),
+		'GB' => array('44', 11),
+	);
+	$overseasPlan = stancerFrenchOverseasPlan();
+
 	$phone = preg_replace('/[^0-9+]/', '', (string) $phone);
 	if ($phone === '') {
 		return '';
@@ -382,26 +444,71 @@ function stancerNormalizePhone($phone, $countryCode = 'FR')
 	// Keep a single leading +, drop any other one.
 	$lead = ($phone[0] === '+') ? '+' : '';
 	$digits = str_replace('+', '', $phone);
+
 	if ($lead === '+') {
-		return (strlen($digits) >= 8) ? '+' . $digits : '';
-	}
-	// "00" is the other way of writing "+".
-	if (strncmp($digits, '00', 2) === 0 && strlen($digits) > 4) {
-		return '+' . substr($digits, 2);
-	}
-	// National French number: 10 digits starting with 0.
-	if (strtoupper($countryCode) === 'FR' && strlen($digits) === 10 && $digits[0] === '0') {
-		return '+33' . substr($digits, 1);
+		$international = $digits;
+	} elseif (strncmp($digits, '00', 2) === 0) {
+		// "00" is the other way of writing "+".
+		$international = substr($digits, 2);
+	} elseif ($digits[0] === '0') {
+		$countryCode = strtoupper(trim((string) $countryCode));
+		if ($countryCode === '') {
+			$countryCode = 'FR';
+		}
+		if (in_array($countryCode, $frenchPlanCountries, true)) {
+			if (strlen($digits) !== 10) {
+				return '';
+			}
+			$prefix = substr($digits, 0, 4);
+			$dialCode = isset($overseasPlan[$prefix]) ? $overseasPlan[$prefix][0] : '33';
+		} elseif (isset($trunkCountries[$countryCode])) {
+			list($dialCode, $nationalLength) = $trunkCountries[$countryCode];
+			if ($nationalLength > 0 && strlen($digits) !== $nationalLength) {
+				return '';
+			}
+		} else {
+			return '';
+		}
+		$international = $dialCode . substr($digits, 1);
+	} else {
+		return '';
 	}
 
-	return '';
+	// Dialing codes are prefix-free, so "330..." can only be France followed
+	// by a trunk 0 nobody dials from abroad.
+	$trunkDialCodes = array('33', '262', '590', '594', '596');
+	foreach ($trunkCountries as $country) {
+		$trunkDialCodes[] = $country[0];
+	}
+	foreach ($trunkDialCodes as $dialCode) {
+		if (strncmp($international, $dialCode . '0', strlen($dialCode) + 1) === 0) {
+			$international = $dialCode . substr($international, strlen($dialCode) + 1);
+			break;
+		}
+	}
+
+	// "+33 692..." is a number of La Réunion written with the mainland code.
+	if (strncmp($international, '33', 2) === 0) {
+		$prefix = '0' . substr($international, 2, 3);
+		if (isset($overseasPlan[$prefix])) {
+			$international = $overseasPlan[$prefix][0] . substr($international, 2);
+		}
+	}
+
+	// E.164: a country code never starts with 0, and 15 digits at most.
+	if (!preg_match('/^[1-9][0-9]{7,14}$/', $international)) {
+		return '';
+	}
+
+	return '+' . $international;
 }
 
 /**
  * Tell whether an international number looks like a mobile one.
  *
- * Stancer wants a mobile and answers 422 on a landline. Only France can be
- * told apart here with any confidence (06/07), so every other country is
+ * Stancer wants a mobile and answers 422 on a landline. Only the French plan
+ * can be told apart here with any confidence: 06/07 on the mainland, the
+ * prefixes of stancerFrenchOverseasPlan() overseas. Every other number is
  * given the benefit of the doubt and left to Stancer to judge.
  *
  * @param  string $phone Number already in international form.
@@ -409,11 +516,45 @@ function stancerNormalizePhone($phone, $countryCode = 'FR')
  */
 function stancerLooksLikeMobile($phone)
 {
-	if (strncmp((string) $phone, '+33', 3) !== 0) {
-		return true;
+	$phone = (string) $phone;
+	if (strncmp($phone, '+33', 3) === 0) {
+		return preg_match('/^\+33[67]/', $phone) === 1;
+	}
+	if (preg_match('/^\+(262|590|594|596)([0-9]{3})/', $phone, $matches)) {
+		$overseasPlan = stancerFrenchOverseasPlan();
+		$prefix = '0' . $matches[2];
+		if (isset($overseasPlan[$prefix]) && $overseasPlan[$prefix][0] === $matches[1]) {
+			return $overseasPlan[$prefix][1];
+		}
 	}
 
-	return preg_match('/^\+33[67]/', $phone) === 1;
+	return true;
+}
+
+/**
+ * Find the mobile of a member Stancer can attach the payment to.
+ *
+ * A member card holds three numbers: the mobile comes first, then the
+ * personal and the professional ones. A French landline is skipped, Stancer
+ * answers 422 on one.
+ *
+ * @param  Adherent $member Member who pays.
+ * @return string           International mobile, or an empty string when none is usable.
+ */
+function stancerResolveMemberMobile($member)
+{
+	if (!is_object($member)) {
+		return '';
+	}
+	$countryCode = empty($member->country_code) ? 'FR' : $member->country_code;
+	foreach (array('phone_mobile', 'phone_perso', 'phone') as $field) {
+		$normalized = stancerNormalizePhone(isset($member->$field) ? $member->$field : '', $countryCode);
+		if ($normalized !== '' && stancerLooksLikeMobile($normalized)) {
+			return $normalized;
+		}
+	}
+
+	return '';
 }
 
 /**
@@ -611,7 +752,7 @@ function stancerAddCustomerIfNeeded($object)
 	} elseif ($object->element  == 'member') {
 		//un membre (association)
 		$email = $object->email;
-		$phone = stancerNormalizePhone($object->phone, empty($object->country_code) ? 'FR' : $object->country_code);
+		$phone = stancerResolveMemberMobile($object);
 		$objname = $object->firstname . " " . $object->lastname;
 		$memberid = $object->id;
 		$country_code = $object->country_code;
@@ -1159,6 +1300,175 @@ function stancerAddSEPAIfNeeded($socid, $data)
 	}
 	// print json_encode($companypaymentmode);
 	return $sepaID;
+}
+
+/**
+ * Switch the recurring billing of a thirdparty to the SEPA mandate it just signed
+ *
+ * The mandate becomes the default one of the thirdparty, so the direct debits use it
+ * rather than an older one, and every template invoice of the thirdparty moves to
+ * direct debit on the Stancer bank account, whatever its former payment mode, card
+ * included. The payment mode of the thirdparty itself is left untouched: a one-off
+ * invoice keeps the payment mode chosen for it.
+ *
+ * Without $force a mandate is applied once only, so a replayed signature callback
+ * changes nothing. The manual action forces it, to also catch the template invoices
+ * created since.
+ *
+ * @param	int		$companypaymentmodeid	Id of the mandate (llx_societe_rib)
+ * @param	User	$user					User the changes are made in the name of
+ * @param	bool	$force					Apply again a mandate already applied
+ * @return	array{status:string, templates:array<int,string>, message:string}	status is 'done', 'already', 'disabled', 'notstancer' or 'error', templates lists the switched template invoices
+ */
+function stancerApplySignedSepaMandate($companypaymentmodeid, $user, $force = false)
+{
+	global $db, $langs;
+
+	$result = array('status' => 'error', 'templates' => array(), 'message' => '');
+	$companypaymentmodeid = (int) $companypaymentmodeid;
+
+	if (!getDolGlobalString('STANCER_SEPA_SIGNED_SWITCH_TEMPLATES')) {
+		dol_syslog("stancerApplySignedSepaMandate mandate " . $companypaymentmodeid . ": STANCER_SEPA_SIGNED_SWITCH_TEMPLATES is off, nothing done", LOG_DEBUG);
+		$result['status'] = 'disabled';
+		return $result;
+	}
+
+	$mandate = new CompanyPaymentModeStancer($db);
+	if ($companypaymentmodeid <= 0 || $mandate->fetch($companypaymentmodeid) <= 0) {
+		$result['message'] = 'mandate ' . $companypaymentmodeid . ' not found';
+		dol_syslog("stancerApplySignedSepaMandate " . $result['message'] . " " . $mandate->error, LOG_ERR);
+		return $result;
+	}
+
+	// Only a mandate registered on Stancer can be debited by the module
+	if ($mandate->type !== 'ban' || strpos((string) $mandate->label, 'stancer-sepa') !== 0 || empty($mandate->stancer_object_ref)) {
+		dol_syslog("stancerApplySignedSepaMandate mandate " . $companypaymentmodeid . " (label=" . $mandate->label . ", type=" . $mandate->type . ") is not a Stancer SEPA mandate, nothing done");
+		$result['status'] = 'notstancer';
+		return $result;
+	}
+
+	$socid = (int) $mandate->fk_soc;
+	$actionCode = 'AC_STANCER_SEPA_SIGNED_' . $companypaymentmodeid;
+	if (!$force) {
+		$actioncommCheck = new ActionComm($db);
+		$existing = $actioncommCheck->getActions($socid, 0, '', " AND a.code = '" . $db->escape($actionCode) . "'");
+		if (!is_array($existing)) {
+			$result['message'] = 'cannot look for the event ' . $actionCode . ' ' . $actioncommCheck->error;
+			dol_syslog("stancerApplySignedSepaMandate mandate " . $companypaymentmodeid . ": " . $result['message'], LOG_ERR);
+			return $result;
+		}
+		if (count($existing) > 0) {
+			dol_syslog("stancerApplySignedSepaMandate mandate " . $companypaymentmodeid . " already applied (event " . $actionCode . "), nothing done");
+			$result['status'] = 'already';
+			return $result;
+		}
+	}
+
+	$paymentModeId = (int) dol_getIdFromCode($db, 'PRE', 'c_paiement', 'code', 'id', 1);
+	if ($paymentModeId <= 0) {
+		$result['message'] = 'no payment mode with code PRE';
+		dol_syslog("stancerApplySignedSepaMandate mandate " . $companypaymentmodeid . ": " . $result['message'], LOG_ERR);
+		return $result;
+	}
+	// The scheduled direct debit only collects the invoices on the Stancer bank account
+	$bankAccountId = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+	if ($bankAccountId <= 0) {
+		$result['message'] = 'STANCER_BANK_ACCOUNT_FOR_PAYMENTS is not set';
+		dol_syslog("stancerApplySignedSepaMandate mandate " . $companypaymentmodeid . ": " . $result['message'], LOG_ERR);
+		return $result;
+	}
+
+	require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture-rec.class.php';
+
+	$db->begin();
+
+	if ($mandate->setAsDefault($companypaymentmodeid) <= 0) {
+		$result['message'] = 'cannot set mandate ' . $companypaymentmodeid . ' as default ' . $db->lasterror();
+		dol_syslog("stancerApplySignedSepaMandate " . $result['message'], LOG_ERR);
+		$db->rollback();
+		return $result;
+	}
+
+	$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "facture_rec";
+	$sql .= " WHERE fk_soc = " . ((int) $socid);
+	$sql .= " AND entity IN (" . getEntity('invoice') . ")";
+	$sql .= " AND (fk_mode_reglement IS NULL OR fk_mode_reglement <> " . ((int) $paymentModeId);
+	$sql .= " OR fk_account IS NULL OR fk_account <> " . ((int) $bankAccountId) . ")";
+	$sql .= " ORDER BY rowid ASC";
+	$resql = $db->query($sql);
+	if (!$resql) {
+		$result['message'] = 'cannot list template invoices ' . $db->lasterror();
+		dol_syslog("stancerApplySignedSepaMandate mandate " . $companypaymentmodeid . ": " . $result['message'], LOG_ERR);
+		$db->rollback();
+		return $result;
+	}
+	$templateIds = array();
+	while ($obj = $db->fetch_object($resql)) {
+		$templateIds[] = (int) $obj->rowid;
+	}
+	$db->free($resql);
+
+	foreach ($templateIds as $templateId) {
+		$template = new FactureRec($db);
+		if ($template->fetch($templateId) <= 0) {
+			$result['message'] = 'cannot load template invoice ' . $templateId . ' ' . $template->error;
+			dol_syslog("stancerApplySignedSepaMandate mandate " . $companypaymentmodeid . ": " . $result['message'], LOG_ERR);
+			$db->rollback();
+			$result['templates'] = array();
+			return $result;
+		}
+		$formerMode = (int) $template->mode_reglement_id;
+		if ($formerMode !== $paymentModeId && $template->setPaymentMethods($paymentModeId) < 0) {
+			$result['message'] = 'cannot set direct debit on template invoice ' . $template->ref . ' ' . $template->error;
+			dol_syslog("stancerApplySignedSepaMandate mandate " . $companypaymentmodeid . ": " . $result['message'], LOG_ERR);
+			$db->rollback();
+			$result['templates'] = array();
+			return $result;
+		}
+		if ((int) $template->fk_account !== $bankAccountId && $template->setBankAccount($bankAccountId) < 0) {
+			$result['message'] = 'cannot set the Stancer bank account on template invoice ' . $template->ref . ' ' . $template->error;
+			dol_syslog("stancerApplySignedSepaMandate mandate " . $companypaymentmodeid . ": " . $result['message'], LOG_ERR);
+			$db->rollback();
+			$result['templates'] = array();
+			return $result;
+		}
+		dol_syslog("stancerApplySignedSepaMandate template invoice " . $template->ref . " (id " . $templateId . ") of thirdparty " . $socid . " switched from payment mode " . $formerMode . " to direct debit");
+		$result['templates'][] = (string) $template->ref;
+	}
+
+	$langs->load('stancer@stancer');
+	$actioncomm = new ActionComm($db);
+	$actioncomm->type_code = 'AC_OTH_AUTO';
+	$actioncomm->code = $actionCode;
+	$actioncomm->label = $langs->transnoentitiesnoconv('StancerSepaSignedEventLabel', $mandate->rum);
+	if (count($result['templates']) > 0) {
+		$actioncomm->note_private = $langs->transnoentitiesnoconv('StancerSepaSignedEventTemplates', implode(', ', $result['templates']));
+	} else {
+		$actioncomm->note_private = $langs->transnoentitiesnoconv('StancerSepaSignedEventNoTemplate');
+	}
+	$now = dol_now();
+	$actioncomm->datep = $now;
+	$actioncomm->datef = $now;
+	$actioncomm->percentage = -1;
+	$actioncomm->socid = $socid;
+	$actioncomm->authorid = $user->id;
+	$actioncomm->userownerid = $user->id;
+	$actioncomm->elementid = $socid;
+	// @phan-suppress-next-line PhanDeprecatedProperty  ActionComm::create() only reads fk_element up to Dolibarr 18, both fields must be fed
+	$actioncomm->fk_element = $socid;
+	$actioncomm->elementtype = 'societe';
+	if ($actioncomm->create($user) <= 0) {
+		$result['message'] = 'cannot record the event ' . $actionCode . ' ' . $actioncomm->error;
+		dol_syslog("stancerApplySignedSepaMandate mandate " . $companypaymentmodeid . ": " . $result['message'], LOG_ERR);
+		$db->rollback();
+		$result['templates'] = array();
+		return $result;
+	}
+
+	$db->commit();
+	dol_syslog("stancerApplySignedSepaMandate mandate " . $companypaymentmodeid . " of thirdparty " . $socid . " is now the default one, " . count($result['templates']) . " template invoice(s) switched to direct debit");
+	$result['status'] = 'done';
+	return $result;
 }
 
 /**

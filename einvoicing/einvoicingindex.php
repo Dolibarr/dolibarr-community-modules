@@ -81,6 +81,7 @@ $langs->loadLangs(array("einvoicing@einvoicing"));
 // Load required classes
 include_once __DIR__ . '/class/providers/PDPProviderManager.class.php';
 include_once __DIR__ . '/class/providers/AbstractPDPProvider.class.php';
+require_once __DIR__ . '/lib/einvoicing.lib.php';
 
 $action = GETPOST('action', 'aZ09');
 
@@ -160,7 +161,13 @@ if ($pa_connected) {
 	print '<br>';
 }
 
-
+// Without this, a failing scheduled synchronization is only visible on the card of the job (issue #1142)
+$synchealth = einvoicingSyncJobHealth($db);
+$synclines = einvoicingSyncJobHealthLines($db, $synchealth);
+if ($synchealth !== null && ($synchealth['failed'] || $synchealth['late'])) {
+	print '<div class="error nomargintop">'.$langs->trans($synchealth['failed'] ? "EInvoicingSyncJobFailedWarning" : "EInvoicingSyncJobLateWarning").'</div>';
+	print '<br>';
+}
 
 // Dashboard - Synchronization statistics
 print '<div class="fichehalfleft">';
@@ -169,18 +176,6 @@ print '<table class="noborder centpercent">';
 print '<tr class="liste_titre">';
 print '<th colspan="2">'.$langs->trans("SynchronizationDashboard").'</th>';
 print '</tr>';
-
-// Get last synchronization date
-$sql_last_sync = "SELECT MAX(date_creation) as last_sync FROM " . $db->prefix() . "einvoicing_document";
-$resql_last_sync = $db->query($sql_last_sync);
-$last_sync_date = '';
-if ($resql_last_sync && $db->num_rows($resql_last_sync) > 0) {
-	$obj_last_sync = $db->fetch_object($resql_last_sync);
-	if (!empty($obj_last_sync->last_sync)) {
-		$last_sync_date = dol_print_date($db->jdate($obj_last_sync->last_sync), 'dayhour');
-	}
-	$db->free($resql_last_sync);
-}
 
 // Get count of customer invoices
 $sql_customer = "SELECT COUNT(*) as nb_customer FROM " . $db->prefix() . "einvoicing_document WHERE fk_element_type = 'facture' and flow_type = 'CustomerInvoice'";
@@ -202,23 +197,36 @@ if ($resql_supplier && $db->num_rows($resql_supplier) > 0) {
 	$db->free($resql_supplier);
 }
 
-// Display dashboard
-print '<tr class="oddeven">';
-print '<td>'.$langs->trans("LastSynchronizationDate").'</td>';
-print '<td class="right">' . ($last_sync_date ?: $langs->trans("None")) . '</td>';
-print '</tr>';
+// Display dashboard. The "Automatic synchronization" status line is kept to print it as last line of the table
+$autosyncline = array_shift($synclines);
+foreach ($synclines as $syncline) {
+	print '<tr class="oddeven">';
+	print '<td class="nowraponall">'.$syncline[0].'</td>';
+	print '<td class="right">'.$syncline[1].'</td>';
+	print '</tr>';
+}
 
 print '<tr class="oddeven">';
-print '<td>'.$langs->trans("CustomerInvoicesSynchronized").'</td>';
+print '<td class="nowraponall">'.$langs->trans("CustomerInvoicesSynchronized").'</td>';
 print '<td class="right"><span class="badge badge-info">' . $nb_customer . '</span></td>';
 print '</tr>';
 
 print '<tr class="oddeven">';
-print '<td>'.$langs->trans("SupplierInvoicesSynchronized").'</td>';
+print '<td class="nowraponall">'.$langs->trans("SupplierInvoicesSynchronized").'</td>';
 print '<td class="right"><span class="badge badge-info">' . $nb_supplier . '</span></td>';
 print '</tr>';
 
+if (!empty($autosyncline)) {
+	print '<tr class="oddeven">';
+	print '<td class="nowraponall">'.$autosyncline[0].'</td>';
+	print '<td class="right">'.$autosyncline[1].'</td>';
+	print '</tr>';
+}
+
 print '</table>';
+
+// Button to jump to the synchronization page
+print '<br><div class="center"><a class="button" href="'.dol_buildpath('/einvoicing/document_list.php', 1).'?mainmenu=billing&amp;leftmenu=einvoicing">'.$langs->trans("SynchronizeWithAccessPoint").'</a></div>';
 print '</div>';
 
 

@@ -103,6 +103,135 @@ function stancerReturnObjectMatchesPayment($object, $localPayment)
 }
 
 /**
+ * Record on its invoice a payment the customer comes back from refused
+ * (AC_PAYMENT_STANCER_KO, deduplicated on the payment id so a reload of the
+ * return page adds nothing). Orders, proposals and other objects get no event.
+ *
+ * @param   array                  $tmptag        Return tag exploded into an array (INV, ORD, ...)
+ * @param   array|false            $paymentData   Payment as returned by the Stancer API, false when not fetched
+ * @param   Stancer_payments|null  $localPayment  Local row of the payment
+ * @param   string                 $paymentId     Stancer payment id (paym_xxx)
+ * @return  int                                   1 recorded, 0 nothing to record, -1 on error
+ */
+function stancerRecordReturnFailure($tmptag, $paymentData, $localPayment, $paymentId)
+{
+	global $db;
+
+	// Only a status given by Stancer counts: an API error tells nothing about the payment
+	$status = (is_array($paymentData) && isset($paymentData['status'])) ? (string) $paymentData['status'] : '';
+	if (!in_array($status, stancerPaymentFailureStatuses(), true)) {
+		dol_syslog("stancerRecordReturnFailure payment $paymentId status '$status' is not a failure, nothing to record", LOG_DEBUG);
+		return 0;
+	}
+	if (!is_array($tmptag) || !array_key_exists('INV', $tmptag) || (int) $tmptag['INV'] <= 0) {
+		dol_syslog("stancerRecordReturnFailure payment $paymentId is not for an invoice, no AC_PAYMENT_STANCER_KO", LOG_DEBUG);
+		return 0;
+	}
+	$invoice = new Facture($db);
+	if ($invoice->fetch((int) $tmptag['INV']) <= 0) {
+		dol_syslog("stancerRecordReturnFailure invoice " . $tmptag['INV'] . " of payment $paymentId not found: " . $invoice->error, LOG_ERR);
+		return -1;
+	}
+	if (!stancerReturnObjectMatchesPayment($invoice, $localPayment)) {
+		dol_syslog("stancerRecordReturnFailure invoice " . $invoice->ref . " does not belong to payment $paymentId, AC_PAYMENT_STANCER_KO not recorded", LOG_ERR);
+		return -1;
+	}
+	// The customer has just been refused: now is the time of the failure
+	$res = stancerAddPaymentFailureEvent($invoice, $paymentId, $paymentData, dol_now());
+	return $res < 0 ? -1 : $res;
+}
+
+/**
+ * Invoice, order or proposal a return tag names, loaded only when it really is
+ * the document the payment was issued for (see stancerReturnObjectMatchesPayment())
+ *
+ * @param   array                  $tmptag        Return tag exploded into an array (INV, ORD, PRO, ...)
+ * @param   Stancer_payments|null  $localPayment  Local row of the payment
+ * @return  Facture|Commande|Propal|null          Loaded object, null when the tag names none of them or it does not match
+ */
+function stancerLoadReturnObject($tmptag, $localPayment)
+{
+	global $db;
+
+	$classes = array('INV' => 'Facture', 'ORD' => 'Commande', 'PRO' => 'Propal');
+	foreach ($classes as $key => $class) {
+		if (!is_array($tmptag) || !array_key_exists($key, $tmptag) || (int) $tmptag[$key] <= 0) {
+			continue;
+		}
+		if ($class == 'Commande') {
+			require_once DOL_DOCUMENT_ROOT . '/commande/class/commande.class.php';
+		} elseif ($class == 'Propal') {
+			require_once DOL_DOCUMENT_ROOT . '/comm/propal/class/propal.class.php';
+		}
+		$object = new $class($db);
+		if ($object->fetch((int) $tmptag[$key]) <= 0) {
+			dol_syslog("stancerLoadReturnObject " . $class . " " . $tmptag[$key] . " named by the return tag not found: " . $object->error, LOG_ERR);
+			return null;
+		}
+		if (!stancerReturnObjectMatchesPayment($object, $localPayment)) {
+			dol_syslog("stancerLoadReturnObject " . $class . " " . $object->ref . " does not belong to the payment, not loaded", LOG_ERR);
+			return null;
+		}
+		return $object;
+	}
+	dol_syslog("stancerLoadReturnObject the return tag names no invoice, order or proposal", LOG_DEBUG);
+	return null;
+}
+
+/**
+ * Actions of the return page when the payment did not succeed: AC_PAYMENT_STANCER_KO
+ * on the invoice, PAYMENTONLINE_PAYMENT_KO trigger on the paid document, and the
+ * failure email to the customer of an invoice (STANCER_AUTO_MAIL_INVOICES_ERROR)
+ * when Stancer did refuse the payment (an API error tells nothing about it)
+ *
+ * @param   array                  $tmptag        Return tag exploded into an array (INV, ORD, PRO, ...)
+ * @param   array|false            $paymentData   Payment as returned by the Stancer API, false when not fetched
+ * @param   Stancer_payments|null  $localPayment  Local row of the payment
+ * @param   string                 $paymentId     Stancer payment id (paym_xxx)
+ * @param   int                    $error         Incremented when the trigger fails
+ * @return  Facture|Commande|Propal|null          Document of the payment, null when none could be loaded
+ */
+function stancerProcessReturnFailure($tmptag, $paymentData, $localPayment, $paymentId, &$error)
+{
+	global $user;
+
+	if (stancerRecordReturnFailure($tmptag, $paymentData, $localPayment, $paymentId) < 0) {
+		dol_syslog("stancerProcessReturnFailure failed payment " . $paymentId . " could not be recorded on its invoice", LOG_ERR);
+	}
+
+	$object = stancerLoadReturnObject($tmptag, $localPayment);
+	if ($object === null) {
+		dol_syslog("stancerProcessReturnFailure no document loaded for payment " . $paymentId . ", no trigger and no customer email", LOG_WARNING);
+		return null;
+	}
+
+	if ($object->call_trigger('PAYMENTONLINE_PAYMENT_KO', $user) < 0) {
+		dol_syslog("stancerProcessReturnFailure trigger PAYMENTONLINE_PAYMENT_KO failed on " . $object->ref . ": " . $object->error, LOG_ERR);
+		$error++;
+	}
+
+	if ($object->element == 'facture' && getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_ERROR')) {
+		$status = (is_array($paymentData) && isset($paymentData['status'])) ? (string) $paymentData['status'] : '';
+		if (in_array($status, stancerPaymentFailureStatuses(), true)) {
+			dol_syslog("stancerProcessReturnFailure payment refused, sending error email to customer for " . $object->ref, LOG_DEBUG);
+			$mailRes = stancerSendInvoiceMailModele(
+				getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_ERROR', ''),
+				$object,
+				'BILL_PAYMENTFAILED_SENTBYMAIL',
+				1  // forceMail=1: each failed attempt should notify the customer
+			);
+			if ($mailRes < 0) {
+				dol_syslog("stancerProcessReturnFailure error email to customer failed for " . $object->ref, LOG_ERR);
+			}
+		} else {
+			dol_syslog("stancerProcessReturnFailure status '" . $status . "' is not a refusal, customer of " . $object->ref . " not emailed", LOG_WARNING);
+		}
+	}
+
+	return $object;
+}
+
+/**
  * Resolve the currency code of a payment coming back from Stancer.
  *
  * Same session-less scenario as stancerResolveReturnPaymentId(): an empty
@@ -189,6 +318,536 @@ function stancerIsDepositPayment($object)
 	}
 
 	return 0;
+}
+
+/**
+ * Amount to record for a payment coming back from Stancer: the amount Stancer
+ * really captured. The session one was seeded by the payment page and is only
+ * used when the API gave no amount.
+ *
+ * @param   array|false   $paymentData    Payment as returned by the Stancer API, false when not fetched
+ * @param   float|string  $sessionAmount  Amount kept in session, may be empty
+ * @param   string        $paymentId      Stancer payment id (paym_xxx), for the log
+ * @return  float                         Amount in main currency unit
+ */
+function stancerResolveReturnAmount($paymentData, $sessionAmount, $paymentId)
+{
+	$sessionAmt = (float) $sessionAmount;
+	if (!is_array($paymentData) || !isset($paymentData['amount'])) {
+		dol_syslog("stancerResolveReturnAmount no amount from the API for payment " . $paymentId . ", using the session amount " . $sessionAmt, LOG_WARNING);
+		return $sessionAmt;
+	}
+	// The API amount is an integer number of cents, so /100 is exact
+	$apiAmt = (float) $paymentData['amount'] / 100;
+	if ($sessionAmt > 0 && abs($apiAmt - $sessionAmt) > 0.01) {
+		dol_syslog("stancerResolveReturnAmount amount mismatch session=" . $sessionAmt . " api=" . $apiAmt . " for payment " . $paymentId . ", using the API amount", LOG_ERR);
+	}
+
+	return $apiAmt;
+}
+
+/**
+ * Lock the local rows of a Stancer payment until the end of the current
+ * transaction, so that two processes billing the same payment (double click on
+ * the return page, return page and scheduled job at the same time) run one after
+ * the other. Must be the first statement of the transaction: on MySQL the snapshot
+ * of the second process is then taken after the first one committed.
+ *
+ * @param   string  $paymentId  Stancer payment id (paym_xxx)
+ * @return  int                 1 locked, 0 nothing to lock (no local row, or SQLite which locks the whole file on write), -1 on SQL error
+ */
+function stancerLockLocalPayment($paymentId)
+{
+	global $db;
+
+	if (!in_array($db->type, array('mysql', 'mysqli', 'pgsql'), true)) {
+		dol_syslog("stancerLockLocalPayment no row lock on database type " . $db->type . " for payment " . $paymentId, LOG_DEBUG);
+		return 0;
+	}
+	$sql = "SELECT rowid FROM " . MAIN_DB_PREFIX . "stancer_stancer_payments";
+	$sql .= " WHERE stancer_id = '" . $db->escape($paymentId) . "' FOR UPDATE";
+	$resql = $db->query($sql);
+	if (!$resql) {
+		dol_syslog("stancerLockLocalPayment cannot lock payment " . $paymentId . ": " . $db->lasterror(), LOG_ERR);
+		return -1;
+	}
+	if ($db->num_rows($resql) == 0) {
+		dol_syslog("stancerLockLocalPayment no local row for payment " . $paymentId . ", nothing locked", LOG_WARNING);
+		return 0;
+	}
+
+	return 1;
+}
+
+/**
+ * Invoice already carrying a payment recorded for this Stancer payment id.
+ *
+ * @param   string  $paymentId  Stancer payment id (paym_xxx)
+ * @return  int                 Invoice id, 0 when the payment is recorded nowhere, -1 on SQL error
+ */
+function stancerFindInvoiceOfStancerPayment($paymentId)
+{
+	global $db;
+
+	$paymentId = trim((string) $paymentId);
+	if ($paymentId === '') {
+		dol_syslog("stancerFindInvoiceOfStancerPayment empty payment id, nothing to look for", LOG_WARNING);
+		return 0;
+	}
+	$sql = "SELECT pf.fk_facture FROM " . MAIN_DB_PREFIX . "paiement as p";
+	$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "paiement_facture as pf ON pf.fk_paiement = p.rowid";
+	$sql .= " WHERE p.num_paiement = '" . $db->escape($paymentId) . "' OR p.ext_payment_id = '" . $db->escape($paymentId) . "'";
+	$sql .= " ORDER BY pf.rowid ASC";
+	$sql .= $db->plimit(1);
+	$resql = $db->query($sql);
+	if (!$resql) {
+		dol_syslog("stancerFindInvoiceOfStancerPayment cannot search payment " . $paymentId . ": " . $db->lasterror(), LOG_ERR);
+		return -1;
+	}
+	$obj = $db->fetch_object($resql);
+
+	return $obj ? (int) $obj->fk_facture : 0;
+}
+
+/**
+ * Tell whether a payment captured on an order or a proposal must be billed as a
+ * deposit.
+ *
+ * With STANCER_DEPOSIT_FROM_CAPTURED_AMOUNT, any payment below the total of the
+ * document is a deposit, whatever the payment page asked for. Otherwise the
+ * historical rule stands: the payment started as a deposit and the document still
+ * carries a deposit percentage with the matching option on.
+ *
+ * @param   Commande|Propal  $origin   Order or proposal
+ * @param   float            $amount   Captured amount, tax included
+ * @param   int              $partial  1 when the payment was started as a deposit
+ * @return  int                        1 deposit, 0 full invoice
+ */
+function stancerOriginPaymentIsDeposit($origin, $amount, $partial)
+{
+	if (getDolGlobalString('STANCER_DEPOSIT_FROM_CAPTURED_AMOUNT') != '') {
+		return ((float) $amount < (float) price2num($origin->total_ttc, 'MT') - 0.01) ? 1 : 0;
+	}
+	if ((int) $partial === 1 && stancerIsDepositPayment($origin)) {
+		return 1;
+	}
+	if ((int) $partial === 1) {
+		dol_syslog("stancerOriginPaymentIsDeposit payment on " . $origin->ref . " was started as a deposit but the document or the setup no longer allows one, billed in full", LOG_WARNING);
+	}
+
+	return 0;
+}
+
+/**
+ * Unpaid invoice of an order or a proposal that can take a captured payment
+ * instead of billing the document a second time: an invoice left without its
+ * payment by an earlier failure, or one the merchant made by hand.
+ *
+ * @param   Commande|Propal  $origin   Order or proposal
+ * @param   float            $amount   Captured amount, tax included
+ * @param   int              $deposit  1 when the payment is billed as a deposit
+ * @return  Facture|null               Invoice to reuse, null when none fits
+ */
+function stancerFindReusableOriginInvoice($origin, $amount, $deposit)
+{
+	global $db;
+
+	$origin->fetchObjectLinked($origin->id, $origin->element, null, 'facture');
+	$wantedType = $deposit ? Facture::TYPE_DEPOSIT : Facture::TYPE_STANDARD;
+	// Only the invoice links: the ids under other keys belong to other tables
+	$invoiceIds = isset($origin->linkedObjectsIds['facture']) ? (array) $origin->linkedObjectsIds['facture'] : array();
+	foreach ($invoiceIds as $facid) {
+		$inv = new Facture($db);
+		if ($inv->fetch((int) $facid) <= 0) {
+			dol_syslog("stancerFindReusableOriginInvoice cannot fetch invoice " . $facid . " linked to " . $origin->ref . ": " . $inv->error, LOG_ERR);
+			continue;
+		}
+		if ((int) $inv->type !== $wantedType || !in_array((int) $inv->status, array(Facture::STATUS_DRAFT, Facture::STATUS_VALIDATED), true)) {
+			continue;
+		}
+		$paid = (float) $inv->getSommePaiement();
+		if ($deposit) {
+			// A deposit invoice is reused only when it is the very one of this amount, untouched
+			if ($paid == 0 && abs((float) $inv->total_ttc - $amount) <= 0.01) {
+				return $inv;
+			}
+			continue;
+		}
+		$remaining = (float) price2num($inv->total_ttc - $paid - (float) $inv->getSumCreditNotesUsed() - (float) $inv->getSumDepositsUsed(), 'MT');
+		if ($remaining > 0.005 && $amount <= $remaining + 0.01) {
+			return $inv;
+		}
+	}
+
+	return null;
+}
+
+/**
+ * Deposit invoice of exactly the amount Stancer captured on an order or a
+ * proposal. One line per VAT rate of the document, each worth its share of the
+ * total, entered tax included so that the invoice total is the captured amount to
+ * the cent. Unlike Facture::createDepositFromOrigin(), it needs neither a deposit
+ * percentage on the document nor deposit payment terms.
+ * The caller holds the transaction and rolls it back on failure.
+ *
+ * @param   Commande|Propal  $origin  Order or proposal
+ * @param   float            $amount  Captured amount, tax included
+ * @param   int              $date    Invoice date
+ * @param   User             $user    User creating the invoice
+ * @return  Facture|null              Draft deposit invoice, null on error (reason logged)
+ */
+function stancerCreateDepositInvoiceForAmount($origin, $amount, $date, $user)
+{
+	global $db, $langs;
+
+	$langs->load('stancer@stancer');
+	$amount = (float) price2num($amount, 'MT');
+	if ($amount <= 0 || $amount > (float) price2num($origin->total_ttc, 'MT') + 0.005) {
+		dol_syslog("stancerCreateDepositInvoiceForAmount amount " . $amount . " does not fit in " . $origin->ref . " total " . $origin->total_ttc, LOG_ERR);
+		return null;
+	}
+	if (empty($origin->lines)) {
+		$origin->fetch_lines();
+	}
+	$totalByRate = array();
+	foreach ($origin->lines as $line) {
+		if (!empty($line->special_code) || empty($line->qty)) {
+			continue;
+		}
+		$rate = (string) price2num($line->tva_tx);
+		$totalByRate[$rate] = ($totalByRate[$rate] ?? 0) + (float) $line->total_ttc;
+	}
+	$linesTotal = array_sum($totalByRate);
+	if ($linesTotal <= 0) {
+		dol_syslog("stancerCreateDepositInvoiceForAmount " . $origin->ref . " has no line with an amount to share the deposit on", LOG_ERR);
+		return null;
+	}
+
+	$deposit = new Facture($db);
+	$deposit->socid = (int) $origin->socid;
+	$deposit->type = Facture::TYPE_DEPOSIT;
+	$deposit->date = $date;
+	$deposit->cond_reglement_id = $origin->cond_reglement_id;
+	$deposit->mode_reglement_id = $origin->mode_reglement_id;
+	$deposit->fk_project = $origin->fk_project;
+	$deposit->fk_account = $origin->fk_account;
+	// Same property as stancerCreateInvoiceFromPropal(), valid on Dolibarr 15..21
+	// @phan-suppress-next-line PhanDeprecatedProperty
+	$deposit->ref_client = (string) $origin->ref_client;
+	$deposit->fk_multicurrency = $origin->fk_multicurrency;
+	$deposit->multicurrency_code = $origin->multicurrency_code;
+	$deposit->multicurrency_tx = $origin->multicurrency_tx;
+	// $origin_type does not exist before Dolibarr 19, $origin is the property of the whole range
+	// @phan-suppress-next-line PhanDeprecatedProperty
+	$deposit->origin = $origin->element;
+	$deposit->origin_id = $origin->id;
+	$deposit->linked_objects[$origin->element] = $origin->id;
+	if ($deposit->create($user) <= 0) {
+		dol_syslog("stancerCreateDepositInvoiceForAmount cannot create the deposit invoice of " . $origin->ref . ": " . $deposit->error . ' ' . implode(', ', $deposit->errors), LOG_ERR);
+		return null;
+	}
+
+	$label = $langs->transnoentities('StancerDepositLineFromCapturedAmount', $origin->ref);
+	$rates = array_keys($totalByRate);
+	$lastIndex = count($rates) - 1;
+	$shared = 0.0;
+	foreach ($rates as $index => $rate) {
+		// The last rate takes the rounding remainder so the shares add up to the amount
+		$share = ($index === $lastIndex)
+			? (float) price2num($amount - $shared, 'MT')
+			: (float) price2num($amount * $totalByRate[$rate] / $linesTotal, 'MT');
+		$shared += $share;
+		if ($share == 0) {
+			continue;
+		}
+		if ($deposit->addline($label, 0, 1, (float) $rate, 0, 0, 0, 0, '', '', 0, 0, 0, 'TTC', $share, 1) < 0) {
+			dol_syslog("stancerCreateDepositInvoiceForAmount cannot add the " . $rate . "% line to the deposit invoice of " . $origin->ref . ": " . $deposit->error, LOG_ERR);
+			return null;
+		}
+	}
+	$deposit->fetch($deposit->id);
+	if (abs((float) $deposit->total_ttc - $amount) > 0.005) {
+		dol_syslog("stancerCreateDepositInvoiceForAmount deposit invoice of " . $origin->ref . " totals " . $deposit->total_ttc . " instead of " . $amount, LOG_ERR);
+		return null;
+	}
+
+	return $deposit;
+}
+
+/**
+ * New invoice for a payment captured on an order or a proposal: deposit or full
+ * invoice, see stancerOriginPaymentIsDeposit(). The caller holds the transaction.
+ *
+ * @param   Commande|Propal  $origin    Order or proposal
+ * @param   float            $amount    Captured amount, tax included
+ * @param   int              $deposit   1 to bill a deposit
+ * @param   int              $date      Invoice date
+ * @param   string[]         $messages  Failure reason appended here
+ * @return  Facture|null                Invoice created, null on error
+ */
+function stancerCreateOriginInvoice($origin, $amount, $deposit, $date, &$messages)
+{
+	global $db, $user;
+
+	$invoice = null;
+	$reason = '';
+	if ($deposit && getDolGlobalString('STANCER_DEPOSIT_FROM_CAPTURED_AMOUNT') != '') {
+		$invoice = stancerCreateDepositInvoiceForAmount($origin, $amount, $date, $user);
+	} elseif ($deposit) {
+		// Facture::createDepositFromOrigin() only exists from Dolibarr 16 on, the
+		// partial payment options are only offered there (admin/cb.php)
+		// @phpstan-ignore-next-line
+		$invoice = Facture::createDepositFromOrigin($origin, $date, (int) $origin->cond_reglement_id, $user, 0, true);
+		$reason = (string) $origin->error;
+		if ($invoice && abs((float) $invoice->total_ttc - $amount) > 0.01) {
+			dol_syslog("stancerCreateOriginInvoice deposit invoice " . $invoice->ref . " of " . $origin->ref . " totals " . $invoice->total_ttc . " but " . $amount . " was captured", LOG_WARNING);
+		}
+	} elseif ($origin->element == 'commande') {
+		$invoice = new Facture($db);
+		if ($invoice->createFromOrder($origin, $user) <= 0) {
+			$reason = $invoice->error . ' ' . implode(', ', $invoice->errors);
+			$invoice = null;
+		}
+	} else {
+		$res = stancerCreateInvoiceFromPropal($db, $user, (int) $origin->id);
+		if (is_object($res)) {
+			$invoice = $res;
+		} else {
+			$reason = (string) $res;
+		}
+	}
+	if (!is_object($invoice) || empty($invoice->id)) {
+		$messages[] = 'Failed to create ' . ($deposit ? 'deposit ' : '') . 'invoice from ' . $origin->element . ' ' . $origin->ref . '.';
+		dol_syslog("stancerCreateOriginInvoice failed to create " . ($deposit ? 'deposit ' : '') . "invoice from " . $origin->element . " " . $origin->ref . ": " . $reason, LOG_ERR);
+		return null;
+	}
+
+	return $invoice;
+}
+
+/**
+ * Bill a payment Stancer captured on an order or a proposal: find or create the
+ * invoice, validate it, record the payment and its bank line, all inside one
+ * transaction so that a failure leaves nothing behind (no validated invoice
+ * without its payment).
+ *
+ * Safe to call again for the same payment (reload of the return page, late
+ * return, scheduled job): the local payment row is locked first, a payment
+ * already recorded under this Stancer id ends the call, and an unpaid invoice of
+ * the document able to take the amount is reused instead of billing it twice.
+ *
+ * @param   Commande|Propal  $origin    Order or proposal the payment was made on
+ * @param   array            $payment   payment_id (paym_xxx), amount (captured, main currency unit), currency,
+ *                                      date (timestamp), payment_type_id, partial (1 when started as a deposit), ipaddress
+ * @param   Facture|null     $invoice   Invoice billed, or the one already carrying the payment
+ * @param   string[]         $messages  What was done, or why it failed
+ * @return  int                         1 billed now, 0 already billed before, <0 on error (nothing written)
+ */
+function stancerBillOriginPayment($origin, $payment, &$invoice, &$messages)
+{
+	global $db, $conf, $user;
+
+	require_once DOL_DOCUMENT_ROOT . '/compta/paiement/class/paiement.class.php';
+	$invoice = null;
+	$paymentId = trim((string) ($payment['payment_id'] ?? ''));
+	$amount = (float) price2num($payment['amount'] ?? 0, 'MT');
+	$paymentTypeId = (int) ($payment['payment_type_id'] ?? 0);
+	$currency = strtoupper(trim((string) ($payment['currency'] ?? '')));
+	if ($currency === '') {
+		$currency = strtoupper((string) $conf->currency);
+	}
+	$date = !empty($payment['date']) ? (int) $payment['date'] : dol_now();
+	$what = $origin->element . ' ' . $origin->ref;
+
+	if ($paymentId === '' || $amount <= 0 || $paymentTypeId <= 0) {
+		$messages[] = 'Failed to get a valid payment id, amount or payment type to bill ' . $what . '.';
+		dol_syslog("stancerBillOriginPayment missing data to bill " . $what . ": payment=" . $paymentId . " amount=" . $amount . " type=" . $paymentTypeId, LOG_ERR);
+		return -1;
+	}
+	$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+	$withBank = stancerIsModEnabled('bank');
+	if ($withBank && $bankaccountid <= 0) {
+		$messages[] = 'Setup of bank account to use in module stancer was not set. No way to record the payment.';
+		dol_syslog("stancerBillOriginPayment STANCER_BANK_ACCOUNT_FOR_PAYMENTS is not set, payment " . $paymentId . " of " . $what . " not billed", LOG_ERR);
+		return -2;
+	}
+
+	$db->begin();
+	if (stancerLockLocalPayment($paymentId) < 0) {
+		$db->rollback();
+		$messages[] = 'Cannot lock payment ' . $paymentId . '.';
+		dol_syslog("stancerBillOriginPayment cannot lock payment " . $paymentId . ", " . $what . " not billed", LOG_ERR);
+		return -3;
+	}
+	$existingInvoiceId = stancerFindInvoiceOfStancerPayment($paymentId);
+	if ($existingInvoiceId < 0) {
+		$db->rollback();
+		$messages[] = 'Cannot check whether payment ' . $paymentId . ' was already recorded.';
+		dol_syslog("stancerBillOriginPayment duplicate check failed for payment " . $paymentId . ", " . $what . " not billed", LOG_ERR);
+		return -3;
+	}
+	if ($existingInvoiceId > 0) {
+		$db->commit();
+		$invoice = new Facture($db);
+		if ($invoice->fetch($existingInvoiceId) <= 0) {
+			dol_syslog("stancerBillOriginPayment cannot fetch invoice " . $existingInvoiceId . " already carrying payment " . $paymentId . ": " . $invoice->error, LOG_ERR);
+			$invoice = null;
+		}
+		$messages[] = 'Payment ' . $paymentId . ' was already recorded' . ($invoice ? ' on invoice ' . $invoice->ref : '') . '.';
+		dol_syslog("stancerBillOriginPayment payment " . $paymentId . " of " . $what . " already recorded on invoice " . $existingInvoiceId . ", nothing done", LOG_WARNING);
+		return 0;
+	}
+
+	$deposit = stancerOriginPaymentIsDeposit($origin, $amount, (int) ($payment['partial'] ?? 0));
+	$invoice = stancerFindReusableOriginInvoice($origin, $amount, $deposit);
+	if ($invoice !== null) {
+		dol_syslog("stancerBillOriginPayment payment " . $paymentId . " of " . $what . " goes on the unpaid invoice " . $invoice->ref . " already linked to it", LOG_INFO);
+	} else {
+		$invoice = stancerCreateOriginInvoice($origin, $amount, $deposit, $date, $messages);
+		if ($invoice === null) {
+			$db->rollback();
+			return -4;
+		}
+	}
+
+	$error = 0;
+	// No retry without triggers here: inside this transaction the failed attempt
+	// keeps its new reference, and a second one would leave a gap in the numbering.
+	if ((int) $invoice->status === Facture::STATUS_DRAFT) {
+		if ($invoice->validate($user) <= 0) {
+			$messages[] = 'Failed to validate invoice ' . $invoice->ref . ' of ' . $what . '.';
+			dol_syslog("stancerBillOriginPayment cannot validate invoice " . $invoice->ref . " of " . $what . ": " . $invoice->error . ' ' . implode(', ', $invoice->errors), LOG_ERR);
+			$error++;
+		} else {
+			$invoice->fetch($invoice->id);
+		}
+	}
+
+	if (!$error) {
+		if ($invoice->setPaymentMethods($paymentTypeId) < 0) {
+			dol_syslog("stancerBillOriginPayment cannot set the payment method of invoice " . $invoice->ref . ": " . $invoice->error, LOG_WARNING);
+		}
+		// setBankAccount() writes fk_account unconditionally: never with an empty account
+		if ($bankaccountid > 0 && $invoice->setBankAccount($bankaccountid) < 0) {
+			dol_syslog("stancerBillOriginPayment cannot set the bank account of invoice " . $invoice->ref . ": " . $invoice->error, LOG_WARNING);
+		}
+		// A deposit leaves the rest of the order to bill
+		if (!$deposit && $origin->element == 'commande' && empty($origin->billed) && $origin->classifyBilled($user) < 0) {
+			dol_syslog("stancerBillOriginPayment cannot classify order " . $origin->ref . " as billed: " . $origin->error, LOG_WARNING);
+		}
+	}
+
+	$paiement = new Paiement($db);
+	if (!$error) {
+		if ($currency === strtoupper((string) $conf->currency)) {
+			$paiement->amounts = array($invoice->id => $amount);
+		} elseif (!empty($invoice->multicurrency_code) && strtoupper((string) $invoice->multicurrency_code) === $currency) {
+			$paiement->multicurrency_amounts = array($invoice->id => $amount);
+		} else {
+			$messages[] = 'Payment ' . $paymentId . ' was done in ' . $currency . ', a currency invoice ' . $invoice->ref . ' is not in.';
+			dol_syslog("stancerBillOriginPayment payment " . $paymentId . " in " . $currency . " cannot go on invoice " . $invoice->ref . " in " . $conf->currency . "/" . $invoice->multicurrency_code, LOG_ERR);
+			$error++;
+		}
+	}
+	if (!$error) {
+		$paiement->datepaye = $date;
+		$paiement->paiementid = $paymentTypeId;
+		$paiement->num_payment = $paymentId;
+		$paiement->note_public = 'Online payment ' . dol_print_date($date, 'standard') . ' from ' . ($payment['ipaddress'] ?? '') . ' (' . $what . ')';
+		$paiement->ext_payment_id = $paymentId;
+		// Must be 'stancer' so that reconciliation recognizes the posting
+		$paiement->ext_payment_site = 'stancer';
+		$paiementId = $paiement->create($user, 1);
+		if ($paiementId < 0) {
+			$messages[] = $paiement->error . ' ' . implode("<br>\n", array_filter($paiement->errors, 'strlen'));
+			dol_syslog("stancerBillOriginPayment cannot record payment " . $paymentId . " on invoice " . $invoice->ref . ": " . $paiement->error, LOG_ERR);
+			$error++;
+		} else {
+			$messages[] = 'Payment created (id=' . $paiementId . ')';
+		}
+	}
+	if (!$error && $withBank) {
+		if ($paiement->addPaymentToBank($user, 'payment', '(CustomerInvoicePayment)', $bankaccountid, '', '') < 0) {
+			$messages[] = $paiement->error . ' ' . implode("<br>\n", array_filter($paiement->errors, 'strlen'));
+			dol_syslog("stancerBillOriginPayment cannot add payment " . $paymentId . " to bank account " . $bankaccountid . ": " . $paiement->error, LOG_ERR);
+			$error++;
+		} else {
+			$messages[] = 'Bank transaction of payment created';
+		}
+	}
+	if (!$error && getDolGlobalString('STANCER_CB_AS_PAID') != '') {
+		$invoice->fetch($invoice->id);
+		if ((int) $invoice->status === Facture::STATUS_CLOSED) {
+			dol_syslog("stancerBillOriginPayment invoice " . $invoice->ref . " already closed by its payment", LOG_DEBUG);
+		} elseif (!stancerInvoiceIsFullyPaid($invoice)) {
+			dol_syslog("stancerBillOriginPayment invoice " . $invoice->ref . " not closed as paid, payments do not cover the total", LOG_WARNING);
+		} elseif ($invoice->setPaid($user) < 0) {
+			dol_syslog("stancerBillOriginPayment cannot close invoice " . $invoice->ref . " as paid: " . $invoice->error, LOG_WARNING);
+		}
+	}
+
+	if ($error) {
+		$db->rollback();
+		dol_syslog("stancerBillOriginPayment payment " . $paymentId . " of " . $what . " not billed, everything rolled back", LOG_ERR);
+		$invoice = null;
+		return -5;
+	}
+	if (!$db->commit()) {
+		$messages[] = 'Cannot commit the billing of ' . $what . '.';
+		dol_syslog("stancerBillOriginPayment commit failed for payment " . $paymentId . " of " . $what . ": " . $db->lasterror(), LOG_ERR);
+		$invoice = null;
+		return -6;
+	}
+	$invoice->fetch($invoice->id);
+	$messages[] = 'Invoice ' . $invoice->ref . ' paid from ' . $what;
+	dol_syslog("stancerBillOriginPayment payment " . $paymentId . " billed on invoice " . $invoice->ref . " of " . $what, LOG_INFO);
+
+	return 1;
+}
+
+/**
+ * Everything a captured payment on an order or a proposal triggers, shared by the
+ * return page and the scheduled job: sign the proposal, bill the payment (see
+ * stancerBillOriginPayment()), then put the event on the invoice and email it.
+ *
+ * @param   Commande|Propal  $origin    Order or proposal the payment was made on
+ * @param   array            $payment   Same keys as stancerBillOriginPayment(), plus notify (false: no email)
+ * @param   Facture|null     $invoice   Invoice billed, or the one already carrying the payment
+ * @param   string[]         $messages  What was done, or why it failed
+ * @return  int                         1 billed now, 0 nothing billed (already billed, proposal without automatic invoice), <0 on error
+ */
+function stancerProcessOriginPayment($origin, $payment, &$invoice, &$messages)
+{
+	global $user;
+
+	$invoice = null;
+	if ($origin->element == 'propal') {
+		if ((int) $origin->status === Propal::STATUS_VALIDATED && $origin->closeProposal($user, Propal::STATUS_SIGNED, 'Paiement Stancer') < 0) {
+			dol_syslog("stancerProcessOriginPayment cannot sign proposal " . $origin->ref . ": " . $origin->error, LOG_ERR);
+		}
+		if (getDolGlobalString('STANCER_AUTO_INVOICE_ON_PROPAL_PAID') == '') {
+			$messages[] = 'Propal ' . $origin->ref . ' marked as signed. No invoice created (auto invoice disabled).';
+			dol_syslog("stancerProcessOriginPayment STANCER_AUTO_INVOICE_ON_PROPAL_PAID is off, payment " . ($payment['payment_id'] ?? '') . " of proposal " . $origin->ref . " not billed", LOG_INFO);
+			return 0;
+		}
+	}
+	if (!stancerIsModEnabled('invoice')) {
+		$messages[] = 'Invoice module is not enabled';
+		dol_syslog("stancerProcessOriginPayment invoice module is not enabled, payment " . ($payment['payment_id'] ?? '') . " of " . $origin->ref . " not billed", LOG_ERR);
+		return -1;
+	}
+
+	$res = stancerBillOriginPayment($origin, $payment, $invoice, $messages);
+	if ($res > 0) {
+		stancerAddPaymentResultEvent($invoice, true, (string) $payment['payment_id'], '', '', '', !empty($payment['date']) ? (int) $payment['date'] : dol_now());
+		if ($origin->element == 'propal' && ($payment['notify'] ?? true) && getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_CB') != '') {
+			if (stancerSendInvoiceMailModele(getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_CB_MAILTYPE', ''), $invoice, 'BILL_PAYED_SENTBYMAIL') < 0) {
+				dol_syslog("stancerProcessOriginPayment cannot email invoice " . $invoice->ref . " of proposal " . $origin->ref, LOG_ERR);
+			}
+		}
+	}
+
+	return $res;
 }
 
 /**
@@ -935,6 +1594,10 @@ function stancerSEPAstartPay($object, $userMessage = true, $companypaymentmodeid
 			'fk_soc' => $socid,
 		];
 		$sp->fillDataArray($data);
+		// Stancer may refuse the debit right away: record it on the invoice like the refresh would
+		if (in_array((string) $data['status'], stancerPaymentFailureStatuses(), true)) {
+			stancerAddPaymentFailureEvent($object, (string) $paymentId, $paymentData);
+		}
 		$res = $sp->create($user, true);
 		if ($res > 0) {
 			$message = $langs->trans('StancerSepaPaymentEngaged');
@@ -1297,6 +1960,12 @@ function stancerSEPAstartPayGrouped(array $invoices, $companypaymentmodeid, $use
 	);
 	$sp->fillDataArray($data);
 	$resCreate = $sp->create($user, true);
+	// Stancer may refuse the debit right away: one event per invoice of the group
+	if (in_array((string) $data['status'], stancerPaymentFailureStatuses(), true)) {
+		foreach ($invoices as $inv) {
+			stancerAddPaymentFailureEvent($inv, (string) $paymentId, $paymentData);
+		}
+	}
 	if (!$resCreate) {
 		dol_syslog("stancerSEPAstartPayGrouped Stancer_payments create failed", LOG_ERR);
 		return -1;
@@ -1542,6 +2211,10 @@ function stancerCBstartPay($object, $userMessage = true, $companypaymentmodeid =
 			'fk_soc' => $socid,
 		];
 		$sp->fillDataArray($data);
+		// The saved card is charged at once: a refusal is known now, record it on the invoice
+		if (in_array((string) $data['status'], stancerPaymentFailureStatuses(), true)) {
+			stancerAddPaymentFailureEvent($object, (string) $pid, $paymentResult);
+		}
 		$res = $sp->create($user, true);
 		if ($res > 0) {
 			$message = $langs->trans('StancerCardPaymentEngaged');

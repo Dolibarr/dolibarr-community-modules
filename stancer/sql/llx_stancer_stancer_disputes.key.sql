@@ -15,11 +15,11 @@
 
 
 -- BEGIN MODULEBUILDER INDEXES
-ALTER TABLE llx_stancer_stancer_disputes ADD INDEX idx_stancer_stancer_disputes_rowid (rowid);
-ALTER TABLE llx_stancer_stancer_disputes ADD INDEX idx_stancer_stancer_disputes_dispute_id (dispute_id);
-ALTER TABLE llx_stancer_stancer_disputes ADD INDEX idx_stancer_stancer_disputes_payment_id (payment_id);
-ALTER TABLE llx_stancer_stancer_disputes ADD INDEX idx_stancer_stancer_disputes_status (status);
-ALTER TABLE llx_stancer_stancer_disputes ADD INDEX idx_stancer_stancer_disputes_fk_soc (fk_soc);
+CREATE INDEX idx_stancer_stancer_disputes_rowid ON llx_stancer_stancer_disputes (rowid);
+CREATE INDEX idx_stancer_stancer_disputes_dispute_id ON llx_stancer_stancer_disputes (dispute_id);
+CREATE INDEX idx_stancer_stancer_disputes_payment_id ON llx_stancer_stancer_disputes (payment_id);
+CREATE INDEX idx_stancer_stancer_disputes_status ON llx_stancer_stancer_disputes (status);
+CREATE INDEX idx_stancer_stancer_disputes_fk_soc ON llx_stancer_stancer_disputes (fk_soc);
 ALTER TABLE llx_stancer_stancer_disputes ADD CONSTRAINT llx_stancer_stancer_disputes_fk_user_creat FOREIGN KEY (fk_user_creat) REFERENCES llx_user(rowid) ON DELETE SET NULL;
 -- END MODULEBUILDER INDEXES
-ALTER TABLE llx_stancer_stancer_disputes ADD UNIQUE INDEX uk_stancer_stancer_disputes_dispute_id (entity, dispute_id);
+CREATE UNIQUE INDEX uk_stancer_stancer_disputes_dispute_id ON llx_stancer_stancer_disputes (entity, dispute_id);

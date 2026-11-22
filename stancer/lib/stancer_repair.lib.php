@@ -264,14 +264,17 @@ function stancerRepairCreateDistinctCustomer($soc, $stancerApi)
 
 	$name = stancerFilterSocName((string) $soc->name);
 	$data = array('name' => $name);
-	if (!empty($soc->email)) {
-		$data['email'] = $soc->email;
+	// Same email and mobile as stancerAddCustomerIfNeeded() would send.
+	$payer = stancerResolvePayerContact($soc, null);
+	if ($payer['email'] !== '') {
+		$data['email'] = $payer['email'];
 	}
-	if (!empty($soc->phone) && substr($soc->phone, 0, 1) === '+') {
-		$data['mobile'] = $soc->phone;
+	if ($payer['mobile'] !== '') {
+		$data['mobile'] = $payer['mobile'];
 	}
 	if (empty($data['email']) && empty($data['mobile'])) {
-		return array('id' => '', 'error' => 'Thirdparty has neither email nor +mobile, cannot create a Stancer customer');
+		dol_syslog("stancerRepairCreateDistinctCustomer: socid=" . (int) $soc->id . " has neither email nor mobile, on itself or its contacts", LOG_WARNING);
+		return array('id' => '', 'error' => 'Thirdparty has neither email nor mobile, cannot create a Stancer customer');
 	}
 
 	// Shared helper: retries without the mobile if Stancer 422s on it.
@@ -526,12 +529,15 @@ function stancerRepairSharedCustomer($customerID, $ownerSocid, $db, $user, $stan
 		}
 
 		// CASE C: the intruder exists but is a GENERIC account with no email and
-		// no +mobile (typically Dolibarr's "CLIENT DIVERS"). A Stancer customer
+		// no mobile, on itself or its contacts (typically Dolibarr's "CLIENT
+		// DIVERS"). A Stancer customer
 		// cannot be created for it, and such an account never legitimately owns a
 		// cust_xxx. We do NOT move the payment (its invoice really is on that
 		// generic account); we just clear the wrong customer label to break the
 		// share. No API call.
-		$hasContact = (!empty($soc->email) || (!empty($soc->phone) && substr($soc->phone, 0, 1) === '+'));
+		dol_include_once('/stancer/lib/stancer_customer.lib.php');
+		$payer = stancerResolvePayerContact($soc, null);
+		$hasContact = ($payer['email'] !== '' || $payer['mobile'] !== '');
 		if (!$hasContact) {
 			if ($dryRun) {
 				$action['status']            = 'planned';

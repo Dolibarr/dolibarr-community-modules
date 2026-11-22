@@ -31,7 +31,11 @@
  * @param  string  $paymentStancerId  Stancer payment ID (paym_xxx)
  * @param  string  $reason            Reason for reopening (for the note)
  * @return Facture|Facture[]|int      Facture for solo, array<Facture> for grouped,
- *                                    0 if no invoice found or already unpaid, -1 on error
+ *                                    0 if no invoice found, already unpaid or still fully
+ *                                    covered once this payment is cancelled, -1 on error
+ *
+ * An invoice is reopened only when something is left to pay once this payment is
+ * cancelled. Otherwise it would end up validated ("started") with nothing left to pay.
  *
  * The grouped path only returns the array once at least one invoice has been reopened
  * (the empty case returns 0 earlier), so the real type is narrower than Facture[].
@@ -57,6 +61,12 @@ function stancerReopenInvoiceFromPayment($paymentStancerId, $reason)
 		return 0;
 	}
 
+	// Amount of this payment still standing on each invoice (capture minus any RETURN_ already posted)
+	$standing = stancerPaymentStandingAllocations($paymentStancerId);
+	if (!is_array($standing)) {
+		return -1;
+	}
+
 	// Grouped payment path: reopen every linked invoice and create ONE reverse Paiement covering all of them.
 	if (!empty($sp->grouped_invoice_ids)) {
 		$ids = array_filter(array_map('intval', explode(',', (string) $sp->grouped_invoice_ids)));
@@ -67,24 +77,12 @@ function stancerReopenInvoiceFromPayment($paymentStancerId, $reason)
 			return 0;
 		}
 
-		// Fetch the original Paiement row (single row, multiple amounts dispatch) to retrieve paymenttype and per-invoice allocations.
-		$origPaymentRowId = 0;
-		$origPaymentTypeId = 0;
-		$perInvoiceAlloc = array();
-		$sqlOrig = "SELECT p.rowid, p.fk_paiement, pf.fk_facture, pf.amount";
-		$sqlOrig .= " FROM " . MAIN_DB_PREFIX . "paiement AS p";
-		$sqlOrig .= " INNER JOIN " . MAIN_DB_PREFIX . "paiement_facture AS pf ON pf.fk_paiement = p.rowid";
-		$sqlOrig .= " WHERE p.num_paiement = '" . $db->escape($paymentStancerId) . "'";
-		$resOrig = $db->query($sqlOrig);
-		if ($resOrig) {
-			while ($row = $db->fetch_object($resOrig)) {
-				$origPaymentRowId = (int) $row->rowid;
-				$origPaymentTypeId = (int) $row->fk_paiement;
-				$perInvoiceAlloc[(int) $row->fk_facture] = (float) $row->amount;
-			}
-		}
-
+		// One transaction for the whole group: a failure on one invoice or on the reverse
+		// payment must not leave invoices reopened while their payments still cover them.
+		$db->begin();
 		$reopened = array();
+		$reverseAmounts = array();
+		$reverseRefs = array();
 		foreach ($ids as $iid) {
 			$facture = new Facture($db);
 			if ($facture->fetch($iid) <= 0) {
@@ -95,64 +93,256 @@ function stancerReopenInvoiceFromPayment($paymentStancerId, $reason)
 				dol_syslog("stancerReopenInvoiceFromPayment $paymentStancerId grouped: invoice " . $facture->ref . " is not closed (status=" . $facture->status . "), skip", LOG_DEBUG);
 				continue;
 			}
-			$resUnpaid = $facture->setUnpaid($user);
-			if ($resUnpaid < 0) {
-				dol_syslog("stancerReopenInvoiceFromPayment $paymentStancerId grouped: setUnpaid failed for " . $facture->ref . ": " . $facture->error, LOG_ERR);
+
+			// The invoices of a failed group are often paid again one by one (retry under
+			// another paym_id): those stay fully covered and must stay closed.
+			$amountStanding = isset($standing['amounts'][$facture->id]) ? $standing['amounts'][$facture->id] : 0.0;
+			$remainAfter = stancerInvoiceRemainAfterReturn($facture, $amountStanding);
+			if ($remainAfter <= 0) {
+				dol_syslog("stancerReopenInvoiceFromPayment $paymentStancerId grouped: invoice " . $facture->ref
+					. " stays fully covered once this payment is cancelled (standing=" . $amountStanding
+					. ", total_ttc=" . $facture->total_ttc . ", remain after=" . $remainAfter . "), not reopened", LOG_WARNING);
 				continue;
 			}
 
-			// Private note per invoice
-			$note = dol_now('tzserver');
-			$noteContent = dol_print_date($note, 'dayhour') . ' - ' . $reason;
-			$existingNote = $facture->note_private;
-			$facture->note_private = (!empty($existingNote) ? $existingNote . "\n" : '') . $noteContent;
-			$facture->update_note($facture->note_private, '_private');
+			if ($facture->setUnpaid($user) < 0) {
+				dol_syslog("stancerReopenInvoiceFromPayment $paymentStancerId grouped: setUnpaid failed for " . $facture->ref . ": " . $facture->error, LOG_ERR);
+				$db->rollback();
+				return -1;
+			}
+			if (stancerAppendReopenNote($facture, $reason) < 0) {
+				$db->rollback();
+				return -1;
+			}
 
 			$reopened[] = $facture;
+			if ($amountStanding > 0) {
+				$reverseAmounts[$facture->id] = -1 * $amountStanding;
+				$reverseRefs[] = $facture->ref;
+			} else {
+				dol_syslog("stancerReopenInvoiceFromPayment $paymentStancerId grouped: invoice " . $facture->ref
+					. " holds no amount of this payment, reopened without reverse payment (remain after=" . $remainAfter . ")", LOG_WARNING);
+			}
 		}
 
 		if (count($reopened) === 0) {
-			dol_syslog("stancerReopenInvoiceFromPayment $paymentStancerId grouped: no invoice could be reopened", LOG_DEBUG);
+			// Nothing was written in the transaction
+			$db->commit();
+			dol_syslog("stancerReopenInvoiceFromPayment $paymentStancerId grouped: no invoice to reopen", LOG_DEBUG);
 			return 0;
 		}
 
-		// Build a single reverse Paiement covering the reopened invoices (negative amounts).
-		$reverseAmounts = array();
-		foreach ($reopened as $fac) {
-			if (isset($perInvoiceAlloc[$fac->id]) && $perInvoiceAlloc[$fac->id] > 0) {
-				$reverseAmounts[$fac->id] = -1 * (float) $perInvoiceAlloc[$fac->id];
+		if (count($reverseAmounts) > 0) {
+			$resReverse = stancerCreateReversePayment($paymentStancerId, $reverseAmounts, $standing['paymentTypeId'], $reason, 'SEPA return ' . implode('+', $reverseRefs));
+			if ($resReverse < 0) {
+				$db->rollback();
+				return -1;
 			}
-		}
-		if (count($reverseAmounts) > 0 && $origPaymentTypeId > 0) {
-			$reverse = new Paiement($db);
-			$reverse->datepaye = dol_now();
-			$reverse->amounts = $reverseAmounts;
-			$reverse->paiementid = $origPaymentTypeId;
-			$reverse->num_payment = 'RETURN_' . $paymentStancerId;
-			$reverse->note_public = $reason;
-			$reverseId = $reverse->create($user, 0);
-			if ($reverseId > 0) {
-				$bankAccountId = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
-				if ($bankAccountId > 0) {
-					$labelReverse = 'SEPA return ' . implode('+', array_map(function ($f) {
-						return $f->ref; }, $reopened));
-					$resBankAdd = $reverse->addPaymentToBank($user, 'payment', $labelReverse, $bankAccountId, '', '');
-					if ($resBankAdd < 0) {
-						dol_syslog("stancerReopenInvoiceFromPayment $paymentStancerId grouped: reverse addPaymentToBank failed: " . $reverse->error, LOG_ERR);
-					}
-				}
-				dol_syslog("stancerReopenInvoiceFromPayment $paymentStancerId grouped: reverse Paiement id=$reverseId created for " . count($reverseAmounts) . " invoices", LOG_INFO);
-			} else {
-				dol_syslog("stancerReopenInvoiceFromPayment $paymentStancerId grouped: reverse Paiement creation failed: " . $reverse->error, LOG_ERR);
-			}
-		} else {
-			dol_syslog("stancerReopenInvoiceFromPayment $paymentStancerId grouped: no per-invoice allocation found, no reverse Paiement created (origPaymentRowId=$origPaymentRowId)", LOG_WARNING);
 		}
 
+		$db->commit();
+		dol_syslog("stancerReopenInvoiceFromPayment $paymentStancerId grouped: " . count($reopened) . " invoice(s) set to unpaid, reason: $reason", LOG_INFO);
 		return $reopened;
 	}
 
-	// Solo payment path (legacy): try to find invoice ID from unique_id (pattern: INV=<id> or INV=<id>.xxx)
+	// Solo payment path (legacy)
+	$invoiceId = stancerResolveInvoiceIdFromPayment($sp, $paymentStancerId);
+
+	if (empty($invoiceId)) {
+		dol_syslog("stancerReopenInvoiceFromPayment no invoice found for payment $paymentStancerId (unique_id=" . $sp->unique_id . ", order_id=" . $sp->order_id . ", paiement fallback also failed)", LOG_WARNING);
+		return 0;
+	}
+
+	$facture = new Facture($db);
+	$resFetch = $facture->fetch($invoiceId);
+	if ($resFetch <= 0) {
+		dol_syslog("stancerReopenInvoiceFromPayment cannot fetch invoice id=$invoiceId: " . $facture->error, LOG_ERR);
+		return -1;
+	}
+
+	// Only reopen if invoice is currently paid (status = Facture::STATUS_CLOSED = 2)
+	if ($facture->status != Facture::STATUS_CLOSED) {
+		dol_syslog("stancerReopenInvoiceFromPayment invoice " . $facture->ref . " is not paid (status=" . $facture->status . "), skip", LOG_DEBUG);
+		return 0;
+	}
+
+	// SAFETY: do NOT reopen an invoice that stays fully covered once this payment is
+	// cancelled. Typical case: first Stancer attempt refused -> second attempt captured
+	// under a different paym_id. Same outcome with a credit note, or with a RETURN_ already
+	// posted for this payment. Reopening would leave a validated invoice with nothing
+	// left to pay, and a valid capture would look unpaid.
+	$amountStanding = isset($standing['amounts'][$facture->id]) ? $standing['amounts'][$facture->id] : 0.0;
+	$remainAfter = stancerInvoiceRemainAfterReturn($facture, $amountStanding);
+	if ($remainAfter <= 0) {
+		dol_syslog("stancerReopenInvoiceFromPayment ABORT reopen of " . $facture->ref . " for paym=$paymentStancerId: invoice stays fully covered once this payment is cancelled (standing=" . $amountStanding
+			. ", total_ttc=" . $facture->total_ttc . ", remain after=" . $remainAfter . "). Likely a retry succeeded under a different Stancer id.", LOG_WARNING);
+		return 0;
+	}
+
+	// F3: wrap the whole reopen sequence (setUnpaid + reverse payment + bank entry
+	// + note) in one transaction so a partial failure leaves nothing half-applied.
+	$db->begin();
+	$result = $facture->setUnpaid($user);
+	if ($result < 0) {
+		dol_syslog("stancerReopenInvoiceFromPayment setUnpaid failed on invoice " . $facture->ref . ": " . $facture->error, LOG_ERR);
+		$db->rollback();
+		return -1;
+	}
+
+	// Reverse payment (negative amount) to restore the remain to pay
+	if ($amountStanding > 0) {
+		$resReverse = stancerCreateReversePayment($paymentStancerId, array($facture->id => -1 * $amountStanding), $standing['paymentTypeId'], $reason, 'SEPA return ' . $facture->ref);
+		if ($resReverse < 0) {
+			$db->rollback();
+			return -1;
+		}
+	} else {
+		dol_syslog("stancerReopenInvoiceFromPayment invoice " . $facture->ref . " holds no amount of $paymentStancerId, reopened without reverse payment (remain after=" . $remainAfter . ")", LOG_WARNING);
+	}
+
+	if (stancerAppendReopenNote($facture, $reason) < 0) {
+		$db->rollback();
+		return -1;
+	}
+
+	$db->commit();
+	dol_syslog("stancerReopenInvoiceFromPayment invoice " . $facture->ref . " set to unpaid, reason: $reason", LOG_INFO);
+	return $facture;
+}
+
+/**
+ * Amount of a Stancer payment still standing on each invoice: what the Dolibarr
+ * payment recorded under its id dispatched, minus the RETURN_<id> reverse payments
+ * already posted.
+ *
+ * @param  string  $paymentStancerId  Stancer payment ID (paym_xxx)
+ * @return array{amounts: array<int,float>, paymentTypeId: int}|int  -1 on SQL error
+ */
+function stancerPaymentStandingAllocations($paymentStancerId)
+{
+	global $db;
+
+	$result = array('amounts' => array(), 'paymentTypeId' => 0);
+	$sql = "SELECT p.num_paiement, p.fk_paiement, pf.fk_facture, pf.amount";
+	$sql .= " FROM " . MAIN_DB_PREFIX . "paiement AS p";
+	$sql .= " INNER JOIN " . MAIN_DB_PREFIX . "paiement_facture AS pf ON pf.fk_paiement = p.rowid";
+	$sql .= " WHERE p.num_paiement IN ('" . $db->escape($paymentStancerId) . "', '" . $db->escape('RETURN_' . $paymentStancerId) . "')";
+	$resql = $db->query($sql);
+	if (!$resql) {
+		dol_syslog("stancerPaymentStandingAllocations SQL error for $paymentStancerId: " . $db->lasterror(), LOG_ERR);
+		return -1;
+	}
+	while ($row = $db->fetch_object($resql)) {
+		$iid = (int) $row->fk_facture;
+		if (!isset($result['amounts'][$iid])) {
+			$result['amounts'][$iid] = 0.0;
+		}
+		$result['amounts'][$iid] += (float) $row->amount;
+		if ((string) $row->num_paiement === (string) $paymentStancerId && (int) $row->fk_paiement > 0) {
+			$result['paymentTypeId'] = (int) $row->fk_paiement;
+		}
+	}
+	foreach ($result['amounts'] as $iid => $amount) {
+		$amount = (float) price2num($amount, 'MT');
+		if ($amount < 0) {
+			dol_syslog("stancerPaymentStandingAllocations $paymentStancerId returned more than captured on invoice id=$iid ($amount), counted as 0", LOG_WARNING);
+			$amount = 0.0;
+		}
+		$result['amounts'][$iid] = $amount;
+	}
+	return $result;
+}
+
+/**
+ * Amount left to pay on an invoice once a payment amount is cancelled
+ *
+ * @param  Facture  $facture          Invoice
+ * @param  float    $amountCancelled  Amount of the cancelled payment on this invoice
+ * @return float                      Remain to pay, 0 or less when the invoice stays covered
+ */
+function stancerInvoiceRemainAfterReturn($facture, $amountCancelled)
+{
+	$covered = (float) $facture->getSommePaiement() + (float) $facture->getSumCreditNotesUsed() + (float) $facture->getSumDepositsUsed();
+	return (float) price2num((float) $facture->total_ttc - $covered + $amountCancelled, 'MT');
+}
+
+/**
+ * Record the RETURN_<id> reverse payment of a cancelled Stancer payment and its bank line
+ *
+ * @param  string              $paymentStancerId  Stancer payment ID (paym_xxx)
+ * @param  array<int,float>    $amounts           Negative amount per invoice id
+ * @param  int                 $paymentTypeId     Payment type of the original payment
+ * @param  string              $reason            Public note of the reverse payment
+ * @param  string              $bankLabel         Label of the bank line
+ * @return int                                    Id of the reverse payment, -1 on error
+ */
+function stancerCreateReversePayment($paymentStancerId, $amounts, $paymentTypeId, $reason, $bankLabel)
+{
+	global $db, $user;
+
+	if ($paymentTypeId <= 0) {
+		dol_syslog("stancerCreateReversePayment $paymentStancerId: payment type of the original payment not found", LOG_ERR);
+		return -1;
+	}
+
+	$reverse = new Paiement($db);
+	$reverse->datepaye = dol_now();
+	$reverse->amounts = $amounts;
+	$reverse->paiementid = $paymentTypeId;
+	$reverse->num_payment = 'RETURN_' . $paymentStancerId;
+	$reverse->note_public = $reason;
+	// 0: the invoices were just reopened, there is nothing to close
+	$reverseId = $reverse->create($user, 0);
+	if ($reverseId <= 0) {
+		dol_syslog("stancerCreateReversePayment $paymentStancerId: reverse payment creation failed: " . $reverse->error, LOG_ERR);
+		return -1;
+	}
+
+	$bankAccountId = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
+	if ($bankAccountId > 0) {
+		$resBankAdd = $reverse->addPaymentToBank($user, 'payment', $bankLabel, $bankAccountId, '', '');
+		if ($resBankAdd < 0) {
+			dol_syslog("stancerCreateReversePayment $paymentStancerId: bank entry of the reverse payment failed: " . $reverse->error, LOG_ERR);
+			return -1;
+		}
+	} else {
+		dol_syslog("stancerCreateReversePayment STANCER_BANK_ACCOUNT_FOR_PAYMENTS not configured, reverse payment not added to bank", LOG_WARNING);
+	}
+
+	dol_syslog("stancerCreateReversePayment $paymentStancerId: reverse payment id=$reverseId created on " . count($amounts) . " invoice(s) (" . json_encode($amounts) . ")", LOG_INFO);
+	return (int) $reverseId;
+}
+
+/**
+ * Append the reopen reason, dated, to the private note of an invoice
+ *
+ * @param  Facture  $facture  Invoice
+ * @param  string   $reason   Reason for reopening
+ * @return int                <0 on error, >0 on success
+ */
+function stancerAppendReopenNote($facture, $reason)
+{
+	$noteContent = dol_print_date(dol_now('tzserver'), 'dayhour') . ' - ' . $reason;
+	$facture->note_private = (!empty($facture->note_private) ? $facture->note_private . "\n" : '') . $noteContent;
+	$res = $facture->update_note($facture->note_private, '_private');
+	if ($res < 0) {
+		dol_syslog("stancerAppendReopenNote update_note failed for invoice " . $facture->ref . ": " . $facture->error, LOG_ERR);
+	}
+	return $res;
+}
+
+/**
+ * Id of the invoice a solo (not grouped) Stancer payment was made for
+ *
+ * @param  Stancer_payments  $sp                Local payment row
+ * @param  string            $paymentStancerId  Stancer payment ID (paym_xxx)
+ * @return int                                  Invoice id, 0 when none is found
+ */
+function stancerResolveInvoiceIdFromPayment($sp, $paymentStancerId)
+{
+	global $db;
+
+	// Tag first (pattern: INV=<id> or INV=<id>.xxx)
 	$invoiceId = 0;
 	if (!empty($sp->unique_id) && preg_match('/INV=(\d+)/', $sp->unique_id, $matches)) {
 		$invoiceId = (int) $matches[1];
@@ -178,132 +368,51 @@ function stancerReopenInvoiceFromPayment($paymentStancerId, $reason)
 			$objPaiement = $db->fetch_object($resPaiement);
 			if ($objPaiement && !empty($objPaiement->fk_facture)) {
 				$invoiceId = (int) $objPaiement->fk_facture;
-				dol_syslog("stancerReopenInvoiceFromPayment found invoice via llx_paiement.num_paiement=$paymentStancerId -> fk_facture=$invoiceId");
+				dol_syslog("stancerResolveInvoiceIdFromPayment found invoice via llx_paiement.num_paiement=$paymentStancerId -> fk_facture=$invoiceId");
 			}
 		} else {
-			dol_syslog("stancerReopenInvoiceFromPayment SQL error on paiement fallback: " . $db->lasterror(), LOG_ERR);
+			dol_syslog("stancerResolveInvoiceIdFromPayment SQL error on paiement fallback: " . $db->lasterror(), LOG_ERR);
 		}
 	}
 
-	if (empty($invoiceId)) {
-		dol_syslog("stancerReopenInvoiceFromPayment no invoice found for payment $paymentStancerId (unique_id=" . $sp->unique_id . ", order_id=" . $sp->order_id . ", paiement fallback also failed)", LOG_WARNING);
-		return 0;
-	}
+	return (int) $invoiceId;
+}
 
-	$facture = new Facture($db);
-	$resFetch = $facture->fetch($invoiceId);
-	if ($resFetch <= 0) {
-		dol_syslog("stancerReopenInvoiceFromPayment cannot fetch invoice id=$invoiceId: " . $facture->error, LOG_ERR);
-		return -1;
-	}
+/**
+ * Invoices a Stancer payment was made for: every invoice of a grouped SEPA
+ * payment, or the single invoice of a solo payment
+ *
+ * @param  string  $paymentStancerId  Stancer payment ID (paym_xxx)
+ * @return Facture[]                  Fetched invoices, empty when none is found
+ */
+function stancerGetInvoicesFromPayment($paymentStancerId)
+{
+	global $db;
 
-	// Only reopen if invoice is currently paid (status = Facture::STATUS_CLOSED = 2)
-	if ($facture->status != Facture::STATUS_CLOSED) {
-		dol_syslog("stancerReopenInvoiceFromPayment invoice " . $facture->ref . " is not paid (status=" . $facture->status . "), skip", LOG_DEBUG);
-		return 0;
+	$invoices = array();
+	$sp = new Stancer_payments($db);
+	if (empty($paymentStancerId) || $sp->fetch(0, '', $paymentStancerId) <= 0) {
+		dol_syslog("stancerGetInvoicesFromPayment payment $paymentStancerId not found in local DB", LOG_WARNING);
+		return $invoices;
 	}
-
-	// SAFETY: do NOT setUnpaid if the invoice is already fully covered by OTHER positive
-	// payments (typical retry scenario: first Stancer attempt refused -> second attempt
-	// captured under a different paym_id). Reopening in that case wipes a perfectly valid
-	// payment and the customer ends up "owing" money on an invoice that Stancer already
-	// captured.
-	$sqlOtherPay = "SELECT pf.amount, p.num_paiement";
-	$sqlOtherPay .= " FROM " . MAIN_DB_PREFIX . "paiement AS p";
-	$sqlOtherPay .= " INNER JOIN " . MAIN_DB_PREFIX . "paiement_facture AS pf ON pf.fk_paiement = p.rowid";
-	$sqlOtherPay .= " WHERE pf.fk_facture = " . ((int) $invoiceId);
-	$sqlOtherPay .= " AND (p.num_paiement IS NULL OR p.num_paiement != '" . $db->escape($paymentStancerId) . "')";
-	$sqlOtherPay .= " AND pf.amount > 0";
-	$resOtherPay = $db->query($sqlOtherPay);
-	if ($resOtherPay) {
-		$otherPaid = 0.0;
-		$otherRefs = array();
-		while ($row = $db->fetch_object($resOtherPay)) {
-			$otherPaid += (float) $row->amount;
-			if (!empty($row->num_paiement)) {
-				$otherRefs[] = $row->num_paiement;
-			}
-		}
-		if ($otherPaid >= (float) $facture->total_ttc - 0.001) {
-			dol_syslog("stancerReopenInvoiceFromPayment ABORT reopen of " . $facture->ref
-				. " for refused paym=$paymentStancerId: invoice is already fully covered by other payment(s) totalling "
-				. number_format($otherPaid, 2) . " (total_ttc=" . number_format((float) $facture->total_ttc, 2)
-				. "), refs=[" . implode(',', $otherRefs) . "]. Likely a retry succeeded under a different Stancer id.", LOG_WARNING);
-			return 0;
-		}
+	if (!empty($sp->grouped_invoice_ids)) {
+		$ids = array_filter(array_map('intval', explode(',', (string) $sp->grouped_invoice_ids)));
 	} else {
-		dol_syslog("stancerReopenInvoiceFromPayment SQL error on retry-check: " . $db->lasterror(), LOG_ERR);
+		$ids = array(stancerResolveInvoiceIdFromPayment($sp, $paymentStancerId));
 	}
-
-	// F3: wrap the whole reopen sequence (setUnpaid + reverse payment + bank entry
-	// + note) in one transaction so a partial failure leaves nothing half-applied.
-	$db->begin();
-	$result = $facture->setUnpaid($user);
-	if ($result < 0) {
-		dol_syslog("stancerReopenInvoiceFromPayment setUnpaid failed on invoice " . $facture->ref . ": " . $facture->error, LOG_ERR);
-		$db->rollback();
-		return -1;
-	}
-
-	// Create reverse payment (negative amount) to restore "reste à payer"
-	$sqlOrigPayment = "SELECT p.rowid, p.fk_paiement, pf.amount as pf_amount";
-	$sqlOrigPayment .= " FROM " . MAIN_DB_PREFIX . "paiement AS p";
-	$sqlOrigPayment .= " INNER JOIN " . MAIN_DB_PREFIX . "paiement_facture AS pf ON pf.fk_paiement = p.rowid";
-	$sqlOrigPayment .= " WHERE p.num_paiement = '" . $db->escape($paymentStancerId) . "'";
-	$sqlOrigPayment .= " AND pf.fk_facture = " . ((int) $invoiceId);
-	$sqlOrigPayment .= " LIMIT 1";
-	$resOrigPayment = $db->query($sqlOrigPayment);
-	if ($resOrigPayment) {
-		$origPayment = $db->fetch_object($resOrigPayment);
-		if ($origPayment && $origPayment->pf_amount > 0) {
-			$reversePayment = new Paiement($db);
-			$reversePayment->datepaye = dol_now();
-			$reversePayment->amounts = array($invoiceId => -((float) $origPayment->pf_amount));
-			$reversePayment->paiementid = $origPayment->fk_paiement;
-			$reversePayment->num_payment = 'RETURN_' . $paymentStancerId;
-			$reversePayment->note_public = $reason;
-
-			$reverseId = $reversePayment->create($user, 0);
-			if ($reverseId > 0) {
-				$bankAccountId = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
-				if ($bankAccountId > 0) {
-					$resBankAdd = $reversePayment->addPaymentToBank($user, 'payment', 'SEPA return ' . $facture->ref, $bankAccountId, '', '');
-					if ($resBankAdd < 0) {
-						dol_syslog("stancerReopenInvoiceFromPayment reverse payment bank entry failed for invoice " . $facture->ref . ": " . $reversePayment->error, LOG_ERR);
-						$db->rollback();
-						return -1;
-					}
-				} else {
-					dol_syslog("stancerReopenInvoiceFromPayment STANCER_BANK_ACCOUNT_FOR_PAYMENTS not configured, reverse payment not added to bank", LOG_WARNING);
-				}
-				dol_syslog("stancerReopenInvoiceFromPayment reverse payment created (id=$reverseId, amount=-" . $origPayment->pf_amount . ") for invoice " . $facture->ref, LOG_INFO);
-			} else {
-				dol_syslog("stancerReopenInvoiceFromPayment reverse payment creation failed for invoice " . $facture->ref . ": " . $reversePayment->error, LOG_ERR);
-				$db->rollback();
-				return -1;
-			}
-		} else {
-			dol_syslog("stancerReopenInvoiceFromPayment no original Dolibarr payment found for num_paiement=$paymentStancerId on invoice $invoiceId", LOG_WARNING);
+	foreach ($ids as $iid) {
+		if (empty($iid)) {
+			dol_syslog("stancerGetInvoicesFromPayment no invoice found for payment $paymentStancerId", LOG_WARNING);
+			continue;
 		}
-	} else {
-		dol_syslog("stancerReopenInvoiceFromPayment SQL error looking for original payment: " . $db->lasterror(), LOG_ERR);
+		$facture = new Facture($db);
+		if ($facture->fetch($iid) <= 0) {
+			dol_syslog("stancerGetInvoicesFromPayment cannot fetch invoice id=$iid of payment $paymentStancerId: " . $facture->error, LOG_ERR);
+			continue;
+		}
+		$invoices[] = $facture;
 	}
-
-	// Add a private note for traceability
-	$note = dol_now('tzserver');
-	$noteContent = dol_print_date($note, 'dayhour') . ' - ' . $reason;
-	$existingNote = $facture->note_private;
-	$facture->note_private = (!empty($existingNote) ? $existingNote . "\n" : '') . $noteContent;
-	$resNote = $facture->update_note($facture->note_private, '_private');
-	if ($resNote < 0) {
-		dol_syslog("stancerReopenInvoiceFromPayment update_note failed for invoice " . $facture->ref . ": " . $facture->error, LOG_ERR);
-		$db->rollback();
-		return -1;
-	}
-
-	$db->commit();
-	dol_syslog("stancerReopenInvoiceFromPayment invoice " . $facture->ref . " set to unpaid, reason: $reason", LOG_INFO);
-	return $facture;
+	return $invoices;
 }
 
 /**
@@ -987,6 +1096,21 @@ function stancerRefreshAllDisputes($userMessage = true, $lastrun = null)
 				$sd->update($user);
 			} else {
 				$sd->create($user);
+			}
+
+			// A dispute means the money came back: one AC_PAYMENT_STANCER_KO per invoice of
+			// the payment, deduplicated on the payment id (the payment refresh may have seen
+			// the "disputed" status first)
+			if (!empty($sd->payment_id)) {
+				$disputeDate = stancerApiDate(isset($dispute['created']) ? $dispute['created'] : null);
+				$disputeCode = isset($dispute['response']) ? (string) $dispute['response'] : '';
+				$disputeMessage = stancerGetSepaResponseMessage($disputeCode);
+				if ($disputeMessage === $disputeCode) {
+					$disputeMessage = '';
+				}
+				foreach (stancerGetInvoicesFromPayment($sd->payment_id) as $disputedInvoice) {
+					stancerAddPaymentResultEvent($disputedInvoice, false, (string) $sd->payment_id, 'disputed', $disputeCode, $disputeMessage, ($disputeDate instanceof DateTime) ? $disputeDate->getTimestamp() : null);
+				}
 			}
 
 			// Statuses meaning the money is lost (dispute won by customer or not contestable)

@@ -136,6 +136,34 @@ class InterfaceStancerTriggers extends DolibarrTriggers
 
 		// Or you can execute some code below in the switch/case
 		switch ($action) {
+			// Sent by the signature module once the customer has signed a mandate
+			case 'COMPANYPAYMENTMODE_SIGNED':
+				if (!$object instanceof CompanyPaymentMode) {
+					dol_syslog("stancerTrigger $action called with " . $objClass . " instead of CompanyPaymentMode, skip", LOG_ERR);
+					return 0;
+				}
+				$applied = stancerApplySignedSepaMandate((int) $object->id, $user);
+				if ($applied['status'] === 'error') {
+					// The signature callback has no user to show an error to: tell the SEPA contact
+					// so the switch is done by hand from the Stancer tab of the thirdparty
+					dol_syslog("stancerTrigger $action mandate " . $object->id . ": template invoices not switched to direct debit, " . $applied['message'], LOG_ERR);
+					$langs->load('stancer@stancer');
+					$societe = new Societe($this->db);
+					$societe->fetch((int) $object->fk_soc);
+					$sent = stancerSendMail(
+						getDolGlobalString('STANCER_EMAIL_INFO_SEPA', ''),
+						$langs->transnoentitiesnoconv('StancerMailSubjectSepaSignedSwitchError', $societe->name),
+						$langs->transnoentitiesnoconv('StancerMailSepaSignedSwitchError', dol_escape_htmltag((string) $societe->name), dol_escape_htmltag($applied['message'])),
+						false,
+						'',
+						'thi' . ((int) $object->fk_soc)
+					);
+					if ($sent <= 0) {
+						dol_syslog("stancerTrigger $action mandate " . $object->id . ": warning mail not sent (STANCER_EMAIL_INFO_SEPA empty or mail error)", LOG_ERR);
+					}
+				}
+				return 0;
+
 			// Users
 			//case 'USER_CREATE':
 			//case 'USER_MODIFY':
@@ -257,49 +285,50 @@ class InterfaceStancerTriggers extends DolibarrTriggers
 				if (getDolGlobalString('STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE', '') != '') {
 					$mailtype = getDolGlobalString('STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_MAILTYPE', '');
 					if ($mailtype != '') {
-						$delayHours = (int) getDolGlobalString('STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_DELAY', '0');
-						if ($delayHours > 0) {
-							// Schedule the mail for later: a human can still send it manually before the cron fires
-							$dueDate = dol_now() + ($delayHours * 3600);
-							$pendingActionCode = 'BILL_VALIDATE_PENDING';
-							$actioncommCheck = new ActionComm($this->db);
-							// The module requires Dolibarr 15 minimum, where getActions() no longer takes $db as first argument.
-							// The column is percent, the ActionComm property percentage: this
-							// filter is raw SQL. Naming it percentage made getActions() answer
-							// "no such column", which is not empty, so the mail was never
-							// scheduled: the pending event looked like it already existed.
-							$existingPending = $actioncommCheck->getActions($object->socid, $object->id, "invoice", " AND code='AC_" . $pendingActionCode . "' AND percent < 100");
-							if (!is_array($existingPending)) {
-								dol_syslog("stancerTrigger BILL_VALIDATE: could not look for a pending mail on invoice " . $object->ref . ", not scheduling: " . (is_string($existingPending) ? $existingPending : $actioncommCheck->error), LOG_ERR);
-							} elseif (!empty($existingPending)) {
-								dol_syslog("stancerTrigger BILL_VALIDATE: delay=" . $delayHours . "h but a pending mail already exists for invoice " . $object->ref . ", skip schedule", LOG_DEBUG);
-							} else {
-								$pendingEvt = new ActionComm($this->db);
-								$pendingEvt->type_code   = 'AC_OTH_AUTO';
-								$pendingEvt->code        = 'AC_' . $pendingActionCode;
-								$pendingEvt->label       = $langs->trans('StancerBillValidatePendingTitle', $object->ref, $delayHours);
-								$pendingEvt->datep       = $dueDate;
-								$pendingEvt->datef       = $dueDate;
-								$pendingEvt->percentage  = 0;
-								$pendingEvt->socid       = $object->socid;
-								$pendingEvt->authorid    = $user->id;
-								$pendingEvt->userownerid = $user->id;
-								$pendingEvt->note_private = $langs->trans('StancerBillValidatePendingNote', $delayHours, $mailtype);
-								$pendingEvt->elementid   = (int) $object->id;
-								// @phan-suppress-next-line PhanDeprecatedProperty  Dolibarr 15..18 only read fk_element in ActionComm::create()
-								$pendingEvt->fk_element  = $object->id;
-								$pendingEvt->elementtype = 'invoice';
-								$pendingEvt->fulldayevent = 0;
-								$resPending = $pendingEvt->create($user);
-								if ($resPending > 0) {
-									dol_syslog("stancerTrigger BILL_VALIDATE: scheduled mail for invoice " . $object->ref . " in " . $delayHours . "h (modele=$mailtype, due=" . dol_print_date($dueDate, 'dayhour') . ")", LOG_INFO);
-								} else {
-									dol_syslog("stancerTrigger BILL_VALIDATE: failed to create pending ActionComm for invoice " . $object->ref . ": " . $pendingEvt->error, LOG_ERR);
-								}
-							}
+						// Never send from here: Dolibarr calls BILL_VALIDATE before giving the object its
+						// definitive ref and status, and before the validated PDF exists, so the mail
+						// would carry the provisional (PROV) invoice. The mail is always queued, even
+						// with no delay, and the cron sends it once the invoice is really validated.
+						// Meanwhile a human can still send it manually, which cancels the queued one.
+						$delayHours = max(0, (int) getDolGlobalString('STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_DELAY', '0'));
+						// The definitive ref is already known here (newref), the object still holds the PROV one.
+						$invoiceRef = !empty($object->newref) ? (string) $object->newref : (string) $object->ref;
+						$dueDate = dol_now() + ($delayHours * 3600);
+						$pendingActionCode = 'BILL_VALIDATE_PENDING';
+						$actioncommCheck = new ActionComm($this->db);
+						// The module requires Dolibarr 15 minimum, where getActions() no longer takes $db as first argument.
+						// The column is percent, the ActionComm property percentage: this
+						// filter is raw SQL. Naming it percentage made getActions() answer
+						// "no such column", which is not empty, so the mail was never
+						// scheduled: the pending event looked like it already existed.
+						$existingPending = $actioncommCheck->getActions($object->socid, $object->id, "invoice", " AND code='AC_" . $pendingActionCode . "' AND percent < 100");
+						if (!is_array($existingPending)) {
+							dol_syslog("stancerTrigger BILL_VALIDATE: could not look for a pending mail on invoice " . $invoiceRef . ", not scheduling: " . (is_string($existingPending) ? $existingPending : $actioncommCheck->error), LOG_ERR);
+						} elseif (!empty($existingPending)) {
+							dol_syslog("stancerTrigger BILL_VALIDATE: delay=" . $delayHours . "h but a pending mail already exists for invoice " . $invoiceRef . ", skip schedule", LOG_DEBUG);
 						} else {
-							dol_syslog("stancerTrigger BILL_VALIDATE: global all-invoices option active, sending mail immediately (modele=$mailtype, delay=0)", LOG_DEBUG);
-							stancerSendInvoiceMailModele($mailtype, $object, 'BILL_VALIDATE_SENTBYMAIL');
+							$pendingEvt = new ActionComm($this->db);
+							$pendingEvt->type_code   = 'AC_OTH_AUTO';
+							$pendingEvt->code        = 'AC_' . $pendingActionCode;
+							$pendingEvt->label       = $langs->trans('StancerBillValidatePendingTitle', $invoiceRef, $delayHours);
+							$pendingEvt->datep       = $dueDate;
+							$pendingEvt->datef       = $dueDate;
+							$pendingEvt->percentage  = 0;
+							$pendingEvt->socid       = $object->socid;
+							$pendingEvt->authorid    = $user->id;
+							$pendingEvt->userownerid = $user->id;
+							$pendingEvt->note_private = $langs->trans('StancerBillValidatePendingNote', $delayHours, $mailtype);
+							$pendingEvt->elementid   = (int) $object->id;
+							// @phan-suppress-next-line PhanDeprecatedProperty  Dolibarr 15..18 only read fk_element in ActionComm::create()
+							$pendingEvt->fk_element  = $object->id;
+							$pendingEvt->elementtype = 'invoice';
+							$pendingEvt->fulldayevent = 0;
+							$resPending = $pendingEvt->create($user);
+							if ($resPending > 0) {
+								dol_syslog("stancerTrigger BILL_VALIDATE: scheduled mail for invoice " . $invoiceRef . " in " . $delayHours . "h (modele=$mailtype, due=" . dol_print_date($dueDate, 'dayhour') . ")", LOG_INFO);
+							} else {
+								dol_syslog("stancerTrigger BILL_VALIDATE: failed to create pending ActionComm for invoice " . $invoiceRef . ": " . $pendingEvt->error, LOG_ERR);
+							}
 						}
 					} else {
 						dol_syslog("stancerTrigger BILL_VALIDATE: STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE active but no mail template configured, skipping", LOG_WARNING);

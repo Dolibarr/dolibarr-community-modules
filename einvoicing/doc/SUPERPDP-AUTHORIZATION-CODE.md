@@ -37,7 +37,7 @@ Configuration → eInvoicing :
 ## 3. Se connecter
 
 1. Cliquer **« Connecter à SuperPDP »** → redirection vers `https://api.superpdp.tech/oauth2/authorize`
-   (pré-rempli avec le SIREN de votre société et l'email de l'utilisateur).
+   (pré-rempli avec le numéro d'entreprise de votre société et l'email de la société, à défaut celui de l'utilisateur).
 2. Dérouler le **tunnel d'inscription / consentement** SUPER PDP (KYC/KYB).
 3. Retour automatique sur `…/admin/setup.php?code=…&state=…` (connexion directe ; via le proxy, le
    client reçoit directement `…/admin/setup.php?accesstoken=…&refresh_token=…&expires_in=…`) → le module **vérifie le `state`** (anti-CSRF),
@@ -49,7 +49,9 @@ Configuration → eInvoicing :
 La marque grise passe par un **proxy OAuth** : l'instance opérateur (`EINVOICING_SUPERPDP_VIAPARTNER` =
 `proxy`) détient le `client_id` / `client_secret` (`EINVOICING_SUPERPDPVIAPARTNER_CLIENT_ID[_PROD]`,
 `_CLIENT_SECRET[_PROD]`) et ne livre les jetons qu'aux domaines de
-`EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN`. Chaque instance cliente pose `EINVOICING_SUPERPDP_VIAPARTNER`
+`EINVOICING_SUPERPDPVIAPARTNER_ONLY_DOMAIN` (liste séparée par des virgules, sous-domaines compris).
+Laissée vide, elle laisse encore passer tous les domaines (étape de transition, signalée par un
+avertissement sur les pages de configuration) : à renseigner. Chaque instance cliente pose `EINVOICING_SUPERPDP_VIAPARTNER`
 (nom du partenaire) et `EINVOICING_SUPERPDP_VIAPARTNER_OAUTH_URL` (URL du proxy), puis choisit l'entrée
 « SuperPDP via partenaire » ; `EINVOICING_SUPERPDP_VIAPARTNER_ONLY` masque les autres plateformes. Le
 client ne détient jamais le secret.
@@ -62,7 +64,7 @@ permet d'agir pour lui.
 
 > Multi-clients : une instance/entité Dolibarr connectée = un compte délégué. Pour gérer plusieurs clients
 > distincts, chacun se connecte depuis sa propre instance/entité. Les jetons sont stockés chiffrés
-> (`dolEncrypt`), dans `llx_oauth_token` (Dolibarr ≥ 23) ou dans des constantes (< 23), par `service` +
+> (`dolEncrypt`), dans `llx_oauth_token` (Dolibarr ≥ 23, pré-versions 23.0.0-alpha/beta comprises) ou dans des constantes (< 23), par `service` +
 > `entity`. En multisociété avec `EINVOICING_MULTICOMPANY_USE_MASTER_SETUP`, les entités esclaves
 > utilisent le jeton de l'entité maître.
 
@@ -75,6 +77,9 @@ permet d'agir pour lui.
 - Renouvellement déclenché 60 s avant expiration. En mode « via partenaire », il passe par le proxy
   (`action=refresh`) ; s'il échoue, il faut se reconnecter. En connexion directe, un refresh refusé
   retombe sur une ré-authentification client_credentials.
+- Les renouvellements concurrents (cron, onglets, pages) sont sérialisés par un verrou de base de
+  données : le `refresh_token` étant à usage unique, deux renouvellements simultanés pouvaient faire
+  révoquer toute la famille de jetons côté SUPER PDP.
 - Révocation possible (RFC 7009) : `https://api.superpdp.tech/oauth2/revoke`.
 
 ## 6. Dépannage

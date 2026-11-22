@@ -76,9 +76,70 @@ trait CommonProtocol
 	 * @param  float|null	$alreadyPaid	Amount already received that the document will report as
 	 *                                      BT-113 (payments + used credit notes). Null recomputes the
 	 *                                      payments alone, which is enough for a standalone call.
+	 * @param  string		$contractorRole	EInvoicing::CONTRACTOR_ROLE_* the invoice is issued under, '' for none.
+	 *                                      Turns a services frame into S5/S6 (issue #946).
 	 * @return string  BillingProcessID
 	 */
-	public function getBillingProcessID($invoice, $alreadyPaid = null)
+	public function getBillingProcessID($invoice, $alreadyPaid = null, $contractorRole = '')
+	{
+		$prefix = $this->getBillingFramePrefix($invoice);
+
+		// S5/S6 name who files a services invoice, so they replace the 1/2/4 suffix. No B or M variant
+		// exists: validateInvoiceConfiguration() refuses the role on any other frame before generation.
+		if ($prefix === 'S' && $contractorRole === 'subcontractor') {
+			return 'S5';
+		}
+		if ($prefix === 'S' && $contractorRole === 'cocontractor') {
+			return 'S6';
+		}
+
+		// Determine suffix 1 (initial invoice) or 2 (already paid invoice) according to invoice status and payment information and if the invoice contain a line a deposit (prepayment) so final invoice after deposit then suffix is 4
+		//
+		// BT-23 is the billing case of the document, not a payment status: BR-FR-CO-09 makes B2/S2/M2
+		// fatal unless the amount already paid (BT-113) equals the total (BT-112) and the amount due
+		// (BT-115) is 0. Facture::STATUS_CLOSED alone does not say that, so claim the frame only when
+		// the amount the document will actually carry in BT-113 covers the total.
+		$totalTtc = (float) price2num($invoice->total_ttc, 'MT');
+		if ($alreadyPaid === null) {
+			// The error is the int -1, a refund of 1.00 the float -1.0.
+			$alreadyPaid = $invoice->getSommePaiement();
+			if (!is_float($alreadyPaid)) {
+				if ($alreadyPaid < 0) {
+					dol_syslog(__METHOD__ . ' cannot read the payments of invoice ' . $invoice->id . ': ' . $invoice->error, LOG_ERR);
+				}
+				$alreadyPaid = 0.0;
+			}
+		}
+		// Credit note: total is negative in Dolibarr, BT-113 is positive in the document.
+		$isFullyPaid = ($totalTtc != 0.0 && abs(abs((float) $alreadyPaid) - abs($totalTtc)) < 0.005);
+
+		if ($invoice->status == Facture::STATUS_CLOSED && empty($invoice->close_code) && $isFullyPaid) {
+			return $prefix . '2';
+		} else {
+			// Check if the invoice contains a deposit (prepayment) line
+			$hasDepositLine = false;
+			if (!empty($invoice->lines)) {
+				foreach ($invoice->lines as $line) {
+					if ($line->desc == '(DEPOSIT)') {
+						$hasDepositLine = true;
+						break;
+					}
+				}
+			}
+			if ($hasDepositLine) {
+				return $prefix . '4';
+			}
+			return $prefix . '1';
+		}
+	}
+
+	/**
+	 * Prefix of the billing frame (BT-23): B for goods, S for services, M for both.
+	 *
+	 * @param  CommonInvoice	$invoice	Invoice whose lines are read
+	 * @return string						'B', 'S' or 'M'
+	 */
+	public function getBillingFramePrefix($invoice)
 	{
 		$hasProduct  = false;
 		$hasService  = false;
@@ -106,36 +167,7 @@ trait CommonProtocol
 			$prefix = 'B';
 		}
 
-		// Determine suffix 1 (initial invoice) or 2 (already paid invoice) according to invoice status and payment information and if the invoice contain a line a deposit (prepayment) so final invoice after deposit then suffix is 4
-		//
-		// BT-23 is the billing case of the document, not a payment status: BR-FR-CO-09 makes B2/S2/M2
-		// fatal unless the amount already paid (BT-113) equals the total (BT-112) and the amount due
-		// (BT-115) is 0. Facture::STATUS_CLOSED alone does not say that, so claim the frame only when
-		// the amount the document will actually carry in BT-113 covers the total.
-		$totalTtc = (float) price2num($invoice->total_ttc, 'MT');
-		if ($alreadyPaid === null) {
-			$alreadyPaid = (float) $invoice->getSommePaiement();
-		}
-		$isFullyPaid = ($totalTtc != 0.0 && abs((float) $alreadyPaid - $totalTtc) < 0.005);
-
-		if ($invoice->status == Facture::STATUS_CLOSED && empty($invoice->close_code) && $isFullyPaid) {
-			return $prefix . '2';
-		} else {
-			// Check if the invoice contains a deposit (prepayment) line
-			$hasDepositLine = false;
-			if (!empty($invoice->lines)) {
-				foreach ($invoice->lines as $line) {
-					if ($line->desc == '(DEPOSIT)') {
-						$hasDepositLine = true;
-						break;
-					}
-				}
-			}
-			if ($hasDepositLine) {
-				return $prefix . '4';
-			}
-			return $prefix . '1';
-		}
+		return $prefix;
 	}
 
 	/**
@@ -1642,7 +1674,7 @@ trait CommonProtocol
 		global $langs, $user;
 
 		$langs->load("einvoicing@einvoicing");
-		$setupUrl = dol_buildpath('/einvoicing/admin/setup_options.php', 1) . '#EINVOICING_DEFAULT_ROUTING_MIXED';
+		$setupUrl = dol_buildpath('/einvoicing/admin/setup_receive.php', 1) . '#EINVOICING_DEFAULT_ROUTING_MIXED';
 		$action = $user->admin
 			? '<a class="button small smallpaddingimp" style="display:inline-block;width:auto;" href="' . dol_escape_htmltag($setupUrl) . '" target="_blank">'
 			: '<a class="button disabled classfortooltip small smallpaddingimp" style="display:inline-block;width:auto;" href="#" title="' . dol_escape_htmltag($langs->trans("NotEnoughPermissions")) . '">';
@@ -2952,5 +2984,100 @@ trait CommonProtocol
 		}
 
 		return array('message' => implode("<br>\n", $messages));
+	}
+
+	/**
+	 * Attach a supplier invoice being imported to the recurring template of its vendor.
+	 *
+	 * A vendor billed on a subscription already has a template in Dolibarr, holding the settings the
+	 * operator chose once (bank account, project, payment). Called before create(), so the invoice is
+	 * written with them rather than corrected afterwards. See issue #997.
+	 *
+	 * @param	FactureFournisseur	$supplierInvoice	Supplier invoice being built, modified by reference
+	 * @param	int					$socId				Vendor of the received document
+	 * @param	string[]			$return_messages	Messages of the import, completed by reference
+	 * @return	?FactureFournisseurRec					The template the invoice was attached to, null when none was
+	 */
+	private function _attachSupplierInvoiceToRecurringTemplate(FactureFournisseur $supplierInvoice, $socId, array &$return_messages)
+	{
+		global $langs;
+
+		if (!getDolGlobalString('EINVOICING_LINK_TO_RECURRING_TEMPLATE_IF_ONLY_ONE_FOUND')) {
+			return null;
+		}
+
+		// A credit note or a replacement does not stand for the invoice of a period: attaching one would
+		// make the template skip a generation it still owes.
+		if ((int) $supplierInvoice->type !== FactureFournisseur::TYPE_STANDARD) {
+			return null;
+		}
+
+		dol_include_once('einvoicing/class/utils/RecurringSupplierInvoiceHelper.class.php');
+		dol_include_once('fourn/class/fournisseur.facture-rec.class.php');
+
+		$templates = RecurringSupplierInvoiceHelper::listTemplatesOfVendor((int) $socId);
+		$templateId = RecurringSupplierInvoiceHelper::soleActiveTemplate($templates);
+		if ($templateId <= 0) {
+			if (count($templates) > 1) {
+				$return_messages[] = $langs->trans('EInvoiceRecurringTemplateAmbiguous', count($templates));
+			}
+			return null;
+		}
+
+		$template = new FactureFournisseurRec($this->db);
+		if ($template->fetch($templateId) <= 0) {
+			dol_syslog(__METHOD__ . ' could not load the recurring template ' . $templateId . ' of vendor ' . ((int) $socId), LOG_WARNING);
+			return null;
+		}
+
+		$supplierInvoice->fk_fac_rec_source = $template->id;
+		foreach (RecurringSupplierInvoiceHelper::fieldsToInherit($supplierInvoice, $template) as $field => $value) {
+			$supplierInvoice->$field = $value;
+		}
+
+		return $template;
+	}
+
+	/**
+	 * Finish attaching an imported supplier invoice to a recurring template, once it is stored.
+	 *
+	 * Moves the template past the generation this document stands for, so Dolibarr does not add a draft
+	 * of its own for the same period, and names the draft it generated already when there is one.
+	 *
+	 * @param	FactureFournisseur		$supplierInvoice	Supplier invoice, created
+	 * @param	FactureFournisseurRec	$template			Template it was attached to
+	 * @param	string[]				$return_messages	Messages of the import, completed by reference
+	 * @return	void
+	 */
+	private function _completeRecurringTemplateAttachment(FactureFournisseur $supplierInvoice, FactureFournisseurRec $template, array &$return_messages)
+	{
+		global $langs, $user;
+
+		dol_include_once('einvoicing/class/utils/RecurringSupplierInvoiceHelper.class.php');
+
+		$return_messages[] = $langs->trans('EInvoiceRecurringTemplateAttached', (string) $template->ref);
+
+		// insertExtraFields() rewrites the whole row: what the import already stored there, the order
+		// reference of the vendor among others, has to be read back first or it is lost.
+		$supplierInvoice->fetch_optionals();
+		$options = RecurringSupplierInvoiceHelper::optionsToInherit($supplierInvoice, $template);
+		if (!empty($options)) {
+			$supplierInvoice->array_options = array_merge(is_array($supplierInvoice->array_options) ? $supplierInvoice->array_options : array(), $options);
+			if ($supplierInvoice->insertExtraFields('', $user) < 0) {
+				dol_syslog(__METHOD__ . ' extrafields of template ' . $template->id . ' not applied to invoice ' . $supplierInvoice->id . ': ' . $supplierInvoice->error, LOG_WARNING);
+			}
+		}
+
+		if (RecurringSupplierInvoiceHelper::skipNextGeneration($template, $user) > 0) {
+			$return_messages[] = $langs->trans('EInvoiceRecurringTemplateGenerationSkipped', (string) $template->ref);
+		}
+
+		$twinId = RecurringSupplierInvoiceHelper::findGeneratedDraft((int) $template->id, (int) $supplierInvoice->socid, (int) $supplierInvoice->id);
+		if ($twinId > 0) {
+			$twin = new FactureFournisseur($this->db);
+			if ($twin->fetch($twinId) > 0) {
+				$return_messages[] = $langs->trans('EInvoiceRecurringTemplateDraftExists', $twin->getNomUrl(1));
+			}
+		}
 	}
 }

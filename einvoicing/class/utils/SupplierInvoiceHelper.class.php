@@ -50,7 +50,7 @@ class SupplierInvoiceHelper
 	 * document. It is the module number, the way Dolibarr tags a line a module created, and it is the
 	 * only line of an imported invoice outside the VAT breakdown: every per-rate comparison skips it.
 	 */
-	const LINE_SPECIAL_CODE_ROUNDING = 95020;
+	const EINVOICING_SPECIAL_CODE_ROUNDING_LINE = 95020;
 
 	/**
 	 * BT-114 of a received document, the amount that rounds its total to what is due.
@@ -165,13 +165,53 @@ class SupplierInvoiceHelper
 		if (isset($parsedHeader['duePayableAmount'])) {
 			$prepaid = isset($parsedHeader['totalPrepaidAmount']) ? (float) $parsedHeader['totalPrepaidAmount'] : 0.0;
 			$due = (float) $parsedHeader['duePayableAmount'] + $prepaid;
-			if (abs($due - $rounded) < 0.005) {
+			if (einvoicingAmountsEqual($due, $rounded)) {
 				return $due;
 			}
 			dol_syslog(__METHOD__ . ' BT-115 (' . $parsedHeader['duePayableAmount'] . ') does not answer BR-CO-16 on BT-112/BT-113/BT-114, the invoice is confronted with BT-112 instead', LOG_WARNING, 0, '_einvoicing');
 		}
 
 		return $rounded;
+	}
+
+	/**
+	 * Tell whether the lines of a received document add up to the sum of line net amounts it announces.
+	 *
+	 * BR-CO-10 fixes BT-106 as the sum of every BT-131, and BT-109, BT-110 and BT-112 are computed from
+	 * BT-106. A document breaking it computes its VAT on a base its own lines contradict, so an invoice
+	 * built from those lines cannot total what the document announces (issue #1198). Nothing is said when
+	 * the document announces no BT-106 or a line carries no BT-131: there is then no sum to confront.
+	 * Nor for an EXTENDED document, which that rule does not bind.
+	 *
+	 * @param	array<string,mixed>				$parsedHeader	Header data of the received document
+	 * @param	array<int,array<string,mixed>>	$parsedLines	Lines of the received document, as parsed
+	 * @return	?array{lines:float,announced:float}				Sum of BT-131 and BT-106 when they differ, null otherwise
+	 */
+	public static function lineTotalContradiction(array $parsedHeader, array $parsedLines)
+	{
+		// An EXTENDED profile disables BR-CO-10 and tolerates a cent per line instead (BR-FREXT-CO-10), which
+		// keepVatRoundedPerLine() answers: within it the document is right, beyond it the generic report says enough.
+		if (self::isExtendedDocument($parsedHeader)) {
+			return null;
+		}
+		if (!isset($parsedHeader['lineTotalAmount']) || empty($parsedLines)) {
+			return null;
+		}
+
+		$sum = 0.0;
+		foreach ($parsedLines as $line) {
+			if (!isset($line['lineTotalAmount'])) {
+				return null;
+			}
+			$sum += (float) $line['lineTotalAmount'];
+		}
+		$sum = round($sum, 2);
+
+		if (abs($sum - (float) $parsedHeader['lineTotalAmount']) < 0.005) {
+			return null;
+		}
+
+		return array('lines' => $sum, 'announced' => (float) $parsedHeader['lineTotalAmount']);
 	}
 
 	/**
@@ -200,7 +240,7 @@ class SupplierInvoiceHelper
 	 */
 	public static function isRoundingLine($line): bool
 	{
-		return isset($line->special_code) && (int) $line->special_code === self::LINE_SPECIAL_CODE_ROUNDING;
+		return isset($line->special_code) && (int) $line->special_code === self::EINVOICING_SPECIAL_CODE_ROUNDING_LINE;
 	}
 
 	/**
@@ -716,8 +756,8 @@ class SupplierInvoiceHelper
 		$invoiceTva = $sign * ((float) $invoice->total_tva + $deposits['tva']);
 		$invoiceTtc = $sign * ((float) $invoice->total_ttc + $deposits['ttc']);
 
-		if (abs($invoiceTva - (float) $announcedTva) >= 0.005
-			|| abs($invoiceTtc - (float) $announcedTtc) >= 0.005) {
+		if (!einvoicingAmountsEqual($invoiceTva, (float) $announcedTva)
+			|| !einvoicingAmountsEqual($invoiceTtc, (float) $announcedTtc)) {
 			return false;
 		}
 
@@ -729,7 +769,7 @@ class SupplierInvoiceHelper
 			return true;
 		}
 
-		return abs(self::linkedDepositAmount((int) $invoice->id) - (float) $announcedPrepaid) < 0.005;
+		return einvoicingAmountsEqual(self::linkedDepositAmount((int) $invoice->id), (float) $announcedPrepaid);
 	}
 
 	/**
@@ -795,9 +835,10 @@ class SupplierInvoiceHelper
 	 * @param	float	$announcedTtc			BT-112 of the received document, absolute value
 	 * @param	?float	$announcedPrepaid		BT-113 of the received document, when it is what the mark is about
 	 * @param	?string	$announcedRefOfDeposit	The ref of the deposit if prepaid is from a deposit
+	 * @param	?array{lines:float,announced:float}	$lineTotalContradiction	What lineTotalContradiction() found, when the mark is about it
 	 * @return	int								-1 on error, >0 otherwise
 	 */
-	public static function flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc, $announcedPrepaid = null, $announcedRefOfDeposit = null)
+	public static function flagTotalsMismatch($supplierInvoiceId, $announcedTva, $announcedTtc, $announcedPrepaid = null, $announcedRefOfDeposit = null, $lineTotalContradiction = null)
 	{
 		global $db;
 
@@ -806,6 +847,10 @@ class SupplierInvoiceHelper
 		if ($announcedPrepaid !== null && $announcedRefOfDeposit !== null) {
 			$value['prepaid'] = (float) $announcedPrepaid;
 			$value['prepaidref'] = (string) $announcedRefOfDeposit;
+		}
+		if ($lineTotalContradiction !== null) {
+			$value['lines'] = (float) $lineTotalContradiction['lines'];
+			$value['linetotal'] = (float) $lineTotalContradiction['announced'];
 		}
 		$value = json_encode($value);
 
@@ -816,7 +861,7 @@ class SupplierInvoiceHelper
 	 * Read the mark left by an import that could not reproduce the totals of the document.
 	 *
 	 * @param	int		$supplierInvoiceId		Id of the supplier invoice
-	 * @return	?array{tva:float,ttc:float,prepaid?:float}	The totals the document announces, or null when the invoice carries no mark
+	 * @return	?array{tva:float,ttc:float,prepaid?:float,prepaidref?:string,lines?:float,linetotal?:float}	The totals the document announces, or null when the invoice carries no mark
 	 */
 	public static function totalsMismatch($supplierInvoiceId)
 	{
@@ -841,6 +886,11 @@ class SupplierInvoiceHelper
 		}
 		if (isset($decoded['prepaidref'])) {
 			$announced['prepaidref'] = (string) $decoded['prepaidref'];
+		}
+		// Only a mark written for a document whose lines contradict BT-106 carries both sums (issue #1198)
+		if (isset($decoded['lines'], $decoded['linetotal'])) {
+			$announced['lines'] = (float) $decoded['lines'];
+			$announced['linetotal'] = (float) $decoded['linetotal'];
 		}
 
 		return $announced;
@@ -1017,6 +1067,19 @@ class SupplierInvoiceHelper
 
 		if ($source->status == FactureFournisseur::STATUS_DRAFT) {
 			dol_syslog(__METHOD__ . ' Supplier invoice id ' . $sourceId . ' is replaced by id ' . $replacement->id . ' but is still a draft: left as it is', LOG_INFO, 0, '_einvoicing');
+			return 0;
+		}
+
+		// If a credit note already cancels this source, do not close it again as replaced: that would
+		// double-cancel it and make the accounting net fall to zero.
+		$sqlCreditNote = 'SELECT rowid FROM ' . MAIN_DB_PREFIX . "facture_fourn WHERE fk_facture_source = " . ((int) $sourceId) . " AND type = " . FactureFournisseur::TYPE_CREDIT_NOTE . " AND fk_statut NOT IN (" . FactureFournisseur::STATUS_DRAFT . "," . FactureFournisseur::STATUS_ABANDONED . ") AND entity = " . ((int) $source->entity);
+		$resCreditNote = $db->query($sqlCreditNote);
+		if (!$resCreditNote) {
+			dol_syslog(__METHOD__ . ' DB error checking credit notes for source id ' . $sourceId . ': ' . $db->lasterror(), LOG_ERR, 0, '_einvoicing');
+			return -1;
+		}
+		if ($db->num_rows($resCreditNote) > 0) {
+			dol_syslog(__METHOD__ . ' Supplier invoice id ' . $sourceId . ' replaced by id ' . $replacement->id . ' already has a validated credit note: leaving it as is to avoid double cancellation', LOG_INFO, 0, '_einvoicing');
 			return 0;
 		}
 

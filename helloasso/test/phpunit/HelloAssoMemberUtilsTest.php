@@ -168,4 +168,38 @@ class HelloAssoMemberUtilsTest extends CommonClassTest
 		$this->assertLessThan($result, 0);
 		return 1;
 	}
+
+	/**
+	 * testgetDonationAmountsByPayment
+	 *
+	 * @return	void
+	 */
+	public function testgetDonationAmountsByPayment()
+	{
+		global $conf,$user,$langs,$db;
+		$conf = $this->savconf;
+		$user = $this->savuser;
+		$langs = $this->savlangs;
+		$db = $this->savdb;
+
+		$localobject = new HelloAssoMemberUtils($db);
+
+		// Membership 15 + donation 10 paid with one payment of 25
+		$newmember = json_decode('{"payments":[{"id":111,"amount":2500,"shareAmount":1500}]}');
+		$donations = array(json_decode('{"type":"Donation","amount":1000,"payments":[{"id":111,"amount":2500,"shareAmount":1000}]}'));
+		$result = $localobject->getDonationAmountsByPayment($newmember, $donations);
+		$this->assertEquals(array(111 => 10.0), $result);
+
+		// Installments: donation share is spread on each payment
+		$newmember = json_decode('{"payments":[{"id":1,"shareAmount":750},{"id":2,"shareAmount":750}]}');
+		$donations = array(json_decode('{"type":"Donation","amount":1000,"payments":[{"id":1,"shareAmount":500},{"id":2,"shareAmount":500}]}'));
+		$result = $localobject->getDonationAmountsByPayment($newmember, $donations);
+		$this->assertEquals(array(1 => 5.0, 2 => 5.0), $result);
+
+		// Donation not matching any payment of the member is put on the first payment
+		$newmember = json_decode('{"payments":[{"id":9,"shareAmount":1500}]}');
+		$donations = array(json_decode('{"type":"Donation","amount":1000,"payments":[]}'));
+		$result = $localobject->getDonationAmountsByPayment($newmember, $donations);
+		$this->assertEquals(array(9 => 10.0), $result);
+	}
 }

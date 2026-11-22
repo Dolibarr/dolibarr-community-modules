@@ -381,8 +381,8 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 	if ($action == 'reimport') {
 		$formconfirm = $form->formconfirm(
 			$_SERVER["PHP_SELF"].'?id='.$object->id,
-			$langs->trans('EInvoiceReimport'),
-			$langs->trans('EInvoiceReimportRebuildConfirm', $object->flow_id),
+			$langs->trans($object->flow_type == 'SupplierInvoiceLC' ? 'EInvoiceReimportLifecycle' : 'EInvoiceReimport'),
+			$langs->trans($object->flow_type == 'SupplierInvoiceLC' ? 'EInvoiceReimportLifecycleConfirm' : 'EInvoiceReimportRebuildConfirm', $object->flow_id),
 			'confirm_reimport',
 			'',
 			0,
@@ -649,6 +649,15 @@ if ($object->id > 0 && (empty($action) || ($action != 'edit' && $action != 'crea
 		} else {
 			print '<span class="butActionRefused classfortooltip" title="'.dol_escape_htmltag($langs->trans('EInvoiceReimportOnlyOnADraft')).'">'.$langs->trans('EInvoiceReimport').'</span>';
 		}
+		print '</div>'."\n";
+	}
+
+	// A received lifecycle status attached to no supplier invoice has not been applied: offer to process it again.
+	if ($action != 'presend' && $action != 'editline'
+		&& $object->flow_direction == 'In' && $object->fk_element_type == 'invoice_supplier'
+		&& $object->flow_type == 'SupplierInvoiceLC' && !empty($object->flow_id) && empty($object->fk_element_id)) {
+		print '<div class="tabsAction">'."\n";
+		print dolGetButtonAction('', $langs->trans('EInvoiceReimportLifecycle'), 'default', $_SERVER["PHP_SELF"].'?id='.$object->id.'&action=reimport&token='.newToken(), '', $permissiontoadd);
 		print '</div>'."\n";
 	}
 

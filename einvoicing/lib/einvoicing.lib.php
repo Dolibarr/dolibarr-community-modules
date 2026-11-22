@@ -1,6 +1,7 @@
 <?php
 /* Copyright (C) 2025		SuperAdmin					<daoud.mouhamed@gmail.com>
  * Copyright (C) 2026		Jose Martinez				<jose.martinez@pichinov.com>
+ * Copyright (C) 2026       Alexandre Spangaro          <alexandre@inovea-conseil.com>
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -52,9 +53,19 @@ function einvoicingAdminPrepareHead()
 	$head[$h][2] = 'settings';
 	$h++;
 
-	$head[$h][0] = dol_buildpath("/einvoicing/admin/setup_options.php", 1);
-	$head[$h][1] = $langs->trans("Options");
-	$head[$h][2] = 'options';
+	$head[$h][0] = dol_buildpath("/einvoicing/admin/setup_send.php", 1);
+	$head[$h][1] = $langs->trans("OptionsEInvoicingSend");
+	$head[$h][2] = 'send';
+	$h++;
+
+	$head[$h][0] = dol_buildpath("/einvoicing/admin/setup_receive.php", 1);
+	$head[$h][1] = $langs->trans("OptionsEInvoicingReceive");
+	$head[$h][2] = 'receive';
+	$h++;
+
+	$head[$h][0] = dol_buildpath("/einvoicing/admin/setup_advanced.php", 1);
+	$head[$h][1] = $langs->trans("OptionsEInvoicingAdvanced");
+	$head[$h][2] = 'advanced';
 	$h++;
 
 	/*
@@ -1122,6 +1133,34 @@ function einvoicingVatBreakdownKey($categoryVAT, $rate, $exemptionReasonCode = '
 }
 
 /**
+ * Tell whether two amounts are the same once written with the 2 decimals EN 16931 gives every amount.
+ *
+ * Rounded by price2num() like every Dolibarr total, but to 2 decimals and not to MAIN_MAX_DECIMALS_TOT:
+ * the amounts are confronted with a document.
+ *
+ * @param	float	$amount1	First amount
+ * @param	float	$amount2	Second amount
+ * @return	bool				True when both amounts round to the same cent
+ */
+function einvoicingAmountsEqual(float $amount1, float $amount2): bool
+{
+	return (float) price2num($amount1, 2) === (float) price2num($amount2, 2);
+}
+
+/**
+ * Tell whether an amount is at least one positive cent once written with the 2 decimals of EN 16931.
+ *
+ * Rounded the same way as einvoicingAmountsEqual(); zero and negative amounts are not positive.
+ *
+ * @param	float	$amount		Amount
+ * @return	bool				True when the amount writes a positive cent
+ */
+function einvoicingAmountIsPositive(float $amount): bool
+{
+	return (float) price2num($amount, 2) > 0;
+}
+
+/**
  * Tell whether an URL may be used as the target of a redirect made by the OAuth proxy.
  *
  * public/proxy_oauthcallback.php is reachable without authentication and hands the freshly issued
@@ -1391,4 +1430,235 @@ function einvoicingDiagnosticPreviewLink($fileName)
 	$out .= '<span class="fas fa-search-plus pictofixedwidth" style="color: #808080;"></span></a>';
 
 	return $out;
+}
+
+/**
+ * Read the state of the scheduled job that synchronizes the flows, from the row the scheduler keeps for it.
+ *
+ * @param	DoliDB		$db		Database handler
+ * @return	array{id:int,enabled:bool,running:bool,failed:bool,late:bool,datelastrun:int,datenextrun:int,lastoutput:string}|null	Null when the job is not found
+ */
+function einvoicingSyncJobHealth($db)
+{
+	global $conf;
+
+	$sql = "SELECT rowid, status, processing, frequency, unitfrequency, datelastrun, datenextrun, lastresult, lastoutput";
+	$sql .= " FROM ".MAIN_DB_PREFIX."cronjob";
+	$sql .= " WHERE module_name = 'einvoicing' AND methodename = 'cronSyncFlows'";
+	$sql .= " AND status IN (0, 1) AND entity IN (0, ".((int) $conf->entity).")";
+	$sql .= " ORDER BY status DESC, rowid ASC";
+	$sql .= $db->plimit(1);
+
+	$resql = $db->query($sql);
+	if (!$resql) {
+		dol_syslog(__FUNCTION__." ".$db->lasterror(), LOG_ERR);
+		return null;
+	}
+	$obj = $db->fetch_object($resql);
+	$db->free($resql);
+	if (!$obj) {
+		return null;
+	}
+
+	// With the module Scheduled jobs off, nothing runs the job, whatever its row says: it is disabled, not late.
+	$enabled = ((int) $obj->status == 1 && isModEnabled('cron'));
+	$running = ((int) $obj->processing > 0);
+	$datenextrun = (int) $db->jdate($obj->datenextrun);
+	// The scheduler reprograms the job after each run, failed or not. A due date left more than one period
+	// behind means nothing runs it any more: the system cron is stopped, or a run died and left it "processing".
+	$period = max((int) $obj->frequency * (int) $obj->unitfrequency, 900);
+
+	return array(
+		'id' => (int) $obj->rowid,
+		'enabled' => $enabled,
+		'running' => $running,
+		'failed' => $enabled && !$running && (string) $obj->lastresult !== '' && (string) $obj->lastresult !== '0',
+		'late' => $enabled && $datenextrun > 0 && $datenextrun + $period < dol_now(),
+		'datelastrun' => (int) $db->jdate($obj->datelastrun),
+		'datenextrun' => $datenextrun,
+		'lastoutput' => (string) $obj->lastoutput,
+	);
+}
+
+/**
+ * Single state of the scheduled synchronization, the most serious one first.
+ *
+ * @param	?array{id:int,enabled:bool,running:bool,failed:bool,late:bool,datelastrun:int,datenextrun:int,lastoutput:string}	$health	As returned by einvoicingSyncJobHealth()
+ * @return	'notfound'|'disabled'|'stuck'|'failed'|'late'|'running'|'neverrun'|'ok'
+ */
+function einvoicingSyncJobState($health)
+{
+	if ($health === null) {
+		return 'notfound';
+	}
+	if (!$health['enabled']) {
+		return 'disabled';
+	}
+	if ($health['running'] && $health['late']) {
+		return 'stuck';
+	}
+	if ($health['failed']) {
+		return 'failed';
+	}
+	if ($health['late']) {
+		return 'late';
+	}
+	if ($health['running']) {
+		return 'running';
+	}
+	return empty($health['datelastrun']) ? 'neverrun' : 'ok';
+}
+
+/**
+ * Label of a state returned by einvoicingSyncJobState()
+ *
+ * @param	string	$code	State
+ * @return	string			Translated label
+ */
+function einvoicingSyncJobStateLabel($code)
+{
+	global $langs;
+
+	$keys = array('notfound' => 'EInvoicingSyncJobNotFound', 'disabled' => 'Disabled', 'stuck' => 'EInvoicingSyncJobStuck', 'failed' => 'EInvoicingSyncJobFailed', 'late' => 'EInvoicingSyncJobLate', 'running' => 'EInvoicingSyncJobRunning', 'neverrun' => 'EInvoicingSyncJobNeverRun', 'ok' => 'EInvoicingSyncJobOk');
+
+	return $langs->trans($keys[$code]);
+}
+
+/**
+ * Lines that describe the scheduled synchronization, shared by the home page of the module and the widget.
+ *
+ * @param	DoliDB		$db			Database handler
+ * @param	?array{id:int,enabled:bool,running:bool,failed:bool,late:bool,datelastrun:int,datenextrun:int,lastoutput:string}	$health	As returned by einvoicingSyncJobHealth()
+ * @return	array<array{0:string,1:string}>		Label and HTML value of each line
+ */
+function einvoicingSyncJobHealthLines($db, $health)
+{
+	global $langs, $user;
+
+	$langs->loadLangs(array('cron', 'einvoicing@einvoicing'));
+
+	$lines = array();
+
+	$code = einvoicingSyncJobState($health);
+	$badges = array('notfound' => 'secondary', 'disabled' => 'secondary', 'stuck' => 'danger', 'failed' => 'danger', 'late' => 'warning', 'running' => 'info', 'neverrun' => 'secondary', 'ok' => 'success');
+	$state = dolGetBadge(einvoicingSyncJobStateLabel($code), '', $badges[$code]);
+	if ($health !== null && !empty($health['datelastrun'])) {
+		$state .= ' <span class="opacitymedium">'.dol_print_date($health['datelastrun'], 'dayhour', 'tzuserrel').'</span>';
+	}
+	if ($health !== null && $user->hasRight('cron', 'read')) {
+		$state .= ' <a href="'.DOL_URL_ROOT.'/cron/card.php?id='.$health['id'].'" title="'.dol_escape_htmltag($langs->trans("CronTask")).'">'.img_picto('', 'cron').'</a>';
+	}
+	$lines[] = array($langs->trans("EInvoicingSyncJob"), $state);
+
+	if ($health !== null && $health['failed']) {
+		// The scheduler stores the output of the job, then the error on a line of its own: the error is the cause
+		$outputlines = explode("\n", trim($health['lastoutput']));
+		$cause = trim(dol_string_nohtmltag(end($outputlines), 1));
+		$full = trim(dol_string_nohtmltag(str_replace("\n", '<br>', $health['lastoutput']), 0));
+		$lines[] = array($langs->trans("Error"), '<span class="small classfortooltip" title="'.dol_escape_htmltag($full).'">'.dol_escape_htmltag(dol_trunc($cause, 90)).'</span>');
+	}
+	if ($health !== null && $health['late']) {
+		$lines[] = array($langs->trans("EInvoicingSyncJobExpectedAt"), '<span class="warning">'.dol_print_date($health['datenextrun'], 'dayhour', 'tzuserrel').'</span>');
+	}
+
+	$sql = "SELECT MAX(date_creation) as lastdoc FROM ".MAIN_DB_PREFIX."einvoicing_document WHERE entity IN (".getEntity('einvoicing').")";
+	$resql = $db->query($sql);
+	$obj = $resql ? $db->fetch_object($resql) : null;
+	$lastdoc = ($obj && !empty($obj->lastdoc)) ? dol_print_date($db->jdate($obj->lastdoc), 'dayhour', 'tzuserrel') : $langs->trans("None");
+	$lines[] = array($langs->trans("EInvoicingLastDocumentRecorded"), $lastdoc);
+
+	return $lines;
+}
+
+/**
+ * Returns the active and usable UNTDID codes for extra entrie
+ *
+ * @param   DoliDB              $db             Database handler
+ * @param   Translate           $langs          Translation
+ * @param   int                 $entity         Entity
+ * @param   array<int,string>   $excludedCodes  Code exclude already managed
+ * @return  array<string,array{rowid:int,code:string,label:string}>
+ */
+function einvoicingGetActiveUntdid4451Codes($db, $langs, $entity, array $excludedCodes = array())
+{
+	$result = array();
+	$sql = 'SELECT rowid, code, label, position';
+	$sql .= ' FROM '.MAIN_DB_PREFIX.'c_einvoicing_untdid4451';
+	$sql .= ' WHERE entity IN (0, '.((int) $entity).')';
+	$sql .= ' AND active = 1';
+	$sql .= ' ORDER BY position ASC, code ASC';
+
+	$resql = $db->query($sql);
+	if (!$resql) {
+		dol_syslog('einvoicingGetActiveUntdid4451Codes SQL error: '.$db->lasterror(), LOG_ERR);
+		return $result;
+	}
+
+	while ($obj = $db->fetch_object($resql)) {
+		$code = strtoupper(trim((string) $obj->code));
+		if (!preg_match('/^[A-Z0-9]{3}$/', $code) || in_array($code, $excludedCodes, true)) {
+			continue;
+		}
+
+		$label = $obj->label;
+		$translatedLabel = $langs->trans($label);
+		if ($translatedLabel !== $label) {
+			$label = $translatedLabel;
+		}
+
+		$result[$code] = array(
+			'rowid' => (int) $obj->rowid,
+			'code' => $code,
+			'label' => $label,
+		);
+	}
+	$db->free($resql);
+
+	return $result;
+}
+
+/**
+ * Check to see if a code is active in the UNTDID 4451 dictionary.
+ *
+ * @param   DoliDB              $db             Database handler
+ * @param   string              $code           Code
+ * @param   int                 $entity         Entity
+ * @param   array<int,string>   $excludedCodes  Code exclude already managed
+ * @return  bool
+ */
+function einvoicingIsActiveUntdid4451Code($db, $code, $entity, array $excludedCodes = array())
+{
+	global $conf;
+
+	$code = strtoupper(trim((string) $code));
+
+	if (!preg_match('/^[A-Z0-9]{3}$/', $code)) {
+		return false;
+	}
+
+	if (in_array($code, $excludedCodes, true)) {
+		return false;
+	}
+
+	$sql = 'SELECT rowid';
+	$sql .= ' FROM '.MAIN_DB_PREFIX.'c_einvoicing_untdid4451';
+	$sql .= " WHERE code = '".$db->escape($code)."'";
+	if (! empty($entity)) {
+		$sql .= " AND entity = " . ((int) $entity);
+	} else {
+		$sql .= " AND entity = " . ((int) $conf->entity); // unique key include the entity so each company has its own index
+	}
+	$sql .= ' AND active = 1';
+	$sql .= $db->plimit(1);
+
+	$resql = $db->query($sql);
+
+	if (!$resql) {
+		dol_syslog('einvoicingIsActiveUntdid4451Code SQL error: '.$db->lasterror(), LOG_ERR);
+		return false;
+	}
+
+	$valid = ($db->num_rows($resql) > 0);
+	$db->free($resql);
+	return $valid;
 }

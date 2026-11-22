@@ -130,6 +130,25 @@ Lorsqu'une contestation est perdue (statuts : perdue, acceptée, hors délai, no
 
 Le bouton **Rafraîchir** synchronise les contestations depuis l'API Stancer.
 
+## Résultat de chaque paiement dans les événements de la facture
+
+Chaque tentative de paiement Stancer d'une facture laisse un événement dans l'onglet **Événements** de la facture, avec les mêmes conventions que les prélèvements Stripe du cœur de Dolibarr :
+
+| Code de l'événement | Signification |
+|---|---|
+| `AC_PAYMENT_STANCER_OK` | Le paiement a été encaissé par Stancer et enregistré sur la facture |
+| `AC_PAYMENT_STANCER_KO` | Stancer a refusé le paiement, l'a laissé échouer ou expirer, ou le client l'a contesté |
+
+Ces événements sont de type "Événement automatique" (`AC_OTH_AUTO`), rattachés au tiers et à la facture. Il y en a un seul par paiement Stancer et par facture : les synchronisations quotidiennes, le retour du client sur la page de paiement et la synchronisation des contestations ne le créent pas une seconde fois. L'identifiant du paiement Stancer (`paym_...`) est conservé dans la référence externe de l'événement.
+
+Pour un échec, la date de l'événement est celle de l'échec chez Stancer quand elle est connue (refus d'une carte, date de la contestation), sinon celle de sa détection. Le champ des paramètres complémentaires contient le statut Stancer, le code de réponse et son explication, séparés par " - ", par exemple `disputed - AM04 - Provision insuffisante`.
+
+Un paiement encaissé puis contesté porte les deux événements. Le paiement d'une commande ou d'un devis n'en crée pas tant qu'il n'existe pas de facture : l'événement de réussite est posé sur la facture créée à partir de la commande ou du devis, un échec avant facturation n'en laisse aucun.
+
+Les autres modules peuvent s'appuyer sur ces codes comme sur ceux de Stripe, par exemple pour espacer les nouvelles tentatives de prélèvement ou pour suspendre un service après plusieurs échecs. Une règle qui cherche `AC_PAYMENT_%_KO` dans `llx_actioncomm` (filtrée sur `elementtype = 'invoice'` et `fk_element`) couvre ainsi Stripe et Stancer.
+
+Les événements historiques du module restent créés comme avant : réouverture de facture (`AC_BILL_REOPEN_FAILED_...`), notification à l'administrateur (`AC_ADMIN_PAYERROR_...`), emails envoyés et `AC_STANCER_PAYMENT_OK`, qui indique que le paiement et sa ligne bancaire ont été enregistrés.
+
 ## Onglet Stancer sur la fiche tiers
 
 Chaque fiche tiers dispose d'un onglet **Stancer** qui centralise les informations de paiement du client :

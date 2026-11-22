@@ -23,9 +23,8 @@
  *
  * Todo: Check if it works with multi byte (mb_*) character sets!
  *
- * Usage:
- * cd htdocs/langs
- * ./dev/translation/strip_language_file.php <primary_lang_dir> <secondary_lang_dir> [file.lang|all]
+ * Usage (from the repository root, or from any directory if you use full paths):
+ * php dev/translation/strip_language_file.php <path/to/primary_lang_dir> <path/to/secondary_lang_dir> [file.lang|all]
  *
  * To rename all .delta files, you can do
  * for fic in `ls *.delta`; do f=`echo $fic | sed -e 's/\.delta//'`; echo $f; mv $f.delta $f; done
@@ -60,7 +59,7 @@ $rc = 0;
 
 $lPrimary = isset($argv[1])?$argv[1]:'';
 $lSecondary = isset($argv[2])?$argv[2]:'';
-$lEnglish = 'en_US';
+$lEnglish = rtrim(dirname($lSecondary), '/').'/en_US';
 $filesToProcess = isset($argv[3])?$argv[3]:'';
 
 if (empty($lPrimary) || empty($lSecondary) || empty($filesToProcess)) {
@@ -77,7 +76,7 @@ $aEnglish = array();
 
 // Define array $filesToProcess
 if ($filesToProcess == 'all') {
-	$dir = new DirectoryIterator('htdocs/cabinetmed/langs/'.$lPrimary);
+	$dir = new DirectoryIterator($lPrimary);
 	while ($dir->valid()) {
 		if (!$dir->isDot() && $dir->isFile() && ! preg_match('/^\./', $dir->getFilename())) {
 			$files[] =  $dir->getFilename();
@@ -92,9 +91,9 @@ if ($filesToProcess == 'all') {
 
 // Loop on each file
 foreach ($filesToProcess as $fileToProcess) {
-	$lPrimaryFile = 'htdocs/cabinetmed/langs/'.$lPrimary.'/'.$fileToProcess;
-	$lSecondaryFile = 'htdocs/cabinetmed/langs/'.$lSecondary.'/'.$fileToProcess;
-	$lEnglishFile = 'htdocs/cabinetmed/langs/'.$lEnglish.'/'.$fileToProcess;
+	$lPrimaryFile = $lPrimary.'/'.$fileToProcess;
+	$lSecondaryFile = $lSecondary.'/'.$fileToProcess;
+	$lEnglishFile = $lEnglish.'/'.$fileToProcess;
 	$output = $lSecondaryFile . '.delta';
 
 	print "---- Process language file ".$lSecondaryFile."\n";
@@ -322,7 +321,7 @@ foreach ($filesToProcess as $fileToProcess) {
 	print "Output can be found at $output.\n";
 
 	print "To rename all .delta files, you can do:\n";
-	print '> for fic in `ls htdocs/cabinetmed/langs/'.$lSecondary.'/*.delta`; do f=`echo $fic | sed -e \'s/\.delta//\'`; echo $f; mv $f.delta $f; done'."\n";
+	print '> for fic in `ls '.$lSecondary.'/*.delta`; do f=`echo $fic | sed -e \'s/\.delta//\'`; echo $f; mv $f.delta $f; done'."\n";
 }
 
 

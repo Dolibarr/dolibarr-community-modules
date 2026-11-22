@@ -324,6 +324,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	{
 		global $db, $langs, $user;
 
+		// Buttons are only for customer and supplier invoices
+		if (!is_object($object) || !in_array($object->element, ['facture', 'invoice_supplier'])) {
+			return 0;
+		}
+
 		$langs->load("einvoicing@einvoicing");
 		$einvoicing = new EInvoicing($db);
 		$checkConfig = $einvoicing->checkModulePrerequisites();
@@ -564,6 +569,24 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 						'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=sendStatusMessage&pdpstatuscode=' . $code . '&token=' . newToken()
 					);
 				}
+
+				// A vendor billed on a subscription has a recurring template carrying the settings chosen
+				// once for it. Offered on a draft not attached to one yet, whatever the import decided
+				// on its own: this is where the operator says which template this document stands for.
+				'@phan-var-force FactureFournisseur $object';
+				/** @var FactureFournisseur $object */
+				if ($isdraft && empty($object->fk_fac_rec_source) && !empty($object->socid)) {
+					dol_include_once('einvoicing/class/utils/RecurringSupplierInvoiceHelper.class.php');
+					if (RecurringSupplierInvoiceHelper::listTemplatesOfVendor((int) $object->socid)) {
+						$url_button[] = array(
+							'lang' => 'einvoicing',
+							'enabled' => true,
+							'perm' => ($forcedisabling ? -1 : (bool) $user->hasRight('fournisseur', 'facture', 'creer')),
+							'label' => $langs->trans('EInvoiceAttachToRecurringTemplate'),
+							'url' => '/fourn/facture/card.php?id=' . $object->id . '&action=attach_rectemplate&token=' . newToken()
+						);
+					}
+				}
 			}
 
 			// Offer to import a received document again, on the invoice it was booked on: this is where
@@ -630,12 +653,15 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		// Add button to change the entity (multi-company) of a supplier invoice (we test context invoicesuppliercard but also main for old versions of module)
 		if (getDolGlobalString('EINVOICING_ALLOW_MULTICOMPANY_INVOICE_MOVE') && isModEnabled('multicompany') && in_array($object->element, ['invoice_supplier'])
-			&& !empty($object->id) && $user->hasRight('fournisseur', 'facture', 'creer') && preg_match('/invoicesuppliercard|main/', $parameters['currentcontext'] ?? '')) {
+			&& !empty($object->id) && preg_match('/invoicesuppliercard|main/', $parameters['currentcontext'] ?? '')) {
 			// isEditable() only exists since Dolibarr 23 and answers a negative code when refused. Before, same
 			// rule as the core card offers "Modify" with: no payment and not dispatched in bookkeeping.
 			$editable = method_exists($object, 'isEditable') ? ($object->isEditable() > 0)
 				: ($object->getSommePaiement() == 0 && $object->getVentilExportCompta() == 0);
-			if ($editable) {
+			if (!$user->hasRight('fournisseur', 'facture', 'creer')) {
+				print '<span class="butActionRefused classfortooltip" title="' . dol_escape_htmltag($langs->trans('NotEnoughPermissions')) . '">'
+					. $langs->trans('ChangeEntity') . '</span>';
+			} elseif ($editable) {
 				print '<a class="butAction" href="' . DOL_URL_ROOT . '/fourn/facture/card.php?id=' . $object->id . '&action=change_entity&token=' . newToken() . '">'
 					. $langs->trans('ChangeEntity') . '</a>';
 			} else {
@@ -659,6 +685,11 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 	public function doActions($parameters, $object, &$action, $hookmanager)
 	{
 		global $db, $langs, $user, $conf;
+
+		// Only an admin can disable and enable a module: the others are not told, nor is the check run
+		if (!empty($user->admin)) {
+			EInvoicing::warnIfReactivationNeeded();
+		}
 
 		// Before anything else, and before the early return below: a list of the core builds its
 		// $arrayfields before it knows any action, and the versions that offer no 'completeArrayFields'
@@ -730,10 +761,33 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				}
 			}
 
+			// Action to force the despatch advice reference of the invoice (BT-16, issue #1151)
+			if ($action == 'setdespatchadvice' && $permissiontoedit) {
+				$despatchAdvice = GETPOST('einvoice_despatch_advice', 'alphanohtml');
+				$result = $einvoicing->insertOrUpdateExtraField($object->id, $object->element, EInvoicing::EXTRAFIELD_DESPATCH_ADVICE_REFERENCE, $despatchAdvice);
+				if ($result < 0) {
+					$error++;
+					$this->errors = array_merge($this->errors, $einvoicing->errors);
+				}
+			}
+
 			// Action to set the buyer reference of the invoice (BT-10, issue #678)
 			if ($action == 'setbuyerreference' && $permissiontoedit) {
 				$buyerReference = GETPOST('einvoice_buyer_reference', 'alphanohtml');
 				$result = $einvoicing->insertOrUpdateExtraField($object->id, $object->element, EInvoicing::EXTRAFIELD_BUYER_REFERENCE, $buyerReference);
+				if ($result < 0) {
+					$error++;
+					$this->errors = array_merge($this->errors, $einvoicing->errors);
+				}
+			}
+
+			// Action to set the role the invoice is issued under (BT-23 S5/S6, issue #946)
+			if ($action == 'setcontractorrole' && $permissiontoedit && $object->element == 'facture') {
+				$contractorRole = GETPOST('einvoice_contractor_role', 'aZ09');
+				if (!in_array($contractorRole, array(EInvoicing::CONTRACTOR_ROLE_SUBCONTRACTOR, EInvoicing::CONTRACTOR_ROLE_COCONTRACTOR))) {
+					$contractorRole = '';
+				}
+				$result = $einvoicing->insertOrUpdateExtraField($object->id, $object->element, EInvoicing::EXTRAFIELD_CONTRACTOR_ROLE, $contractorRole);
 				if ($result < 0) {
 					$error++;
 					$this->errors = array_merge($this->errors, $einvoicing->errors);
@@ -882,6 +936,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		if ($isSupplierInvoiceContext) {
 			'@phan-var-force FactureFournisseur $object';
+			/** @var FactureFournisseur $object */
 			$permissiontoedit = $user->hasRight('fournisseur', 'facture', 'creer');
 			// Who may validate a supplier invoice is decided by the core, in fourn/facture/card.php
 			// ($usercanvalidate): the "create" right is enough, unless advanced permissions are on, where
@@ -996,6 +1051,70 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				}
 			}
 
+			// Action to attach the invoice to a recurring template of its vendor (issue #997)
+			if ($action == 'confirm_attach_rectemplate' && $permissiontoedit) {
+				$db->begin();
+
+				dol_include_once('einvoicing/class/utils/RecurringSupplierInvoiceHelper.class.php');
+				dol_include_once('fourn/class/fournisseur.facture-rec.class.php');
+
+				$templateId = GETPOSTINT('rec_template_id');
+				$template = new FactureFournisseurRec($db);
+
+				if ($templateId <= 0 || $template->fetch($templateId) <= 0) {
+					$error++;
+					setEventMessages($langs->trans('EInvoiceRecurringTemplateNotFound'), null, 'errors');
+				} elseif ((int) $template->socid !== (int) $object->socid) {
+					// A template of another vendor would bring its bank account and its project onto this
+					// invoice, and show it as generated by a subscription it has nothing to do with.
+					$error++;
+					setEventMessages($langs->trans('EInvoiceRecurringTemplateOtherVendor'), null, 'errors');
+				} else {
+					$attachRes = RecurringSupplierInvoiceHelper::attachStoredInvoice($object, $template, $user);
+					if ($attachRes['res'] < 0) {
+						$error++;
+						setEventMessages($langs->trans('EInvoiceRecurringTemplateAttachFailed'), array($attachRes['message']), 'errors');
+					} else {
+						$message = $langs->trans('EInvoiceRecurringTemplateAttached', (string) $template->ref);
+						if (!empty($attachRes['fields'])) {
+							$message .= ' ' . $langs->trans('EInvoiceRecurringTemplateFieldsTaken', implode(', ', $attachRes['fields']));
+						}
+						setEventMessages($message, null, 'mesgs');
+
+						// A no-op on a template that already generated the invoice of this period: only one
+						// of the two ever applies, the draft below is the other one.
+						if (RecurringSupplierInvoiceHelper::skipNextGeneration($template, $user) > 0) {
+							setEventMessages($langs->trans('EInvoiceRecurringTemplateGenerationSkipped', (string) $template->ref), null, 'mesgs');
+						}
+
+						$generatedDraftId = RecurringSupplierInvoiceHelper::findGeneratedDraft((int) $template->id, (int) $object->socid, (int) $object->id);
+						if ($generatedDraftId > 0) {
+							$generatedDraft = new FactureFournisseur($db);
+							if ($generatedDraft->fetch($generatedDraftId) > 0) {
+								if (GETPOST('deletegenerateddraft', 'alpha')) {
+									if ($generatedDraft->delete($user) > 0) {
+										setEventMessages($langs->trans('EInvoiceRecurringTemplateDraftDeleted', (string) $generatedDraft->ref), null, 'mesgs');
+									} else {
+										$error++;
+										setEventMessages($langs->trans('EInvoiceRecurringTemplateDraftNotDeleted', (string) $generatedDraft->ref), $generatedDraft->errors, 'errors');
+									}
+								} else {
+									setEventMessages($langs->trans('EInvoiceRecurringTemplateDraftExists', $generatedDraft->getNomUrl(1)), null, 'warnings');
+								}
+							}
+						}
+					}
+				}
+
+				if ($error) {
+					$db->rollback();
+					return -1;
+				} else {
+					$db->commit();
+					return 0;
+				}
+			}
+
 			// Action to change the entity (multi-company) of a supplier invoice
 			if ($action == 'confirm_change_entity' && $permissiontoedit) {
 				$db->begin();
@@ -1071,6 +1190,45 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					}
 					return 0;
 				}
+			}
+
+			// Record on the vendor the payment account the received document announces (BT-84/85/86).
+			// Only ever on this explicit confirmation: the import itself writes nothing of the kind.
+			if ($action == 'confirm_einvoice_addpayeeban' && GETPOST('confirm') == 'yes') {
+				dol_include_once('einvoicing/class/utils/PayeeBankAccountHelper.class.php');
+				/** @var FactureFournisseur $object */
+
+				if (!getDolGlobalInt('EINVOICING_THIRDPARTIES_ADD_PAYEE_BANK_ACCOUNT')) {
+					setEventMessages($langs->trans('EInvoicePayeeAccountAddNotEnabled'), array(), 'errors');
+					return 0;
+				}
+				if (!PayeeBankAccountHelper::userCanAddAccount($user)) {
+					setEventMessages($langs->trans('NotEnoughPermissions'), array(), 'errors');
+					return 0;
+				}
+
+				// Read the document again rather than trust the posted values: only what it really
+				// announces may be recorded on the vendor
+				$payeeAccounts = PayeeBankAccountHelper::announcedAccounts($db, $object);
+				$payeeAccountIdx = GETPOSTINT('payeeaccount');
+				if (!isset($payeeAccounts[$payeeAccountIdx])) {
+					setEventMessages($langs->trans('EInvoicePayeeAccountNotFound'), array(), 'errors');
+					return 0;
+				}
+
+				$addError = '';
+				$resadd = PayeeBankAccountHelper::addAccountToThirdparty($db, $user, (int) $object->socid, $payeeAccounts[$payeeAccountIdx], (string) $object->ref_supplier, $addError);
+				if ($resadd > 0) {
+					setEventMessages($langs->trans('EInvoicePayeeAccountAdded', dol_escape_htmltag($payeeAccounts[$payeeAccountIdx]['iban'])), array(), 'mesgs');
+				} elseif ($resadd == 0) {
+					setEventMessages($langs->trans('EInvoicePayeeAccountAlreadyKnown', dol_escape_htmltag($payeeAccounts[$payeeAccountIdx]['iban'])), array(), 'warnings');
+				} else {
+					$this->errors[] = $addError;
+					setEventMessages($langs->trans('EInvoicePayeeAccountAddFailed', dol_escape_htmltag($addError)), array(), 'errors');
+					return -1;
+				}
+
+				return 0;
 			}
 		}
 
@@ -1561,6 +1719,55 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				$this->resprints .= $formconfirm;
 			}
 
+			// Confirmation popup to attach the invoice to a recurring template of its vendor (issue #997)
+			if ($action == 'attach_rectemplate') {
+				'@phan-var-force FactureFournisseur $object';
+				/** @var FactureFournisseur $object */
+				$form = new Form($db);
+				$langs->loadLangs(array('bills', 'banks', 'projects', 'suppliers'));
+
+				dol_include_once('einvoicing/class/utils/RecurringSupplierInvoiceHelper.class.php');
+				$templateList = array();
+				foreach (RecurringSupplierInvoiceHelper::listTemplatesOfVendor((int) $object->socid) as $template) {
+					$templateLabel = $template['title'];
+					if ($template['ref_supplier'] !== '') {
+						$templateLabel .= ' (' . $template['ref_supplier'] . ')';
+					}
+					if (!empty($template['suspended'])) {
+						$templateLabel .= ' - ' . $langs->transnoentities('Disabled');
+					}
+					$templateList[$template['id']] = $templateLabel;
+				}
+
+				$formquestion = array(
+					array(
+						'type' => 'select',
+						'name' => 'rec_template_id',
+						'label' => $langs->trans('RepeatableSupplierInvoice'),
+						'values' => $templateList,
+						'default' => '',
+						'select_show_empty' => 1
+					),
+					array(
+						'type' => 'checkbox',
+						'name' => 'deletegenerateddraft',
+						'label' => $langs->trans('EInvoiceDeleteDraftGeneratedByTemplate'),
+						'value' => 0
+					)
+				);
+				$formconfirm = $form->formconfirm(
+					DOL_URL_ROOT . '/fourn/facture/card.php?id=' . $object->id . '&action=confirm_attach_rectemplate',
+					$langs->trans('EInvoiceAttachToRecurringTemplate'),
+					$langs->trans('EInvoiceConfirmAttachToRecurringTemplate', (string) $object->ref),
+					'confirm_attach_rectemplate',
+					$formquestion,
+					'yes',
+					1,
+					280
+				);
+				$this->resprints .= $formconfirm;
+			}
+
 			// Confirmation popup to change the entity (multi-company) of a supplier invoice
 			if ($action == 'change_entity') {
 				$form = new Form($db);
@@ -1605,6 +1812,41 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					250
 				);
 				$this->resprints .= $formconfirm;
+			}
+
+			// Confirmation before recording on the vendor the account the received document announces.
+			// It defaults to "no": a bank account read from an incoming document is what an invoice
+			// fraud carries too, so the user has to say it is the right one.
+			if ($action == 'einvoice_addpayeeban') {
+				dol_include_once('einvoicing/class/utils/PayeeBankAccountHelper.class.php');
+				'@phan-var-force FactureFournisseur $object';
+				/** @var FactureFournisseur $object */
+
+				$payeeAccounts = PayeeBankAccountHelper::announcedAccounts($db, $object);
+				$payeeAccountIdx = GETPOSTINT('payeeaccount');
+				if (isset($payeeAccounts[$payeeAccountIdx]) && PayeeBankAccountHelper::addAccountOffered($user)) {
+					$form = new Form($db);
+
+					$object->fetch_thirdparty();
+					$vendorName = is_object($object->thirdparty) ? $object->thirdparty->name : '';
+
+					// Escaped before reaching trans(): the IBAN and the reference are written by the sender
+					$question = $langs->trans('EInvoicePayeeAccountAddConfirm', dol_escape_htmltag($payeeAccounts[$payeeAccountIdx]['iban']), dol_escape_htmltag($vendorName), dol_escape_htmltag((string) $object->ref_supplier));
+					$question .= '<br><br>' . $langs->trans('EInvoicePayeeAccountFraudWarning');
+
+					$formconfirm = $form->formconfirm(
+						$_SERVER["PHP_SELF"] . '?id=' . ((int) $object->id) . '&action=confirm_einvoice_addpayeeban&payeeaccount=' . ((int) $payeeAccountIdx),
+						$langs->trans('EInvoicePayeeAccountAdd'),
+						$question,
+						'confirm_einvoice_addpayeeban',
+						'',
+						'no',
+						1,
+						360
+					);
+
+					$this->resprints .= $formconfirm;
+				}
 			}
 		}
 
@@ -1671,6 +1913,120 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 
 	/**
+	 * Field of the buyer's order line (BT-132, issue #1192) into the form adding a line to a customer order
+	 * or to a customer invoice (free entry, for an invoice not made from an order).
+	 *
+	 * @param	array<string,mixed>	$parameters		Hook parameters
+	 * @param	CommonObject		$object			Order or invoice the line is added to
+	 * @param	string				$action			Current action
+	 * @param	HookManager			$hookmanager	Hook manager
+	 * @return	int									0, the standard form goes on
+	 */
+	public function formCreateProductOptions($parameters, $object, &$action, $hookmanager)
+	{
+		$this->resprints = '';
+		if (self::buyerOrderLineIdApplies($object)) {
+			$this->resprints = self::buyerOrderLineIdInput(GETPOST('einvoice_buyer_order_line_id', 'alphanohtml'));
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Field of the buyer's order line (BT-132, issue #1192) into the form editing a line of a customer order
+	 * or invoice. The template does not print ->resPrint for this hook: the field is printed here.
+	 *
+	 * @param	array<string,mixed>	$parameters		Hook parameters, with the line edited into 'line'
+	 * @param	CommonObject		$object			Order or invoice of the line
+	 * @param	string				$action			Current action
+	 * @param	HookManager			$hookmanager	Hook manager
+	 * @return	int									0, the standard form goes on
+	 */
+	public function formEditProductOptions($parameters, $object, &$action, $hookmanager)
+	{
+		global $db;
+
+		$line = $parameters['line'] ?? null;
+		if (self::buyerOrderLineIdApplies($object) && is_object($line) && (int) $line->id > 0) {
+			$einvoicing = new EInvoicing($db);
+			$value = GETPOSTISSET('einvoice_buyer_order_line_id') ? GETPOST('einvoice_buyer_order_line_id', 'alphanohtml') : (string) $einvoicing->getExtraFieldValue((int) $line->id, $object->element == 'commande' ? 'commandedet' : 'facturedet', EInvoicing::EXTRAFIELD_BUYER_ORDER_LINE_ID);
+			print self::buyerOrderLineIdInput($value);
+		}
+
+		return 0;
+	}
+
+	// phpcs:disable PEAR.NamingConventions.ValidFunctionName.ScopeNotCamelCaps
+	/**
+	 * Buyer's order line (BT-132, issue #1192) under the description of a line of an order or an invoice.
+	 * The hook exists from Dolibarr 22: before, the value is seen into the line edit form.
+	 *
+	 * @param	array<string,mixed>	$parameters		Hook parameters, with the line shown into 'line'
+	 * @param	CommonObject		$object			Order or invoice of the line
+	 * @param	string				$action			Current action
+	 * @param	HookManager			$hookmanager	Hook manager
+	 * @return	int									0, the standard view goes on
+	 */
+	public function objectLineView_BeforeProductExtrafield($parameters, $object, &$action, $hookmanager)
+	{
+		global $db, $langs;
+
+		$this->resprints = '';
+		$line = $parameters['line'] ?? null;
+		if (!self::buyerOrderLineIdApplies($object) || !is_object($line) || (int) $line->id <= 0) {
+			return 0;
+		}
+		// One query for all the lines of the object, not one per line shown
+		static $cache = array();
+		$key = $object->element . '-' . (int) $object->id;
+		if (!isset($cache[$key])) {
+			$einvoicing = new EInvoicing($db);
+			$cache[$key] = $einvoicing->getBuyerOrderLineIds($object);
+		}
+		if (($cache[$key][(int) $line->id] ?? '') !== '') {
+			$langs->load('einvoicing@einvoicing');
+			$this->resprints = '<br><span class="opacitymedium">' . $langs->trans('EInvoiceBuyerOrderLineId') . ' :</span> ' . dol_escape_htmltag($cache[$key][(int) $line->id]);
+		}
+
+		return 0;
+	}
+	// phpcs:enable
+
+	/**
+	 * Whether the buyer's order line (BT-132) is shown on the lines of this object: a customer order or invoice.
+	 *
+	 * @param	mixed	$object			Object of the hook
+	 * @return	bool
+	 */
+	private static function buyerOrderLineIdApplies($object)
+	{
+		if (!is_object($object) || empty($object->element) || !in_array($object->element, array('commande', 'facture'), true)) {
+			return false;
+		}
+
+		return !getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || getDolGlobalString('EINVOICING_ONLY_GENERATE');
+	}
+
+	/**
+	 * Input of the buyer's order line (BT-132), for the line forms of an order or an invoice.
+	 *
+	 * @param	string	$value	Value to show
+	 * @return	string			HTML
+	 */
+	private static function buyerOrderLineIdInput($value)
+	{
+		global $form, $langs;
+
+		$langs->load('einvoicing@einvoicing');
+		$label = $langs->trans('EInvoiceBuyerOrderLineId');
+		if (is_object($form)) {
+			$label = $form->textwithpicto($label, $langs->trans('EInvoiceBuyerOrderLineIdHelp'));
+		}
+
+		return '<div class="einvoicebuyerorderline paddingtop">' . $label . ' <input type="text" name="einvoice_buyer_order_line_id" class="width100" maxlength="255" value="' . dol_escape_htmltag((string) $value) . '"></div>';
+	}
+
+	/**
 	 * Complete the $arrayfields with custom fields to be able to use them in list views (like thirdparty or invoice list)
 	 *
 	 * @param array<string,mixed> 	$parameters		Array of parameters
@@ -1706,6 +2062,13 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		if (in_array('invoicelist', $contexts, true) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
 			// Add fields to invoice list
+			$arrayfields['pdp_provider'] = array(
+				'label' => 'einvoicingSourceTitle',
+				'checked' => 1,
+				'position' => 899,
+				'enabled' => '1',
+				'perms' => '1'
+			);
 			$arrayfields['einvoicegenerated'] = array(
 				'label' => 'EInvoiceFile',
 				'checked' => -1,
@@ -1715,6 +2078,23 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			);
 			$arrayfields['pdp_syncstatus'] = array(
 				'label' => 'PDPSyncStatus',
+				'checked' => 1,
+				'position' => 901,
+				'enabled' => '1',
+				'perms' => '1'
+			);
+		}
+
+		if (in_array('supplierinvoicelist', $contexts, true) && !einvoicingReceptionDisabled()) {
+			$arrayfields['pdp_provider'] = array(
+				'label' => 'einvoicingSourceTitle',
+				'checked' => 1,
+				'position' => 900,
+				'enabled' => '1',
+				'perms' => '1'
+			);
+			$arrayfields['pdp_lcstatus'] = array(
+				'label' => 'einvoicingInvoiceStatus',
 				'checked' => 1,
 				'position' => 901,
 				'enabled' => '1',
@@ -2004,7 +2384,8 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			$this->resprints .= ' AND EXISTS (SELECT 1 FROM ' . $db->prefix() . 'einvoicing_routing as subrt';
 			$this->resprints .= ' WHERE subrt.fk_soc = s.rowid';	// Alias of the thirdparty in the thirdparty list of the core
 			$this->resprints .= " AND subrt.routing_type = 'thirdparty' AND subrt.active = 1";
-			$this->resprints .= " AND subrt.routing_id = '" . $db->escape(GETPOST('search_routing_id', 'alpha')) . "')";
+			$this->resprints .= natural_search('subrt.routing_id', GETPOST('search_routing_id', 'alpha'));
+			$this->resprints .= ")";
 		}
 
 		if (in_array('invoicelist', $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
@@ -2086,22 +2467,29 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			);
 
 			// AP platform
-			print '<td class="liste_titre">';
-			print $form->selectarray(
-				'search_pdplinked',
-				$listofoptions,
-				GETPOST('search_pdplinked', 'alpha'),
-				-2,
-				0,
-				0,
-				'',
-				0,
-				0,
-				0,
-				'',
-				'width100 '
-			);
-			print '</td>';
+			if (empty($parameters['arrayfields']['pdp_provider']) || !empty($parameters['arrayfields']['pdp_provider']['checked'])) {
+				print '<td class="liste_titre">';
+				print $form->selectarray(
+					'search_pdplinked',
+					$listofoptions,
+					GETPOST('search_pdplinked', 'alpha'),
+					-2,
+					0,
+					0,
+					'',
+					0,
+					0,
+					0,
+					'',
+					'width100 '
+				);
+				print '</td>';
+			}
+
+			// E-invoice file: no filter, but the cell keeps the filters under their own column
+			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
+				print '<td class="liste_titre"></td>';
+			}
 
 			// E-invoice status
 			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
@@ -2144,41 +2532,45 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			);
 
 			// AP platform
-			print '<td class="liste_titre">';
-			print $form->selectarray(
-				'search_pdplinked',
-				$listofoptions,
-				GETPOST('search_pdplinked', 'alpha'),
-				-2,
-				0,
-				0,
-				'',
-				0,
-				0,
-				0,
-				'',
-				'width100 '
-			);
-			print '</td>';
+			if (empty($parameters['arrayfields']['pdp_provider']) || !empty($parameters['arrayfields']['pdp_provider']['checked'])) {
+				print '<td class="liste_titre">';
+				print $form->selectarray(
+					'search_pdplinked',
+					$listofoptions,
+					GETPOST('search_pdplinked', 'alpha'),
+					-2,
+					0,
+					0,
+					'',
+					0,
+					0,
+					0,
+					'',
+					'width100 '
+				);
+				print '</td>';
+			}
 
 			// E-invoice status of the supplier invoice into the Access Point system
-			$einvoicing = new EInvoicing($db);
-			print '<td class="liste_titre pdp_lcstatus">';
-			print $form->selectarray(
-				'search_pdp_lcstatus',
-				$einvoicing->getEinvoiceStatusOptions(0, 1),
-				GETPOST('search_pdp_lcstatus', 'alpha'),
-				-2,
-				0,
-				0,
-				'',
-				0,
-				0,
-				0,
-				'',
-				'width100 '
-			);
-			print '</td>';
+			if (empty($parameters['arrayfields']['pdp_lcstatus']) || !empty($parameters['arrayfields']['pdp_lcstatus']['checked'])) {
+				$einvoicing = new EInvoicing($db);
+				print '<td class="liste_titre pdp_lcstatus">';
+				print $form->selectarray(
+					'search_pdp_lcstatus',
+					$einvoicing->getEinvoiceStatusOptions(0, 1),
+					GETPOST('search_pdp_lcstatus', 'alpha'),
+					-2,
+					0,
+					0,
+					'',
+					0,
+					0,
+					0,
+					'',
+					'width100 '
+				);
+				print '</td>';
+			}
 		}
 
 
@@ -2224,7 +2616,9 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				return 0;
 			}
 
-			print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingSourceTitle'));
+			if (empty($parameters['arrayfields']['pdp_provider']) || !empty($parameters['arrayfields']['pdp_provider']['checked'])) {
+				print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingSourceTitle'));
+			}
 
 			// Einvoice generated or not
 			if (!empty($parameters['arrayfields']['einvoicegenerated']['checked'])) {
@@ -2239,8 +2633,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		// Supplier invoice list, Product list, Soc list
 		if (in_array('supplierinvoicelist', $contexts) && !einvoicingReceptionDisabled()) {
-			print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingSourceTitle'));
-			print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingInvoiceStatus'), '', '', '', $parameters['param'] ?? '', '', '', '', 'center ');
+			if (empty($parameters['arrayfields']['pdp_provider']) || !empty($parameters['arrayfields']['pdp_provider']['checked'])) {
+				print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingSourceTitle'));
+			}
+			if (empty($parameters['arrayfields']['pdp_lcstatus']) || !empty($parameters['arrayfields']['pdp_lcstatus']['checked'])) {
+				print_liste_field_titre($langs->transnoentitiesnoconv('einvoicingInvoiceStatus'), '', '', '', $parameters['param'] ?? '', '', '', '', 'center ');
+			}
 		}
 
 		if (in_array('thirdpartylist', $contexts) && (!getDolGlobalString('EINVOICING_DISABLE_SYNC_DOLI_TO_AP') || !getDolGlobalString('EINVOICING_DISABLE_SYNC_AP_TO_DOLI') || getDolGlobalString('EINVOICING_ONLY_GENERATE'))) {
@@ -2293,13 +2691,15 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 			$obj = $parameters['obj'];
 
-			print '<td class="tdoverflowmax100">';
-			if ($obj->pdplink_id) {
-				print dolPrintHTML($obj->pdp_provider);
-			}
-			print '</td>';
-			if (isset($parameters['i']) && empty($parameters['i'])) {
-				$parameters['totalarray']['nbfield']++;
+			if (empty($parameters['arrayfields']['pdp_provider']) || !empty($parameters['arrayfields']['pdp_provider']['checked'])) {
+				print '<td class="tdoverflowmax100">';
+				if ($obj->pdplink_id) {
+					print dolPrintHTML($obj->pdp_provider);
+				}
+				print '</td>';
+				if (isset($parameters['i']) && empty($parameters['i'])) {
+					$parameters['totalarray']['nbfield']++;
+				}
 			}
 
 			// E-invoice generation status
@@ -2320,7 +2720,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			if (empty($parameters['arrayfields']['pdp_syncstatus']) || !empty($parameters['arrayfields']['pdp_syncstatus']['checked'])) {
 				$currentStatusDetails = $obj->pdp_syncstatus ? $einvoicing->getStatusLabel($obj->pdp_syncstatus, 'facture', $obj->pdp_lcrecipients ?? '') : '';
 				print '<td class="center tdoverflowmax100" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
-				print $currentStatusDetails;
+				print $obj->pdp_syncstatus ? $einvoicing->getStatusBadge($obj->pdp_syncstatus, 'facture', $obj->pdp_lcrecipients ?? '') : '';
 				print '</td>';
 				if (isset($parameters['i']) && empty($parameters['i'])) {
 					$parameters['totalarray']['nbfield']++;
@@ -2332,23 +2732,27 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		if (in_array('supplierinvoicelist', $contexts) && !einvoicingReceptionDisabled()) {
 			$obj = $parameters['obj'];
 
-			print '<td class="tdoverflowmax100">';
-			if ($obj->pdplink_id) {
-				print dolPrintHTML($obj->pdp_provider);
-			}
-			print '</td>';
-			if (isset($parameters['i']) && empty($parameters['i'])) {
-				$parameters['totalarray']['nbfield']++;
+			if (empty($parameters['arrayfields']['pdp_provider']) || !empty($parameters['arrayfields']['pdp_provider']['checked'])) {
+				print '<td class="tdoverflowmax100">';
+				if ($obj->pdplink_id) {
+					print dolPrintHTML($obj->pdp_provider);
+				}
+				print '</td>';
+				if (isset($parameters['i']) && empty($parameters['i'])) {
+					$parameters['totalarray']['nbfield']++;
+				}
 			}
 
 			// E-invoice status of the supplier invoice into the Access Point system
-			$einvoicing = new EInvoicing($db);
-			$currentStatusDetails = $obj->pdp_lcstatus ? $einvoicing->getStatusLabel((int) $obj->pdp_lcstatus, 'invoice_supplier') : '-';
-			print '<td class="center tdoverflowmax100" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
-			print $currentStatusDetails;
-			print '</td>';
-			if (isset($parameters['i']) && empty($parameters['i'])) {
-				$parameters['totalarray']['nbfield']++;
+			if (empty($parameters['arrayfields']['pdp_lcstatus']) || !empty($parameters['arrayfields']['pdp_lcstatus']['checked'])) {
+				$einvoicing = new EInvoicing($db);
+				$currentStatusDetails = $obj->pdp_lcstatus ? $einvoicing->getStatusLabel((int) $obj->pdp_lcstatus, 'invoice_supplier') : '-';
+				print '<td class="center tdoverflowmax100" title="' . dolPrintHTMLForAttribute($currentStatusDetails) . '">';
+				print $obj->pdp_lcstatus ? $einvoicing->getStatusBadge((int) $obj->pdp_lcstatus, 'invoice_supplier') : '-';
+				print '</td>';
+				if (isset($parameters['i']) && empty($parameters['i'])) {
+					$parameters['totalarray']['nbfield']++;
+				}
 			}
 		}
 
@@ -2357,9 +2761,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				$obj = $parameters['obj'];
 
 				print '<td class="tdoverflowmax125">';
-				if ($obj->pdplink_id) {
-					print dolPrintHTML($obj->routing_id);
-				}
+				print dolPrintHTML($obj->routing_id);
 				print '</td>';
 				if (isset($parameters['i']) && empty($parameters['i'])) {
 					$parameters['totalarray']['nbfield']++;
@@ -2561,6 +2963,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// itself and have nothing to gain here. The line is recognised by the name the module gives the
 		// file it writes, which costs nothing: the viewer resolves the path of the file on its own, and
 		// prints nothing if it does not find it.
+		$matches = array();
 		if ($modulepart == 'facture') {
 			// Sent to a customer: <ref>/<ref>_cii.xml, the name EInvoicing::getEInvoiceXmlFilePath() builds
 			if (!$user->hasRight('facture', 'lire') || substr($relativepath, -8) !== '_cii.xml') {
@@ -2568,12 +2971,12 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 			}
 			$urlparam = '';
 		} elseif ($modulepart == 'facture_fournisseur') {
-			// Received from a supplier: <ref supplier>_einvoice.xml, the name
-			// CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment() gives the file it saves
-			if (!$user->hasRight('fournisseur', 'facture', 'lire') || substr($relativepath, -13) !== '_einvoice.xml') {
+			// Received from a supplier: <ref>-<ref supplier>_einvoice.xml, and _original.xml on option, the
+			// names CIIProtocol::saveEInvoiceFileToSupplierInvoiceAttachment() gives the files it saves
+			if (!$user->hasRight('fournisseur', 'facture', 'lire') || !preg_match('/_(einvoice|original)\.xml$/', $relativepath, $matches)) {
 				return 0;
 			}
-			$urlparam = '&element=supplier';
+			$urlparam = '&element=supplier&format='.$matches[1];
 		} else {
 			return 0;
 		}
@@ -2586,7 +2989,7 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 		// page answers as a full page. The file name keeps the download link the core gives it.
 		$url = dol_buildpath('/einvoicing/xmlpreview.php', 1).'?id='.$invoiceid.$urlparam.'&mode=raw';
 
-		$anchorid = 'einvoicingxmlpreview'.$invoiceid;
+		$anchorid = 'einvoicingxmlpreview'.$invoiceid.(empty($matches[1]) ? '' : $matches[1]);
 		$this->resprints = '<td class="right nowraponall">';
 		$this->resprints .= $this->einvoiceXmlPreviewAnchor($url, $anchorid);
 
@@ -2663,19 +3066,21 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		$this->resprints = '';
 
+		// The name of each file the module writes, and what the viewer needs to read that one back
 		$contexts = is_array($hookmanager->contextarray) ? $hookmanager->contextarray : array();
 		if (in_array('invoicesuppliercarddocument', $contexts, true)) {
 			if (!$user->hasRight('fournisseur', 'facture', 'lire')) {
 				return 0;
 			}
-			$suffix = '_einvoice.xml';
-			$urlparam = '&element=supplier';
+			$targets = array();
+			foreach (array('einvoice', 'original') as $format) {
+				$targets['_'.$format.'.xml'] = array('&element=supplier&format='.$format, $format);
+			}
 		} elseif (in_array('invoicedocument', $contexts, true)) {
 			if (!$user->hasRight('facture', 'lire')) {
 				return 0;
 			}
-			$suffix = '_cii.xml';
-			$urlparam = '';
+			$targets = array('_cii.xml' => array('', ''));
 		} else {
 			return 0;
 		}
@@ -2687,15 +3092,16 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 
 		$langs->load("einvoicing@einvoicing");
 
-		$url = dol_buildpath('/einvoicing/xmlpreview.php', 1).'?id='.$invoiceid.$urlparam.'&mode=raw';
-		$anchorid = 'einvoicingxmlpreview'.$invoiceid;
-		$anchor = $this->einvoiceXmlPreviewAnchor($url, $anchorid);
-
 		// Printed, not returned: printCommonFooter() of the core never prints the resPrint of this hook,
 		// it only reads its return value to decide whether to print its own block.
 		// The line is found on the name of the file the module writes, the one the viewer reads back.
 		// Nothing is inserted when that file is not listed, so a tab without an XML is left untouched.
-		print '<script nonce="'.getNonce().'" type="text/javascript">
+		foreach ($targets as $suffix => $target) {
+			$url = dol_buildpath('/einvoicing/xmlpreview.php', 1).'?id='.$invoiceid.$target[0].'&mode=raw';
+			$anchorid = 'einvoicingxmlpreview'.$invoiceid.$target[1];
+			$anchor = $this->einvoiceXmlPreviewAnchor($url, $anchorid);
+
+			print '<script nonce="'.getNonce().'" type="text/javascript">
 			(function() {
 				var links = document.querySelectorAll(\'table a[href*="'.dol_escape_js($suffix).'"]\');
 				if (!links.length || document.getElementById("'.$anchorid.'")) {
@@ -2708,6 +3114,70 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 				name.insertAdjacentHTML("beforeend", '.json_encode($anchor).');
 			})();
 			</script>'."\n";
+		}
+
+		return 0;
+	}
+
+	/**
+	 * Add the state of the scheduled synchronization to the open elements dashboard of the home page
+	 * (issue #1142). It counts as one late element while the job failed or no longer runs. Hidden when
+	 * the synchronization is not scheduled: module Scheduled jobs off, job disabled or not found.
+	 *
+	 * @param	array<string,mixed>	$parameters		Hook parameters
+	 * @param	object				$object			Unused
+	 * @param	string				$action			Unused
+	 * @param	HookManager			$hookmanager	Hook manager
+	 * @return	int									0 in all cases, the dashboard is only completed
+	 */
+	public function addOpenElementsDashboardLine($parameters, $object, &$action, $hookmanager)
+	{
+		global $db, $langs, $user;
+
+		if (!$user->hasRight('einvoicing', 'read')) {
+			return 0;
+		}
+
+		include_once DOL_DOCUMENT_ROOT.'/core/class/workboardresponse.class.php';	// @phpstan-ignore includeOnce.fileNotFound (PHPStan takes DOL_DOCUMENT_ROOT from install/inc.php of the core, where it is '..')
+		$langs->load("einvoicing@einvoicing");
+
+		$code = einvoicingSyncJobState(einvoicingSyncJobHealth($db));
+		if (in_array($code, array('notfound', 'disabled'), true)) {
+			return 0;
+		}
+		$problem = in_array($code, array('stuck', 'failed', 'late'), true);
+
+		$board = new WorkboardResponse();
+		$board->label = $langs->trans("EInvoicingSyncJobBoard", einvoicingSyncJobStateLabel($code));
+		$board->url = dol_buildpath('/einvoicing/einvoicingindex.php', 1);
+		$board->img = img_object('', 'einvoicing@einvoicing');
+		$board->nbtodo = $problem ? 1 : 0;
+		$board->nbtodolate = $problem ? 1 : 0;
+
+		$this->results = array('einvoicing_sync' => $board);
+
+		return 0;
+	}
+
+	/**
+	 * Put the line of addOpenElementsDashboardLine() in the Invoices card of the core, so it takes the look
+	 * of the core instead of a card of its own
+	 *
+	 * @param	array<string,mixed>	$parameters		Hook parameters
+	 * @param	object				$object			Unused
+	 * @param	string				$action			Unused
+	 * @param	HookManager			$hookmanager	Hook manager
+	 * @return	int									0 in all cases
+	 */
+	public function addOpenElementsDashboardGroup($parameters, $object, &$action, $hookmanager)
+	{
+		// The core merges the returned groups over its own: the group is returned whole, the line added to it
+		if (empty($parameters['dashboardgroup']['facture']['stats']) || !is_array($parameters['dashboardgroup']['facture']['stats'])) {
+			return 0;
+		}
+		$group = $parameters['dashboardgroup']['facture'];
+		$group['stats'][] = 'einvoicing_sync';
+		$this->results = array('facture' => $group);
 
 		return 0;
 	}

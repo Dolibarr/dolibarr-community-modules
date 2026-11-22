@@ -102,7 +102,8 @@ jobs:
   phpunit:
     name: PHPUnit on Dolibarr ${{ matrix.dolibarr }}
     needs: cores
-    runs-on: ubuntu-latest
+    # Pinned: on ubuntu-26.04, Dolibarr 22.0.0 hangs in tidy on compta/facture/list.php (30 s timeout).
+    runs-on: ubuntu-24.04
 
     strategy:
       # One core failing says nothing about the others, and the interesting information is usually

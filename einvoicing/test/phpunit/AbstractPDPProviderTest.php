@@ -130,7 +130,7 @@ class AbstractPDPProviderTest extends CommonClassTest
 	 */
 	public function testAReimportWritesItsOwnEvent()
 	{
-		global $db, $user;
+		global $db, $user, $langs;
 
 		$supplier = new Societe($db);
 		$supplier->name = 'EINVOICING TEST IMPORT EVENT';
@@ -168,9 +168,57 @@ class AbstractPDPProviderTest extends CommonClassTest
 		$invoice->delete($user);
 		$supplier->delete($supplier->id);
 
-		$this->assertSame('EINVOICING - Import of the received invoice ' . $invoice->ref_supplier, $labels[0]);
-		$this->assertSame('EINVOICING - Import again of the received invoice ' . $invoice->ref_supplier, $labels[1]);
-		$this->assertStringStartsWith('Imported again from the flow flow-of-the-test received from TEST', $notes[1]);
+		// The wording belongs to the lang file (and the language of the instance), so compare with the key.
+		$this->assertSame('EINVOICING - ' . $langs->transnoentitiesnoconv('EInvoicingEventImportLabel', $invoice->ref_supplier), $labels[0]);
+		$this->assertSame('EINVOICING - ' . $langs->transnoentitiesnoconv('EInvoicingEventReimportLabel', $invoice->ref_supplier), $labels[1]);
+		$this->assertNotSame($labels[0], $labels[1], 'a re-import must not read like a first import');
+		$this->assertStringStartsWith($langs->transnoentitiesnoconv('EInvoicingEventReimportNote', 'flow-of-the-test', 'TEST', einvoicingModuleStamp()), $notes[1]);
+	}
+
+	/**
+	 * EINVOICING_SAVE_ALWAYS_ALSO (#980): the Original is kept beside the imported Converted, the readable
+	 * view of a Factur-X is fetched on 'original+readable' only, and EINVOICING_PREFER_ORIGINAL reads as
+	 * 'original' instead of driving the import.
+	 *
+	 * @return	void
+	 */
+	public function testSaveAlwaysAlsoKeepsTheOriginalBesideTheConverted()
+	{
+		global $conf;
+
+		$saved = array(getDolGlobalString('EINVOICING_SAVE_ALWAYS_ALSO'), getDolGlobalString('EINVOICING_PREFER_ORIGINAL'));
+		$provider = (new ReflectionClass('TestPDPProvider'))->newInstanceWithoutConstructor();
+		$others = new ReflectionMethod('AbstractPDPProvider', 'fetchOtherReceivedFormats');
+		$others->setAccessible(true);
+		$readable = new ReflectionMethod('AbstractPDPProvider', 'wantsReadableView');
+		$readable->setAccessible(true);
+		$imported = array('doc_type' => 'Converted', 'documents' => array('Converted' => '<cii/>', 'Original' => '%PDF-1.7'));
+
+		try {
+			$conf->global->EINVOICING_SAVE_ALWAYS_ALSO = '';
+			$conf->global->EINVOICING_PREFER_ORIGINAL = '';
+			$this->assertSame('', AbstractPDPProvider::getSaveAlwaysAlso());
+			$this->assertSame(array(), $others->invoke($provider, 'flow', $imported), 'Off by default');
+			$this->assertFalse($readable->invoke($provider, 'FACTURX'), 'A Factur-X is already readable');
+			$this->assertTrue($readable->invoke($provider, 'CII'));
+
+			$conf->global->EINVOICING_PREFER_ORIGINAL = '1';
+			$this->assertSame('original', AbstractPDPProvider::getSaveAlwaysAlso(), 'The former option reads as original');
+
+			$conf->global->EINVOICING_SAVE_ALWAYS_ALSO = 'original';
+			$this->assertSame(array('Original' => '%PDF-1.7'), $others->invoke($provider, 'flow', $imported), 'Already fetched, not asked twice');
+			$this->assertSame(array(), $others->invoke($provider, 'flow', array('doc_type' => 'Original', 'documents' => array())), 'An imported Original is already kept');
+			$this->assertFalse($readable->invoke($provider, 'FACTURX'));
+
+			$conf->global->EINVOICING_SAVE_ALWAYS_ALSO = 'original+readable';
+			$this->assertTrue($readable->invoke($provider, 'FACTURX'), 'Asked even for a Factur-X');
+
+			$conf->global->EINVOICING_SAVE_ALWAYS_ALSO = 'anything';
+			$this->assertSame('', AbstractPDPProvider::getSaveAlwaysAlso(), 'An unknown value keeps nothing more');
+		} finally {
+			$conf->global->EINVOICING_SAVE_ALWAYS_ALSO = $saved[0];
+			$conf->global->EINVOICING_PREFER_ORIGINAL = $saved[1];
+		}
 	}
 
 	/**
@@ -244,6 +292,41 @@ class AbstractPDPProviderTest extends CommonClassTest
 			$this->assertSame(1, preg_match('//u', $stored), 'A truncated payload stays valid UTF-8 (shift ' . $shift . ')');
 			$this->assertLessThanOrEqual($max, strlen($stored), 'A stored payload never exceeds the size of its column');
 		}
+	}
+
+	/**
+	 * A status we sent on a supplier invoice can be listed by the platform before it gets its type:
+	 * it must still be linked to that invoice, not shown as an unknown customer invoice "NOTFOUND".
+	 *
+	 * @return	void
+	 */
+	public function testAnUntypedFlowWeSentOnASupplierInvoiceIsASupplierInvoiceStatus()
+	{
+		global $db, $conf;
+
+		$savedProvider = getDolGlobalString('EINVOICING_PDP');
+		$conf->global->EINVOICING_PDP = 'ESALINK';
+		$flowId = 'untyped-lc-' . uniqid();
+
+		try {
+			$this->assertGreaterThan(0, (new EInvoicing($db))->storeStatusMessage(1, 'invoice_supplier', 205, '', 'out', $flowId), (string) $db->lasterror());
+
+			$provider = (new ReflectionClass('TestPDPProvider'))->newInstanceWithoutConstructor();
+			$provider->db = $db;
+			$method = new ReflectionMethod('AbstractPDPProvider', 'resolveFlowType');
+			$method->setAccessible(true);
+
+			$resolved = $method->invoke($provider, $flowId, null);
+			$typed = $method->invoke($provider, $flowId, 'CustomerInvoice');
+			$unknown = $method->invoke($provider, 'not-sent-by-us-' . uniqid(), null);
+		} finally {
+			$db->query("DELETE FROM " . $db->prefix() . "einvoicing_lifecycle_msg WHERE flow_id = '" . $db->escape($flowId) . "'");
+			$conf->global->EINVOICING_PDP = $savedProvider;
+		}
+
+		$this->assertSame('SupplierInvoiceLC', $resolved);
+		$this->assertSame('CustomerInvoice', $typed, 'A type given by the platform is never replaced');
+		$this->assertNull($unknown, 'A flow we never sent keeps its missing type');
 	}
 
 	/**

@@ -8,7 +8,9 @@ type: "module-dolibarr"
 
 # Stancer pour Dolibarr
 
-Le module Stancer intègre la plateforme de paiement [Stancer](https://www.stancer.com/) dans votre ERP Dolibarr. Il vous permet d'encaisser vos clients par **carte bancaire** et par **prélèvement SEPA**, directement depuis vos factures, commandes et devis.
+Le module Stancer intègre la plateforme de paiement [Stancer](https://www.stancer.com/?mtm_campaign=Dolibarr&mtm_source=Dolibarr) dans votre ERP Dolibarr. Il vous permet d'encaisser vos clients par **carte bancaire** et par **prélèvement SEPA**, directement depuis vos factures, commandes et devis.
+
+Essayez-le sur un Dolibarr installé en moins de 20 secondes, avec vos clés de test Stancer : [dolitry.fr/stancer](https://dolitry.fr/stancer/)
 
 ## Fonctionnalités principales
 
@@ -57,7 +59,7 @@ Le module Stancer intègre la plateforme de paiement [Stancer](https://www.stanc
 
 - **Dolibarr** version 15.0 ou supérieure
 - **PHP** version 7.4 ou supérieure
-- Un **compte Stancer** avec vos clés API (inscription sur [stancer.com](https://www.stancer.com/))
+- Un **compte Stancer** avec vos clés API (inscription sur [stancer.com](https://www.stancer.com/?mtm_campaign=Dolibarr&mtm_source=Dolibarr))
 - Les modules **Banque** et **Prélèvements** activés dans Dolibarr
 
 ## Premiers pas

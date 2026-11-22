@@ -109,6 +109,9 @@ $item = $formSetup->newItem('STANCER_AUTO_SEPA_ONLY_FOR_CONTRACTS')->setAsYesNo(
 $item = $formSetup->newItem('STANCER_SEPA_GROUP_SAME_DAY')->setAsYesNo();
 $item->helpText = $langs->transnoentities('STANCER_SEPA_GROUP_SAME_DAYTooltip');
 
+$item = $formSetup->newItem('STANCER_SEPA_SIGNED_SWITCH_TEMPLATES')->setAsYesNo();
+$item->helpText = $langs->transnoentities('STANCER_SEPA_SIGNED_SWITCH_TEMPLATESTooltip');
+
 
 $warningSepa = false;
 if (isset($conf->uptosign) && $conf->uptosign->enabled) {
@@ -201,10 +204,22 @@ if ($idpaiementpre) {
 	print '<div class="error"><span class="fa fa-warning"> </span> <span class="clear"> ' . $langs->trans("STANCER_NO_CODE_PRE") . '</span></div>';
 }
 
+// Switching STANCER_ENABLE_SEPA off deletes the constant and the scheduled job then
+// skips every direct debit: say what it costs while mandates or invoices exist
+if (getDolGlobalString('STANCER_ENABLE_SEPA', '') == '') {
+	dol_include_once('/stancer/class/stancer.class.php');
+	$stancerSetup = new Stancer($db);
+	$nbSepaMandates = $stancerSetup->countStancerPaymentModes('ban');
+	$nbSepaWaiting = ($idpaiementpre ? $stancerSetup->countInvoicesToProcess('ban', (int) $idpaiementpre) : 0);
+	if ($nbSepaMandates > 0 || $nbSepaWaiting > 0) {
+		print '<div class="warning"><span class="fa fa-warning"> </span> <span class="clear"> ' . $langs->trans("StancerSepaDisabledWarning", (string) max(0, $nbSepaMandates), (string) max(0, $nbSepaWaiting)) . '</span></div>';
+	}
+}
+
 
 //note j'ai pas capté les modifs de dolibarr qui n'utilise plus cette variable globale ...
 if (getDolGlobalString('PRELEVEMENT_ICS', '') != '') {
-	print '<div class="info"><span class="fa fa-info"> </span> <span class="clear"> ' . $langs->transnoentitiesnoconv("StancerMandatePresentationWarning", "<a href='https://stancer.com/documentation/fr/api/#sepa'>", "</a>") . '</span></div>';
+	print '<div class="info"><span class="fa fa-info"> </span> <span class="clear"> ' . $langs->transnoentitiesnoconv("StancerMandatePresentationWarning", "<a href='https://stancer.com/documentation/fr/api/?mtm_campaign=Dolibarr&mtm_source=Dolibarr#sepa'>", "</a>") . '</span></div>';
 }
 
 if ($action == 'edit') {

@@ -48,6 +48,16 @@ class ActionsDolisecure
 	public $resprints;
 
 	/**
+	 * @var array<mixed>	Values returned by a hook, merged by HookManager into its resArray
+	 */
+	public $results = array();
+
+	/**
+	 * @var string[]	Warning messages, reset and collected by HookManager
+	 */
+	public $warnings = array();
+
+	/**
 	 * @param DoliDB $db Database handler
 	 */
 	public function __construct($db)

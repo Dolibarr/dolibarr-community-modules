@@ -178,6 +178,8 @@ class modDoliSecure extends DolibarrModules
 			2 => array('DOLISECURE_SHOW_OK_BANNER', 'chaine', '1', 'Show a green indicator on home page even when no vulnerability is found', 0),
 			3 => array('DOLISECURE_SEND_ADMIN_ALERT', 'chaine', '1', 'Send an email to administrators when a new vulnerability is found', 0),
 			4 => array('DOLISECURE_ALERT_EMAIL', 'chaine', '', 'Optional override (comma-separated) for the alert email recipients; defaults to all active administrators', 0),
+			// Transifex project carrying the translations of this module, used by the translation admin page to build its links
+			5 => array('DOLISECURE_TRANSIFEX_PROJECT', 'chaine', 'dolibarr-association/dolibarr-community-modules', '0'),
 		);
 
 		// Some keys to add into the overwriting translation tables

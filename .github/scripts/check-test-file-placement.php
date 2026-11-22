@@ -45,6 +45,7 @@ if ($base === '') {
  */
 function tested_sources($content)
 {
+	$matches = array();
 	preg_match_all("/dol_include_once\('([^']+)'\)/", (string) $content, $matches);
 	$sources = array_values(array_unique($matches[1]));
 	sort($sources);

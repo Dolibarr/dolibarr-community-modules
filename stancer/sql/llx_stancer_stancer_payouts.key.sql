@@ -15,13 +15,13 @@
 
 
 -- BEGIN MODULEBUILDER INDEXES
-ALTER TABLE llx_stancer_stancer_payouts ADD INDEX idx_stancer_stancer_payouts_rowid (rowid);
-ALTER TABLE llx_stancer_stancer_payouts ADD INDEX idx_stancer_stancer_payouts_payout_id (payout_id);
-ALTER TABLE llx_stancer_stancer_payouts ADD INDEX idx_stancer_stancer_payouts_status (status);
+CREATE INDEX idx_stancer_stancer_payouts_rowid ON llx_stancer_stancer_payouts (rowid);
+CREATE INDEX idx_stancer_stancer_payouts_payout_id ON llx_stancer_stancer_payouts (payout_id);
+CREATE INDEX idx_stancer_stancer_payouts_status ON llx_stancer_stancer_payouts (status);
 -- END MODULEBUILDER INDEXES
 
 --ALTER TABLE llx_stancer_stancer_payouts ADD UNIQUE INDEX uk_stancer_stancer_payouts_fieldxy(fieldx, fieldy);
 
 --ALTER TABLE llx_stancer_stancer_payouts ADD CONSTRAINT llx_stancer_stancer_payouts_fk_field FOREIGN KEY (fk_field) REFERENCES llx_stancer_myotherobject(rowid);
 
-ALTER TABLE llx_stancer_stancer_payouts ADD UNIQUE INDEX uk_stancer_stancer_payouts_payout_id (entity, payout_id);
+CREATE UNIQUE INDEX uk_stancer_stancer_payouts_payout_id ON llx_stancer_stancer_payouts (entity, payout_id);

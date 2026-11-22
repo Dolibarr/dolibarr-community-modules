@@ -55,8 +55,10 @@ jobs:
     steps:
       - id: pick
         run: |
-          all='["18.0.0","24.0.0"]'
-          review='["18.0.0","24.0.0"]'
+          # The oldest supported line is followed on its maintenance branch, not on a frozen release
+          # tag: the branch carries the core fixes (its PHPDoc in particular) that a tag never will.
+          all='["18.0","24.0.0"]'
+          review='["18.0","24.0.0"]'
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "matrix=$review" >> "$GITHUB_OUTPUT"
           else

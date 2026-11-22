@@ -496,7 +496,7 @@ abstract class AbstractPDPProvider
 	 *
 	 * @param	string			$flowId				Identifier of the flow to read
 	 * @param	ProtocolManager	$protocolManager	Protocol factory used to recognize the documents
-	 * @return	array{file:?string,protocol:?AbstractProtocol,protocol_name:string,doc_type:string,fetched:int,attempts:string[],client_not_configured:bool}	The importable document, or a null protocol and the reason each shape was rejected
+	 * @return	array{file:?string,protocol:?AbstractProtocol,protocol_name:string,doc_type:string,fetched:int,documents:array<string,string>,attempts:string[],client_not_configured:bool}	The importable document, or a null protocol and the reason each shape was rejected
 	 */
 	protected function fetchImportableFlowDocument($flowId, $protocolManager)
 	{
@@ -506,16 +506,14 @@ abstract class AbstractPDPProvider
 			'protocol_name' => '',
 			'doc_type' => '',
 			'fetched' => 0,				// nb of documents the access point did return, whatever their syntax
+			'documents' => array(),		// every document returned, by docType, readable or not
 			'attempts' => array(),
 			'client_not_configured' => false
 		);
 
-		// EINVOICING_PREFER_ORIGINAL: fetch the issuer's Original document (its Factur-X, which carries
-		// the human-readable PDF) before the Converted one, so the created supplier invoice keeps the PDF.
-		$docTypeOrder = getDolGlobalString('EINVOICING_PREFER_ORIGINAL')
-			? array('Original', 'Converted', 'ReadableView')
-			: array('Converted', 'Original', 'ReadableView');		// Default: First take the Converted (so always in same format defined in AP setup).
-		foreach ($docTypeOrder as $docType) {
+		// Always the Converted first, so the import reads the format set on the access point account.
+		// The Original is kept beside it with EINVOICING_SAVE_ALWAYS_ALSO, see fetchOtherReceivedFormats().
+		foreach (array('Converted', 'Original', 'ReadableView') as $docType) {
 			$flowResponse = $this->fetchFlowData($flowId, $docType, 'get_flow_for_supplier_invoice');
 
 			if ($flowResponse['status_code'] != 200) {
@@ -530,6 +528,7 @@ abstract class AbstractPDPProvider
 			$result['fetched']++;
 
 			$content = (string) $flowResponse['response'];
+			$result['documents'][$docType] = $content;
 			$protocolName = $protocolManager->detectProtocolFromContent($content);
 			if (empty($protocolName)) {
 				$result['attempts'][] = $docType . ": unrecognized syntax";
@@ -563,6 +562,66 @@ abstract class AbstractPDPProvider
 		}
 
 		return $result;
+	}
+
+	/**
+	 * What EINVOICING_SAVE_ALWAYS_ALSO asks to keep beside the imported document.
+	 *
+	 * 'original' adds the Original, 'original+readable' also the readable view when the imported
+	 * document is already a PDF. EINVOICING_PREFER_ORIGINAL, which it replaces, reads as 'original'.
+	 *
+	 * @return	string	'', 'original' or 'original+readable'
+	 */
+	public static function getSaveAlwaysAlso()
+	{
+		$mode = getDolGlobalString('EINVOICING_SAVE_ALWAYS_ALSO');
+		if ($mode === '' && getDolGlobalString('EINVOICING_PREFER_ORIGINAL')) {
+			$mode = 'original';
+		}
+
+		return in_array($mode, array('original', 'original+readable'), true) ? $mode : '';
+	}
+
+	/**
+	 * Whether the readable view of the access point is fetched with the imported document.
+	 *
+	 * @param	string	$protocolName	Protocol of the imported document
+	 * @return	bool					True unless that document is already readable, a Factur-X PDF
+	 */
+	protected function wantsReadableView($protocolName)
+	{
+		return $protocolName != 'FACTURX' || static::getSaveAlwaysAlso() === 'original+readable';
+	}
+
+	/**
+	 * The Original of a received flow, to be kept as an attached file beside the imported one.
+	 *
+	 * Only with EINVOICING_SAVE_ALWAYS_ALSO, and only when the Original is not the imported document.
+	 * A document already fetched by fetchImportableFlowDocument() is not asked for twice, and a failure
+	 * is logged without stopping the import.
+	 *
+	 * @param	string	$flowId		Identifier of the flow
+	 * @param	array{doc_type:string,documents?:array<string,string>}	$importable	What fetchImportableFlowDocument() returned
+	 * @return	array<string,string>	The raw documents to keep, by docType ('Original')
+	 */
+	protected function fetchOtherReceivedFormats($flowId, $importable)
+	{
+		$docType = 'Original';
+		if (static::getSaveAlwaysAlso() === '' || $importable['doc_type'] == $docType) {
+			return array();
+		}
+
+		if (isset($importable['documents'][$docType])) {
+			return array($docType => $importable['documents'][$docType]);
+		}
+
+		$flowResponse = $this->fetchFlowData($flowId, $docType, 'get_other_format_for_supplier_invoice');
+		if ($flowResponse['status_code'] != 200 || (string) $flowResponse['response'] === '') {
+			dol_syslog(__METHOD__ . " No '" . $docType . "' document kept for flowId " . $flowId . ": HTTP " . $flowResponse['status_code'] . (empty($flowResponse['errorMessage']) ? '' : ' - ' . $flowResponse['errorMessage']), LOG_WARNING, 0, '_einvoicing');
+			return array();
+		}
+
+		return array($docType => (string) $flowResponse['response']);
 	}
 
 	/**
@@ -1389,7 +1448,7 @@ abstract class AbstractPDPProvider
 	 * Record a lifecycle status the vendor issued about one of its invoices, onto the supplier
 	 * invoice it refers to.
 	 *
-	 * A status this Dolibarr instance cannot attach to an invoice (refused, an unparseable CDAR, or an
+	 * A status this Dolibarr instance cannot attach to an invoice (refused, an unparsable CDAR, or an
 	 * access point account shared with another system) is not worth retrying: the flow is stored with
 	 * res=0 so the synchronization does not stall on it run after run. A negative result is reserved for
 	 * a transient failure of the platform call itself - the caller must NOT store the flow in that case
@@ -1421,11 +1480,11 @@ abstract class AbstractPDPProvider
 		// An exact link to try below, before it is overwritten with the CDAR's IssuerAssignedID.
 		$flowTrackingId = (string) $document->tracking_idref;
 
-		$flowResponse = $this->fetchFlowData($flowId, 'Original');
+		$flowResponse = $this->fetchFlowData($flowId, 'Original', 'get_flow_for_lifecycle_status');
 		if ($flowResponse['status_code'] != 200) {
 			// Some flows have no 'Original' on the access point, only the converted copy. Both carry
 			// the same CDAR, so fall back rather than fail the flow (and every flow behind it).
-			$flowResponse = $this->fetchFlowData($flowId, 'Converted');
+			$flowResponse = $this->fetchFlowData($flowId, 'Converted', 'get_flow_for_lifecycle_status');
 		}
 		if ($flowResponse['status_code'] != 200) {
 			return $this->postponeIncomingSupplierInvoiceStatus($flowId, "Failed to retrieve flow details for flowId: " . $flowId);
@@ -1529,8 +1588,15 @@ abstract class AbstractPDPProvider
 		// new delivery, not the invoice the platform already holds and this status quotes (issue #985).
 		$statusToRecord = $einvoicing->isTransmissionOnlyRejection($supplierInvoice->id, $supplierInvoice->element, $document->cdar_lifecycle_code, $document->cdar_reason_code)
 			? 0 : $document->cdar_lifecycle_code;
+		// Same for a status older than one the invoice already holds (a flow imported again): it only goes
+		// into the history, the current status and its comment stay the newer ones.
+		$isOlderStatus = (!empty($document->submittedat) && $einvoicing->hasNewerStatusMessage($supplierInvoice->id, $supplierInvoice->element, $document->submittedat) > 0);
+		if ($isOlderStatus) {
+			dol_syslog(__METHOD__ . " FlowId " . $flowId . " - status " . $document->cdar_lifecycle_code . " is older than the current status of supplier invoice " . $supplierInvoice->ref . ", only added to its history", LOG_INFO);
+			$statusToRecord = 0;
+		}
 
-		$resExtLink = $einvoicing->insertOrUpdateExtLink($supplierInvoice->id, $supplierInvoice->element, '', $statusToRecord, '', $statusComment);
+		$resExtLink = $einvoicing->insertOrUpdateExtLink($supplierInvoice->id, $supplierInvoice->element, '', $statusToRecord, '', ($isOlderStatus ? '' : $statusComment));
 
 		$resStatusMessage = ($resExtLink > 0 ? $einvoicing->storeStatusMessage(
 			$supplierInvoice->id,
@@ -1558,7 +1624,42 @@ abstract class AbstractPDPProvider
 		$reasonDetail = $statusComment ? " - " . $statusComment : '';
 		$this->addEvent('STATUS', "EINVOICING - Status: " . $statusLabel, "EINVOICING - Status: " . $statusLabel . $reasonDetail, $supplierInvoice);
 
-		return array('res' => 1, 'message' => "FlowId " . $flowId . " - Vendor status " . $document->cdar_lifecycle_code . ($amountsReported !== '' ? " (" . $amountsReported . ")" : '') . " recorded on supplier invoice " . $supplierInvoice->ref);
+		return array('res' => 1, 'message' => "FlowId " . $flowId . " - Vendor status " . $document->cdar_lifecycle_code . ($amountsReported !== '' ? " (" . $amountsReported . ")" : '') . " recorded on supplier invoice " . $supplierInvoice->ref . ($isOlderStatus ? " (older than its current status, history only)" : ''));
+	}
+
+	/**
+	 * Type of a flow, completed when the platform lists it before typing it: a status we sent on a
+	 * supplier invoice is recognised by its flow id, recorded when it was sent.
+	 *
+	 * @param	string		$flowId		Flow ID (UUID)
+	 * @param	?string		$flowType	Flow type given by the platform
+	 * @return	?string					Flow type to process the flow with
+	 */
+	protected function resolveFlowType($flowId, $flowType)
+	{
+		if (!empty($flowType)) {
+			return $flowType;
+		}
+
+		dol_include_once('einvoicing/class/einvoicing.class.php');
+		$sentStatus = (new EInvoicing($this->db))->fetchStatusMessages($flowId);
+		if (is_array($sentStatus) && ($sentStatus['element_type'] ?? '') === 'invoice_supplier') {
+			return 'SupplierInvoiceLC';
+		}
+
+		return $flowType;
+	}
+
+	/**
+	 * Rank of a flow type to order flows sharing the same updatedAt: an invoice comes before the
+	 * lifecycle statuses about it (the platform issues its 202 at the very instant it receives the invoice).
+	 *
+	 * @param	string	$flowType	Flow type (SupplierInvoice, SupplierInvoiceLC, CustomerInvoice, ...)
+	 * @return	int					0 for an invoice, 1 for any other flow
+	 */
+	protected static function flowTypeSortRank($flowType)
+	{
+		return in_array((string) $flowType, array('SupplierInvoice', 'CustomerInvoice')) ? 0 : 1;
 	}
 
 	/**
@@ -1607,7 +1708,8 @@ abstract class AbstractPDPProvider
 	 * a third party can be keyed in with spaces where a CDAR never carries any. A GlobalID under scheme
 	 * 0002 (SIREN) is also tried against the first 9 digits of the SIRET, since a third party recorded
 	 * with only its SIRET filled in still carries the same SIREN (verified on the Hubtimize case behind
-	 * #857: GlobalID '908544638' under scheme 0002).
+	 * #857: GlobalID '908544638' under scheme 0002). Spaces are ignored everywhere, a SIRET GlobalID matches
+	 * the SIREN, and a French VAT number matches the SIREN it embeds (third party created from its VAT only).
 	 *
 	 * @param	string	$vendorLegalId	Legal identifier carried by the CDAR, empty when it carries none
 	 * @param	string	$siren			Third party SIREN
@@ -1617,18 +1719,31 @@ abstract class AbstractPDPProvider
 	 */
 	protected function matchesVendorLegalId($vendorLegalId, $siren, $siret, $tvaIntra)
 	{
+		$vendorLegalId = removeAllSpaces((string) $vendorLegalId);
 		if ($vendorLegalId === '') {
 			return false;
 		}
+		$siren = removeAllSpaces((string) $siren);
+		$siret = removeAllSpaces((string) $siret);
+		$tvaIntra = dol_strtoupper(removeAllSpaces((string) $tvaIntra));
 
-		if ($vendorLegalId === (string) $siren || $vendorLegalId === (string) $siret) {
+		if ($vendorLegalId === $siren || $vendorLegalId === $siret) {
 			return true;
 		}
-		if ((string) $siret !== '' && $vendorLegalId === substr((string) $siret, 0, 9)) {
+		if ($siret !== '' && $vendorLegalId === dol_substr($siret, 0, 9)) {
+			return true;
+		}
+		// A GlobalID given as a SIRET (scheme 0009) while the third party only carries its SIREN
+		if ($siren !== '' && dol_strlen($vendorLegalId) == 14 && dol_substr($vendorLegalId, 0, 9) === $siren) {
+			return true;
+		}
+		// A third party known only by its French VAT number (FR + 2-char key + SIREN) still carries the SIREN
+		$reg = array();
+		if (preg_match('/^FR[0-9A-Z]{2}([0-9]{9})$/', $tvaIntra, $reg) && dol_substr($vendorLegalId, 0, 9) === $reg[1]) {
 			return true;
 		}
 
-		return removeAllSpaces($vendorLegalId) === removeAllSpaces($tvaIntra);
+		return dol_strtoupper($vendorLegalId) === $tvaIntra;
 	}
 
 	/**
