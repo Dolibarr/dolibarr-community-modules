@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is a part of horstoeko/zugferd.
  *
@@ -11,43 +13,43 @@ namespace horstoeko\zugferd;
 
 use horstoeko\stringmanagement\PathUtils;
 use horstoeko\stringmanagement\StringUtils;
+use Smalot\PdfParser\Config;
 
 /**
  * Class representing the general settings
  *
  * @category Zugferd
- * @package  zugferd
  * @author   D. Erling <horstoeko@erling.com.de>
  * @license  https://opensource.org/licenses/MIT MIT
- * @link     https://github.com/horstoeko/zugferd
+ * @see      https://github.com/horstoeko/zugferd
  */
 class ZugferdSettings
 {
     /**
      * The number of decimals for amount values
      *
-     * @var integer
+     * @var int
      */
     protected static $amountDecimals = 2;
 
     /**
      * The number of decimals for quantity values
      *
-     * @var integer
+     * @var int
      */
     protected static $quantityDecimals = 2;
 
     /**
      * The number of decimals for percent values
      *
-     * @var integer
+     * @var int
      */
     protected static $percentDecimals = 2;
 
     /**
      * The number of decimals for measure values
      *
-     * @var integer
+     * @var int
      */
     protected static $measureDecimals = 2;
 
@@ -56,33 +58,33 @@ class ZugferdSettings
      *
      * @var string
      */
-    protected static $decimalSeparator = ".";
+    protected static $decimalSeparator = '.';
 
     /**
      * The thousands seperator
      *
      * @var string
      */
-    protected static $thousandsSeparator = "";
+    protected static $thousandsSeparator = '';
 
     /**
      * The filename of a ICC profile
      *
      * @var string
      */
-    protected static $iccProfileFilename = "sRGB2014.icc";
+    protected static $iccProfileFilename = 'sRGB2014.icc';
 
     /**
      * The filename of the XMP meta data
      *
      * @var string
      */
-    protected static $xmpMetaDataFilename = "facturx_extension_schema.xmp";
+    protected static $xmpMetaDataFilename = 'facturx_extension_schema.xmp';
 
     /**
      * Node paths which present an amount. Used for special amount formatting
      *
-     * @var array<string,integer>
+     * @var array<string,int>
      */
     protected static $specialDecimalPlacesMaps = [];
 
@@ -91,90 +93,97 @@ class ZugferdSettings
      *
      * @var string
      */
-    protected static $serializerCacheDirectory = "";
+    protected static $serializerCacheDirectory = '';
+
+    /**
+     * An optional config for the Smalot\PdfParser
+     *
+     * @var ?Config
+     */
+    protected static $pdfParserConfig;
 
     /**
      * Get the number of decimals to use for amount values
      *
-     * @return integer
+     * @return int
      */
     public static function getAmountDecimals(): int
     {
-        return static::$amountDecimals;
+        return self::$amountDecimals;
     }
 
     /**
      * Set the number of decimals to use for amount values
      *
-     * @param  integer $amountDecimals
+     * @param  int  $amountDecimals
      * @return void
      */
     public static function setAmountDecimals(int $amountDecimals): void
     {
-        static::$amountDecimals = $amountDecimals;
+        self::$amountDecimals = $amountDecimals;
     }
 
     /**
      * Get the number of decimals to use for amount values
      *
-     * @return integer
+     * @return int
      */
     public static function getQuantityDecimals(): int
     {
-        return static::$quantityDecimals;
+        return self::$quantityDecimals;
     }
 
     /**
      * Set the number of decimals to use for quantity values
      *
-     * @param  integer $quantityDecimals
+     * @param  int  $quantityDecimals
      * @return void
      */
     public static function setQuantityDecimals(int $quantityDecimals): void
     {
-        static::$quantityDecimals = $quantityDecimals;
+        self::$quantityDecimals = $quantityDecimals;
     }
 
     /**
      * Get the number of decimals to use for percent values
      *
-     * @return integer
+     * @return int
      */
     public static function getPercentDecimals(): int
     {
-        return static::$percentDecimals;
+        return self::$percentDecimals;
     }
 
     /**
      * Set the number of decimals to use for percent values
      *
-     * @param  integer $percentDecimals
+     * @param  int  $percentDecimals
      * @return void
      */
     public static function setPercentDecimals(int $percentDecimals): void
     {
-        static::$percentDecimals = $percentDecimals;
+        self::$percentDecimals = $percentDecimals;
     }
 
     /**
      * Get the number of decimals to use for measure values
      *
-     * @return integer
+     * @return int
      */
     public static function getMeasureDecimals(): int
     {
-        return static::$measureDecimals;
+        return self::$measureDecimals;
     }
 
     /**
      * Set the number of decimals to use for measure values
      *
-     * @param  integer $measureDecimals
+     * @param  int  $measureDecimals
      * @return void
      */
     public static function setMeasureDecimals(int $measureDecimals): void
     {
-        static::$measureDecimals = $measureDecimals;
+        self::$measureDecimals = $measureDecimals;
     }
 
     /**
@@ -184,7 +193,7 @@ class ZugferdSettings
      */
     public static function getDecimalSeparator(): string
     {
-        return static::$decimalSeparator;
+        return self::$decimalSeparator;
     }
 
     /**
@@ -195,7 +204,7 @@ class ZugferdSettings
      */
     public static function setDecimalSeparator(string $decimalSeparator): void
     {
-        static::$decimalSeparator = $decimalSeparator;
+        self::$decimalSeparator = $decimalSeparator;
     }
 
     /**
@@ -205,7 +214,7 @@ class ZugferdSettings
      */
     public static function getThousandsSeparator(): string
     {
-        return static::$thousandsSeparator;
+        return self::$thousandsSeparator;
     }
 
     /**
@@ -216,7 +225,7 @@ class ZugferdSettings
      */
     public static function setThousandsSeparator(string $thousandsSeparator): void
     {
-        static::$thousandsSeparator = $thousandsSeparator;
+        self::$thousandsSeparator = $thousandsSeparator;
     }
 
     /**
@@ -226,7 +235,7 @@ class ZugferdSettings
      */
     public static function getIccProfileFilename(): string
     {
-        return static::$iccProfileFilename;
+        return self::$iccProfileFilename;
     }
 
     /**
@@ -237,7 +246,7 @@ class ZugferdSettings
      */
     public static function setIccProfileFilename(string $iccProfileFilename): void
     {
-        static::$iccProfileFilename = $iccProfileFilename;
+        self::$iccProfileFilename = $iccProfileFilename;
     }
 
     /**
@@ -247,7 +256,7 @@ class ZugferdSettings
      */
     public static function getXmpMetaDataFilename(): string
     {
-        return static::$xmpMetaDataFilename;
+        return self::$xmpMetaDataFilename;
     }
 
     /**
@@ -258,67 +267,68 @@ class ZugferdSettings
      */
     public static function setXmpMetaDataFilename(string $xmpMetaDataFilename): void
     {
-        static::$xmpMetaDataFilename = $xmpMetaDataFilename;
+        self::$xmpMetaDataFilename = $xmpMetaDataFilename;
     }
 
     /**
      * Returns a list of node paths which have a special number of decimal places
      *
-     * @return array
+     * @return array<string,int>
      */
     public static function getSpecialDecimalPlacesMaps(): array
     {
-        return static::$specialDecimalPlacesMaps;
+        return self::$specialDecimalPlacesMaps;
     }
 
     /**
      * Get a specific map for node paths with a special number of decimal places. If not map
      * is found then the default value is returns
      *
-     * @param  string  $nodePath
-     * @param  integer $defaultDecimalPlaces
-     * @return integer
+     * @param  string $nodePath
+     * @param  int    $defaultDecimalPlaces
+     * @return int
      */
     public static function getSpecialDecimalPlacesMap(string $nodePath, int $defaultDecimalPlaces): int
     {
         $nodePath = preg_replace('@\[\d+\]@', '', $nodePath);
-        return static::$specialDecimalPlacesMaps[$nodePath] ?? $defaultDecimalPlaces;
+
+        return self::$specialDecimalPlacesMaps[$nodePath] ?? $defaultDecimalPlaces;
     }
 
     /**
      * Update the map of node paths which have a special number of decimal places
      *
-     * @param  array $specialDecimalPlacesMaps
+     * @param  array<string,int> $specialDecimalPlacesMaps
      * @return void
      */
     public static function setSpecialDecimalPlacesMaps(array $specialDecimalPlacesMaps): void
     {
-        static::$specialDecimalPlacesMaps = $specialDecimalPlacesMaps;
+        self::$specialDecimalPlacesMaps = $specialDecimalPlacesMaps;
     }
 
     /**
      * Add a new map for a node path with a special number of decimal places
      *
-     * @param  string  $nodePath
-     * @param  integer $defaultDecimalPlaces
+     * @param  string $nodePath
+     * @param  int    $defaultDecimalPlaces
      * @return void
      */
     public static function addSpecialDecimalPlacesMap(string $nodePath, int $defaultDecimalPlaces): void
     {
         $nodePath = preg_replace('@\[\d+\]@', '', $nodePath);
-        static::$specialDecimalPlacesMaps[$nodePath] = $defaultDecimalPlaces;
+        self::$specialDecimalPlacesMaps[$nodePath] = $defaultDecimalPlaces;
     }
 
     /**
      * Set the number of decimals to use for unit single amount (unit prices) values
      *
-     * @param  integer $defaultDecimalPlaces
+     * @param  int  $defaultDecimalPlaces
      * @return void
      */
     public static function setUnitAmountDecimals(int $defaultDecimalPlaces): void
     {
-        static::addSpecialDecimalPlacesMap('/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:ChargeAmount', $defaultDecimalPlaces);
-        static::addSpecialDecimalPlacesMap('/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:ChargeAmount', $defaultDecimalPlaces);
+        self::addSpecialDecimalPlacesMap('/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeAgreement/ram:GrossPriceProductTradePrice/ram:ChargeAmount', $defaultDecimalPlaces);
+        self::addSpecialDecimalPlacesMap('/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:IncludedSupplyChainTradeLineItem/ram:SpecifiedLineTradeAgreement/ram:NetPriceProductTradePrice/ram:ChargeAmount', $defaultDecimalPlaces);
     }
 
     /**
@@ -329,7 +339,7 @@ class ZugferdSettings
      */
     public static function setSerializerCacheDirectory(string $serializerCacheDirectoty): void
     {
-        static::$serializerCacheDirectory = $serializerCacheDirectoty;
+        self::$serializerCacheDirectory = $serializerCacheDirectoty;
     }
 
     /**
@@ -339,17 +349,17 @@ class ZugferdSettings
      */
     public static function getSerializerCacheDirectory(): string
     {
-        return static::$serializerCacheDirectory;
+        return self::$serializerCacheDirectory;
     }
 
     /**
      * Returns true if a cache directory for the internal serializer is configured, otherwise false
      *
-     * @return boolean
+     * @return bool
      */
     public static function hasSerializerCacheDirectory(): bool
     {
-        return StringUtils::stringIsNullOrEmpty(static::$serializerCacheDirectory) === false;
+        return false === StringUtils::stringIsNullOrEmpty(self::$serializerCacheDirectory);
     }
 
     /**
@@ -359,7 +369,7 @@ class ZugferdSettings
      */
     public static function getRootDirectory(): string
     {
-        return PathUtils::combineAllPaths(__DIR__, "..");
+        return PathUtils::combineAllPaths(__DIR__, '..');
     }
 
     /**
@@ -369,7 +379,7 @@ class ZugferdSettings
      */
     public static function getSourceDirectory(): string
     {
-        return PathUtils::combineAllPaths(static::getRootDirectory(), "src");
+        return PathUtils::combineAllPaths(self::getRootDirectory(), 'src');
     }
 
     /**
@@ -379,7 +389,7 @@ class ZugferdSettings
      */
     public static function getAssetDirectory(): string
     {
-        return PathUtils::combineAllPaths(static::getSourceDirectory(), "assets");
+        return PathUtils::combineAllPaths(self::getSourceDirectory(), 'assets');
     }
 
     /**
@@ -389,7 +399,7 @@ class ZugferdSettings
      */
     public static function getYamlDirectory(): string
     {
-        return PathUtils::combineAllPaths(static::getSourceDirectory(), "yaml");
+        return PathUtils::combineAllPaths(self::getSourceDirectory(), 'yaml');
     }
 
     /**
@@ -399,7 +409,7 @@ class ZugferdSettings
      */
     public static function getValidationDirectory(): string
     {
-        return PathUtils::combineAllPaths(static::getSourceDirectory(), "validation");
+        return PathUtils::combineAllPaths(self::getSourceDirectory(), 'validation');
     }
 
     /**
@@ -409,7 +419,7 @@ class ZugferdSettings
      */
     public static function getSchemaDirectory(): string
     {
-        return PathUtils::combineAllPaths(static::getSourceDirectory(), "schema");
+        return PathUtils::combineAllPaths(self::getSourceDirectory(), 'schema');
     }
 
     /**
@@ -419,7 +429,7 @@ class ZugferdSettings
      */
     public static function getSchematronDirectory(): string
     {
-        return PathUtils::combineAllPaths(static::getSchemaDirectory(), "schematron");
+        return PathUtils::combineAllPaths(self::getSchemaDirectory(), 'schematron');
     }
 
     /**
@@ -429,7 +439,7 @@ class ZugferdSettings
      */
     public static function getXsltDirectory(): string
     {
-        return PathUtils::combineAllPaths(static::getSchemaDirectory(), "xslt");
+        return PathUtils::combineAllPaths(self::getSchemaDirectory(), 'xslt');
     }
 
     /**
@@ -439,7 +449,7 @@ class ZugferdSettings
      */
     public static function getFullIccProfileFilename(): string
     {
-        return PathUtils::combinePathWithFile(static::getAssetDirectory(), static::$iccProfileFilename);
+        return PathUtils::combinePathWithFile(self::getAssetDirectory(), self::$iccProfileFilename);
     }
 
     /**
@@ -449,6 +459,39 @@ class ZugferdSettings
      */
     public static function getFullXmpMetaDataFilename(): string
     {
-        return PathUtils::combinePathWithFile(static::getAssetDirectory(), static::$xmpMetaDataFilename);
+        return PathUtils::combinePathWithFile(self::getAssetDirectory(), self::$xmpMetaDataFilename);
+    }
+
+    /**
+     * Set a PdfParser config
+     *
+     * This is optional, to allow for customization of PdfParser used by
+     * PdfReader.
+     *
+     * Example:
+     *
+     * ```
+     * $config = new Config();
+     * $config->setDecodeMemoryLimit(16 * 1024 * 1024);
+     * $config->setRetainImageContent(false);
+     * ZugferdSettings::setPdfParserConfig($config);
+     * ```
+     *
+     * @param  Config $config Config object for Smalot\PdfParser
+     * @return void
+     */
+    public static function setPdfParserConfig(Config $config): void
+    {
+        self::$pdfParserConfig = $config;
+    }
+
+    /**
+     * Get the PdfParser config
+     *
+     * @return null|Config Config object for Smalot\PdfParser
+     */
+    public static function getPdfParserConfig(): ?Config
+    {
+        return self::$pdfParserConfig;
     }
 }

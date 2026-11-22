@@ -57,7 +57,7 @@ class modEInvoicing extends DolibarrModules
 
 		// Family can be 'base' (core modules),'crm','financial','hr','projects','products','ecm','technic' (transverse modules),'interface' (link with external tools),'other','...'
 		// It is used to group modules by family in module setup page
-		$this->family = "other";
+		$this->family = "financial";
 
 		// Module position in the family on 2 digits ('01', '10', '20', ...)
 		$this->module_position = '90';
@@ -127,7 +127,7 @@ class modEInvoicing extends DolibarrModules
 			// Contexts are listed one by one on purpose: 'all' loads this class into every HookManager of the
 			// request, including the ones other modules build for their own contexts.
 			'hooks' => [
-				'invoicecard', 'invoicesuppliercard', 'thirdpartycard', 'thirdpartycomm', 'productcard',
+				'invoicecard', 'invoicesuppliercard', 'ordercard', 'thirdpartycard', 'thirdpartycomm', 'productcard',
 				'invoicedocument', 'invoicesuppliercarddocument',
 				'invoicelist', 'supplierinvoicelist', 'thirdpartylist', 'societelist', 'productlist',
 				'productservicelist', 'accountancysupplierlist',
@@ -187,6 +187,8 @@ class modEInvoicing extends DolibarrModules
 			3 => array('EINVOICING_SYNC_MARGIN_TIME_HOURS', 'chaine', '12', '0'),
 			4 => array('EINVOICING_FLOWS_SYNC_CALL_SIZE', 'chaine', '100', '0'),
 			5 => array('EINVOICING_PROTOCOL', 'chaine', 'CII', '0'),
+			// Transifex project carrying the translations of this module, used by the translation admin page to build its links
+			6 => array('EINVOICING_TRANSIFEX_PROJECT', 'chaine', 'dolibarr-association/dolibarr-community-modules', '0'),
 		);
 
 		// Some keys to add into the overwriting translation tables
@@ -377,7 +379,7 @@ class modEInvoicing extends DolibarrModules
 			'prefix' => img_picto('', 'einvoicing.png@einvoicing', 'class="pictofixedwidth valignmiddle paddingright"'),
 			'mainmenu' => 'billing',
 			'leftmenu' => 'einvoicing_billing',
-			'url' => '/einvoicing/einvoicingindex.php',
+			'url' => '/einvoicing/einvoicingindex.php?mainmenu=billing&leftmenu=einvoicing',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1000,
 			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
@@ -394,10 +396,10 @@ class modEInvoicing extends DolibarrModules
 			'titre' => 'EInvoiceSynchronization',
 			'mainmenu' => 'billing',
 			'leftmenu' => 'einvoicing_documents',
-			'url' => '/einvoicing/document_list.php',
+			'url' => '/einvoicing/document_list.php?mainmenu=billing&leftmenu=einvoicing',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1001,
-			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
+			'enabled' => 'isModEnabled("einvoicing") && preg_match(\'/^(einvoicing|all)/\', $leftmenu) && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
 			'perms' => '$user->hasRight("einvoicing", "write")',
 			'target' => '',
 			'user' => 2,
@@ -411,10 +413,10 @@ class modEInvoicing extends DolibarrModules
 			'titre' => 'MapEInvoiceProducts',
 			'mainmenu' => 'billing',
 			'leftmenu' => 'einvoicing_product_mapping',
-			'url' => '/einvoicing/product_mapping.php',
+			'url' => '/einvoicing/product_mapping.php?mainmenu=billing&leftmenu=einvoicing',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1002,
-			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE") && !getDolGlobalString("EINVOICING_DISABLE_SYNC_AP_TO_DOLI")',
+			'enabled' => 'isModEnabled("einvoicing") && preg_match(\'/^(einvoicing|all)/\', $leftmenu) && !getDolGlobalString("EINVOICING_ONLY_GENERATE") && !getDolGlobalString("EINVOICING_DISABLE_SYNC_AP_TO_DOLI")',
 			'perms' => '$user->hasRight("einvoicing", "write")',
 			'target' => '',
 			'user' => 2,
@@ -428,10 +430,10 @@ class modEInvoicing extends DolibarrModules
 			'titre' => 'MappedVendorRefs',
 			'mainmenu' => 'billing',
 			'leftmenu' => 'einvoicing_vendorrefs',
-			'url' => '/einvoicing/vendorref_list.php',
+			'url' => '/einvoicing/vendorref_list.php?mainmenu=billing&leftmenu=einvoicing',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1003,
-			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE") && !getDolGlobalString("EINVOICING_DISABLE_SYNC_AP_TO_DOLI")',
+			'enabled' => 'isModEnabled("einvoicing") && preg_match(\'/^(einvoicing|all)/\', $leftmenu) && !getDolGlobalString("EINVOICING_ONLY_GENERATE") && !getDolGlobalString("EINVOICING_DISABLE_SYNC_AP_TO_DOLI")',
 			'perms' => '$user->hasRight("einvoicing", "read")',
 			'target' => '',
 			'user' => 2,
@@ -445,10 +447,10 @@ class modEInvoicing extends DolibarrModules
 			'titre' => 'EInvoiceSyncPending',
 			'mainmenu' => 'billing',
 			'leftmenu' => 'einvoicing_sync_pending',
-			'url' => '/einvoicing/sync_pending_list.php',
+			'url' => '/einvoicing/sync_pending_list.php?mainmenu=billing&leftmenu=einvoicing',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1004,
-			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE") && getDolGlobalInt("EINVOICING_ENABLE_MANUAL_ACTION_QUEUE")',
+			'enabled' => 'isModEnabled("einvoicing") && preg_match(\'/^(einvoicing|all)/\', $leftmenu) && !getDolGlobalString("EINVOICING_ONLY_GENERATE") && getDolGlobalInt("EINVOICING_ENABLE_MANUAL_ACTION_QUEUE")',
 			'perms' => '$user->hasRight("einvoicing", "read")',
 			'target' => '',
 			'user' => 2,
@@ -479,10 +481,10 @@ class modEInvoicing extends DolibarrModules
 			'titre' => 'pdpFeedback',
 			'mainmenu' => 'billing',
 			'leftmenu' => 'einvoicing_feedback',
-			'url' => '/einvoicing/call_list.php',
+			'url' => '/einvoicing/call_list.php?mainmenu=billing&leftmenu=einvoicing',
 			'langs' => 'einvoicing@einvoicing',
 			'position' => 1003,
-			'enabled' => 'isModEnabled("einvoicing") && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
+			'enabled' => 'isModEnabled("einvoicing") && preg_match(\'/^(einvoicing|all)/\', $leftmenu) && !getDolGlobalString("EINVOICING_ONLY_GENERATE")',
 			'perms' => '$user->hasRight("einvoicing", "read")',
 			'target' => '',
 			'user' => 2,

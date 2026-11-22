@@ -188,6 +188,53 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			// TODO
 		}
 
+		// ORDER AND INVOICE LINES: the line of the buyer's purchase order a line bills (BT-132, issue #1192).
+		// Entered into the line form of the order or invoice card: a save that does not post the field (API,
+		// clone, creation from another object) leaves it untouched. An empty value deletes it.
+		if (in_array($action, array('LINEORDER_INSERT', 'LINEORDER_MODIFY', 'LINEBILL_INSERT', 'LINEBILL_MODIFY'), true) && (int) $object->id > 0) {
+			$einvoicing = new EInvoicing($this->db);
+			$elementType = (strpos($action, 'LINEORDER_') === 0) ? 'commandedet' : 'facturedet';
+			$value = null;
+			if (GETPOSTISSET('einvoice_buyer_order_line_id')) {
+				$value = trim(GETPOST('einvoice_buyer_order_line_id', 'alphanohtml'));
+			} elseif ($action == 'LINEBILL_INSERT' && (int) $object->origin_id > 0
+				&& in_array(self::originOf($object), array('commande', 'order', 'commandedet', 'orderline'), true)) {
+				// An invoice line made from an order line takes its value: the card passes 'commande' and the
+				// line id, Facture::create() with lines that keep their origin the line element and its id.
+				$value = (string) $einvoicing->getExtraFieldValue((int) $object->origin_id, 'commandedet', EInvoicing::EXTRAFIELD_BUYER_ORDER_LINE_ID);
+			}
+			if ($value !== null && $einvoicing->insertOrUpdateExtraField((int) $object->id, $elementType, EInvoicing::EXTRAFIELD_BUYER_ORDER_LINE_ID, $value) < 0) {
+				$this->errors = array_merge($this->errors, $einvoicing->errors);
+				return -1;
+			}
+		}
+		// Facture::createFromOrder() (automatic billing, API) gives its lines no origin: match them on the order
+		if ($action == 'BILL_CREATE') {
+			'@phan-var-force Facture $object';
+			/** @var Facture $object */
+			if ((int) $object->origin_id > 0 && (int) $object->type != Facture::TYPE_DEPOSIT && in_array(self::originOf($object), array('commande', 'order'), true)) {
+				$einvoicing = new EInvoicing($this->db);
+				if ($einvoicing->copyBuyerOrderLineIdsFromOrder((int) $object->id, (int) $object->origin_id) < 0) {
+					$this->errors = array_merge($this->errors, $einvoicing->errors);
+					return -1;
+				}
+			}
+		}
+		if ($action == 'ORDER_DELETE' && (int) $object->id > 0) {
+			$einvoicing = new EInvoicing($this->db);
+			if ($einvoicing->deleteLineExtraFields('commandedet', (int) $object->id) < 0) {
+				$this->errors = array_merge($this->errors, $einvoicing->errors);
+				return -1;
+			}
+		}
+		if (($action == 'LINEORDER_DELETE' || $action == 'LINEBILL_DELETE') && (int) $object->id > 0) {
+			$einvoicing = new EInvoicing($this->db);
+			if ($einvoicing->insertOrUpdateExtraField((int) $object->id, $action == 'LINEORDER_DELETE' ? 'commandedet' : 'facturedet', EInvoicing::EXTRAFIELD_BUYER_ORDER_LINE_ID, '') < 0) {
+				$this->errors = array_merge($this->errors, $einvoicing->errors);
+				return -1;
+			}
+		}
+
 		// INVOICES AND PAYMENT
 		if ($action == 'BILL_CREATE') {
 			/** @var Facture $object */
@@ -316,6 +363,11 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			// Lock on the REAL PA state (persistent flow_id), see BILL_UNVALIDATE above.
 			if ($einvoicing->isTransmittedLockActive($object->id, (string) $object->ref)) {
 				$this->errors[] = $langs->trans('EinvoicingCantDeleteATransmittedInvoice');
+				return -1;
+			}
+			// The core deletes the lines without their trigger: their buyer's order line (BT-132) goes here
+			if ($einvoicing->deleteLineExtraFields('facturedet', (int) $object->id) < 0) {
+				$this->errors = array_merge($this->errors, $einvoicing->errors);
 				return -1;
 			}
 		}
@@ -646,6 +698,21 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 			dol_syslog(__METHOD__ . ' Failed to send paid status (212) to platform for invoice id=' . $invoice->id . ' : ' . $result['message'], LOG_ERR);
 			setEventMessage($langs->trans("ModuleEInvoicingName").' : '.$result['message'], 'errors');
 		}
+	}
+
+	/**
+	 * Element an object or a line was made from: origin_type from Dolibarr 20, origin before.
+	 *
+	 * @param	CommonObject|CommonObjectLine	$object		Object of the trigger
+	 * @return	string								Element, '' if none
+	 */
+	private static function originOf($object)
+	{
+		if (!empty($object->origin_type)) {
+			return (string) $object->origin_type;
+		}
+
+		return (string) $object->origin;	// @phan-suppress-current-line PhanDeprecatedProperty
 	}
 
 	/**

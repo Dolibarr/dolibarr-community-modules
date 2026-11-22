@@ -470,6 +470,7 @@ $billing_period    	= [];
 $numligne          	= 1;
 $hasServiceLine		= false;	// With the VAT mode below, drives the VAT point date code (BT-8)
 $hasProductLine		= false;
+$buyerOrderLineIds	= $einvoicing->getBuyerOrderLineIds($object);	// llx_facturedet.rowid => buyer's order line (BT-132)
 // @phan-suppress-current-line PhanTypeArraySuspiciousNullable
 foreach ($object->lines as $line) {
 	$isDepositLine = 0;
@@ -772,6 +773,7 @@ foreach ($object->lines as $line) {
 		'linestatuscode'            => 'NA',
 		'linestatusreasoncode'      => 'NA',
 		'lineNote'                  => null,
+		'buyerorderlineid'          => $buyerOrderLineIds[(int) $line->id] ?? '',	// BT-132 (issue #1192)
 
 		'prodname'                  => $libelle,			// BT-153
 		'proddesc'                  => $description,		// BT-154
@@ -1177,7 +1179,7 @@ $invoiceData = [
 	// $prepaidAmount is what the document reports in BT-113, and BR-FR-CO-09 ties the "already paid"
 	// frames to it, so the frame has to be decided from the same figure.
 	// Values allowed by BR-FR-08: B1, S1, M1, B2, S2, M2, S3, B4, S4, M4, S5, S6, B7, S7, B8, S8, M8, B9, S9, M9
-	'businessProcessId'    => $this->getBillingProcessID($object, $prepaidAmount),
+	'businessProcessId'    => $this->getBillingProcessID($object, $prepaidAmount, (string) $einvoicing->getExtraFieldValue($object->id, $object->element, EInvoicing::EXTRAFIELD_CONTRACTOR_ROLE)),
 	'isTestDocument'       => !empty($object->specimen),
 
 	// Notes
@@ -1293,7 +1295,7 @@ $invoiceData = [
 	'orderReference'            => $promise_code,
 	'contractReference'         => $object->array_options['options_d4d_contract_number'] ?? null,
 	'contractReferenceTypeCode' => $contractReferenceTypeCode,
-	'despatchAdviceRef'         => null,
+	'despatchAdviceRef'         => $einvoicing->getDespatchAdviceReference($object),	// BT-16 (issue #1151)
 
 	// VAT breakdown for section ApplicableHeaderTradeSettlement
 	'taxBreakdown'              => $taxBreakdown,

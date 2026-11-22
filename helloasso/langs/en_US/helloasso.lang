@@ -88,6 +88,7 @@ HelloAssoRecordNotFound=Record not found
 
 HelloAssoMembersNothingDone=%s Membership fee(s) processed but nothing was done (dry run). %s membership fee(s) had an error.
 HelloAssoMembersAddedSucessfully=%s membership fee(s) added successfully
+HelloAssoMembersNoNewMembers=No new membership fee to synchronize
 HelloAssoDolibarrCorrespondenceParameters=Correspondence parameters between HelloAsso and Dolibarr
 HelloAssoFormParameters=HelloAsso form settings
 HelloAssoMemberTypeIdTitle=ID of the corresponding member type in HelloAsso
@@ -102,6 +103,12 @@ ModuleHelloAssoMemberSyncDesc=Synchronize HelloAsso membership fees into the Dol
 HelloAssoSyncButtonDesc=Test the synchronization of your membership fees without modifying your data.<br>Once the configuration is OK, you can automate the synchronization in the Scheduled jobs module with the HelloAssoGetNewMembers job.
 HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS=Additional actions on membership fee synchronization
 HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS_HELP=Additional actions on membership fee synchronization.<br>More actions are available if third party creation is enabled on synchronization.
+HelloassoMemberDonationProduct=Product for complementary donations in membership orders
+HelloassoMemberDonationProductHelp=Optional. HelloAsso lets members add a donation when paying their membership fee. When a product/service is selected here (typically a service linked to accounting account 754 - Donations), the donation is billed on the member's invoice as a second line using this product, and the payment recorded on the HelloAsso bank account is the full amount paid (membership fee + donation). Leave empty to ignore donations (previous behavior).
+HelloAssoMemberDonationLabel=HelloAsso donation with membership, payment no. %s
+HelloAssoMembersDonationsAdded=%s complementary donation(s) recorded
+ErrorHelloAssoDonationProductNotFound=Product for complementary donations (id %s) not found. Check the HelloAsso membership settings
+HelloAssoDonationProductSameAsSubscriptionProduct=The product for complementary donations is the same as the product used for membership fees (setup of module Members). Donations would be recorded on the membership fees accounting account. Select a dedicated product/service (for example linked to account 754 - Donations).
 
 # About page
 #

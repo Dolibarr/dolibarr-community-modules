@@ -46,7 +46,7 @@ HELLOASSO_CLIENT_ORGANISATION=Organisationsnavn for produktionstilstand
 HELLOASSO_CLIENT_ORGANISATION_HELP=Navnet på organisationen for produktionstilstand. Skal stemme overens med navnet, der er defineret i HelloAsso-kontoen.
 HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS=Bankkonto til betalinger
 HELLOASSO_SHOW_ONLINE_PAYMENTS=Vis online betalingsside
-HELLOASSO_STANDAR_BTN = Aktivér den grafiske stil HelloAsso for betalingsknappen
+HELLOASSO_STANDAR_BTN = Aktivér den grafiske stil HelloAsso for betalingsknappen (bryder Dolibarr-udseendets konsistens)
 HELLOASSO_STANDAR_BTN_HELP = Aktiver denne indstilling for at indlæse HelloAsso CSS-filen, som erstatter Dolibarrs standardstil med et design, der er harmoniseret med HelloAssos visuelle identitet (knapper, farver osv.).
 
 ExampleOfTestCreditCardHelloAsso=Eksempler på testkreditkort kan findes på denne URL:
@@ -88,6 +88,7 @@ HelloAssoRecordNotFound=Optagelse ikke fundet
 
 HelloAssoMembersNothingDone=%s Medlemsgebyr(er) blev behandlet, men intet blev gjort (prøve). Der var en fejl i medlemsgebyr(erne) %s.
 HelloAssoMembersAddedSucessfully=Medlemsgebyr(er) for %s er blevet tilføjet
+HelloAssoMembersNoNewMembers=No new membership fee to synchronize
 HelloAssoDolibarrCorrespondenceParameters=Korrespondanceparametre mellem HelloAsso og Dolibarr
 HelloAssoFormParameters=Indstillinger for HelloAsso-formular
 HelloAssoMemberTypeIdTitle=ID for den tilsvarende medlemstype i HelloAsso
@@ -102,6 +103,12 @@ ModuleHelloAssoMemberSyncDesc=Synkroniser HelloAsso medlemsgebyrer med Dolibarr-
 HelloAssoSyncButtonDesc=Test synkroniseringen af dine medlemsgebyrer uden at ændre dine data.<br>Når konfigurationen er OK, kan du automatisere synkroniseringen i modulet Planlagte job med jobbet HelloAssoGetNewMembers.
 HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS=Yderligere handlinger ved synkronisering af medlemsgebyrer
 HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS_HELP=Yderligere handlinger ved synkronisering af medlemsgebyrer.<br>Flere handlinger er tilgængelige, hvis oprettelse via tredjepart er aktiveret ved synkronisering.
+HelloassoMemberDonationProduct=Product for complementary donations in membership orders
+HelloassoMemberDonationProductHelp=Optional. HelloAsso lets members add a donation when paying their membership fee. When a product/service is selected here (typically a service linked to accounting account 754 - Donations), the donation is billed on the member's invoice as a second line using this product, and the payment recorded on the HelloAsso bank account is the full amount paid (membership fee + donation). Leave empty to ignore donations (previous behavior).
+HelloAssoMemberDonationLabel=HelloAsso donation with membership, payment no. %s
+HelloAssoMembersDonationsAdded=%s complementary donation(s) recorded
+ErrorHelloAssoDonationProductNotFound=Product for complementary donations (id %s) not found. Check the HelloAsso membership settings
+HelloAssoDonationProductSameAsSubscriptionProduct=The product for complementary donations is the same as the product used for membership fees (setup of module Members). Donations would be recorded on the membership fees accounting account. Select a dedicated product/service (for example linked to account 754 - Donations).
 
 # About page
 #

@@ -101,7 +101,6 @@ NbOfLinesToMap=Nombre de lignes à cartographier
 NotMappable=Impossible à cartographier
 NotMappableBecauseNoVendorRef=Cette ligne ne comporte aucune référence produit fournisseur ; il est donc impossible d’y associer un produit. Créez plutôt le produit ou définissez un produit par défaut pour ce fournisseur.
 SaveMappingAndCreateVendorRefs=Sauvegarder la cartographie
-AllLinesOfFlowAreMapped=Toutes les étapes de ce flux sont liées à un produit. Vous pouvez relancer la synchronisation.
 NbOfProductsMapped=%s produit(s) mappé(s)
 NoProductMapped=Aucun produit cartographié
 FailedToMapProduct=Échec de la correspondance avec la référence du fournisseur %s
