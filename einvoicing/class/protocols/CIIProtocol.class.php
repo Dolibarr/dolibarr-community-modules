@@ -1908,6 +1908,7 @@ class CIIProtocol extends AbstractProtocol
 	 * @param	array<string,array{productId:int,unitPrice:float,refFourn:string,tvaTx:float}>	$entries	The entries collected so far
 	 * @param	int																			$productId	Product the line is billed on
 	 * @param	array<string,mixed>															$parsedLine	The parsed line
+	 * @return	void																		The entry is added to $entries
 	 */
 	protected function collectSupplierPriceEntry(array &$entries, int $productId, array $parsedLine): void
 	{
