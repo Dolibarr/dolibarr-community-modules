@@ -51,7 +51,7 @@ class Call extends CommonObject
 	 * @var string		Prefix to check for any trigger code of any business class to prevent bad value for trigger code.
 	 * @see CommonTrigger::call_trigger()
 	 */
-	public $TRIGGER_PREFIX = 'CALL';	// Will be used to build trgiger keys 'EINVOICING_MYOBJECT_MODIFY', ...
+	public $TRIGGER_PREFIX = 'CALL';	// The prefix core builds from the class name: CALL_CREATE, CALL_MODIFY, ...
 
 	/**
 	 * @var string 		Name of table without prefix where object is stored. This is also the key used for extrafields management (so extrafields know the link to the parent table).
@@ -597,7 +597,7 @@ class Call extends CommonObject
 
 			if (!$error && !$notrigger) {
 				// Call trigger
-				$result = $this->call_trigger('MYOBJECT_VALIDATE', $user);
+				$result = $this->call_trigger('CALL_VALIDATE', $user);
 				if ($result < 0) {
 					$error++;
 				}
@@ -680,7 +680,7 @@ class Call extends CommonObject
 			return 0;
 		}
 
-		return $this->setStatusCommon($user, self::STATUS_FAILED, $notrigger, 'EINVOICING_MYOBJECT_UNVALIDATE');
+		return $this->setStatusCommon($user, self::STATUS_FAILED, $notrigger, 'CALL_UNVALIDATE');
 	}
 
 	/**
@@ -697,7 +697,7 @@ class Call extends CommonObject
 			return 0;
 		}
 
-		return $this->setStatusCommon($user, self::STATUS_CANCELED, $notrigger, 'EINVOICING_MYOBJECT_CANCEL');
+		return $this->setStatusCommon($user, self::STATUS_CANCELED, $notrigger, 'CALL_CANCEL');
 	}
 
 	/**
@@ -714,7 +714,7 @@ class Call extends CommonObject
 			return 0;
 		}
 
-		return $this->setStatusCommon($user, self::STATUS_SUCCESS, $notrigger, 'EINVOICING_MYOBJECT_REOPEN');
+		return $this->setStatusCommon($user, self::STATUS_SUCCESS, $notrigger, 'CALL_REOPEN');
 	}
 
 	/**

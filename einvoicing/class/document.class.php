@@ -52,7 +52,7 @@ class Document extends CommonObject
 	 * @var string		Prefix to check for any trigger code of any business class to prevent bad value for trigger code.
 	 * @see CommonTrigger::call_trigger()
 	 */
-	public $TRIGGER_PREFIX = 'EINVOICING_MYOBJECT';	// Will be used to build trgiger keys 'EINVOICING_MYOBJECT_MODIFY', ...
+	public $TRIGGER_PREFIX = 'DOCUMENT';	// The prefix core builds from the class name: DOCUMENT_CREATE, DOCUMENT_MODIFY, ...
 
 	/**
 	 * @var string 		Name of table without prefix where object is stored. This is also the key used for extrafields management (so extrafields know the link to the parent table).
@@ -907,7 +907,7 @@ class Document extends CommonObject
 
 			if (!$error && !$notrigger) {
 				// Call trigger
-				$result = $this->call_trigger('MYOBJECT_VALIDATE', $user);
+				$result = $this->call_trigger('DOCUMENT_VALIDATE', $user);
 				if ($result < 0) {
 					$error++;
 				}
@@ -990,7 +990,7 @@ class Document extends CommonObject
 			return 0;
 		}
 
-		return $this->setStatusCommon($user, self::STATUS_DRAFT, $notrigger, 'EINVOICING_MYOBJECT_UNVALIDATE');
+		return $this->setStatusCommon($user, self::STATUS_DRAFT, $notrigger, 'DOCUMENT_UNVALIDATE');
 	}
 
 	/**
@@ -1007,7 +1007,7 @@ class Document extends CommonObject
 			return 0;
 		}
 
-		return $this->setStatusCommon($user, self::STATUS_CANCELED, $notrigger, 'EINVOICING_MYOBJECT_CANCEL');
+		return $this->setStatusCommon($user, self::STATUS_CANCELED, $notrigger, 'DOCUMENT_CANCEL');
 	}
 
 	/**
@@ -1024,7 +1024,7 @@ class Document extends CommonObject
 			return 0;
 		}
 
-		return $this->setStatusCommon($user, self::STATUS_VALIDATED, $notrigger, 'EINVOICING_MYOBJECT_REOPEN');
+		return $this->setStatusCommon($user, self::STATUS_VALIDATED, $notrigger, 'DOCUMENT_REOPEN');
 	}
 
 	/**
