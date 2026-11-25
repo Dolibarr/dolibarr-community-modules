@@ -74,7 +74,8 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 
 		$error = 0;
 
-		dol_syslog("Trigger '".$this->name."' for action '".$action."' launched by ".__FILE__.". id=".$object->id);
+		// Not every object sent to the triggers has an id (WebHost API calls, the Context of ExternalAccess...)
+		dol_syslog("Trigger '".$this->name."' for action '".$action."' launched by ".__FILE__.". id=".(!empty($object->id) ? $object->id : ''));
 
 		// Note: Option EINVOICING_AUTO_SEND_ON_GENERATION is managed in hook afterPDFCreation(), which is
 		// told by the BILL_VALIDATE case below that a validation is what triggers the coming generation.
