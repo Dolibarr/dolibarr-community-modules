@@ -1649,7 +1649,7 @@ class EInvoicing
 	 */
 	private function _checkThirdpartyViaExternalAPIs($thirdparty)
 	{
-		global $langs;
+		global $conf, $langs;
 
 		$warnings = [];
 
@@ -1664,7 +1664,14 @@ class EInvoicing
 			$siren = substr(removeAllSpaces(idprof($thirdparty)), 0, 9);
 			$apiUrl = 'https://recherche-entreprises.api.gouv.fr/search?q=' . urlencode($siren) . '&per_page=5';
 
-			$response = getURLContent($apiUrl, 'GET', '', 1, ['Accept: application/json']);
+			// Asked once per SIREN and request (BILL_VALIDATE then afterPDFCreation check the same third party, a mass action
+			// each invoice), with a short timeout instead of the 5 + 30 s of the core, since the check is optional.
+			if (!isset($conf->cache['einvoicing_registry'][$siren])) {
+				$timeout = getDolGlobalInt('EINVOICING_API_VALIDATION_TIMEOUT', 5);
+				// @phpstan-ignore arguments.count (the two timeouts are arguments of getURLContent() since Dolibarr 22, ignored before)
+				$conf->cache['einvoicing_registry'][$siren] = getURLContent($apiUrl, 'GET', '', 1, ['Accept: application/json'], array('http', 'https'), 0, -1, min(3, $timeout), $timeout);
+			}
+			$response = $conf->cache['einvoicing_registry'][$siren];
 
 			if ($response['http_code'] !== 200) {
 				// API unreachable: log and continue without blocking
