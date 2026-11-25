@@ -1406,3 +1406,28 @@ EInvoicingUntdid4451TRR=Tarif demandé
 EInvoicingUntdid4451TXD=Déclaration fiscale
 EInvoicingUntdid4451WHI=Instruction/information d'entrepôt
 EInvoicingUntdid4451ZZZ=Défini mutuellement
+
+# ==============================================================================
+# Manual Import Section
+# ==============================================================================
+
+EInvoiceManualImport=Import manuel de facture électronique
+EInvoiceManualImportTitle=Importer une facture électronique
+EInvoiceChooseFile=Sélectionner un fichier à importer
+EInvoiceAcceptedFormats=Formats acceptés : .pdf (Factur-X) ou .xml (CII uniquement)
+EInvoiceSupportedProtocols=Protocoles supportés
+EInvoiceImportFile=Importer le fichier
+EInvoiceHowTo=Comment importer une facture
+EInvoiceManualStepDownload=Téléchargez la facture électronique depuis le site de votre PA (SuperPDP, etc.) au format Factur-X (original ou neutre)
+EInvoiceManualStepSelect=Sélectionnez le fichier PDF ou XML(CII) téléchargé ci-dessous
+EInvoiceManualStepImport=Cliquez sur « Importer le fichier » pour procéder à l'importation
+EInvoiceManualStepVerify=Vérifiez la facture fournisseur créée dans Dolibarr
+EInvoiceManualImportSuccess=Facture électronique importée avec succès : %s
+ViewInvoice=Ouvrir la facture
+ErrorUnrecognizedEInvoiceFormat=Le fichier soumis ne semble pas être une facture électronique valide (Factur-X, CII).
+ErrorProtocolNotEnabled=Le protocole %s n'est pas activé dans la configuration du module.
+ErrorFailedToImportEInvoice=Échec de l'importation de la facture électronique.
+ErrorNoFileSelected=Aucun fichier sélectionné.
+ErrorFileUpload=Erreur lors du téléchargement du fichier (code : %s).
+ErrorEmptyFile=Le fichier soumis est vide.
+ErrorFailedToSaveUploadedFile=Impossible de sauvegarder le fichier téléchargé.

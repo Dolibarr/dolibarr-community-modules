@@ -457,6 +457,23 @@ class modEInvoicing extends DolibarrModules
 			'object' => '',
 		);
 		/* END MODULEBUILDER LEFTMENU PDPSYNCPENDING */
+		// add Manual Import page
+		/* BEGIN MODULEBUILDER LEFTMENU MANUALIMPORT */
+		$this->menu[$r++] = array(
+			'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=einvoicing_documents',
+			'type' => 'left',
+			'titre' => 'EInvoiceManualImport',
+			'mainmenu' => 'billing',
+			'leftmenu' => 'einvoicing_manual_import',
+			'url' => '/einvoicing/manual_import.php',
+			'langs' => 'einvoicing@einvoicing',
+			'position' => 1005,
+			'enabled' => 'isModEnabled("einvoicing")',
+			'perms' => '$user->hasRight("einvoicing", "read")',
+		);
+		/* END MODULEBUILDER LEFTMENU MANUALIMPORT */
+		// End Manual Import
+
 		/* BEGIN MODULEBUILDER LEFTMENU PDPSOCIETIES */
 		// $this->menu[$r++] = array(
 		// 	'fk_menu' => 'fk_mainmenu=billing,fk_leftmenu=einvoicing_billing',

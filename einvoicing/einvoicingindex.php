@@ -234,6 +234,14 @@ print '</div>';
 
 print '<div class="fichehalfright">';
 
+// Manual Import Button
+print '<div class="center">';
+print '<a href="manual_import.php" class="button button-approve">';
+print $langs->trans("EInvoiceManualImport") . ' <span class="fa fa-upload opacitymedium"></span>';
+print '</a>';
+print '</div>';
+print '<br>';
+
 
 
 print '</div><div class="clearboth"></div>';
