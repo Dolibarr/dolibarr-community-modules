@@ -2987,6 +2987,94 @@ trait CommonProtocol
 	}
 
 	/**
+	 * Settings of a supplier invoice being imported that the vendor card of Dolibarr predefines, as the
+	 * creation form of the core takes them (fourn/facture/card.php): FactureFournisseur::create() reads
+	 * none of them, so an imported invoice was left without what a typed one gets.
+	 * A static property and not a constant: constants in a trait need PHP 8.2.
+	 *
+	 * @var array<string,string>	Invoice field => field of the vendor (Societe) holding its default
+	 */
+	private static $VENDOR_DEFAULT_FIELDS = array(
+		'cond_reglement_id' => 'cond_reglement_supplier_id',
+		'mode_reglement_id' => 'mode_reglement_supplier_id',
+		'fk_account' => 'fk_account',
+	);
+
+	/**
+	 * Values of the payment settings a received document gave a supplier invoice, read before anything
+	 * else (recurring template, vendor) fills it, so they can be ranked against those afterwards.
+	 *
+	 * @param	FactureFournisseur	$supplierInvoice	Supplier invoice after _applyPaymentInfoToSupplierInvoice()
+	 * @return	non-empty-array<string,int>				Invoice field => value from the document, 0 when it gave none
+	 */
+	private function _paymentSettingsFromDocument(FactureFournisseur $supplierInvoice)
+	{
+		$values = array();
+		foreach (array_keys(self::$VENDOR_DEFAULT_FIELDS) as $field) {
+			$values[$field] = (int) ($supplierInvoice->$field ?? 0);
+		}
+
+		return $values;
+	}
+
+	/**
+	 * Rank the sources of the payment settings of a supplier invoice being imported: the recurring
+	 * template it is attached to, the defaults of its vendor, and the received document.
+	 *
+	 * The vendor card holds what the buyer chose for that vendor (terms, a precise payment method, the
+	 * bank account to pay from), where the document only gives a generic payment means (BT-81) and a
+	 * term matched on an exact number of days. EINVOICING_IMPORT_PAYMENT_SETTINGS_FROM decides:
+	 * - 'thirdparty' (default): template, then vendor, then document;
+	 * - 'document': document, then template, then vendor. That is the order the module had before it
+	 *   read the vendor, the vendor now only filling what both leave empty.
+	 *
+	 * The due date is not ranked: the one the document states (BT-9) is what the vendor claims and is
+	 * kept. Without one, it is computed from the payment terms retained, as the core does on a typed
+	 * invoice.
+	 *
+	 * @param	FactureFournisseur		$supplierInvoice	Supplier invoice being built, modified by reference
+	 * @param	Societe					$vendor				Vendor of the received document, loaded
+	 * @param	array<string,int>		$fromDocument		Values the document gave, from _paymentSettingsFromDocument()
+	 * @param	?FactureFournisseurRec	$template			Recurring template the invoice is attached to, null when none
+	 * @return	array{message:string}						What was taken from where, for the log of the import
+	 */
+	private function _applyVendorDefaultsToSupplierInvoice(FactureFournisseur $supplierInvoice, $vendor, array $fromDocument, $template = null)
+	{
+		$messages = array();
+		$documentFirst = (getDolGlobalString('EINVOICING_IMPORT_PAYMENT_SETTINGS_FROM', 'thirdparty') === 'document');
+		$order = $documentFirst ? array('document', 'template', 'thirdparty') : array('template', 'thirdparty', 'document');
+
+		foreach (self::$VENDOR_DEFAULT_FIELDS as $field => $vendorField) {
+			$candidates = array(
+				'template' => (is_object($template) ? (int) ($template->$field ?? 0) : 0),
+				'thirdparty' => (is_object($vendor) ? (int) ($vendor->$vendorField ?? 0) : 0),
+				'document' => (int) ($fromDocument[$field] ?? 0),
+			);
+
+			foreach ($order as $source) {
+				if ($candidates[$source] > 0) {
+					if ((int) ($supplierInvoice->$field ?? 0) !== $candidates[$source]) {
+						$messages[] = $field . ' taken from the ' . $source . ' (' . $candidates[$source] . ').';
+					}
+					$supplierInvoice->$field = $candidates[$source];
+					break;
+				}
+			}
+		}
+
+		// No due date in the document: the one the retained terms give, like the creation form of the core
+		if (empty($supplierInvoice->date_echeance) && !empty($supplierInvoice->date) && (int) $supplierInvoice->cond_reglement_id > 0) {
+			$dueDate = $supplierInvoice->calculate_date_lim_reglement();
+			if (!empty($dueDate)) {
+				$supplierInvoice->date_echeance = $dueDate;
+				$messages[] = 'Due date computed from the payment terms.';
+			}
+		}
+
+		return array('message' => implode("<br>\n", $messages));
+	}
+
+	/**
 	 * Attach a supplier invoice being imported to the recurring template of its vendor.
 	 *
 	 * A vendor billed on a subscription already has a template in Dolibarr, holding the settings the

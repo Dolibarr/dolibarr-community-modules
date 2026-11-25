@@ -254,8 +254,19 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 	// Off by default: it writes on the invoice settings the operator chose for the subscription, and
 	// moves the template past a generation it still owed.
 	$item = $formSetup->newItem('EINVOICING_LINK_TO_RECURRING_TEMPLATE_IF_ONLY_ONE_FOUND')->setAsYesNo();
-	$item->helpText = $langs->transnoentities('EINVOICING_LINK_TO_RECURRING_TEMPLATE_IF_ONLY_ONE_FOUND_HELP');
+	$item->helpText = $langs->transnoentities('EINVOICING_LINK_TO_RECURRING_TEMPLATE_IF_ONLY_ONE_FOUND_HELP', $langs->transnoentities('EINVOICING_IMPORT_PAYMENT_SETTINGS_FROM'));
 	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+
+	// Setup conf to choose where the payment terms, payment method and bank account of an imported
+	// supplier invoice come from first: the vendor card (default, as the creation form of the core does)
+	// or the received document (the behaviour before the vendor card was read).
+	$item = $formSetup->newItem('EINVOICING_IMPORT_PAYMENT_SETTINGS_FROM')->setAsSelect(array(
+		'thirdparty' => $langs->transnoentities('EInvoicingPaymentSettingsFromThirdparty'),
+		'document' => $langs->transnoentities('EInvoicingPaymentSettingsFromDocument'),
+	));
+	$item->helpText = $langs->transnoentities('EINVOICING_IMPORT_PAYMENT_SETTINGS_FROM_HELP', $langs->transnoentities('EINVOICING_LINK_TO_RECURRING_TEMPLATE_IF_ONLY_ONE_FOUND'));
+	$item->defaultFieldValue = 'thirdparty';
 	$item->cssClass = 'minwidth500';
 
 	// Setup conf to choose use of auto generation or not of third parties

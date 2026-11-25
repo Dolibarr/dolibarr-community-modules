@@ -702,6 +702,212 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
+	 * Two distinct active entries of each dictionary the payment settings point to, and a bank account
+	 * id, so the sources of a setting can be told apart. Ids only: nothing is written.
+	 *
+	 * @return	array{terms:int[],modes:int[]}|null		Null when the dictionaries of this instance do not have two of each
+	 */
+	private function twoPaymentTermsAndModes()
+	{
+		global $db;
+
+		$terms = array();
+		$resql = $db->query("SELECT rowid FROM " . MAIN_DB_PREFIX . "c_payment_term WHERE active = 1 AND type_cdr = 0 AND nbjour > 0 AND entity IN (" . getEntity('c_payment_term') . ") ORDER BY rowid LIMIT 2");
+		while ($resql && ($obj = $db->fetch_object($resql))) {
+			$terms[] = (int) $obj->rowid;
+		}
+		$modes = array();
+		$resql = $db->query("SELECT id FROM " . MAIN_DB_PREFIX . "c_paiement WHERE active = 1 AND entity IN (" . getEntity('c_paiement') . ") ORDER BY id LIMIT 2");
+		while ($resql && ($obj = $db->fetch_object($resql))) {
+			$modes[] = (int) $obj->id;
+		}
+
+		return (count($terms) == 2 && count($modes) == 2) ? array('terms' => $terms, 'modes' => $modes) : null;
+	}
+
+	/**
+	 * Rank the payment settings of a supplier invoice being imported with the given setup.
+	 *
+	 * @param	string				$from			Value of EINVOICING_IMPORT_PAYMENT_SETTINGS_FROM, '' for unset
+	 * @param	array<string,int>	$fromDocument	What the received document gave
+	 * @param	object				$vendor			Vendor, with its supplier defaults
+	 * @param	?object				$template		Recurring template the invoice is attached to
+	 * @param	array<string,mixed>	$invoiceFields	Fields of the invoice before ranking (date, due date...)
+	 * @return	FactureFournisseur					The invoice, with its settings ranked
+	 */
+	private function rankPaymentSettings($from, array $fromDocument, $vendor, $template = null, array $invoiceFields = array())
+	{
+		global $conf, $db;
+
+		$name = 'EINVOICING_IMPORT_PAYMENT_SETTINGS_FROM';
+		if (!array_key_exists($name, $this->savedConstants)) {
+			$this->savedConstants[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
+		}
+		if ($from === '') {
+			unset($conf->global->$name);
+		} else {
+			$conf->global->$name = $from;
+		}
+
+		$supplierInvoice = new FactureFournisseur($db);
+		foreach ($fromDocument + $invoiceFields as $field => $value) {
+			$supplierInvoice->$field = $value;
+		}
+
+		$rank = new ReflectionMethod(CIIProtocol::class, '_applyVendorDefaultsToSupplierInvoice');
+		$rank->setAccessible(true);
+		$rank->invoke(new CIIProtocol($db), $supplierInvoice, $vendor, $fromDocument, $template);
+
+		return $supplierInvoice;
+	}
+
+	/**
+	 * By default the payment terms, payment method and bank account set on the vendor card win over
+	 * what the received document says, the way the creation form of the core preloads them on a typed
+	 * supplier invoice. FactureFournisseur::create() reads none of them, so they were left out.
+	 *
+	 * @return void
+	 */
+	public function testTheVendorCardComesFirstByDefault()
+	{
+		global $db;
+
+		$ids = $this->twoPaymentTermsAndModes();
+		if ($ids === null) {
+			$this->markTestSkipped('This instance has not two active payment terms and payment methods');
+		}
+
+		$vendor = new Societe($db);
+		$vendor->cond_reglement_supplier_id = $ids['terms'][0];
+		$vendor->mode_reglement_supplier_id = $ids['modes'][0];
+		$vendor->fk_account = 7;
+		$fromDocument = array('cond_reglement_id' => $ids['terms'][1], 'mode_reglement_id' => $ids['modes'][1], 'fk_account' => 0);
+
+		foreach (array('', 'thirdparty') as $from) {
+			$invoice = $this->rankPaymentSettings($from, $fromDocument, $vendor);
+
+			$this->assertSame($ids['terms'][0], (int) $invoice->cond_reglement_id, 'the payment terms of the vendor must win (setup "' . $from . '")');
+			$this->assertSame($ids['modes'][0], (int) $invoice->mode_reglement_id, 'the payment method of the vendor must win (setup "' . $from . '")');
+			$this->assertSame(7, (int) $invoice->fk_account, 'the bank account of the vendor must be taken (setup "' . $from . '")');
+		}
+	}
+
+	/**
+	 * A vendor card left empty does not empty what the received document gave.
+	 *
+	 * @return void
+	 */
+	public function testAnEmptyVendorCardKeepsTheDocumentSettings()
+	{
+		global $db;
+
+		$ids = $this->twoPaymentTermsAndModes();
+		if ($ids === null) {
+			$this->markTestSkipped('This instance has not two active payment terms and payment methods');
+		}
+
+		$vendor = new Societe($db);
+		$fromDocument = array('cond_reglement_id' => $ids['terms'][1], 'mode_reglement_id' => $ids['modes'][1], 'fk_account' => 0);
+
+		$invoice = $this->rankPaymentSettings('thirdparty', $fromDocument, $vendor);
+
+		$this->assertSame($ids['terms'][1], (int) $invoice->cond_reglement_id, 'the payment terms of the document must stay');
+		$this->assertSame($ids['modes'][1], (int) $invoice->mode_reglement_id, 'the payment method of the document must stay');
+		$this->assertEmpty($invoice->fk_account, 'no bank account must come out of nowhere');
+	}
+
+	/**
+	 * With "received document first", the document keeps the place it always had, and the vendor card
+	 * only fills what it leaves empty: here the bank account, which a received document never gives.
+	 *
+	 * @return void
+	 */
+	public function testTheDocumentComesFirstWhenSetSo()
+	{
+		global $db;
+
+		$ids = $this->twoPaymentTermsAndModes();
+		if ($ids === null) {
+			$this->markTestSkipped('This instance has not two active payment terms and payment methods');
+		}
+
+		$vendor = new Societe($db);
+		$vendor->cond_reglement_supplier_id = $ids['terms'][0];
+		$vendor->mode_reglement_supplier_id = $ids['modes'][0];
+		$vendor->fk_account = 7;
+		$fromDocument = array('cond_reglement_id' => $ids['terms'][1], 'mode_reglement_id' => $ids['modes'][1], 'fk_account' => 0);
+
+		$invoice = $this->rankPaymentSettings('document', $fromDocument, $vendor);
+
+		$this->assertSame($ids['terms'][1], (int) $invoice->cond_reglement_id, 'the payment terms of the document must win');
+		$this->assertSame($ids['modes'][1], (int) $invoice->mode_reglement_id, 'the payment method of the document must win');
+		$this->assertSame(7, (int) $invoice->fk_account, 'the vendor must still fill the bank account the document leaves empty');
+	}
+
+	/**
+	 * A recurring template the invoice is attached to holds what the operator chose for that very
+	 * subscription: it comes before the vendor card, which is a default for every invoice of the vendor.
+	 *
+	 * @return void
+	 */
+	public function testTheRecurringTemplateComesBeforeTheVendorCard()
+	{
+		global $db;
+
+		$ids = $this->twoPaymentTermsAndModes();
+		if ($ids === null) {
+			$this->markTestSkipped('This instance has not two active payment terms and payment methods');
+		}
+
+		$vendor = new Societe($db);
+		$vendor->cond_reglement_supplier_id = $ids['terms'][0];
+		$vendor->mode_reglement_supplier_id = $ids['modes'][0];
+		$vendor->fk_account = 7;
+		$template = new stdClass();
+		$template->cond_reglement_id = $ids['terms'][1];
+		$template->mode_reglement_id = 0;
+		$template->fk_account = 9;
+
+		$invoice = $this->rankPaymentSettings('thirdparty', array('cond_reglement_id' => 0, 'mode_reglement_id' => 0, 'fk_account' => 0), $vendor, $template);
+
+		$this->assertSame($ids['terms'][1], (int) $invoice->cond_reglement_id, 'the payment terms of the template must win over the vendor');
+		$this->assertSame($ids['modes'][0], (int) $invoice->mode_reglement_id, 'the vendor must fill what the template leaves empty');
+		$this->assertSame(9, (int) $invoice->fk_account, 'the bank account of the template must win over the vendor');
+	}
+
+	/**
+	 * The due date the document states (BT-9) is what the vendor claims and is kept whatever the terms
+	 * retained. Without one, it is computed from those terms, as the core does on a typed invoice.
+	 *
+	 * @return void
+	 */
+	public function testTheDueDateIsKeptOrComputedFromTheTerms()
+	{
+		global $db;
+
+		$ids = $this->twoPaymentTermsAndModes();
+		if ($ids === null) {
+			$this->markTestSkipped('This instance has not two active payment terms and payment methods');
+		}
+
+		$vendor = new Societe($db);
+		$vendor->cond_reglement_supplier_id = $ids['terms'][0];
+		$invoiceDate = dol_mktime(12, 0, 0, 3, 2, 2026);
+		$statedDueDate = dol_mktime(12, 0, 0, 4, 30, 2026);
+		$noDocument = array('cond_reglement_id' => 0, 'mode_reglement_id' => 0, 'fk_account' => 0);
+
+		$invoice = $this->rankPaymentSettings('thirdparty', $noDocument, $vendor, null, array('date' => $invoiceDate, 'date_echeance' => $statedDueDate));
+		$this->assertSame($statedDueDate, (int) $invoice->date_echeance, 'the due date the document states must be kept');
+
+		$invoice = $this->rankPaymentSettings('thirdparty', $noDocument, $vendor, null, array('date' => $invoiceDate));
+		$expected = new FactureFournisseur($db);
+		$expected->date = $invoiceDate;
+		$expected->cond_reglement_id = $ids['terms'][0];
+		$this->assertNotEmpty($invoice->date_echeance, 'without a due date in the document, one must be computed from the terms');
+		$this->assertSame((int) $expected->calculate_date_lim_reglement(), (int) $invoice->date_echeance, 'the due date must be the one the terms give');
+	}
+
+	/**
 	 * A received document carrying several payment means: the accounts it announces (BT-84, BT-85,
 	 * BT-86) are all read, in document order, the same account written twice is kept once, and a
 	 * payment means without an IBAN - a cash payment - announces no account at all. Issue #1031.
