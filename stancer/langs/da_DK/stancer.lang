@@ -99,6 +99,9 @@ STANCER_CB_ORDER_PARTIAL_PAY = Aktivér delvis betaling for ordrer med automatis
 STANCER_CB_ORDER_PARTIAL_PAYTooltip = Denne mulighed giver mulighed for at opsætte "30%% betaling på ordre" for eksempel. Yderligere information i <a href="https://doc.cap-rel.fr/projet_stancer/versement_d_un_acompte_a_la_commande">dokumentationen</a>
 STANCER_CB_PROPAL_PARTIAL_PAY = Aktivér delvis betaling for tilbud med automatisk oprettelse af depositumsfaktura
 STANCER_CB_PROPAL_PARTIAL_PAYTooltip = Denne indstilling giver mulighed for at opsætte "20%% betaling ved tilbudssignatur", for eksempel ved hjælp af den indbetalingsprocent, der er defineret i tilbudsbetalingsbetingelserne.
+STANCER_DEPOSIT_FROM_CAPTURED_AMOUNT = Bill the amount actually collected on an order or a quote as a deposit
+STANCER_DEPOSIT_FROM_CAPTURED_AMOUNTTooltip = When the amount paid online is below the total of the order or the quote, a deposit invoice of that exact amount is created, whether or not the document has a deposit percentage and deposit payment terms. Without this option, the deposit follows the percentage of the document.
+StancerDepositLineFromCapturedAmount = Deposit on %s
 
 STANCER_AUTO_SEPA_ONLY_FOR_CONTRACTS = Udløs kun automatiske SEPA-betalinger, hvis fakturaen er knyttet til en kontrakt
 STANCER_AUTO_SEPA_ONLY_FOR_CONTRACTSTooltip = Lad dette felt være umarkeret, hvis du ønsker, at en faktura, hvis betalingsmetode er Betalingsservice, automatisk skal debiteres af den planlagte opgave.
@@ -259,6 +262,8 @@ STANCER_ADD_FEES_ON_BANK_NONE = Ingen, bliv i manuel tilstand
 StancerFees = Stancer-gebyrer
 StancerCheckPay = Daglig Stancer (bank)
 StancerCheckPaymentAndPayout = Verifikation af Stancer-betalinger og udbetalinger
+StancerCheckPayInactiveWarning = The scheduled job "%s" is disabled: if a customer closes the browser after paying, Stancer collects the payment but nothing is invoiced or recorded in Dolibarr. Enable this job so that these payments are caught up every night.
+StancerCheckPayInactiveLink = Open the list of scheduled jobs
 StancerTransferFromToDone = Overførsel fra %s til %s (beløb %s %s) er gennemført.
 StancerCheckTakePayments = Stancer automatiske betalinger
 StancerCheckTakePaymentsDetails = Automatisk start af CB-betalinger og SEPA-betalinger: Starter automatisk betaling for enhver ubetalt faktura, hvis betalingsmetode er CB eller betaling via direkte debitering, og hvis bankkonto er Stancer. Flere detaljer: <a href="https://doc.cap-rel.fr/projet_stancer/paiement_automatique_des_factures">https://doc.cap-rel.fr/projet_stancer/paiement_automatique_des_factures</a>
@@ -310,6 +315,12 @@ StancerdoTakePaymentStancerResultMessageC = Én ny faktura (SEPA-betaling) er bl
 StancerdoTakePaymentStancerResultMessageCP = %s nye fakturaer (SEPA direkte debitering) er blevet behandlet (informationsmail sendt): %s.
 StancerdoTakePaymentStancerResultMessageD = Én faktura (SEPA-betaling via direkte debitering) har endnu ikke nået sin betalingsdato: %s.
 StancerdoTakePaymentStancerResultMessageDP = %s fakturaer (SEPA direkte debitering) har endnu ikke nået deres betalingsdato: %s.
+StancerTakePaymentSummary = Invoices examined: %s (SEPA direct debit: %s, card: %s)
+StancerTakePaymentModeDisabled = disabled
+StancerTakePaymentSepaDisabledWaiting = SEPA direct debit is disabled in the Stancer setup: %s direct debit invoice(s) are waiting on the Stancer account and will not be collected
+StancerTakePaymentCardDisabledWaiting = Card payment is disabled in the Stancer setup: %s card invoice(s) are waiting on the Stancer account and will not be charged
+StancerTakePaymentSelectionError = Selecting the invoices to collect failed: %s
+StancerSepaDisabledWarning = SEPA direct debit is disabled: the scheduled job collects no invoice. %s Stancer SEPA mandate(s) are registered and %s invoice(s) are waiting for a direct debit.
 STANCER_AUTO_MAIL_INVOICES_CB = Automatisk e-mailfakturaer betalt af centralbank
 STANCER_AUTO_MAIL_INVOICES_CBTooltip = Denne mulighed giver dig mulighed for automatisk at sende fakturaen, når CB-betalingen iværksættes af Stancers planlagte opgave, eller når din kunde betaler en faktura direkte online.
 STANCER_AUTO_MAIL_INVOICES_CB_MAILTYPE = Vælg den skabelon, du vil bruge til CB-betalingsnotifikations-e-mailen
@@ -333,7 +344,7 @@ STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATETooltip = Med denne mulighed sender modul
 STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_MAILTYPE = Vælg den e-mailskabelon, der skal bruges ved fakturavalidering
 STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_MAILTYPETooltip = For at oprette en e-mailskabelon skal du gå til Hjem > Konfiguration > E-mails (skriv "Send fakturaer til kunder")
 STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_DELAY = Forsinkelse før automatisk afsendelse (i timer)
-STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_DELAYTooltip = Antal timer, der skal ventes efter fakturavalidering, før den automatisk sendes via e-mail. Under denne forsinkelse kan et menneske stadig sende fakturaen manuelt (den automatiske afsendelse annulleres derefter). 0 = øjeblikkelig afsendelse ved validering. Typisk værdi: 24 (sendes den næste dag, hvis ingen har reageret).
+STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_DELAYTooltip = Number of hours to wait after invoice validation before automatically sending it by email. During this delay, a human can still send the invoice manually (the automatic sending is then canceled). 0 = sent at the next run of the scheduled job (within the hour), once the invoice has its definitive number and PDF. Typical value: 24 (sent the next day if nobody has acted).
 StancerBillValidatePendingTitle = Automatisk afsendelse af faktura %s planlagt om %s timer
 StancerBillValidatePendingNote = Valideringsmail planlagt om %s timer ved hjælp af skabelonen %s. Hvis fakturaen sendes manuelt inden da, annulleres den automatiske afsendelse.
 StancerBillValidatePendingCancelled = Automatisk afsendelse annulleret på grund af %s

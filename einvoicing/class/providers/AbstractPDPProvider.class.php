@@ -496,7 +496,7 @@ abstract class AbstractPDPProvider
 	 *
 	 * @param	string			$flowId				Identifier of the flow to read
 	 * @param	ProtocolManager	$protocolManager	Protocol factory used to recognize the documents
-	 * @return	array{file:?string,protocol:?AbstractProtocol,protocol_name:string,doc_type:string,fetched:int,attempts:string[],client_not_configured:bool}	The importable document, or a null protocol and the reason each shape was rejected
+	 * @return	array{file:?string,protocol:?AbstractProtocol,protocol_name:string,doc_type:string,fetched:int,documents:array<string,string>,attempts:string[],client_not_configured:bool}	The importable document, or a null protocol and the reason each shape was rejected
 	 */
 	protected function fetchImportableFlowDocument($flowId, $protocolManager)
 	{
@@ -506,16 +506,14 @@ abstract class AbstractPDPProvider
 			'protocol_name' => '',
 			'doc_type' => '',
 			'fetched' => 0,				// nb of documents the access point did return, whatever their syntax
+			'documents' => array(),		// every document returned, by docType, readable or not
 			'attempts' => array(),
 			'client_not_configured' => false
 		);
 
-		// EINVOICING_PREFER_ORIGINAL: fetch the issuer's Original document (its Factur-X, which carries
-		// the human-readable PDF) before the Converted one, so the created supplier invoice keeps the PDF.
-		$docTypeOrder = getDolGlobalString('EINVOICING_PREFER_ORIGINAL')
-			? array('Original', 'Converted', 'ReadableView')
-			: array('Converted', 'Original', 'ReadableView');		// Default: First take the Converted (so always in same format defined in AP setup).
-		foreach ($docTypeOrder as $docType) {
+		// Always the Converted first, so the import reads the format set on the access point account.
+		// The Original is kept beside it with EINVOICING_SAVE_ALWAYS_ALSO, see fetchOtherReceivedFormats().
+		foreach (array('Converted', 'Original', 'ReadableView') as $docType) {
 			$flowResponse = $this->fetchFlowData($flowId, $docType, 'get_flow_for_supplier_invoice');
 
 			if ($flowResponse['status_code'] != 200) {
@@ -530,6 +528,7 @@ abstract class AbstractPDPProvider
 			$result['fetched']++;
 
 			$content = (string) $flowResponse['response'];
+			$result['documents'][$docType] = $content;
 			$protocolName = $protocolManager->detectProtocolFromContent($content);
 			if (empty($protocolName)) {
 				$result['attempts'][] = $docType . ": unrecognized syntax";
@@ -563,6 +562,66 @@ abstract class AbstractPDPProvider
 		}
 
 		return $result;
+	}
+
+	/**
+	 * What EINVOICING_SAVE_ALWAYS_ALSO asks to keep beside the imported document.
+	 *
+	 * 'original' adds the Original, 'original+readable' also the readable view when the imported
+	 * document is already a PDF. EINVOICING_PREFER_ORIGINAL, which it replaces, reads as 'original'.
+	 *
+	 * @return	string	'', 'original' or 'original+readable'
+	 */
+	public static function getSaveAlwaysAlso()
+	{
+		$mode = getDolGlobalString('EINVOICING_SAVE_ALWAYS_ALSO');
+		if ($mode === '' && getDolGlobalString('EINVOICING_PREFER_ORIGINAL')) {
+			$mode = 'original';
+		}
+
+		return in_array($mode, array('original', 'original+readable'), true) ? $mode : '';
+	}
+
+	/**
+	 * Whether the readable view of the access point is fetched with the imported document.
+	 *
+	 * @param	string	$protocolName	Protocol of the imported document
+	 * @return	bool					True unless that document is already readable, a Factur-X PDF
+	 */
+	protected function wantsReadableView($protocolName)
+	{
+		return $protocolName != 'FACTURX' || static::getSaveAlwaysAlso() === 'original+readable';
+	}
+
+	/**
+	 * The Original of a received flow, to be kept as an attached file beside the imported one.
+	 *
+	 * Only with EINVOICING_SAVE_ALWAYS_ALSO, and only when the Original is not the imported document.
+	 * A document already fetched by fetchImportableFlowDocument() is not asked for twice, and a failure
+	 * is logged without stopping the import.
+	 *
+	 * @param	string	$flowId		Identifier of the flow
+	 * @param	array{doc_type:string,documents?:array<string,string>}	$importable	What fetchImportableFlowDocument() returned
+	 * @return	array<string,string>	The raw documents to keep, by docType ('Original')
+	 */
+	protected function fetchOtherReceivedFormats($flowId, $importable)
+	{
+		$docType = 'Original';
+		if (static::getSaveAlwaysAlso() === '' || $importable['doc_type'] == $docType) {
+			return array();
+		}
+
+		if (isset($importable['documents'][$docType])) {
+			return array($docType => $importable['documents'][$docType]);
+		}
+
+		$flowResponse = $this->fetchFlowData($flowId, $docType, 'get_other_format_for_supplier_invoice');
+		if ($flowResponse['status_code'] != 200 || (string) $flowResponse['response'] === '') {
+			dol_syslog(__METHOD__ . " No '" . $docType . "' document kept for flowId " . $flowId . ": HTTP " . $flowResponse['status_code'] . (empty($flowResponse['errorMessage']) ? '' : ' - ' . $flowResponse['errorMessage']), LOG_WARNING, 0, '_einvoicing');
+			return array();
+		}
+
+		return array($docType => (string) $flowResponse['response']);
 	}
 
 	/**

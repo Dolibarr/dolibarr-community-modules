@@ -358,6 +358,18 @@ if (!$hasKeys) {
 	print '</div><br>';
 }
 
+// Without the daily job, a customer closing the tab after paying leaves a captured
+// payment that nothing records. The job refuses to run in test mode anyway.
+if ($hasKeys && getDolGlobalString('STANCER_IS_PROD', '0') == '1' && stancerScheduledCheckPayIsActive() === 0) {
+	print '<div class="warning">';
+	print '<span class="fa fa-exclamation-triangle"></span> ';
+	print $langs->trans("StancerCheckPayInactiveWarning", $langs->transnoentitiesnoconv("StancerCheckPay"));
+	if (stancerIsModEnabled('cron')) {
+		print ' <a href="' . DOL_URL_ROOT . '/cron/list.php">' . $langs->trans("StancerCheckPayInactiveLink") . '</a>';
+	}
+	print '</div><br>';
+}
+
 if ($action =='cleanStancerTests') {
 	// Test SEPA mandates (type='ban') are NEVER deleted here: the IBAN and the RUM
 	// they hold are real, signed by the customer, and Dolibarr shows the bank

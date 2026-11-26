@@ -39,6 +39,15 @@ Deux options permettent d'autoriser le paiement d'un montant inférieur au total
 
 Lorsque le paiement partiel est activé, le client peut modifier le montant proposé sur la page de paiement.
 
+### Acompte du montant encaissé
+
+L'option **Facturer en acompte le montant réellement encaissé sur une commande ou un devis** décide de la facture créée quand le client paie moins que le total du document :
+
+- **Activée** : une facture d'acompte du montant exact encaissé est créée, avec une ligne par taux de TVA du document, au prorata. Le document n'a besoin ni d'un pourcentage d'acompte ni de conditions de règlement d'acompte.
+- **Désactivée** : une facture d'acompte n'est créée que si le paiement a été lancé comme un acompte et que le document porte toujours un pourcentage d'acompte. Sinon, une facture complète est créée et le paiement y est enregistré en partie.
+
+Dans les deux cas, le règlement enregistré est le montant réellement encaissé par Stancer. Une facture d'acompte ne classe pas la commande en "Facturée" : le solde reste à facturer.
+
 ## Classement automatique en payé
 
 L'option **Classer la facture en payée après paiement CB** détermine le comportement après réception d'un paiement CB réussi :
@@ -90,6 +99,10 @@ Le même mécanisme fonctionne pour les commandes :
 2. Le bouton de paiement Stancer apparaît sur la fiche de la commande.
 3. Le client paie via le lien sécurisé.
 4. Le paiement est enregistré et lié à la facture correspondante.
+
+Pour une commande comme pour un devis, la facture, sa validation, le règlement et l'écriture bancaire sont enregistrés d'un seul bloc : si une étape échoue, rien n'est conservé, et le paiement est repris plus tard par la tâche planifiée. Recharger la page de retour, ou y revenir tard, ne facture pas une seconde fois : le module retrouve le paiement déjà enregistré. Si une facture impayée existe déjà pour le document, créée à la main par exemple, le paiement y est enregistré au lieu d'en créer une nouvelle.
+
+Si le client ferme son navigateur après avoir payé, sans revenir sur le site, la tâche planifiée [StancerCheckPay](/stancer/taches-automatiques) crée la facture et enregistre le paiement à son passage suivant.
 
 ## Bouton de paiement sur les documents
 

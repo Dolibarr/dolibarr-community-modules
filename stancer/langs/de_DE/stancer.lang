@@ -99,6 +99,9 @@ STANCER_CB_ORDER_PARTIAL_PAY = Teilzahlung für Bestellungen mit automatischer A
 STANCER_CB_ORDER_PARTIAL_PAYTooltip = Diese Option ermöglicht beispielsweise die Einrichtung einer Zahlung von 30 bei Bestellung. Weitere Informationen finden Sie in der Dokumentation.
 STANCER_CB_PROPAL_PARTIAL_PAY = Teilzahlung für Angebote mit automatischer Anzahlungsrechnung aktivieren
 STANCER_CB_PROPAL_PARTIAL_PAYTooltip = Diese Option ermöglicht z.B. "20%% Zahlung bei Angebotsunterzeichnung" unter Verwendung des in den Zahlungsbedingungen des Angebots definierten Anzahlungsprozentsatzes
+STANCER_DEPOSIT_FROM_CAPTURED_AMOUNT = Bill the amount actually collected on an order or a quote as a deposit
+STANCER_DEPOSIT_FROM_CAPTURED_AMOUNTTooltip = When the amount paid online is below the total of the order or the quote, a deposit invoice of that exact amount is created, whether or not the document has a deposit percentage and deposit payment terms. Without this option, the deposit follows the percentage of the document.
+StancerDepositLineFromCapturedAmount = Deposit on %s
 
 STANCER_AUTO_SEPA_ONLY_FOR_CONTRACTS = Automatische SEPA-Lastschriften nur auslösen, wenn die Rechnung mit einem Vertrag verknüpft ist
 STANCER_AUTO_SEPA_ONLY_FOR_CONTRACTSTooltip = Lassen Sie dieses Feld deaktiviert, wenn jede Rechnung mit Lastschrift-Zahlungsmethode automatisch durch die geplante Aufgabe eingezogen werden soll
@@ -259,6 +262,8 @@ STANCER_ADD_FEES_ON_BANK_NONE = Keine, im manuellen Modus bleiben
 StancerFees = Stancer-Gebühren
 StancerCheckPay = Täglicher Stancer (Bank)
 StancerCheckPaymentAndPayout = Überprüfung von Stancer-Zahlungen und -Auszahlungen
+StancerCheckPayInactiveWarning = The scheduled job "%s" is disabled: if a customer closes the browser after paying, Stancer collects the payment but nothing is invoiced or recorded in Dolibarr. Enable this job so that these payments are caught up every night.
+StancerCheckPayInactiveLink = Open the list of scheduled jobs
 StancerTransferFromToDone = Überweisung von %s nach %s (Betrag %s %s) wurde abgeschlossen
 StancerCheckTakePayments = Automatische Stancer-Zahlungen
 StancerCheckTakePaymentsDetails = Automatische Auszahlung von CB-Zahlungen und SEPA-Lastschriften: Automatische Zahlung für alle unbezahlten Rechnungen, deren Zahlungsmethode CB oder Lastschrift ist und deren Bankkonto bei Stancer geführt wird. Weitere Informationen: <a href="https://doc.cap-rel.fr/projet_stancer/paiement_automatique_des_factures">https://doc.cap-rel.fr/projet_stancer/paiement_automatique_des_factures</a>
@@ -310,6 +315,12 @@ StancerdoTakePaymentStancerResultMessageC = Eine neue Rechnung (SEPA-Lastschrift
 StancerdoTakePaymentStancerResultMessageCP = %s neue Rechnungen (SEPA-Lastschrift) wurden verarbeitet (Informations-E-Mail gesendet): %s.
 StancerdoTakePaymentStancerResultMessageD = Eine Rechnung (SEPA-Lastschrift) hat ihr Zahlungsdatum noch nicht erreicht: %s.
 StancerdoTakePaymentStancerResultMessageDP = %s Rechnungen (SEPA-Lastschrift) haben ihr Zahlungsdatum noch nicht erreicht: %s.
+StancerTakePaymentSummary = Invoices examined: %s (SEPA direct debit: %s, card: %s)
+StancerTakePaymentModeDisabled = disabled
+StancerTakePaymentSepaDisabledWaiting = SEPA direct debit is disabled in the Stancer setup: %s direct debit invoice(s) are waiting on the Stancer account and will not be collected
+StancerTakePaymentCardDisabledWaiting = Card payment is disabled in the Stancer setup: %s card invoice(s) are waiting on the Stancer account and will not be charged
+StancerTakePaymentSelectionError = Selecting the invoices to collect failed: %s
+StancerSepaDisabledWarning = SEPA direct debit is disabled: the scheduled job collects no invoice. %s Stancer SEPA mandate(s) are registered and %s invoice(s) are waiting for a direct debit.
 STANCER_AUTO_MAIL_INVOICES_CB = Automatischer Versand von per CB bezahlten Rechnungen per E-Mail
 STANCER_AUTO_MAIL_INVOICES_CBTooltip = Mit dieser Option können Sie die Rechnung automatisch senden, wenn die CB-Zahlung durch die Stancer-Planungsaufgabe gestartet wird oder wenn Ihr Kunde eine Rechnung direkt online bezahlt.
 STANCER_AUTO_MAIL_INVOICES_CB_MAILTYPE = Wählen Sie die Vorlage für die CB-Zahlungsbenachrichtigungs-E-Mail
@@ -333,7 +344,7 @@ STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATETooltip = Mit dieser Option sendet das Mo
 STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_MAILTYPE = Wählen Sie die E-Mail-Vorlage für die Rechnungsvalidierung aus.
 STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_MAILTYPETooltip = Um eine E-Mail-Vorlage zu erstellen, gehen Sie zu Startseite > Konfiguration > E-Mails (geben Sie „Rechnungen an Kunden senden“ ein).
 STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_DELAY = Verzögerung vor dem automatischen Versand (in Stunden)
-STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_DELAYTooltip = Anzahl der Stunden, die nach der Rechnungsprüfung gewartet werden soll, bevor die Rechnung automatisch per E-Mail versendet wird. Während dieser Wartezeit kann die Rechnung noch manuell versendet werden (der automatische Versand wird dann abgebrochen). 0 = sofortiger Versand nach Prüfung. Typischer Wert: 24 (Versand am Folgetag, falls keine Reaktion erfolgt).
+STANCER_AUTO_MAIL_ALL_INVOICES_VALIDATE_DELAYTooltip = Number of hours to wait after invoice validation before automatically sending it by email. During this delay, a human can still send the invoice manually (the automatic sending is then canceled). 0 = sent at the next run of the scheduled job (within the hour), once the invoice has its definitive number and PDF. Typical value: 24 (sent the next day if nobody has acted).
 StancerBillValidatePendingTitle = Automatischer Versand der Rechnung %s geplant in %s Stunden
 StancerBillValidatePendingNote = Die Validierungsmail wird in %s Stunden mit der Vorlage %s versendet. Falls die Rechnung vorher manuell versendet wird, wird der automatische Versand abgebrochen.
 StancerBillValidatePendingCancelled = Automatischer Versand abgebrochen aufgrund von %s

@@ -40,6 +40,15 @@ Two options allow authorising the payment of an amount lower than the total:
 
 When partial payment is enabled, the customer can change the proposed amount on the payment page.
 
+### Deposit of the collected amount
+
+The **Bill the amount actually collected on an order or a quote as a deposit** option decides which invoice is created when the customer pays less than the total of the document:
+
+- **Enabled**: a deposit invoice of the exact amount collected is created, with one line per VAT rate of the document, pro rata. The document needs neither a deposit percentage nor deposit payment terms.
+- **Disabled**: a deposit invoice is only created when the payment was started as a deposit and the document still carries a deposit percentage. Otherwise a full invoice is created and the payment is recorded on it as a part payment.
+
+In both cases, the recorded payment is the amount Stancer actually collected. A deposit invoice does not mark the order as "Billed": the balance remains to be invoiced.
+
 ## Automatic marking as paid
 
 The **Mark the invoice as paid after CB payment** option determines the behaviour after receiving a successful CB payment:
@@ -91,6 +100,10 @@ The same mechanism works for orders:
 2. The Stancer payment button appears on the order record.
 3. The customer pays via the secure link.
 4. The payment is recorded and linked to the corresponding invoice.
+
+For an order as for a quote, the invoice, its validation, the payment and the bank entry are recorded as one block: if a step fails, nothing is kept, and the payment is picked up later by the scheduled task. Reloading the return page, or coming back to it late, does not bill a second time: the module finds the payment already recorded. If an unpaid invoice already exists for the document, created by hand for instance, the payment is recorded on it instead of creating a new one.
+
+If the customer closes the browser after paying, without coming back to the site, the scheduled task [StancerCheckPay](/stancer/taches-automatiques) creates the invoice and records the payment on its next run.
 
 ## Payment button on documents
 

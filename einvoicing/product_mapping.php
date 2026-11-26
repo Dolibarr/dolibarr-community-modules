@@ -79,6 +79,7 @@ include_once DOL_DOCUMENT_ROOT.'/societe/class/societe.class.php';
 include_once __DIR__.'/class/providers/PDPProviderManager.class.php';
 include_once __DIR__.'/class/protocols/ProtocolManager.class.php';
 include_once __DIR__.'/class/document.class.php';
+include_once __DIR__.'/class/einvoicing.class.php';
 
 // Load translation files required by the page
 $langs->loadLangs(array("einvoicing@einvoicing", "products", "companies", "bills", "other"));
@@ -151,35 +152,23 @@ if (!empty($flowid)) {
 		if (!is_object($provider)) {
 			$loaderror = $langs->trans("FailedToGetProvider", getDolGlobalString('EINVOICING_PDP'));
 		} else {
-			// Get the invoice of the flow. We ask the 'Converted' document, like the synchronization does,
-			// because the 'Original' one may use a syntax we are not able to parse (UBL...).
-			$flowResponse = $provider->fetchFlowData($flowid, 'Converted', 'get_flow_for_product_mapping');
+			// Read the flow the way the synchronization does (Converted, then Original, then ReadableView),
+			// or a flow it imports stays unreadable here, e.g. on a CLIENT_NOT_CONFIGURED account (#1230).
+			$xmlData = '';
+			try {
+				$xmlData = (string) $provider->fetchFlowXml($flowid, false);
+			} catch (Exception $e) {
+				$loaderror = $langs->trans("FailedToGetFlowContent", $flowid).' - '.$e->getMessage();
+			}
 
-			if (empty($flowResponse['status_code']) || $flowResponse['status_code'] != 200) {
-				$loaderror = $langs->trans("FailedToGetFlowContent", $flowid).(empty($flowResponse['errorMessage']) ? '' : ' - '.$flowResponse['errorMessage']);
-			} else {
-				$flowContent = $flowResponse['response'];
-
+			if (empty($loaderror)) {
 				$protocolManager = new ProtocolManager($db);
-				$detectedProtocol = $protocolManager->detectProtocolFromContent($flowContent);
+				$detectedProtocol = ($xmlData === '') ? '' : $protocolManager->detectProtocolFromContent($xmlData);
 				$protocol = empty($detectedProtocol) ? null : $protocolManager->getProtocol($detectedProtocol);
 
 				if (!is_object($protocol)) {
 					$loaderror = $langs->trans("FailedToDetectProtocolOfFlow", $flowid);
 				} else {
-					// A Factur-X document is a PDF embedding the XML, so we may have to extract it first.
-					$xmlData = method_exists($protocol, 'extractXmlFromFileContent') ? $protocol->extractXmlFromFileContent($flowContent) : $flowContent;
-
-					// The extracted content is a pure XML (CII for a Factur-X PDF), so we may have to
-					// switch to the protocol able to parse it.
-					$detectedXmlProtocol = $protocolManager->detectProtocolFromContent($xmlData);
-					if (!empty($detectedXmlProtocol) && $detectedXmlProtocol != $detectedProtocol) {
-						$xmlProtocol = $protocolManager->getProtocol($detectedXmlProtocol);
-						if (is_object($xmlProtocol)) {
-							$protocol = $xmlProtocol;
-						}
-					}
-
 					try {
 						$parsedHeader = $protocol->parseInvoiceHeader($xmlData);
 						$parsedLines = $protocol->parseInvoiceLines($xmlData);
@@ -285,6 +274,13 @@ $help_url = '';
 
 llxHeader('', $title, $help_url, '', 0, 0, '', '', '', 'mod-einvoicing page-product_mapping');
 
+// Keep the label of the product on 2 lines maximum
+print '<style>
+.einv-prodlabel { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+/* An input.button uses its own font-size and does not grow like a button made with the a tag: align heights */
+input.button { font-size: inherit; line-height: inherit; }
+</style>';
+
 if (getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP") && $conf->entity != getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP")) {
 	print $langs->trans("EInvoicingInfoManagedByMasterSetup", getDolGlobalInt("EINVOICING_MULTICOMPANY_USE_MASTER_SETUP"));
 
@@ -354,11 +350,13 @@ print '</form>';
 
 // What the document says about its seller. The mapping is written on that vendor, so it is said out
 // loud: a vendor chosen by hand against a document that names another one is a silent mistake.
+$vendoridentifiedline = '';
 if ($socidfromdocument > 0) {
 	$vendorfromdocument = new Societe($db);
 	if ($vendorfromdocument->fetch($socidfromdocument) > 0) {
 		if ($socid == $socidfromdocument) {
-			print '<div class="opacitymedium paddingtop">'.$langs->trans("VendorIdentifiedFromTheDocument").' '.$vendorfromdocument->getNomUrl(1).'</div>';
+			// Shown with the "Invoice" line below, into a single neutral block
+			$vendoridentifiedline = $langs->trans("VendorIdentifiedFromTheDocument").' '.$vendorfromdocument->getNomUrl(1);
 		} else {
 			print '<div class="warning paddingtop">'.$langs->trans("VendorDiffersFromTheDocument").' '.$vendorfromdocument->getNomUrl(1).'</div>';
 		}
@@ -410,7 +408,10 @@ if (!empty($parsedLines)) {
 		}
 	}
 
-	print '<div class="opacitymedium">';
+	print '<div class="neutral">';
+	if (!empty($vendoridentifiedline)) {
+		print $vendoridentifiedline.'<br>';
+	}
 	if (!empty($parsedHeader['documentno'])) {
 		print $langs->trans("Invoice").' : '.dol_escape_htmltag($parsedHeader['documentno']).' - ';
 	}
@@ -446,10 +447,10 @@ if (!empty($parsedLines)) {
 
 		print '<tr class="oddeven">';
 		print '<td>'.dol_escape_htmltag((string) ($parsedLine['lineid'] ?? ($idx + 1))).'</td>';
-		print '<td>'.dol_escape_htmltag($reffourn).'</td>';
+		print '<td>'.( dol_escape_htmltag($reffourn) !== '' ? dol_escape_htmltag($reffourn) : '<span class="opacitymedium">'.$langs->trans("NotDefinedInTheInvoice").'</span>').'</td>';
 		print '<td>'.dol_escape_htmltag((string) ($parsedLine['prodbuyerid'] ?? '')).'</td>';
 		print '<td>'.dol_escape_htmltag((string) ($parsedLine['prodglobalid'] ?? '')).'</td>';
-		print '<td>'.dol_escape_htmltag(dol_trunc((string) ($parsedLine['prodname'] ?? ''), 60)).'</td>';
+		print '<td class="tdlineheightsmall"><span class="opacitymedium einv-prodlabel">'.dol_escape_htmltag(dol_trunc((string) ($parsedLine['prodname'] ?? ''), 60)).'</span></td>';
 		print '<td class="right">'.dol_escape_htmltag((string) ($parsedLine['billedquantity'] ?? '')).' '.dol_escape_htmltag((string) ($parsedLine['billedquantityunitcode'] ?? '')).'</td>';
 		print '<td class="right">'.price(einvoicingLineUnitPrice($protocol, $parsedLine)).'</td>';
 		print '<td class="right">'.price((float) ($parsedLine['rateApplicablePercent'] ?? 0)).'%</td>';
@@ -467,15 +468,7 @@ if (!empty($parsedLines)) {
 		} elseif ($socid <= 0) {
 			print '<span class="opacitymedium">'.$langs->trans("SelectTheSupplierOfThisFlow").'</span>';
 		} else {
-			// Show the catch-all the line currently falls back on, then still offer to map it properly.
-			if (!empty($defaultrouted[$idx])) {
-				$producttmp = new Product($db);
-				$routedto = ($producttmp->fetch($matchresults[$idx]['res']) > 0) ? $producttmp->getNomUrl(1) : $langs->trans("Product").' #'.((int) $matchresults[$idx]['res']);
-				$routingtype = (string) ($matchresults[$idx]['routingtype'] ?? '');
-				$routedkey = ($routingtype == 'catchall' ? 'LineRoutedToCatchallProduct' : ($routingtype == 'service' ? 'LineRoutedToDefaultService' : 'LineRoutedToDefaultProduct'));
-				print $form->textwithpicto('<span class="opacitymedium">'.$langs->trans($routedkey).'</span> '.$routedto, $langs->trans($routingtype == 'catchall' ? 'LineRoutedToCatchallProductHelp' : 'LineRoutedToDefaultProductHelp'), 1, 'warning');
-				print '<br>';
-			}
+			// Show the mapping info or selector, then the catch-all the line currently falls back on.
 			if ($reffourn === '') {
 				// Without a vendor reference, the mapping has nothing to be stored on
 				print $form->textwithpicto('<span class="opacitymedium">'.$langs->trans("NotMappable").'</span>', $langs->trans("NotMappableBecauseNoVendorRef"), 1, 'warning');
@@ -485,6 +478,14 @@ if (!empty($parsedLines)) {
 				print $form->select_produits(0, 'idprod_'.$idx, '', 0, 0, -1, 2, '', 0, array(), 0, '1', 0, 'maxwidth300', 0, '', null, 0, 1);
 			} else {
 				print '<span class="opacitymedium">'.$langs->trans("NotEnoughPermissions").'</span>';
+			}
+			if (!empty($defaultrouted[$idx])) {
+				$producttmp = new Product($db);
+				$routedto = ($producttmp->fetch($matchresults[$idx]['res']) > 0) ? $producttmp->getNomUrl(1) : $langs->trans("Product").' #'.((int) $matchresults[$idx]['res']);
+				$routingtype = (string) ($matchresults[$idx]['routingtype'] ?? '');
+				$routedkey = ($routingtype == 'catchall' ? 'LineRoutedToCatchallProduct' : ($routingtype == 'service' ? 'LineRoutedToDefaultService' : 'LineRoutedToDefaultProduct'));
+				print '<br>';
+				print $form->textwithpicto('<span class="opacitymedium">'.$langs->trans($routedkey).'</span> '.$routedto, $langs->trans($routingtype == 'catchall' ? 'LineRoutedToCatchallProductHelp' : 'LineRoutedToDefaultProductHelp'), 1, 'info');
 			}
 		}
 		print '</td>';
@@ -497,10 +498,15 @@ if (!empty($parsedLines)) {
 
 	print '<div class="center paddingtop">';
 	if ($nbtomap == 0 && $socid > 0) {
-		print '<br><div class="ok">'.$langs->trans("AllLinesOfFlowAreMapped").'</div>';
+		print '<br><div class="ok paddingbottom">'.$langs->trans("AllLinesOfFlowAreMapped").'</div>';
 	}
-	if ($permissiontoadd && $socid > 0 && $nbtomap > 0) {
-		print '<input type="submit" class="button" value="'.$langs->trans("SaveMappingAndCreateVendorRefs").'">';
+	if ($socid > 0 && $nbtomap > 0) {
+		if ($permissiontoadd) {
+			print '<input type="submit" class="button" value="'.$langs->trans("SaveMappingAndCreateVendorRefs").'">';
+		} else {
+			// A link and not a disabled input: a disabled input shows no tooltip. Same form as the button below.
+			print '<a class="button disabled classfortooltip" href="#" title="'.dol_escape_htmltag($langs->trans("NotEnoughPermissions")).'">'.$langs->trans("SaveMappingAndCreateVendorRefs").'</a>';
+		}
 	}
 	// A line without any vendor reference has nothing to be mapped on, and the default product of the vendor
 	// is the only answer for it. Same link as the one the synchronization suggests, so the page is not a
@@ -508,10 +514,20 @@ if (!empty($parsedLines)) {
 	// titled without the right on the thirdparty, rather than absent: the user reads why, not "how?".
 	if ($socid > 0) {
 		$defaultproducturl = dol_buildpath('/societe/card.php', 1).'?socid='.((int) $socid).'&action=edit&highlight=routing_product_id#treinvoicing';
+		// Does the thirdparty already have a default product or service for the import?
+		$einvoicingtmp = new EInvoicing($db);
+		$defaultroutingexists = false;
+		foreach (array('product', 'service') as $routingtype) {
+			$defaultrouting = $einvoicingtmp->fetchDefaultRouting($socid, $routingtype);
+			if (!empty($defaultrouting) && $defaultrouting != '-1' && $defaultrouting != '0') {
+				$defaultroutingexists = true;
+			}
+		}
+		$buttonlabel = $langs->trans($defaultroutingexists ? "ChangeDefaultProductForThirdparty" : "SetDefaultProductForThirdparty");
 		if ($permissiontosetdefaultproduct) {
-			print '<a class="button" href="'.dol_escape_htmltag($defaultproducturl).'" target="_blank">'.$langs->trans("SetDefaultProductForThirdparty").'</a>';
+			print '<a class="button" href="'.dol_escape_htmltag($defaultproducturl).'" target="_blank">'.$buttonlabel.'</a>';
 		} else {
-			print '<a class="button disabled classfortooltip" href="#" title="'.dol_escape_htmltag($langs->trans("NotEnoughPermissions")).'">'.$langs->trans("SetDefaultProductForThirdparty").'</a>';
+			print '<a class="button disabled classfortooltip" href="#" title="'.dol_escape_htmltag($langs->trans("NotEnoughPermissions")).'">'.$buttonlabel.'</a>';
 		}
 	}
 	print '<a class="button button-cancel" href="'.dol_buildpath('/einvoicing/document_list.php', 1).'">'.$langs->trans("BackToSynchronization").'</a>';
@@ -519,6 +535,9 @@ if (!empty($parsedLines)) {
 
 	print '</form>';
 } elseif (empty($loaderror) && !empty($flowid)) {
+	if (!empty($vendoridentifiedline)) {
+		print '<div class="paddingtop"><span class="opacitymedium">'.$vendoridentifiedline.'</span></div>';
+	}
 	print '<div class="warning">'.$langs->trans("NoLineFoundIntoThisFlow").'</div>';
 }
 
