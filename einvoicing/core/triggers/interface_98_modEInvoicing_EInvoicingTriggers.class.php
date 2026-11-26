@@ -624,7 +624,7 @@ class InterfaceEInvoicingTriggers extends DolibarrTriggers
 		}
 
 		// EINVOICING DOCUMENTS
-		if ($action == 'DOCUMENT_DELETE') {
+		if ($action == 'DOCUMENT_DELETE' || $action == 'EINVOICING_DOCUMENT_DELETE') {	// core 25 builds it from the prefix
 			/**
 			 * @var Document $object
 			 */

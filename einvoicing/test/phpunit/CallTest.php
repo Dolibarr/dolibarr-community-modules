@@ -81,8 +81,8 @@ class CallTriggerSpy extends Call
 class CallTest extends CommonClassTest
 {
 	/**
-	 * The codes the class fires itself start with the prefix core builds from the class name: core 23/24
-	 * logged an error for the ModuleBuilder codes (MYOBJECT_VALIDATE, EINVOICING_MYOBJECT_CANCEL...).
+	 * The codes the class fires start with its prefix (class name up to core 24, EINVOICING_CALL from 25):
+	 * core 23/24 logged an error for the ModuleBuilder codes (MYOBJECT_VALIDATE, EINVOICING_MYOBJECT_CANCEL...).
 	 *
 	 * @return	void
 	 */
@@ -91,7 +91,8 @@ class CallTest extends CommonClassTest
 		global $db, $user;
 
 		$call = new CallTriggerSpy($db);
-		$this->assertSame(strtoupper(get_parent_class($call)), $call->TRIGGER_PREFIX);
+		$prefix = ((float) DOL_VERSION >= 25 ? 'EINVOICING_' : '').'CALL';
+		$this->assertSame($prefix, $call->TRIGGER_PREFIX);
 
 		$call->id = 0;	// no row: the updates match nothing, only the trigger codes are recorded
 		$call->ref = '1';
@@ -101,6 +102,6 @@ class CallTest extends CommonClassTest
 		$call->reopen($user);
 		$call->cancel($user);
 
-		$this->assertSame(array('CALL_VALIDATE', 'CALL_UNVALIDATE', 'CALL_REOPEN', 'CALL_CANCEL'), $call->fired);
+		$this->assertSame(array($prefix.'_VALIDATE', $prefix.'_UNVALIDATE', $prefix.'_REOPEN', $prefix.'_CANCEL'), $call->fired);
 	}
 }

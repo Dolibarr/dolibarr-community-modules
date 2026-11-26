@@ -52,7 +52,7 @@ class Document extends CommonObject
 	 * @var string		Prefix to check for any trigger code of any business class to prevent bad value for trigger code.
 	 * @see CommonTrigger::call_trigger()
 	 */
-	public $TRIGGER_PREFIX = 'DOCUMENT';	// The prefix core builds from the class name: DOCUMENT_CREATE, DOCUMENT_MODIFY, ...
+	public $TRIGGER_PREFIX = 'DOCUMENT';	// EINVOICING_DOCUMENT from core 25, see __construct()
 
 	/**
 	 * @var string 		Name of table without prefix where object is stored. This is also the key used for extrafields management (so extrafields know the link to the parent table).
@@ -252,6 +252,12 @@ class Document extends CommonObject
 		global $langs;
 
 		$this->db = $db;
+
+		// Core 18-24 build DOCUMENT_CREATE/MODIFY/DELETE from the class name, core 25 from this prefix
+		// (Dolibarr#40716): the Module_object_xxx prefix only from 25, so no core logs a prefix error.
+		if ((float) DOL_VERSION >= 25) {
+			$this->TRIGGER_PREFIX = 'EINVOICING_DOCUMENT';
+		}
 
 		if (!getDolGlobalInt('MAIN_SHOW_TECHNICAL_ID') && isset($this->fields['rowid']) && !empty($this->fields['ref'])) {
 			$this->fields['rowid']['visible'] = 0;
@@ -907,7 +913,7 @@ class Document extends CommonObject
 
 			if (!$error && !$notrigger) {
 				// Call trigger
-				$result = $this->call_trigger('DOCUMENT_VALIDATE', $user);
+				$result = $this->call_trigger($this->TRIGGER_PREFIX.'_VALIDATE', $user);
 				if ($result < 0) {
 					$error++;
 				}
@@ -990,7 +996,7 @@ class Document extends CommonObject
 			return 0;
 		}
 
-		return $this->setStatusCommon($user, self::STATUS_DRAFT, $notrigger, 'DOCUMENT_UNVALIDATE');
+		return $this->setStatusCommon($user, self::STATUS_DRAFT, $notrigger, $this->TRIGGER_PREFIX.'_UNVALIDATE');
 	}
 
 	/**
@@ -1007,7 +1013,7 @@ class Document extends CommonObject
 			return 0;
 		}
 
-		return $this->setStatusCommon($user, self::STATUS_CANCELED, $notrigger, 'DOCUMENT_CANCEL');
+		return $this->setStatusCommon($user, self::STATUS_CANCELED, $notrigger, $this->TRIGGER_PREFIX.'_CANCEL');
 	}
 
 	/**
@@ -1024,7 +1030,7 @@ class Document extends CommonObject
 			return 0;
 		}
 
-		return $this->setStatusCommon($user, self::STATUS_VALIDATED, $notrigger, 'DOCUMENT_REOPEN');
+		return $this->setStatusCommon($user, self::STATUS_VALIDATED, $notrigger, $this->TRIGGER_PREFIX.'_REOPEN');
 	}
 
 	/**

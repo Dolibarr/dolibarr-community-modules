@@ -112,8 +112,8 @@ class DocumentTest extends CommonClassTest
 	}
 
 	/**
-	 * The prefix is the one core 23/24 builds from the class name (DOCUMENT_DELETE, listened to by the
-	 * delete guard) and the codes the class fires itself start with it: core logged an error otherwise.
+	 * The prefix is the one core builds DOCUMENT_DELETE from (class name up to 24, the prefix from 25,
+	 * both listened to by the delete guard) and the codes the class fires start with it: no prefix error.
 	 *
 	 * @return	void
 	 */
@@ -122,7 +122,8 @@ class DocumentTest extends CommonClassTest
 		global $db, $user;
 
 		$document = new DocumentTriggerSpy($db);
-		$this->assertSame(strtoupper(get_parent_class($document)), $document->TRIGGER_PREFIX);
+		$prefix = ((float) DOL_VERSION >= 25 ? 'EINVOICING_' : '').'DOCUMENT';
+		$this->assertSame($prefix, $document->TRIGGER_PREFIX);
 
 		$document->id = 0;	// no row: the updates match nothing, only the trigger codes are recorded
 		$document->ref = '1';
@@ -132,6 +133,6 @@ class DocumentTest extends CommonClassTest
 		$document->reopen($user);
 		$document->cancel($user);
 
-		$this->assertSame(array('DOCUMENT_VALIDATE', 'DOCUMENT_UNVALIDATE', 'DOCUMENT_REOPEN', 'DOCUMENT_CANCEL'), $document->fired);
+		$this->assertSame(array($prefix.'_VALIDATE', $prefix.'_UNVALIDATE', $prefix.'_REOPEN', $prefix.'_CANCEL'), $document->fired);
 	}
 }
