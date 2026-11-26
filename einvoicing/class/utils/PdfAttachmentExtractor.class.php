@@ -240,7 +240,7 @@ class PdfAttachmentExtractor extends tcpdi_parser
 	 */
 	protected function decodeXrefStream($startxref, $xref = array())
 	{
-		if ((float) DOL_VERSION <= 23.0) {
+		if ((float) DOL_VERSION <= 24.0) {
 			list($xrefobj) = $this->getRawObject($startxref);
 			$xrefcrs = $this->getIndirectObject($xrefobj[1], $startxref, true);
 			$dict = $this->dictOf($xrefcrs[0]);
