@@ -667,6 +667,45 @@ abstract class AbstractPDPProvider
 	}
 
 	/**
+	 * Tell whether a document would be accepted by the import, running the same checks as fetchImportableFlowDocument().
+	 * Used by the developer tools to test a file without fetching it from the access point.
+	 *
+	 * @param	string			$content			Raw document (PDF or XML)
+	 * @param	ProtocolManager	$protocolManager	Protocol factory used to recognize the document
+	 * @return	array{readable:bool,protocol_name:string,payload_name:string,payload:string,reason:string}	Result of the checks
+	 */
+	public function checkImportableContent($content, $protocolManager)
+	{
+		$result = array('readable' => false, 'protocol_name' => '', 'payload_name' => '', 'payload' => '', 'reason' => '');
+
+		$protocolName = $protocolManager->detectProtocolFromContent($content);
+		if (empty($protocolName)) {
+			$result['reason'] = "unrecognized syntax";
+			return $result;
+		}
+		$result['protocol_name'] = $protocolName;
+
+		$protocol = $protocolManager->getProtocol($protocolName);
+		if (empty($protocol)) {
+			$result['reason'] = $protocolName . " is not supported";
+			return $result;
+		}
+
+		$payloadReason = '';
+		$payload = $this->readableInvoicePayload($content, $protocol, $protocolManager, $payloadReason);
+		if ($payload === null) {
+			$result['reason'] = $protocolName . " but " . $payloadReason;
+			return $result;
+		}
+
+		$result['readable'] = true;
+		$result['payload'] = $payload;
+		$result['payload_name'] = (string) $protocolManager->detectProtocolFromContent($payload);
+
+		return $result;
+	}
+
+	/**
 	 * Send a sample electronic invoice for testing purposes.
 	 * This function generates a sample invoice and sends it to PDP
 	 *
