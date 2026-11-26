@@ -20,7 +20,8 @@
  *      \file       test/phpunit/ActionsEInvoicingTest.php
  *      \ingroup    test
  *      \brief      PHPUnit test for the hooks of einvoicing/class/actions_einvoicing.class.php: the line
- *                  of the scheduled synchronization in the open elements dashboard of the home page.
+ *                  of the scheduled synchronization in the open elements dashboard of the home page, and
+ *                  the e-invoice of a transmitted invoice kept when its PDF is rebuilt.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -38,6 +39,8 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 
 require_once $dolibarrHtdocs . '/master.inc.php';
 require_once DOL_DOCUMENT_ROOT . '/core/class/hookmanager.class.php';
+require_once DOL_DOCUMENT_ROOT . '/compta/facture/class/facture.class.php';
+dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/class/actions_einvoicing.class.php');
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
 
@@ -54,6 +57,31 @@ class ActionsEInvoicingTest extends CommonClassTest
 	 * @var	string|null|false	Entry of the module Scheduled jobs in $conf->modules before the test, false while untouched
 	 */
 	private $savedCronModule = false;
+
+	/** @var int Element id of the in-memory invoice of the PDF rebuild tests: no real invoice uses it */
+	const REBUILD_ELEMENT_ID = 999912650;
+
+	/**
+	 * @var	array<string,?string>	Constants changed by a test, with the value they had before
+	 */
+	private $savedConsts = array();
+
+	/**
+	 * Set a constant for this test only, the way getDolGlobalString() reads it.
+	 *
+	 * @param	string	$name	Constant name
+	 * @param	string	$value	Value
+	 * @return	void
+	 */
+	private function setConst($name, $value)
+	{
+		global $conf;
+
+		if (!array_key_exists($name, $this->savedConsts)) {
+			$this->savedConsts[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
+		}
+		$conf->global->$name = $value;
+	}
 
 	/**
 	 * Turn the module Scheduled jobs on or off for this test only, the way isModEnabled() reads it.
@@ -92,6 +120,14 @@ class ActionsEInvoicingTest extends CommonClassTest
 			}
 			$this->savedCronModule = false;
 		}
+		foreach ($this->savedConsts as $name => $value) {
+			if ($value === null) {
+				unset($conf->global->$name);
+			} else {
+				$conf->global->$name = $value;
+			}
+		}
+		$this->savedConsts = array();
 		parent::tearDown();
 	}
 
@@ -194,5 +230,67 @@ class ActionsEInvoicingTest extends CommonClassTest
 		$hooks = new ActionsEInvoicing($db);
 		$hooks->addOpenElementsDashboardGroup(array('dashboardgroup' => array()), null, $action, new HookManager($db));
 		$this->assertEmpty($hooks->results, 'no Invoices card, no card of its own either');
+	}
+
+	/**
+	 * Rebuild the PDF of a validated in-memory invoice of a French company, with the e-invoice generated in
+	 * real time and the record given, and say what the hook reported.
+	 *
+	 * @param	string	$flowId		Flow id of the record ('' = never submitted)
+	 * @param	string	$allowRegen	Value of EINVOICING_ALLOW_REGEN_TRANSMITTED
+	 * @return	array<string,mixed>	Return code, errors and warnings of the hook
+	 */
+	private function rebuildPdf($flowId, $allowRegen = '0')
+	{
+		global $db;
+
+		$this->setConst('EINVOICING_ALLOW_REGEN_TRANSMITTED', $allowRegen);
+		foreach (array('EINVOICING_DISABLE_SYNC_DOLI_TO_AP', 'EINVOICING_ALLOW_RESEND_TRANSMITTED',
+			'EINVOICING_EINVOICE_CANCEL_IF_EINVOICE_FAILS', 'EINVOICING_SKIP_B2C', 'EINVOICING_USE_BILLING_CONTACT_AS_BUYER') as $name) {
+			$this->setConst($name, '0');
+		}
+		$this->setConst('EINVOICING_PDP', 'SUPERPDP');
+		$this->setConst('EINVOICING_EINVOICE_IN_REAL_TIME', '1');
+
+		$db->query("DELETE FROM " . $db->prefix() . "einvoicing_extlinks WHERE element_id = " . self::REBUILD_ELEMENT_ID);
+		$db->query("DELETE FROM " . $db->prefix() . "einvoicing_lifecycle_msg WHERE element_id = " . self::REBUILD_ELEMENT_ID);
+		$einvoicing = new EInvoicing($db);
+		$einvoicing->insertOrUpdateExtLink(self::REBUILD_ELEMENT_ID, 'facture', $flowId, $flowId ? EInvoicing::STATUS_AWAITING_VALIDATION : EInvoicing::STATUS_GENERATED, 'TEST-1265-0001');
+
+		$invoice = new Facture($db);
+		$invoice->id = self::REBUILD_ELEMENT_ID;
+		$invoice->ref = 'TEST-1265-0001';
+		$invoice->type = Facture::TYPE_STANDARD;
+		$invoice->status = Facture::STATUS_VALIDATED;
+		$invoice->statut = Facture::STATUS_VALIDATED;
+		$invoice->thirdparty = new Societe($db);
+		$invoice->thirdparty->country_code = 'FR';
+		$invoice->thirdparty->tva_assuj = 1;
+		$invoice->lines = array();
+
+		$hooks = new ActionsEInvoicing($db);
+		$action = '';
+		$res = $hooks->afterPDFCreation(array('file' => '', 'object' => $invoice), $invoice, $action, new HookManager($db));
+
+		return array('res' => $res, 'reported' => array_merge((array) $hooks->errors, (array) $hooks->warnings));
+	}
+
+	/**
+	 * A PDF rebuilt after the transmission (a payment, the Generate button) leaves the e-invoice the AP holds
+	 * alone: the hook stops before generating anything (#1265). The same invoice not yet submitted still goes
+	 * to the generation, which reports here on the incomplete in-memory invoice.
+	 *
+	 * @return void
+	 */
+	public function testRebuildingThePdfOfATransmittedInvoiceKeepsItsEInvoice()
+	{
+		$notSubmitted = $this->rebuildPdf('');
+		$this->assertNotEmpty($notSubmitted['reported'], 'an invoice never submitted goes to the generation');
+
+		$transmitted = $this->rebuildPdf('i_1265');
+		$this->assertSame(0, $transmitted['res']);
+		$this->assertSame(array(), $transmitted['reported'], 'nothing is generated for a transmitted invoice');
+
+		$this->assertNotEmpty($this->rebuildPdf('i_1265', '1')['reported'], 'EINVOICING_ALLOW_REGEN_TRANSMITTED lifts the lock');
 	}
 }

@@ -104,6 +104,14 @@ class ActionsEInvoicing extends CommonHookActions  // @phan-suppress-current-lin
 					$currentStatusDetails = $einvoicing->fetchLastknownInvoiceStatus($invoiceObject->id, $invoiceObject->ref);
 
 					if (!isset($currentStatusDetails['code']) || !EInvoicing::isIgnoredStatus($currentStatusDetails['code'])) {
+						// A transmitted e-invoice is the document the AP holds: a later rebuild of the PDF (a payment, the
+						// Generate button) must not rewrite it. Same lock as the e-invoice Generate button (#1265).
+						if (getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME') && !getDolGlobalString('EINVOICING_ALLOW_REGEN_TRANSMITTED')
+							&& $einvoicing->isSendLocked($invoiceObject->id, (string) $invoiceObject->ref)) {
+							dol_syslog(__METHOD__ . " invoice id=" . $invoiceObject->id . " already transmitted, its e-invoice is kept as sent");
+							return 0;
+						}
+
 						if ($invoiceObject->status != $invoiceObject::STATUS_DRAFT	// Never generate/transmit an e-invoice for a DRAFT (note: at validation the invoice has already status VALIDATED when Dolibarr regenerates the final PDF, so the legitimate flow is preserved).
 							&& getDolGlobalString('EINVOICING_EINVOICE_IN_REAL_TIME')) {
 							$messagecss = '';
