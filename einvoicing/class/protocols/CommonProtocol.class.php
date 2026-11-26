@@ -1800,14 +1800,14 @@ trait CommonProtocol
 				'message' => 'Product creation error: ' . dol_escape_htmltag($creationError),
 			];
 		} else {
-			// Suggest manual creation of product
-			dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Auto-creation of products is disabled', LOG_ERR);
-
 			// Free line mode: import the line without linking any product (res=0 signals the protocol to set desc from XML)
 			if (!$isVatBreakdownLine && getDolGlobalInt('EINVOICING_IMPORT_AS_FREE_LINES')) {
 				dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Free line mode: importing without product link', LOG_DEBUG);
 				return array('res' => 0, 'message' => 'Product not found, line imported as free description line (no product link)');
 			}
+
+			// Suggest manual creation of product: a setting-dependent outcome, already reported in the UI
+			dol_syslog(get_class($this) . '::_findOrCreateProductFromEinvoiceLine Auto-creation of products is disabled', LOG_WARNING);
 
 			$prodRef = trim($lineData['prodbuyerid'] ?? '');
 			$prodSupplierRef = trim($lineData['prodsellerid'] ?? '');
