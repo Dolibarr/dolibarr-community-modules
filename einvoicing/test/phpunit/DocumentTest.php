@@ -19,7 +19,8 @@
  *      \file       test/phpunit/DocumentTest.php
  *      \ingroup    test
  *      \brief      PHPUnit test for einvoicing/class/document.class.php: the label and reason of a lifecycle
- *                  status are free text in a CDAR and their columns hold 255 characters.
+ *                  status are free text in a CDAR and their columns hold 255 characters; the trigger codes
+ *                  all start with the class prefix.
  *      \remarks    To run this script as CLI: phpunit filename.php
  */
 
@@ -49,6 +50,26 @@ if (empty($user->id)) {
 	}
 }
 $conf->global->MAIN_DISABLE_ALL_MAILS = 1;
+
+/**
+ * Records the trigger codes instead of running the triggers.
+ */
+class DocumentTriggerSpy extends Document
+{
+	/** @var string[] */
+	public $fired = array();
+
+	/**
+	 * @param	string	$triggerName	Trigger code
+	 * @param	?User	$user			User
+	 * @return	int						0, no trigger ran
+	 */
+	public function call_trigger($triggerName, $user)	// phpcs:ignore PEAR.NamingConventions.ValidFunctionName.ScopeNotCamelCaps
+	{
+		$this->fired[] = $triggerName;
+		return 0;
+	}
+}
 
 
 /**
@@ -88,5 +109,30 @@ class DocumentTest extends CommonClassTest
 		$this->assertSame(dol_substr($reason, 0, 255), $obj->cdar_lifecycle_label);
 		$this->assertSame(dol_substr($reason, 0, 255), $obj->cdar_reason_desc);
 		$this->assertSame($reason, $obj->cdar_reason_detail, 'the detail keeps the whole text');
+	}
+
+	/**
+	 * The prefix is the one core builds DOCUMENT_DELETE from (class name up to 24, the prefix from 25,
+	 * both listened to by the delete guard) and the codes the class fires start with it: no prefix error.
+	 *
+	 * @return	void
+	 */
+	public function testTriggerCodesStartWithTheClassPrefix()
+	{
+		global $db, $user;
+
+		$document = new DocumentTriggerSpy($db);
+		$prefix = ((float) DOL_VERSION >= 25 ? 'EINVOICING_' : '').'DOCUMENT';
+		$this->assertSame($prefix, $document->TRIGGER_PREFIX);
+
+		$document->id = 0;	// no row: the updates match nothing, only the trigger codes are recorded
+		$document->ref = '1';
+		$document->status = Document::STATUS_DRAFT;
+		$document->validate($user);
+		$document->setDraft($user);
+		$document->reopen($user);
+		$document->cancel($user);
+
+		$this->assertSame(array($prefix.'_VALIDATE', $prefix.'_UNVALIDATE', $prefix.'_REOPEN', $prefix.'_CANCEL'), $document->fired);
 	}
 }

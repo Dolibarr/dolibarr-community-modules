@@ -244,7 +244,7 @@ if (empty($reshook)) {
 	*/
 
 	// Actions to send emails
-	$triggersendname = 'EINVOICING_MYOBJECT_SENTBYMAIL';
+	$triggersendname = $object->TRIGGER_PREFIX.'_SENTBYMAIL';
 	$autocopy = 'MAIN_MAIL_AUTOCOPY_MYOBJECT_TO';
 	$trackid = 'document'.$object->id;
 	include DOL_DOCUMENT_ROOT.'/core/actions_sendmails.inc.php';
