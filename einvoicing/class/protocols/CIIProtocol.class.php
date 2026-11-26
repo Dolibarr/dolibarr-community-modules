@@ -798,9 +798,16 @@ class CIIProtocol extends AbstractProtocol
 		$rang = (int) $supplierInvoice->line_max();
 
 		foreach ($supplierInvoice->lines as $i => $val) {
-			$sql = 'INSERT INTO '.MAIN_DB_PREFIX.'facture_fourn_det (fk_facture_fourn, special_code, fk_remise_except)';
+			$extra_params_insert_column = "";
+			$extra_params_insert_value = "";
+			if ((float) DOL_VERSION >= 22) {
+				//Always identify lines that are created by the eInvoicing module with extraparams
+				$extra_params_insert_column=",extraparams";
+				$extra_params_insert_value=json_encode(array('einvoicing'=>array("OriginModuleId" => (string)SupplierInvoiceHelper::EINVOICING_EXTRAPARAMS)));
+			}
+			$sql = 'INSERT INTO '.MAIN_DB_PREFIX.'facture_fourn_det (fk_facture_fourn, special_code, fk_remise_except'.$extra_params_insert_column.')';
 			/** @phan-suppress-next-line PhanUndeclaredProperty */
-			$sql .= " VALUES (".((int) $supplierInvoice->id).", ".((int) $supplierInvoice->lines[$i]->special_code).", ".($supplierInvoice->lines[$i]->fk_remise_except > 0 ? ((int) $supplierInvoice->lines[$i]->fk_remise_except) : 'NULL').')';
+			$sql .= " VALUES (".((int) $supplierInvoice->id).", ".((int) $supplierInvoice->lines[$i]->special_code).", ".($supplierInvoice->lines[$i]->fk_remise_except > 0 ? ((int) $supplierInvoice->lines[$i]->fk_remise_except) : 'NULL').','."'".$this->db->escape($extra_params_insert_value)."'".')';
 
 			$resql_insert = $this->db->query($sql);
 			if ($resql_insert) {
@@ -837,14 +844,7 @@ class CIIProtocol extends AbstractProtocol
 				if ($res < 0) {
 					return false;
 				}
-
-				//Always identify lines that are created by the eInvoicing module with extraparams
 				$supplierInvoice->lines[$i]->id=$idligne;
-				$supplierInvoice->lines[$i]->extraparams=array("OriginModuleId"=>(string) SupplierInvoiceHelper::EINVOICING_EXTRAPARAMS);
-				$resSetExtraParams = $supplierInvoice->lines[$i]->setExtraParameters();
-				if ($resSetExtraParams < 0) {
-					return false;
-				}
 
 				// The core forces every line of a credit note negative (issue #1077). Each line gets back
 				// the sign the document gives it, relative to the sign of the credit note itself.
