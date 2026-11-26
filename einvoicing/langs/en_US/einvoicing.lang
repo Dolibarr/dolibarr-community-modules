@@ -539,6 +539,14 @@ EinvoicingFailedToDetachTheFlowOfADeletedSupplierInvoice=Failed to detach the re
 EInvoiceReplacedSupplierInvoiceClosed=The supplier invoice replaced by %s has been closed as replaced, so it can no longer be paid.
 EinvoicingDuplicateDocumentForSupplierInvoice=Several e-invoicing documents were found for the supplier invoice %s. This should never happen and needs to be fixed in the database before this invoice can be validated or deleted.
 EinvoicingCantDeleteATransmittedInvoice=You are trying to delete an invoice that is locked because it has been transmitted to the Access Point
+EInvTestImportTitle=Test if a received e-invoice file can be read by the import
+EInvTestImportHelp=Upload a PDF (Factur-X) or XML file: the same checks as the import of a received flow are run on it (syntax of the container, then of the invoice it carries).
+EInvTestImportButton=Test
+EInvTestImportUploadFailed=The upload of the file failed (error code %s)
+EInvTestImportContainer=Container syntax
+EInvTestImportPayload=Invoice syntax
+EInvTestImportOK=The document can be read by the import
+EInvTestImportKO=The document would be rejected by the import: %s
 
 # Attachment of an imported supplier invoice to a recurring template (issue #997)
 EINVOICING_LINK_TO_RECURRING_TEMPLATE_IF_ONLY_ONE_FOUND=Attach an imported supplier invoice to the recurring template of its vendor, when the vendor has only one

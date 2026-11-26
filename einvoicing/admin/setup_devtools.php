@@ -199,6 +199,20 @@ if ($action == 'buildsamplesupplierinvoice') {	// Test on permissions already do
 	}
 }
 
+// Test whether an uploaded document would be accepted by the import of received flows
+$checkImportResult = null;
+$checkImportFileName = '';
+if ($action == 'testreadablepayload' && !empty($provider)) {	// Test on permissions already done
+	$uploadError = isset($_FILES['einvoicefile']['error']) ? (int) $_FILES['einvoicefile']['error'] : UPLOAD_ERR_NO_FILE;
+	if ($uploadError != UPLOAD_ERR_OK || empty($_FILES['einvoicefile']['tmp_name']) || !is_uploaded_file($_FILES['einvoicefile']['tmp_name'])) {
+		setEventMessages($langs->trans("EInvTestImportUploadFailed", $uploadError), null, 'errors');
+	} else {
+		$checkImportFileName = dol_sanitizeFileName((string) $_FILES['einvoicefile']['name']);
+		$uploadedContent = (string) file_get_contents($_FILES['einvoicefile']['tmp_name']);
+		$checkImportResult = $provider->checkImportableContent($uploadedContent, new ProtocolManager($db));
+	}
+}
+
 // Save the options declared with $formSetup (action = 'update')
 include DOL_DOCUMENT_ROOT.'/core/actions_setmoduleoptions.inc.php';
 
@@ -376,6 +390,34 @@ if (getDolGlobalString('EINVOICING_PDP')) {
 	if ($invoice_path) {
 		print '<br>';
 		print 'Sample invoice generated into document directory into path:<br><b>'.preg_replace('/^'.preg_quote(DOL_DATA_ROOT.'/', '/').'/', '', $invoice_path).'</b>';
+	}
+	print '</div>';
+	print '<br>';
+
+
+	// Tool to test if a received document can be read by the import
+	print '<div class="neutral">';
+	print $langs->trans("EInvTestImportTitle").'<br>';
+	print '<span class="opacitymedium">'.$langs->trans("EInvTestImportHelp").'</span><br><br>';
+
+	print '<form action="'.$_SERVER["PHP_SELF"].'" method="POST" enctype="multipart/form-data">';
+	print '<input type="hidden" name="action" value="testreadablepayload">';
+	print '<input type="hidden" name="token" value="'.newToken().'">';
+	print '<input type="file" name="einvoicefile" accept=".pdf,.xml,application/pdf,application/xml,text/xml" required> ';
+	print '<input type="submit" class="button smallpaddingimp reposition" name="testimport" value="'.dol_escape_htmltag($langs->trans("EInvTestImportButton")).'">';
+	print '</form>';
+
+	if (is_array($checkImportResult)) {
+		print '<br>';
+		print '<span class="width150 inline-block">'.$langs->trans("File").'</span> '.dol_escape_htmltag($checkImportFileName).'<br>';
+		print '<span class="width150 inline-block">'.$langs->trans("EInvTestImportContainer").'</span> '.dol_escape_htmltag($checkImportResult['protocol_name'] ?: '-').'<br>';
+		if ($checkImportResult['readable']) {
+			print '<span class="width150 inline-block">'.$langs->trans("EInvTestImportPayload").'</span> '.dol_escape_htmltag($checkImportResult['payload_name'] ?: '-').'<br>';
+			print '<span class="ok">'.img_picto('', 'tick', 'class="pictofixedwidth"').$langs->trans("EInvTestImportOK").'</span><br>';
+			print '<textarea class="quatrevingtpercent" rows="12" readonly spellcheck="false">'.dol_escape_htmltag($checkImportResult['payload']).'</textarea>';
+		} else {
+			print '<span class="error">'.img_warning('', '', 'pictofixedwidth').$langs->trans("EInvTestImportKO", dol_escape_htmltag($checkImportResult['reason'])).'</span>';
+		}
 	}
 	print '</div>';
 	print '<br>';
