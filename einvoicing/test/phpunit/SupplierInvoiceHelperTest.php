@@ -43,6 +43,7 @@ if (!file_exists($dolibarrHtdocs . '/master.inc.php')) {
 
 require_once $dolibarrHtdocs . '/master.inc.php';
 require_once DOL_DOCUMENT_ROOT.'/fourn/class/fournisseur.facture.class.php';
+require_once DOL_DOCUMENT_ROOT.'/core/class/discount.class.php';
 dol_include_once('einvoicing/class/einvoicing.class.php');
 dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
 require_once __DIR__ . '/CommonClassTestCompat.inc.php';
@@ -1592,7 +1593,7 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 		$socid = $this->getAnyThirdpartyId();
 
 		$deposit = new FactureFournisseur($db);
-		$deposit->initAsSpecimen();
+		$deposit->initAsSpecimen('nolines');
 		$deposit->ref_supplier = 'DEP_' . uniqid();
 		$deposit->socid = $socid;
 		$deposit->type = FactureFournisseur::TYPE_DEPOSIT;
@@ -1613,7 +1614,7 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 		$this->assertGreaterThan(0, $discount->create($user));
 
 		$invoice = new FactureFournisseur($db);
-		$invoice->initAsSpecimen();
+		$invoice->initAsSpecimen('nolines');
 		$invoice->ref_supplier = 'INV_' . uniqid();
 		$invoice->socid = $socid;
 		$invoice->type = FactureFournisseur::TYPE_STANDARD;
