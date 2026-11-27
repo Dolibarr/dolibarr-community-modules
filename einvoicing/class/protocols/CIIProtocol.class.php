@@ -1485,10 +1485,18 @@ class CIIProtocol extends AbstractProtocol
 		if (!empty($paymentInfoRes['message'])) {
 			dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource ' . $paymentInfoRes['message'], LOG_DEBUG, 0, '_einvoicing');
 		}
+		// Kept apart before the template fills the invoice, so the sources can be ranked below
+		$paymentSettingsFromDocument = $this->_paymentSettingsFromDocument($supplierInvoice);
 
 		// A vendor billed on a subscription already has a recurring template holding the settings the
 		// operator chose once. Taken before create() so the invoice is written with them (issue #997).
 		$recurringTemplate = $this->_attachSupplierInvoiceToRecurringTemplate($supplierInvoice, (int) $socId, $return_messages);
+
+		// The defaults of the vendor card, the way the creation form of the core takes them
+		$vendorDefaultsRes = $this->_applyVendorDefaultsToSupplierInvoice($supplierInvoice, $supplier, $paymentSettingsFromDocument, $recurringTemplate);
+		if (!empty($vendorDefaultsRes['message'])) {
+			dol_syslog(get_class($this) . '::doCreateSupplierInvoiceFromSource ' . $vendorDefaultsRes['message'], LOG_DEBUG, 0, '_einvoicing');
+		}
 
 		$remise_already_used_line_level_ids = array();
 		$supplierPriceEntries = array(); // Collect product/price data to create supplier prices after invoice creation
@@ -5852,6 +5860,10 @@ class CIIProtocol extends AbstractProtocol
 			return -1;
 		}
 		if (!empty($invoice->mode_reglement_id) && $invoice->setPaymentMethods((int) $invoice->mode_reglement_id) < 0) {
+			return -1;
+		}
+		// update() does not write the bank account, create() does: a rebuilt draft would keep its old one
+		if (!empty($invoice->fk_account) && $invoice->setBankAccount((int) $invoice->fk_account, 1) < 0) {
 			return -1;
 		}
 
