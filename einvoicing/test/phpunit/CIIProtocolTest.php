@@ -702,6 +702,83 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
+	 * An invoice often covers several purchase orders, and BT-13 holds only one. The other order
+	 * references a received document carries are read: the header ones of TypeCode 130 (what a
+	 * Dolibarr issuing such an invoice writes) and the order each line of an EXTENDED document names.
+	 *
+	 * @return void
+	 */
+	public function testTheParserReadsEveryOrderReferenceOfTheDocument()
+	{
+		global $db;
+
+		$R = 'urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100';
+		$doc = new DOMDocument();
+		$doc->load(__DIR__ . '/fixtures/received_documents/cii_rounding_amount.xml');
+		$xp = new DOMXPath($doc);
+		$xp->registerNamespace('ram', $R);
+
+		$agreement = $xp->query('//ram:ApplicableHeaderTradeAgreement')->item(0);
+		foreach (array(array('CF2611-0002', '130'), array('ATT-77', '916')) as $refDoc) {
+			$node = $doc->createElementNS($R, 'AdditionalReferencedDocument');
+			$node->appendChild($doc->createElementNS($R, 'IssuerAssignedID', $refDoc[0]));
+			$node->appendChild($doc->createElementNS($R, 'TypeCode', $refDoc[1]));
+			$agreement->appendChild($node);
+		}
+		$lineAgreement = $xp->query('//ram:SpecifiedLineTradeAgreement')->item(0);
+		$lineOrder = $doc->createElementNS($R, 'BuyerOrderReferencedDocument');
+		$lineOrder->appendChild($doc->createElementNS($R, 'IssuerAssignedID', 'CF2611-0003'));
+		$lineOrder->appendChild($doc->createElementNS($R, 'LineID', '2'));
+		$lineAgreement->insertBefore($lineOrder, $lineAgreement->firstChild);
+
+		$protocol = new CIIProtocol($db);
+		$header = $protocol->parseInvoiceHeader($doc->saveXML());
+		$lines = $protocol->parseInvoiceLines($doc->saveXML());
+
+		// The fixture lists references of its own already: the ones added come last
+		$read = array_column($header['headerAdditionalRefDocs'], 'typeCode', 'IssuerAssignedID');
+		$this->assertSame('130', $read['CF2611-0002'] ?? null, 'a header reference of TypeCode 130 must be read with its TypeCode');
+		$this->assertSame('916', $read['ATT-77'] ?? null, 'a header reference of another TypeCode must be read with its TypeCode');
+		$this->assertSame('CF2611-0003', $lines[0]['lineOrderReference'], 'the order a line names must be read');
+	}
+
+	/**
+	 * The order references a document names, ranked: BT-13 first, then the header references of
+	 * TypeCode 130, then the ones of the lines. A reference met twice is kept once, and a header
+	 * reference of another TypeCode (a supporting document, 916) is not an order reference.
+	 *
+	 * @return void
+	 */
+	public function testEveryOrderReferenceOfTheDocumentIsCollectedOnce()
+	{
+		global $db;
+
+		$collect = new ReflectionMethod(CIIProtocol::class, '_orderReferencesOfDocument');
+		$collect->setAccessible(true);
+
+		$header = array(
+			'orderReference' => 'CF2611-0001',
+			'headerAdditionalRefDocs' => array(
+				array('IssuerAssignedID' => 'CF2611-0002', 'typeCode' => '130'),
+				array('IssuerAssignedID' => 'ATT-77', 'typeCode' => '916'),
+				array('IssuerAssignedID' => 'CF2611-0001', 'typeCode' => '130'),
+			),
+		);
+		$lines = array(
+			array('lineOrderReference' => 'CF2611-0003'),
+			array('lineOrderReference' => 'CF2611-0002'),
+			array('lineOrderReference' => ''),
+			array(),
+		);
+
+		$this->assertSame(
+			array('CF2611-0001' => 'BT-13', 'CF2611-0002' => 'header', 'CF2611-0003' => 'line'),
+			$collect->invoke(new CIIProtocol($db), $header, $lines)
+		);
+		$this->assertSame(array(), $collect->invoke(new CIIProtocol($db), array(), array()), 'a document naming no order gives no reference');
+	}
+
+	/**
 	 * A received document carrying several payment means: the accounts it announces (BT-84, BT-85,
 	 * BT-86) are all read, in document order, the same account written twice is kept once, and a
 	 * payment means without an IBAN - a cash payment - announces no account at all. Issue #1031.

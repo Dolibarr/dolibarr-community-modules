@@ -2751,18 +2751,59 @@ trait CommonProtocol
 	}
 
 	/**
-	 * Link an inbound supplier invoice to its Dolibarr purchase order (commande fournisseur).
+	 * Purchase order references a received document names, in the order they are met: BT-13 first,
+	 * then the header references of TypeCode 130 a Dolibarr issuing one invoice for several orders
+	 * writes (see buildXML()), then the order each line of an EXTENDED document says it bills.
 	 *
-	 * Uses BT-13 (BuyerOrderReferencedDocument/IssuerAssignedID). The lookup is reference-exact and
+	 * Each reference is kept once. Not all of them are orders: TypeCode 130 is any invoiced object.
+	 * That is fine, since only a reference matching a single order of the vendor links anything.
+	 *
+	 * @param	array<string,mixed>				$parsedHeader	Header of the document, as parseInvoiceHeader() returns it
+	 * @param	array<int,array<string,mixed>>	$parsedLines	Lines of the document, as parseInvoiceLines() returns them
+	 * @return	array<string,string>							Reference => where it was read: 'BT-13', 'header' or 'line'
+	 */
+	private function _orderReferencesOfDocument(array $parsedHeader, array $parsedLines)
+	{
+		$references = array();
+
+		$bt13 = trim((string) ($parsedHeader['orderReference'] ?? ''));
+		if ($bt13 !== '') {
+			$references[$bt13] = 'BT-13';
+		}
+
+		foreach ((array) ($parsedHeader['headerAdditionalRefDocs'] ?? array()) as $refDoc) {
+			$reference = trim((string) ($refDoc['IssuerAssignedID'] ?? ''));
+			if ($reference !== '' && trim((string) ($refDoc['typeCode'] ?? '')) === '130' && !isset($references[$reference])) {
+				$references[$reference] = 'header';
+			}
+		}
+
+		foreach ($parsedLines as $parsedLine) {
+			$reference = trim((string) ($parsedLine['lineOrderReference'] ?? ''));
+			if ($reference !== '' && !isset($references[$reference])) {
+				$references[$reference] = 'line';
+			}
+		}
+
+		return $references;
+	}
+
+	/**
+	 * Link an inbound supplier invoice to a Dolibarr purchase order (commande fournisseur) it names.
+	 *
+	 * Called for BT-13 (BuyerOrderReferencedDocument/IssuerAssignedID) and for every other order
+	 * reference of the document (see _orderReferencesOfDocument()). The lookup is reference-exact and
 	 * scoped to the resolved supplier, and only a single unambiguous match creates the link. Internal
 	 * ERP reconciliation logic: it must NEVER block import (issue #303).
 	 *
-	 * @param 	FactureFournisseur 	$supplierInvoice 	Freshly created supplier invoice (must expose ->id)
-	 * @param 	int 				$socId 				Resolved supplier third party id
-	 * @param 	string 				$orderReference 	BT-13 purchase order reference carried by the invoice
-	 * @return 	string 									Status message for the import log ('' when nothing was done)
+	 * @param 	FactureFournisseur 	$supplierInvoice 		Freshly created supplier invoice (must expose ->id)
+	 * @param 	int 				$socId 					Resolved supplier third party id
+	 * @param 	string 				$orderReference 		Purchase order reference carried by the invoice
+	 * @param	bool				$warnOtherSupplier		Warn when the reference is an order of another supplier. Only
+	 *														for BT-13: another reference may name something else than an order.
+	 * @return 	string 										Status message for the import log ('' when nothing was done)
 	 */
-	private function _linkSupplierInvoiceToPurchaseOrder($supplierInvoice, $socId, $orderReference)
+	private function _linkSupplierInvoiceToPurchaseOrder($supplierInvoice, $socId, $orderReference, $warnOtherSupplier = true)
 	{
 		global $db, $langs;
 
@@ -2787,6 +2828,9 @@ trait CommonProtocol
 
 		$num = $db->num_rows($resql);
 
+		if ($num == 0 && !$warnOtherSupplier) {
+			return '';
+		}
 		if ($num == 0) {
 			// No order for this supplier. Surface a warning only if the reference exists for another supplier
 			// (likely mis-reference), otherwise stay silent (unchanged behaviour).

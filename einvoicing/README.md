@@ -60,6 +60,23 @@ with taxed or exempt ones - those have to be issued on their own invoice.
 
 On Dolibarr 23 and below the category is unchanged, since the dictionary has no column to state it.
 
+### Purchase orders of a received invoice
+
+When a supplier invoice is imported, the module links it to every purchase order of the vendor that the
+document names: the order reference of the header (BT-13), the header additional references of type 130,
+and the order of each line. Orders the document does not name can be linked by hand with the "Link to"
+button of the draft invoice.
+
+The module does not classify these orders as billed itself. The Workflow module does it when the supplier
+invoice is validated, if its option "When a vendor invoice is validated, classify linked source purchase
+order as billed" is enabled (`WORKFLOW_INVOICE_AMOUNT_CLASSIFY_BILLED_SUPPLIER_ORDER`).
+
+By default, that option classifies the orders only when their total excluding tax equals the total of the
+invoice, so an invoice with shipping costs or a rounding difference leaves them open. To classify the
+linked orders whatever the amounts, set the hidden constant `WORKFLOW_CLASSIFY_IF_AMOUNTS_ARE_DIFFERENTS`
+to 1 in Home - Setup - Other. This constant is global: it also removes the amount check of the other
+Workflow options that classify objects as billed, customer proposals and sales orders included.
+
 ### Experimental features
 
 Developers can enable experimental featues with constant:

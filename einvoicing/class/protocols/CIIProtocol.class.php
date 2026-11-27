@@ -278,6 +278,9 @@ class CIIProtocol extends AbstractProtocol
 			// ── Referenced documents ──────────────────────────────────────────────
 			'invoiceRefDocs' => '__MULTI__/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeSettlement/ram:InvoiceReferencedDocument',
 			'orderReference' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:BuyerOrderReferencedDocument/ram:IssuerAssignedID',
+			// The documents the header lists beside BT-13. A Dolibarr issuing an invoice that covers several
+			// purchase orders writes the orders after the first one here, with TypeCode 130 (see buildXML()).
+			'headerAdditionalRefDocs' => '__MULTI__/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:AdditionalReferencedDocument',
 			'contractReference' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeAgreement/ram:ContractReferencedDocument/ram:IssuerAssignedID',
 			'despatchAdviceRef' => '/rsm:CrossIndustryInvoice/rsm:SupplyChainTradeTransaction/ram:ApplicableHeaderTradeDelivery/ram:DespatchAdviceReferencedDocument/ram:IssuerAssignedID',
 
@@ -342,6 +345,10 @@ class CIIProtocol extends AbstractProtocol
 			'linePeriodEnd' => './ram:SpecifiedLineTradeSettlement/ram:BillingSpecifiedPeriod/ram:EndDateTime/udt:DateTimeString',
 
 			'additionalRefDocs' => '__MULTI__./ram:SpecifiedLineTradeSettlement/ram:AdditionalReferencedDocument',
+
+			// The purchase order this line bills, when it is not the one of the header: EXTENDED lets a line
+			// name its own order, EN 16931 only its line (BT-132) in the order of BT-13.
+			'lineOrderReference' => './ram:SpecifiedLineTradeAgreement/ram:BuyerOrderReferencedDocument/ram:IssuerAssignedID',
 
 			'isDepositLine' => false,
 			'depositInvoiceRef' => 'NA',
@@ -1549,11 +1556,16 @@ class CIIProtocol extends AbstractProtocol
 			// order of Dolibarr, so the invoice can be reconciled by hand when it does not. See issue #603.
 			$this->_saveImportedBuyerOrderReference($supplierInvoice, $parsedHeader['orderReference'] ?? '');
 
-			// Link the invoice to its purchase order (commande fournisseur) when the order reference
-			// (BT-13) matches a single order for the same supplier. Non-blocking. See issue #303.
-			$orderLinkMessage = $this->_linkSupplierInvoiceToPurchaseOrder($supplierInvoice, $socId, $parsedHeader['orderReference'] ?? '');
-			if ($orderLinkMessage !== '') {
-				$return_messages[] = $orderLinkMessage;
+			// Link the invoice to every purchase order (commande fournisseur) the document names, each one
+			// matching a single order of the same supplier. Non-blocking. See issue #303. An invoice often
+			// covers several orders: BT-13 holds one, the others are in the header or on the lines.
+			foreach ($this->_orderReferencesOfDocument($parsedHeader, (array) $parsedLines) as $orderReference => $source) {
+				// A reference other than BT-13 may name something else than an order (TypeCode 130 is
+				// any invoiced object): only BT-13 warns when it matches the order of another supplier.
+				$orderLinkMessage = $this->_linkSupplierInvoiceToPurchaseOrder($supplierInvoice, $socId, $orderReference, $source === 'BT-13');
+				if ($orderLinkMessage !== '') {
+					$return_messages[] = $orderLinkMessage;
+				}
 			}
 
 			// Now that the invoice exists: its extrafields, and the schedule of the template it stands for.
@@ -2826,6 +2838,7 @@ class CIIProtocol extends AbstractProtocol
 					break;
 
 				case 'additionalRefDocs':
+				case 'headerAdditionalRefDocs':
 					$result[] = [
 						'IssuerAssignedID' => $this->getXPathValue($xpath, 'ram:IssuerAssignedID', $n),
 						'typeCode' => $this->getXPathValue($xpath, 'ram:TypeCode', $n),
