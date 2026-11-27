@@ -512,16 +512,17 @@ class PdfAttachmentExtractor extends tcpdi_parser
 
 	/**
 	 * FlateDecode
+	 *
 	 * Decompresses data encoded using the zlib/deflate compression method, reproducing the original text or binary data.
-	 * @param $data (string) Data to decode.
-	 * @return Decoded data string.
-	 * @since 1.0.000 (2011-05-23)
-	 * @public static
+	 *
+	 * @param string $data  Data to decode
+	 * @return non-empty-string data string
+	 *
+	 * @throws \Exception
 	 */
 	public static function decodeFilterFlateDecode($data)
 	{
 		// initialize string to return
-		$decodeMemoryLimit=0;
 		$decoded = @gzuncompress($data);
 		if (false === $decoded) {
 			// If gzuncompress() failed, try again using the compress.zlib://
@@ -532,16 +533,12 @@ class PdfAttachmentExtractor extends tcpdi_parser
 			if (false != $ztmp) {
 				fwrite($ztmp, "\x1f\x8b\x08\x00\x00\x00\x00\x00".$data);
 				$file = stream_get_meta_data($ztmp)['uri'];
-				if (0 === $decodeMemoryLimit) {
-					$decoded = file_get_contents('compress.zlib://'.$file);
-				} else {
-					$decoded = file_get_contents('compress.zlib://'.$file, false, null, 0, $decodeMemoryLimit);
-				}
+				$decoded = file_get_contents('compress.zlib://'.$file);
 				fclose($ztmp);
 			}
 		}
 
-		if (false === is_string($decoded) || '' === $decoded) {
+		if (!(is_string($decoded)) || '' === $decoded) {
 			// If the decoded string is empty, that means decoding failed.
 			throw new \Exception('decodeFilterFlateDecode: invalid data');
 		}
