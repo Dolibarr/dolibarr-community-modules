@@ -803,7 +803,7 @@ class CIIProtocol extends AbstractProtocol
 			if ((float) DOL_VERSION >= 22) {
 				//Always identify lines that are created by the eInvoicing module with extraparams
 				$extra_params_insert_column=",extraparams";
-				$extra_params_insert_value=json_encode(array('einvoicing'=>array("OriginModuleId" => (string)SupplierInvoiceHelper::EINVOICING_EXTRAPARAMS)));
+				$extra_params_insert_value=json_encode(array('einvoicing'=>array("OriginModuleId" => (string) SupplierInvoiceHelper::EINVOICING_EXTRAPARAMS)));
 			}
 			$sql = 'INSERT INTO '.MAIN_DB_PREFIX.'facture_fourn_det (fk_facture_fourn, special_code, fk_remise_except'.$this->db->escape($extra_params_insert_column).')';
 			/** @phan-suppress-next-line PhanUndeclaredProperty */
