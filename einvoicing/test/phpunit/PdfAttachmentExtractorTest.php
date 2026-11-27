@@ -131,6 +131,28 @@ class PdfAttachmentExtractorTest extends CommonClassTest
 	}
 
 	/**
+	 * A Factur-X whose cross-reference is a stream listing compressed objects before the uncompressed
+	 * ones is read. tcpdi does not count the compressed entries, so every object after them is filed
+	 * under a wrong number, and the object stream, whose /Length is an object written after it, was
+	 * then read with no length at all and the parser looped until it ran out of memory.
+	 *
+	 * @return	void
+	 */
+	public function testACrossReferenceStreamWithCompressedObjectsIsRead()
+	{
+		$sample = dirname(__FILE__) . '/../samples/INVTEST-xref_stream.facturx.pdf';
+		$this->assertFileExists($sample, 'The Factur-X sample with a cross-reference stream is missing');
+
+		$xml = PdfAttachmentExtractor::getInvoiceXmlFromFile($sample);
+
+		$this->assertNotEmpty($xml, 'Nothing was extracted from the Factur-X sample with a cross-reference stream');
+		$dom = new DOMDocument();
+		$this->assertTrue($dom->loadXML($xml), 'What was extracted is not parsable XML');
+		$this->assertSame('CrossIndustryInvoice', $dom->documentElement->localName, 'What was extracted is not a CII invoice');
+		$this->assertSame((string) file_get_contents(dirname(__FILE__) . '/../samples/SPECIMEN-doli_ok.cii.xml'), $xml, 'The invoice read back is not the one that was embedded');
+	}
+
+	/**
 	 * A PDF carrying no invoice is refused, rather than answered with something empty that the rest
 	 * of the reception would take for a document.
 	 *
