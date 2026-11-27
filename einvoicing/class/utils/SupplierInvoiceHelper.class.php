@@ -755,6 +755,17 @@ class SupplierInvoiceHelper
 		// too. Nothing is attached in the ordinary case and the sums are zero (issue #948).
 		$deposits = self::linkedDepositTotals((int) $invoice->id);
 		$sign = self::documentSign($invoice, $announcedTtc);
+
+		// Method 1 (XP Z12-014 3.2.19 option 1): when the deposit is deducted through a negative reprise
+		// line (EXT-FR-FE-BG-06), BT-110 and BT-112 are already net of the deposit and BT-113 is zero.
+		// Compare the stored invoice totals directly before adding the linked deposit back for Method 2.
+		if ($deposits['ttc'] > 0
+			&& ($announcedPrepaid === null || einvoicingAmountsEqual((float) $announcedPrepaid, 0.0))
+			&& einvoicingAmountsEqual($sign * (float) $invoice->total_tva, (float) $announcedTva)
+			&& einvoicingAmountsEqual($sign * (float) $invoice->total_ttc, (float) $announcedTtc)) {
+			return true;
+		}
+
 		$invoiceTva = $sign * ((float) $invoice->total_tva + $deposits['tva']);
 		$invoiceTtc = $sign * ((float) $invoice->total_ttc + $deposits['ttc']);
 

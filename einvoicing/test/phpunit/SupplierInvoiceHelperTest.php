@@ -1577,4 +1577,58 @@ class SupplierInvoiceHelperTest extends CommonClassTest
 		$this->assertEquals(1.0, SupplierInvoiceHelper::announcedTotalTtc(array('grandTotalAmount' => 1.0, 'duePayableAmount' => 1.01)), 'one cent is a contradiction');
 		$this->assertEquals(3.3, SupplierInvoiceHelper::announcedTotalTtc(array('grandTotalAmount' => 1.1 + 2.2, 'duePayableAmount' => 3.3)), 'float noise is none');
 	}
+
+	/**
+	 * Method 1 deposit deduction (XP Z12-014 3.2.19 option 1): a deposit reprise line leaves
+	 * BT-110 and BT-112 already net of the deposit and BT-113 equal to 0, while Method 2
+	 * announces totals before deduction and BT-113 equal to the deposit.
+	 *
+	 * @return	void
+	 */
+	public function testTotalsAgreeWithMethod1AndMethod2LinkedDeposits()
+	{
+		global $db, $user;
+
+		$socid = $this->getAnyThirdpartyId();
+
+		$deposit = new FactureFournisseur($db);
+		$deposit->initAsSpecimen();
+		$deposit->ref_supplier = 'DEP_' . uniqid();
+		$deposit->socid = $socid;
+		$deposit->type = FactureFournisseur::TYPE_DEPOSIT;
+		$this->assertGreaterThan(0, $deposit->create($user));
+		$this->assertGreaterThan(0, $deposit->addline('Deposit 20%', 12.59, 20.0, 0, 0, 1));
+		$this->assertGreaterThan(0, $deposit->validate($user));
+
+		$discount = new DiscountAbsolute($db);
+		$discount->description = '(DEPOSIT)';
+		$discount->discount_type = 1;
+		$discount->fk_soc = $socid;
+		$discount->socid = $socid;
+		$discount->fk_invoice_supplier_source = $deposit->id;
+		$discount->amount_ht = 12.59;
+		$discount->amount_tva = 2.52;
+		$discount->amount_ttc = 15.11;
+		$discount->tva_tx = 20.0;
+		$this->assertGreaterThan(0, $discount->create($user));
+
+		$invoice = new FactureFournisseur($db);
+		$invoice->initAsSpecimen();
+		$invoice->ref_supplier = 'INV_' . uniqid();
+		$invoice->socid = $socid;
+		$invoice->type = FactureFournisseur::TYPE_STANDARD;
+		$this->assertGreaterThan(0, $invoice->create($user));
+		$this->assertGreaterThan(0, $invoice->addline('Product', 12.59, 20.0, 0, 0, 1));
+		$this->assertGreaterThan(0, $invoice->insert_discount($discount->id));
+		$this->assertGreaterThan(0, $invoice->fetch($invoice->id));
+
+		// Method 1: BT-110 = 0.00, BT-112 = 0.00, BT-113 = 0.00 (or null when checked from mismatch mark)
+		$this->assertTrue(SupplierInvoiceHelper::totalsAgreeWithDocument($invoice, 0.00, 0.00, 0.00));
+		$this->assertTrue(SupplierInvoiceHelper::totalsAgreeWithDocument($invoice, 0.00, 0.00, null));
+		$this->assertFalse(SupplierInvoiceHelper::totalsAgreeWithDocument($invoice, 1.00, 1.00, 0.00));
+
+		// Method 2: BT-110 = 2.52, BT-112 = 15.11, BT-113 = 15.11
+		$this->assertTrue(SupplierInvoiceHelper::totalsAgreeWithDocument($invoice, 2.52, 15.11, 15.11));
+		$this->assertFalse(SupplierInvoiceHelper::totalsAgreeWithDocument($invoice, 2.52, 15.11, 5.00));
+	}
 }
