@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 /**
  * This file is a part of horstoeko/zugferd.
  *
@@ -9,19 +11,22 @@
 
 namespace horstoeko\zugferd\jms;
 
+use DOMElement;
+use DOMException;
+use DOMText;
 use horstoeko\zugferd\ZugferdSettings;
-use JMS\Serializer\GraphNavigator;
+use JMS\Serializer\GraphNavigatorInterface;
 use JMS\Serializer\Handler\SubscribingHandlerInterface;
 use JMS\Serializer\XmlSerializationVisitor;
+use TypeError;
 
 /**
  * Class representing a collection of serialization handlers for amount formatting and so on
  *
  * @category Zugferd
- * @package  Zugferd
  * @author   D. Erling <horstoeko@erling.com.de>
  * @license  https://opensource.org/licenses/MIT MIT
- * @link     https://github.com/horstoeko/zugferd
+ * @see      https://github.com/horstoeko/zugferd
  */
 class ZugferdTypesHandler implements SubscribingHandlerInterface
 {
@@ -37,136 +42,136 @@ class ZugferdTypesHandler implements SubscribingHandlerInterface
      *          ),
      *      )
      *
-     * @return array
+     * @return array<int, array{direction: 1|2, format: string, type: string, method: string}>
      */
     public static function getSubscribingMethods()
     {
         return [
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\minimum\udt\AmountType',
-                'method' => 'serializeAmountType'
+                'method' => 'serializeAmountType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\basic\udt\AmountType',
-                'method' => 'serializeAmountType'
+                'method' => 'serializeAmountType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\basicwl\udt\AmountType',
-                'method' => 'serializeAmountType'
+                'method' => 'serializeAmountType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\en16931\udt\AmountType',
-                'method' => 'serializeAmountType'
+                'method' => 'serializeAmountType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\extended\udt\AmountType',
-                'method' => 'serializeAmountType'
+                'method' => 'serializeAmountType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\basic\udt\QuantityType',
-                'method' => 'serializeQuantityType'
+                'method' => 'serializeQuantityType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\basicwl\udt\QuantityType',
-                'method' => 'serializeQuantityType'
+                'method' => 'serializeQuantityType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\en16931\udt\QuantityType',
-                'method' => 'serializeQuantityType'
+                'method' => 'serializeQuantityType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\extended\udt\QuantityType',
-                'method' => 'serializeQuantityType'
+                'method' => 'serializeQuantityType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\basic\udt\PercentType',
-                'method' => 'serializePercentType'
+                'method' => 'serializePercentType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\basicwl\udt\PercentType',
-                'method' => 'serializePercentType'
+                'method' => 'serializePercentType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\en16931\udt\PercentType',
-                'method' => 'serializePercentType'
+                'method' => 'serializePercentType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\extended\udt\PercentType',
-                'method' => 'serializePercentType'
+                'method' => 'serializePercentType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\basic\udt\IndicatorType',
-                'method' => 'serializeIndicatorType'
+                'method' => 'serializeIndicatorType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\basicwl\udt\IndicatorType',
-                'method' => 'serializeIndicatorType'
+                'method' => 'serializeIndicatorType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\en16931\udt\IndicatorType',
-                'method' => 'serializeIndicatorType'
+                'method' => 'serializeIndicatorType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\extended\udt\IndicatorType',
-                'method' => 'serializeIndicatorType'
+                'method' => 'serializeIndicatorType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\basic\udt\MeasureType',
-                'method' => 'serializeMeasureType'
+                'method' => 'serializeMeasureType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\basicwl\udt\MeasureType',
-                'method' => 'serializeMeasureType'
+                'method' => 'serializeMeasureType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\en16931\udt\MeasureType',
-                'method' => 'serializeMeasureType'
+                'method' => 'serializeMeasureType',
             ],
             [
-                'direction' => GraphNavigator::DIRECTION_SERIALIZATION,
+                'direction' => GraphNavigatorInterface::DIRECTION_SERIALIZATION,
                 'format' => 'xml',
                 'type' => 'horstoeko\zugferd\entities\extended\udt\MeasureType',
-                'method' => 'serializeMeasureType'
+                'method' => 'serializeMeasureType',
             ],
         ];
     }
@@ -175,8 +180,12 @@ class ZugferdTypesHandler implements SubscribingHandlerInterface
      * Serialize Anount type
      * The amounts will be serialized (by default) with a precission of 2 digits
      *
-     * @param XmlSerializationVisitor $visitor
-     * @param mixed                   $data
+     * @param  XmlSerializationVisitor $visitor
+     * @param  mixed                   $data
+     * @return DOMText
+     *
+     * @throws DOMException
+     * @throws TypeError
      */
     public function serializeAmountType(XmlSerializationVisitor $visitor, $data)
     {
@@ -189,8 +198,8 @@ class ZugferdTypesHandler implements SubscribingHandlerInterface
             )
         );
 
-        if ($data->getCurrencyID() != null) {
-            $attr = $visitor->getDocument()->createAttribute("currencyID");
+        if (null !== $data->getCurrencyID()) {
+            $attr = $visitor->getDocument()->createAttribute('currencyID');
             $attr->value = $data->getCurrencyID();
             $visitor->getCurrentNode()->appendChild($attr);
         }
@@ -202,8 +211,12 @@ class ZugferdTypesHandler implements SubscribingHandlerInterface
      * Serialize quantity type
      * The quantity will be serialized (by default) with a precission of 2 digits
      *
-     * @param XmlSerializationVisitor $visitor
-     * @param mixed                   $data
+     * @param  XmlSerializationVisitor $visitor
+     * @param  mixed                   $data
+     * @return DOMText
+     *
+     * @throws DOMException
+     * @throws TypeError
      */
     public function serializeQuantityType(XmlSerializationVisitor $visitor, $data)
     {
@@ -216,8 +229,8 @@ class ZugferdTypesHandler implements SubscribingHandlerInterface
             )
         );
 
-        if ($data->getUnitCode() != null) {
-            $attr = $visitor->getDocument()->createAttribute("unitCode");
+        if (null !== $data->getUnitCode()) {
+            $attr = $visitor->getDocument()->createAttribute('unitCode');
             $attr->value = $data->getUnitCode();
             $visitor->getCurrentNode()->appendChild($attr);
         }
@@ -229,8 +242,9 @@ class ZugferdTypesHandler implements SubscribingHandlerInterface
      * Serialize a percantage value
      * The valze will be serialized (by default) with a precission of 2 digits
      *
-     * @param XmlSerializationVisitor $visitor
-     * @param mixed                   $data
+     * @param  XmlSerializationVisitor $visitor
+     * @param  mixed                   $data
+     * @return DOMText
      */
     public function serializePercentType(XmlSerializationVisitor $visitor, $data)
     {
@@ -248,8 +262,12 @@ class ZugferdTypesHandler implements SubscribingHandlerInterface
      * Serialize a meassure value
      * The valze will be serialized (by default) with a precission of 2 digits
      *
-     * @param XmlSerializationVisitor $visitor
-     * @param mixed                   $data
+     * @param  XmlSerializationVisitor $visitor
+     * @param  mixed                   $data
+     * @return DOMText
+     *
+     * @throws DOMException
+     * @throws TypeError
      */
     public function serializeMeasureType(XmlSerializationVisitor $visitor, $data)
     {
@@ -262,8 +280,8 @@ class ZugferdTypesHandler implements SubscribingHandlerInterface
             )
         );
 
-        if ($data->getUnitCode() != null) {
-            $attr = $visitor->getDocument()->createAttribute("unitCode");
+        if (null !== $data->getUnitCode()) {
+            $attr = $visitor->getDocument()->createAttribute('unitCode');
             $attr->value = $data->getUnitCode();
             $visitor->getCurrentNode()->appendChild($attr);
         }
@@ -276,11 +294,14 @@ class ZugferdTypesHandler implements SubscribingHandlerInterface
      * False and true values will be serialized correctly (false won't be serialized
      * in the default implementation)
      *
-     * @param XmlSerializationVisitor $visitor
-     * @param mixed                   $data
+     * @param  XmlSerializationVisitor $visitor
+     * @param  mixed                   $data
+     * @return DOMElement|false
+     *
+     * @throws DOMException
      */
     public function serializeIndicatorType(XmlSerializationVisitor $visitor, $data)
     {
-        return $visitor->getDocument()->createElement('udt:Indicator', $data->getIndicator() == false ? 'false' : 'true');
+        return $visitor->getDocument()->createElement('udt:Indicator', false === $data->getIndicator() ? 'false' : 'true');
     }
 }

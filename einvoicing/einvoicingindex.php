@@ -197,7 +197,8 @@ if ($resql_supplier && $db->num_rows($resql_supplier) > 0) {
 	$db->free($resql_supplier);
 }
 
-// Display dashboard
+// Display dashboard. The "Automatic synchronization" status line is kept to print it as last line of the table
+$autosyncline = array_shift($synclines);
 foreach ($synclines as $syncline) {
 	print '<tr class="oddeven">';
 	print '<td class="nowraponall">'.$syncline[0].'</td>';
@@ -215,7 +216,17 @@ print '<td class="nowraponall">'.$langs->trans("SupplierInvoicesSynchronized").'
 print '<td class="right"><span class="badge badge-info">' . $nb_supplier . '</span></td>';
 print '</tr>';
 
+if (!empty($autosyncline)) {
+	print '<tr class="oddeven">';
+	print '<td class="nowraponall">'.$autosyncline[0].'</td>';
+	print '<td class="right">'.$autosyncline[1].'</td>';
+	print '</tr>';
+}
+
 print '</table>';
+
+// Button to jump to the synchronization page
+print '<br><div class="center"><a class="button" href="'.dol_buildpath('/einvoicing/document_list.php', 1).'?mainmenu=billing&amp;leftmenu=einvoicing">'.$langs->trans("SynchronizeWithAccessPoint").'</a></div>';
 print '</div>';
 
 

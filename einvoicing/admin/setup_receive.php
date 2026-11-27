@@ -250,6 +250,14 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
 
+	// Setup conf to attach an imported supplier invoice to the recurring template of its vendor.
+	// Off by default: it writes on the invoice settings the operator chose for the subscription, and
+	// moves the template past a generation it still owed.
+	$item = $formSetup->newItem('EINVOICING_LINK_TO_RECURRING_TEMPLATE_IF_ONLY_ONE_FOUND')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_LINK_TO_RECURRING_TEMPLATE_IF_ONLY_ONE_FOUND_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+
 	// Setup conf to choose use of auto generation or not of third parties
 	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_AUTO_GENERATION')->setAsYesNo();
 	$item->helpText = $langs->transnoentities('EINVOICING_THIRDPARTIES_AUTO_GENERATION_HELP');
@@ -262,6 +270,16 @@ if (!einvoicingReceptionDisabled()) {			// If sync AP to DOLI is not disabled or
 	$item->helpText = $langs->transnoentities('EINVOICING_THIRDPARTIES_COMPLETE_INFO_HELP');
 	$item->defaultFieldValue = '0';
 	$item->cssClass = 'minwidth500';
+
+	// Setup conf to offer, on the card of a received invoice, to record on the vendor the bank account
+	// the document announces (BT-84/85/86). Off by default: the account is only ever added by a click
+	// of the user, and a bank account announced by an incoming document is what an invoice fraud
+	// carries too, so the button itself is opt-in.
+	$item = $formSetup->newItem('EINVOICING_THIRDPARTIES_ADD_PAYEE_BANK_ACCOUNT')->setAsYesNo();
+	$item->helpText = $langs->transnoentities('EINVOICING_THIRDPARTIES_ADD_PAYEE_BANK_ACCOUNT_HELP');
+	$item->defaultFieldValue = '0';
+	$item->cssClass = 'minwidth500';
+	$item->fieldParams['warningifon'] = 1;
 
 	// Setup conf to to enable a limit of flows to synchronize per one synchronization call
 	/* This option is useless, should be always on. Disabling it is possible by editing hidden cosntant

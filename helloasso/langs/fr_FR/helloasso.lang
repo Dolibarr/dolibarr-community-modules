@@ -46,7 +46,7 @@ HELLOASSO_CLIENT_ORGANISATION=Nom de l'organisation pour le mode de production
 HELLOASSO_CLIENT_ORGANISATION_HELP=Nom de l'organisation pour le mode production. Doit correspondre au nom défini dans le compte HelloAsso.
 HELLOASSO_BANK_ACCOUNT_FOR_PAYMENTS=Compte bancaire pour les paiements
 HELLOASSO_SHOW_ONLINE_PAYMENTS=Afficher la page de paiement en ligne
-HELLOASSO_STANDAR_BTN = Activez le style graphique HelloAsso pour le bouton de paiement (casse la cohérence du look Dolibarr)
+HELLOASSO_STANDAR_BTN = Activer le style graphique HelloAsso pour le bouton de paiement (cela rompt la cohérence visuelle avec Dolibarr)
 HELLOASSO_STANDAR_BTN_HELP = Activez cette option pour charger le fichier CSS HelloAsso, qui remplace le style par défaut de Dolibarr par un design harmonisé avec l'identité visuelle de HelloAsso (boutons, couleurs, etc.).
 
 ExampleOfTestCreditCardHelloAsso=Des exemples de cartes de crédit de test sont disponibles à cette URL :
@@ -88,6 +88,7 @@ HelloAssoRecordNotFound=Enregistrement introuvable
 
 HelloAssoMembersNothingDone=%s Les frais d'adhésion ont été traités, mais aucune action n'a été effectuée (test à blanc). %s Les frais d'adhésion ont rencontré une erreur.
 HelloAssoMembersAddedSucessfully=Frais d'adhésion %s ajoutés avec succès
+HelloAssoMembersNoNewMembers=Aucun nouveau frais d'adhésion pour la synchronisation
 HelloAssoDolibarrCorrespondenceParameters=Paramètres de correspondance entre HelloAsso et Dolibarr
 HelloAssoFormParameters=HelloAsso form settings
 HelloAssoMemberTypeIdTitle=ID of the corresponding member type in HelloAsso
@@ -102,6 +103,12 @@ ModuleHelloAssoMemberSyncDesc=Synchronisez les cotisations HelloAsso dans la bas
 HelloAssoSyncButtonDesc=Testez la synchronisation de vos frais d'adhésion sans modifier vos données.<br>Une fois la configuration OK, vous pouvez automatiser la synchronisation dans le module Tâches planifiées avec la tâche HelloAssoGetNewMembers.
 HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS=Actions supplémentaires concernant la synchronisation des frais d'adhésion
 HELLOASSO_SUBSCRIPTION_COMPLEMENTARYACTIONS_HELP=Actions supplémentaires sur la synchronisation des frais d'adhésion.<br>D'autres actions sont disponibles si la création par un tiers est activée lors de la synchronisation.
+HelloassoMemberDonationProduct=Produit destiné aux dons complémentaires dans le cadre des adhésions
+HelloassoMemberDonationProductHelp=Optionnel. HelloAsso permet aux membres d'ajouter un don lors du paiement de leur cotisation. Lorsqu'un produit ou service est sélectionné (généralement un service lié au compte comptable 754 - Dons), le don est facturé en deuxième ligne sur la facture du membre, et le paiement enregistré sur le compte bancaire HelloAsso correspond au montant total payé (cotisation + don). Laissez ce champ vide pour ignorer les dons (comportement précédent).
+HelloAssoMemberDonationLabel=Don HelloAsso avec adhésion, numéro de paiement : %s
+HelloAssoMembersDonationsAdded=%s don(s) complémentaire(s) enregistré(s)
+ErrorHelloAssoDonationProductNotFound=Produit pour les dons complémentaires (id %s) introuvable. Veuillez vérifier les paramètres d'abonnement HelloAsso.
+HelloAssoDonationProductSameAsSubscriptionProduct=Le produit utilisé pour les dons complémentaires est identique à celui utilisé pour les cotisations (configuration du module Membres). Les dons seront enregistrés sur le compte comptable des cotisations. Sélectionnez un produit/service dédié (par exemple, lié au compte 754 - Dons).
 
 # About page
 #

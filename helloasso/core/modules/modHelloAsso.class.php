@@ -165,7 +165,10 @@ class modHelloAsso extends DolibarrModules
 		// Example: $this->const=array(1 => array('HELLOASSO_MYNEWCONST1', 'chaine', 'myvalue', 'This is a constant to add', 1),
 		//                             2 => array('HELLOASSO_MYNEWCONST2', 'chaine', 'myvalue', 'This is another constant to add', 0, 'current', 1)
 		// );
-		$this->const = array();
+		$this->const = array(
+			// Transifex project carrying the translations of this module, used by the translation admin page to build its links
+			1 => array('HELLOASSO_TRANSIFEX_PROJECT', 'chaine', 'dolibarr-association/dolibarr-community-modules', '0'),
+		);
 
 		// Some keys to add into the overwriting translation tables
 		/*$this->overwrite_translation = array(

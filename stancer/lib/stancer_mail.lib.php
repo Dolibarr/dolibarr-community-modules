@@ -541,6 +541,26 @@ function stancerInvoiceMailAttachments($object)
 }
 
 /**
+ * Tell if an object is an invoice that is still a draft.
+ *
+ * A draft invoice carries a provisional (PROV) ref and a provisional PDF: it must never
+ * be mailed to a customer. The ref is checked as well as the status because during
+ * BILL_VALIDATE Dolibarr calls the triggers before setting the definitive ref and status
+ * on the object.
+ *
+ * @param	mixed	$object	Object about to be mailed
+ * @return	bool			True for a draft invoice
+ */
+function stancerIsDraftInvoice($object)
+{
+	if (!is_object($object) || ($object->element ?? '') !== 'facture') {
+		return false;
+	}
+	return (int) ($object->status ?? 0) === Facture::STATUS_DRAFT
+		|| preg_match('/^\(?PROV/i', (string) ($object->ref ?? '')) === 1;
+}
+
+/**
  * send mail with invoice ($object) attached
  *
  * @param   string  $modele  	mail model to use
@@ -551,7 +571,7 @@ function stancerInvoiceMailAttachments($object)
  * @param   string  $extraCc	additional CC email address (appended to thirdparty CC)
  * @param   string  $to		explicit recipient; when empty the billing contact is used
  *
- * @return  int|null      1 on success, -1 on error, 0 if skipped by dedup, null when from/to is empty
+ * @return  int|null      1 on success, -1 on error, 0 if skipped (draft invoice or dedup), null when from/to is empty
  */
 function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $forceMail = 0, $wrapInLayout = false, $extraCc = '', $to = '')
 {
@@ -576,6 +596,11 @@ function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $force
 	// Track id, ActionComm elementtype, template type and document directory all depend
 	// on the type of $object: never hardcode them, see stancerGetObjectMailContext().
 	$mailctx = stancerGetObjectMailContext($object);
+
+	if (stancerIsDraftInvoice($object)) {
+		dol_syslog("stancerSendInvoiceMailModele invoice $objRef (id=$objId) is a draft (status=" . ($object->status ?? '?') . "), mail modele='$modele' not sent", LOG_WARNING);
+		return 0;
+	}
 
 	if ($forceMail == 0 && !empty($actionCode)) {
 		// Dedup: avoid re-sending the same notification for the same invoice. Two storage
@@ -801,7 +826,7 @@ function stancerSendInvoiceMailModele($modele, $object, $actionCode = "", $force
  * @param   string  		$actionCode	actionComm code to use
  * @param   int  			$forceMail	send mail even if actioncomm exists for that code
  * @param   string  		$to			target mail addr
- * @return  int|null				1 if the mail was sent, -1 on error, 0 on dedup, null when from/to is empty
+ * @return  int|null				1 if the mail was sent, -1 on error, 0 if skipped (draft invoice or dedup), null when from/to is empty
  */
 function stancerSendOrderMailModele($modele, $object, $actionCode = "", $forceMail = 0, $to = '')
 {
@@ -811,6 +836,10 @@ function stancerSendOrderMailModele($modele, $object, $actionCode = "", $forceMa
 	// declare the ->socid read below.
 	'@phan-var Facture|Commande|Propal|Adherent|Don $object';
 	dol_syslog("stancerSendOrderMailModele modele=$modele, actionCode=$actionCode, forceMail=$forceMail, element=" . (is_object($object) ? $object->element : '?') . ", id=" . (is_object($object) ? $object->id : '?'), LOG_DEBUG);
+	if (stancerIsDraftInvoice($object)) {
+		dol_syslog("stancerSendOrderMailModele invoice " . ($object->ref ?? '?') . " (id=" . ($object->id ?? '?') . ") is a draft (status=" . ($object->status ?? '?') . "), mail modele='$modele' not sent", LOG_WARNING);
+		return 0;
+	}
 	$result = 0;
 	$subject = $msg = "";
 	// Initialised up front: both are only written inside conditional branches,

@@ -1,5 +1,7 @@
 # AGENTS.md (English Version)
 
+AGENTS.md version: 2.0 (any modification of this file must increase this version number)
+
 ## Objective
 
 This project contains the sources of external modules designed for the Dolibarr ERP and CRM application.
@@ -16,6 +18,7 @@ Every modification must respect:
 - Do not introduce external dependencies without validation
 - Never rename existing functions or variables except if explicitly requested
 - Never remove commented code, even if it's deprecated, except if explicitly requested
+- Never add, change or translate keys into language files of other languages than English. Only `mymodule/langs/en_US/*.lang` may be modified. All other locales (fr_FR, de_DE, es_ES, ...) are managed by an external translation tool (Transifex) and must never be touched, even to add the translation of a new key or to fix a typo
 - Never remove blank lines from the code, even when multiple consecutive blank lines are present. 
 - Separate page actions in the `/* Actions */` section of the PHP code and the rendering part in the `/* Views */` section
 - Never use PHP native curl functions to call a GET or POST URL, but use instead the Dolibarr function getURLContent()
@@ -59,6 +62,13 @@ Before writing any code, the agent **must**:
 
 ---
 
+## File Creation (Tooling)
+
+- The `write_file` tool must creates files with permissions `664` (the web server www-data must be able to read them).
+- Pattern: `write_file` → `bash chmod 664 <path>`
+
+---
+
 ## PHP Best Practices
 
 - Try to use the more portable PHP code possible >= 7.2
@@ -68,6 +78,7 @@ Before writing any code, the agent **must**:
 - Write short, readable, and testable functions
 - Avoid side effects
 - Prefer typed properties and return types when PHP version allows
+- Loading and calling functions must be explicit to imported functions: Do not write dynamic closure functions, do not use `call_user_func` and `call_user_func_array` or `spl_autoload_functions`
 
 ---
 
@@ -78,7 +89,7 @@ Before writing any code, the agent **must**:
     - In classes: use `$this->db`
 - SQL forged by PHP must escaped fields with `db->escape()`, `db->sanitize()`, or by casting values to `(int)` or `(float)`
 - Always use `$db->query()` followed by `$db->fetch_object()` or `$db->fetch_array()` to retrieve results
-- SQL scripts for table and index creation must be placed in `htdocs/install/mysql/tables/` (see existing files for examples)
+- SQL scripts for table and index creation must be placed in `mymodule/sql/` (see existing files for examples)
 - Build list-filter `WHERE` clauses with `natural_search($fields, $value, $mode)` rather than assembling `LIKE` conditions by hand
 
 ---
@@ -138,19 +149,53 @@ Before writing any code, the agent **must**:
 
 ---
 
+## HTML Rendering Functions (html.lib.php)
+
+*Use Dolibarr HTML functions instead of raw echo/print. `htdocs/core/lib/html.lib.php` has in 6 categories with @example tags.*
+
+### Quick Reference
+
+| Category | Function | Example from @example tag |
+|----------|----------|---------------------------|
+| **Text Output** | `dolPrintLabel($s)` | `<span><?php echo dolPrintLabel($object->name); ?></span>` |
+| **Text Output** | `dolPrintText($s)` | `<div class="description"><?php echo dolPrintText($object->description); ?></div>` |
+| **HTML Output** | `dolPrintHTML($s)` | `<div class="rich-text"><?php echo dolPrintHTML($object->note); ?></div>` |
+| **Attributes** | `dolPrintHTMLForAttribute($s)` | `<span title="<?php echo dolPrintHTMLForAttribute($tooltip); ?>">?</span>` |
+| **URL Attributes** | `dolPrintHTMLForAttributeUrl($s)` | `<a href="<?php echo dolPrintHTMLForAttributeUrl($url); ?>">Link</a>` |
+| **Textarea** | `dolPrintHTMLForTextArea($s)` | `<textarea><?php echo dolPrintHTMLForTextArea($content); ?></textarea>` |
+| **Icons** | `img_picto($alt, $picto)` | `<?php echo img_picto('Edit', 'edit'); ?>` |
+| **Buttons** | `dolGetButtonAction($label, $text, $type)` | `<?php echo dolGetButtonAction('Save', '', 'default'); ?>` |
+| **Messages** | `setEventMessages($msg, $msgs)` | `setEventMessages('Saved successfully', array('Message 1', 'Message 2'))` |
+| **Formatted** | `yn($yesno)` | `<?php echo yn($obj->active); ?>` |
+| **Formatted** | `dolOutputDates($start, $end)` | `<?php echo dolOutputDates($date_start, $date_end); ?>` |
+
+### When to Use
+
+- **dolPrintLabel**: Single-line plain text (names, labels)
+- **dolPrintText**: Multi-line plain text (descriptions)
+- **dolPrintHTML**: Rich text with allowed HTML tags
+- **dolPrintHTMLForAttribute**: Any HTML attribute value that is NOT a URL (title, alt, value, data-*, ...)
+- **dolPrintHTMLForAttributeUrl**: Any HTML attribute value that is a URL (`href`, `src`, `action`, `formaction`, `poster`, `data-url`, ...). Never use `dolPrintHTMLForAttribute()` for a URL: it converts the string with `dol_htmlentitiesbr()`, which damages the `&` separators of query strings
+- **img_* functions**: Always use instead of raw `<i>` or `<img>` tags
+- **dolGetButton***: For consistent button styling
+- **setEventMessages**: For user feedback messages
+
+---
+
 ## Security
 
 - Guard page access with `restrictedArea($user, 'module', $id, 'table')` or a specific test that deny access with `accessforbidden()`
 - Always load user inputs (`GET`, `POST`) via `GETPOST()`, `GETPOSTINT()`, `GETPOSTFLOAT()`, ...
 - Prevent JS injection by escaping strings generated by PHP with the Dolibarr function `dol_escape_js()`
 - Prevent SQL injection (use `db->escape()` or cast into `(int)` or `(float)`)
-- Prevent XSS injection by escaping HTML output (use `dolPrintHTML()`, `dolPrintHTMLForAttribute()`)
+- Prevent XSS injection by escaping HTML output (use `dolPrintHTML()`, `dolPrintHTMLForAttribute()`, or `dolPrintHTMLForAttributeUrl()` for URL attributes like `href` or `src`)
 - Always include Dolibarr CSRF tokens:
   - POST forms: `<input type="hidden" name="token" value="'.newToken().'">`
   - GET links with a modifying `action`: `...&token='.newToken().'`
   - Ajax calls: use `currentToken()` instead of `newToken()`, and set `NOTOKENRENEWAL` on the called ajax endpoint
 - Public endpoints called without a session (e.g. webhooks) are exempt via `NOCSRFCHECK` (page-level constant) or, exceptionally, `$dolibarr_nocsrfcheck` (global conf.php override)
 - Use the Dolibarr filesystem wrappers (`dol_mkdir()`, `dol_delete_file()`, `dol_copy()`, `dol_is_file()`, `dol_is_dir()`) and sanitize any user-provided name with `dol_sanitizeFileName()` / `dol_sanitizePathName()`, never raw PHP `mkdir()` / `unlink()` / `file_exists()`
+- For method fetch, update and delete, if database action is done using a criteria based on a rowid, the rowid must be the only criteria. Any additional security check must be done by the caller.  
 
 ---
 
@@ -177,6 +222,7 @@ Before writing any code, the agent **must**:
 - Use `dol_syslog()` for all logging (with appropriate log level: `LOG_DEBUG`, `LOG_WARNING`, `LOG_ERR`)
 - Do not leave `var_dump()`, `print_r()`, or `die()` in committed code
 - Use Dolibarr's `setEventMessages()` to display user-facing messages
+- Log files are called `dolibarr_*.log`
 
 ---
 
@@ -191,13 +237,13 @@ Before any modification, verify:
 
 - If making a major change or adding an important function, add or update PHPUnit test files into `test/phpunit/` (check to have the entry into file `test/phpunit/AllTests.php`).
 - If code validation with `phpstan` is expected, you must add the parameter `-a dev/build/phpstan/bootstrap_action.php` to the phpstan command line. For example:
-	`phpstan analyse --allow-older --no-progress -a dev/build/phpstan/bootstrap_action.php  [list_of_modified_file.php ...]`
+	`phpstan analyse --no-progress -a dev/build/phpstan/bootstrap_action.php  [list_of_modified_file.php ...]`
 - Do not validate the code with `phan` as it is too slow, except if it is explicitly requested. In this case, you must add the parameter `-k .phan/config.php -B dev/tools/phan/baseline.txt --quick` to the phan command line. For example:
 	`phan -k .phan/config.php -B dev/tools/phan/baseline.txt --minimum-target-php-version 7.2 [list_of_modified_file.php ...]`
 
 ### Local Dolibarr Online test — Page Access
 
-You can find the URL of an online instance into file htdocs/conf/conf.php in parameter $dolibarr_main_url_root. 
+You can find the URL of an online instance into file `htdocs/conf/conf.php` in parameter `$dolibarr_main_url_root`. 
 You can ignore and bypass the warning about HTTPS certificate. Ask the password if you need one without trying to get it from database.
 
 Dolibarr requires a CSRF token and a session cookie. To access any authenticated page:
@@ -205,26 +251,38 @@ Dolibarr requires a CSRF token and a session cookie. To access any authenticated
 1. **GET the login page** (e.g. `index.php?mainmenu=home`) to obtain:
    - The CSRF token: extract the `name="token" value="..."` field from the HTML.
    - The session cookie: the `DOLSESSID_*` cookie set in the response headers.
-2. **POST the login form** to `index.php` with `token`, `username`, `password`, and `actionlogin=dologin`. Keep the cookie for subsequent requests.
+2. **POST the login form** to `index.php` with `token`, `username`, `password`, and `actionlogin=dologin`
+	- Ask the password if you need one (don't try to guess it from database).
+	- Keep the cookie for subsequent requests.
 3. **Reuse the session cookie** on all subsequent page requests — the session is now authenticated.
 
 ---
 
 ## Git Workflow
 
+- Never try to make commit or Pull request, except if it was explicitly requested. 
 - Branch strategy:
     - One branch per major version (bug fixes only)
     - `develop` branch for both fixes and new features
 - Never commit directly to `main` or `develop` or any branch name matching regex `^\d+\.\d+$` but use a Pull Request.
 - Commit message format: `TYPE: #issueNumber Short description`
-    - Types: `NEW`, `FIX`, `CLOSE`, `QUAL`, `PERF`, `UXUI` (uppercase, so it appears in the ChangeLog)
-    - Example: `FIX: #1234 Correct VAT calculation on credit notes`
+    - TYPE: `NEW`, `FIX`, `CLOSE`, `QUAL`, `PERF`, `UXUI` (uppercase, so it appears in the ChangeLog)
+    - Example: `FIX #1234 Correct VAT calculation on credit notes`
 - Do not update the `ChangeLog` file (this file will be generated by the maintener before the release from all commit titles)
 - When committing, keep your commit title short (never exceed 70 lines) on first line and add a line "Generated by" xor "Co-authored-by:" to mention the AI agent name at the end of the rest of description. 
-- When making a Pull Request, keep the PR description short (never exceed 80 lines) and mention the AI agent name in the description with a line like `Submitted with <AI agent name>`
-- When fixing a security vulnerability, start PR title with `SEC:` and if you know the name of the vulnerability reporter or a tracking number, mention them in the PR title.
+- When making a Pull Request, keep the PR description short (never exceed 80 lines) and mention the AI agent name and the version of this AGENTS.md file used (see `AGENTS.md version` at the top of this file) in the description with a line like `Submitted with <AI agent name> using AGENTS.md version <version>`
+- When fixing a security vulnerability, start PR title with `SEC` and if you know the name of the vulnerability reporter or a tracking number, mention them in the PR title.
 - A pull request can contain database structure change only, or one new feature, or one bug fix, or a refactoring but never a mix of these. 
 - For code contribution on stable branches (non develop), PR must contains 1 and only 1 bug fix at once. Never introduce new features or refactoring if the target branch is not develop.
+
+---
+
+## Documents produced for the user
+
+- Files produced as deliverables for the user, that are not code changes of the project (reports, slides, graphs, exports, test artifacts, ...), must be written into `/tmp/agents_documents/` (directory shared between the host and all the AI agent containers, see `dev/build/docker-vibe/vibes.sh` and `dev/build/docker-claude/claudes.sh`).
+- That directory is shared by several agents: write into the subdirectory named after the agent (`/tmp/agents_documents/vibe/` for Vibe, `/tmp/agents_documents/claude/` for Claude Code), never directly at its root, and never into the subdirectory of another agent.
+- Inside a git repository, never place such documents into the git working directory: keep the code changes and the documents for the user separated.
+- `/tmp` is purged at reboot: warn the user that the documents must be taken out of the directory before a reboot of the host.
 
 ---
 
@@ -245,6 +303,7 @@ Dolibarr requires a CSRF token and a session cookie. To access any authenticated
 - Delete dead code
 - Add external dependencies (Composer packages, JS libraries) without prior validation
 - Modify the `ChangeLog` file (this file will be generated before the release from all commit titles)
+- Add, modify or translate any language file other than `mymodule/langs/en_US/` (fr_FR, de_DE, ... are managed by an external translation tool)
 - Commit or push without an explicit request from the user
 
 ---

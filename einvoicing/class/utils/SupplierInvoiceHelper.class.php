@@ -374,7 +374,9 @@ class SupplierInvoiceHelper
 			$dolSupplierInvoiceVatDetails = $details['vat_by_rate'];
 			foreach ($parsedHeader['taxBreakdown'] as $taxDetailsByRate) {
 				if ($taxDetailsByRate['typeCode'] === 'VAT') {
-					$currentRate = (string) $taxDetailsByRate['rateApplicablePercent'];
+					// BT-119 is absent from a group outside the scope of VAT (BR-O-05) and optional for an
+					// exempt one: its lines are imported at a zero rate, so that is the rate to look for.
+					$currentRate = (string) price2num($taxDetailsByRate['rateApplicablePercent'] ?? 0);
 					if (array_key_exists($currentRate, $dolSupplierInvoiceVatDetails)) {
 						$dolVatAmount = $dolSupplierInvoiceVatDetails[$currentRate]['vat_amount'];
 						$dolVatBasis = $dolSupplierInvoiceVatDetails[$currentRate]['vat_basis_amount'];

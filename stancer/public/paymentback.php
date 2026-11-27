@@ -505,16 +505,9 @@ if ($ispaymentok) {
 		// print "<p>facture 1</p>";
 		if ($result > 0) {
 			// M2: the recorded amount must come from the Stancer API (source of
-			// truth), not the session (seeded from a GETPOST in newpayment). The
-			// API amount is an integer number of cents, so /100 is exact. Log any
-			// divergence and never record more than what was actually captured.
-			$sessionAmt = (float) $_SESSION["FinalPaymentAmt"];
-			$FinalPaymentAmt = isset($paymentData['amount']) ? ((float) $paymentData['amount'] / 100) : $sessionAmt;
-			if (isset($paymentData['amount']) && abs($FinalPaymentAmt - $sessionAmt) > 0.01) {
-				dol_syslog("stancer paymentback: recorded amount mismatch session=" . $sessionAmt
-					. " api=" . $FinalPaymentAmt . " for payment " . $stancerPaymentId
-					. ", using the API amount", LOG_ERR);
-			}
+			// truth), not the session (seeded from a GETPOST in newpayment), and
+			// never more than what was actually captured.
+			$FinalPaymentAmt = stancerResolveReturnAmount($paymentData, $_SESSION["FinalPaymentAmt"] ?? 0, $stancerPaymentId);
 			$paymentType = $_SESSION["paymentType"] ?? '';
 			if (empty($paymentType)) {
 				$paymentType = 'CB';
@@ -602,8 +595,8 @@ if ($ispaymentok) {
 			$result = 0;
 		}
 		if ($result > 0) {
-			$FinalPaymentAmt = $_SESSION["FinalPaymentAmt"];
-			//if partialPayment=1 -> make a deposit
+			// The amount Stancer really captured, not the one the payment page put in session
+			$FinalPaymentAmt = stancerResolveReturnAmount($paymentData, $_SESSION["FinalPaymentAmt"] ?? 0, $stancerPaymentId);
 			// The row written when the payment started is the reference: without it a
 			// deposit paid through the emailed link (no session) would be billed as a
 			// full payment. The session stays as a fallback for rows created before
@@ -647,160 +640,26 @@ if ($ispaymentok) {
 				$object->update($user);
 			}
 
-
-			// Do action only if $FinalPaymentAmt is set (session variable is cleaned after this page to avoid duplicate actions when page is POST a second time)
-			if (stancerIsModEnabled('invoice')) {
-				$invoice = null;
-				if (
-					$partialPayment == 1
-					&& getDolGlobalString('STANCER_CB_ORDER_PARTIAL_PAY') != ''
-					&& isset($object->deposit_percent) && $object->deposit_percent > 0 && $object->deposit_percent < 100
-				) {
-					$amount = ($object->total_ttc * $object->deposit_percent / 100);
-					dol_syslog("stancerPaymentBack create deposit invoice", LOG_DEBUG, 0, '_payment');
-					// @phpstan-ignore-next-line
-					$invoice = Facture::createDepositFromOrigin($object, $now, (int) $object->cond_reglement_id, $user, 0, true);
-
-					if ($invoice) {
-						dol_syslog("stancerPaymentBack deposit invoice done", LOG_DEBUG, 0, '_payment');
-					} else {
-						$error++;
-						dol_syslog("stancer Failed to create deposit invoice form order " . $tmptag['ORD'] . ", result=$result.", LOG_ERR);
-						$postactionmessages[] = 'Failed to create deposit invoice form order ' . $tmptag['ORD'] . '.';
-						$ispostactionok = -1;
-					}
-				}
-
-				dol_syslog("stancerPaymentBack facture module is enabled, create invoice", LOG_DEBUG, 0, '_payment');
-				if ($invoice === null && !empty($FinalPaymentAmt) && $paymentTypeId > 0) {
-					$invoice = new Facture($db);
-					$result = $invoice->createFromOrder($object, $user);
-					if ($result > 0) {
-						dol_syslog("stancerPaymentBack invoice from order done", LOG_DEBUG, 0, '_payment');
-					} else {
-						$error++;
-						dol_syslog("stancer Failed to create invoice form order " . $tmptag['ORD'] . ", result=$result.", LOG_ERR);
-						$postactionmessages[] = 'Failed to create invoice form order ' . $tmptag['ORD'] . '.';
-						$ispostactionok = -1;
-					}
-				}
-
-				if ($invoice != null) {
-					if ($partialPayment) {
-						//do not classiy billed order in case of deposit invoice !
-					} else {
-						$object->classifyBilled($user);
-					}
-					// setBankAccount() writes fk_account unconditionally, so an unset constant
-					// would wipe the bank account already carried by the invoice. Same guard as
-					// the other branches of this page.
-					$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
-					$paymentmethodId = dol_getIdFromCode($db, 'CB', 'c_paiement', 'code', 'id', 1);
-					$invoice->setPaymentMethods($paymentmethodId);
-					if ($bankaccountid > 0) {
-						$invoice->setBankAccount($bankaccountid);
-					} else {
-						dol_syslog("stancer STANCER_BANK_ACCOUNT_FOR_PAYMENTS is not set, bank account of invoice " . $invoice->ref . " left unchanged", LOG_WARNING, 0, '_payment');
-					}
-					//$invoice->update($user); //validate do the job?
-
-					if ($invoice->status != Facture::STATUS_VALIDATED && $invoice->status != Facture::STATUS_CLOSED) {
-						$invoiceValidate = $invoice->validate($user);
-						if (is_numeric($invoiceValidate) &&  $invoiceValidate <= 0) {
-							dol_syslog("stancer validate invoice ref=" . $invoice->ref . ", validate code is = " . $invoiceValidate . " let me try without trigger", LOG_ERR);
-							$invoiceValidate = $invoice->validate($user, '', 0, 1, 0); //try cf ops
-							dol_syslog("stancer validate invoice ref is now=" . $invoice->ref . ", validate code is = " . $invoiceValidate, LOG_ERR);
-						} else {
-							dol_syslog("stancerPaymentBack invoice validated ok", LOG_DEBUG, 0, '_payment');
-						}
-					}
-
-					// Creation of payment line
-					$paiement = new Paiement($db);
-					$paiement->datepaye = $now;
-					if ($currencyCodeType == $conf->currency) {
-						$paiement->amounts = array($invoice->id => $FinalPaymentAmt); // Array with all payments dispatching with invoice id
-					} else {
-						$paiement->multicurrency_amounts = array($invoice->id => $FinalPaymentAmt); // Array with all payments dispatching
-						$postactionmessages[] = 'Payment was done in a different currency that currency expected of company';
-						$ispostactionok = -1;
-						$error++;
-					}
-					$paiement->paiementid = $paymentTypeId;
-					$paiement->num_payment = $stancerPaymentId; //erics was ''
-					$paiement->note_public = 'Online payment ' . dol_print_date($now, 'standard') . ' from ' . $ipaddress;
-					$paiement->ext_payment_id = $TRANSACTIONID;
-					$paiement->ext_payment_site = 'stancer'; // E4: must be 'stancer' so reconciliation recognizes the posting
-
-					if (!$error) {
-						$paiement_id = $paiement->create($user, 1); // This include closing invoices and regenerating documents
-						if ($paiement_id < 0) {
-							dol_syslog("stancer Failed to create payment : " . $paiement->error, LOG_ERR);
-							$postactionmessages[] = $paiement->error . ' ' . implode("<br>\n", array_filter($paiement->errors, 'strlen'));
-							$ispostactionok = -1;
-							$error++;
-						} else {
-							dol_syslog("stancer payment created");
-							$postactionmessages[] = 'Payment created (id=' . $paiement_id . ')';
-							$ispostactionok = 1;
-						}
-					}
-
-					if (!$error && isModEnabled("bank")) {
-						$bankaccountid = 0;
-						if ($paymentmethod == 'stancer') {
-							$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
-						}
-
-						if ($bankaccountid > 0) {
-							$label = '(CustomerInvoicePayment)';
-							// if ($object->type == Facture::TYPE_CREDIT_NOTE) {
-							// 	$label = '(CustomerInvoicePaymentBack)';
-							// } // Refund of a credit note
-							$result = $paiement->addPaymentToBank($user, 'payment', $label, $bankaccountid, '', '');
-							if ($result < 0) {
-								dol_syslog("stancer add payment to bank error : " . json_encode($paiement->error), LOG_ERR);
-								$postactionmessages[] = $paiement->error . ' ' . implode("<br>\n", array_filter($paiement->errors, 'strlen'));
-								$ispostactionok = -1;
-								$error++;
-							} else {
-								dol_syslog("stancer bank transaction created");
-								$postactionmessages[] = 'Bank transaction of payment created';
-								$ispostactionok = 1;
-
-								if (getDolGlobalString('STANCER_CB_AS_PAID', '') != '') {
-									$invoice->fetch($invoice->id);
-									if (stancerInvoiceIsFullyPaid($invoice)) {
-										$invoice->setPaid($user);
-									} else {
-										dol_syslog("stancer paymentback invoice " . $invoice->ref . " not closed as paid, payments do not cover the total", LOG_WARNING, 0, '_payment');
-									}
-								}
-							}
-						} else {
-							dol_syslog("stancer Setup of bank account to use in module ($paymentmethod) was not set. No way to record the payment", LOG_ERR);
-							$postactionmessages[] = 'Setup of bank account to use in module ' . $paymentmethod . ' was not set. No way to record the payment.';
-							$ispostactionok = -1;
-							$error++;
-						}
-					}
-
-					if (!$error) {
-						$db->commit();
-						// The order is paid through the invoice made from it: the event goes on that invoice
-						stancerAddPaymentResultEvent($invoice, true, (string) $stancerPaymentId, '', '', '', $now);
-					} else {
-						$db->rollback();
-					}
-				} else {
-					dol_syslog("stancer Failed to get a valid value for amount paid ($FinalPaymentAmt) or payment type id ($paymentTypeId) to record the payment of order " . $tmptag['ORD'] . ". May be payment was already recorded. ", LOG_ERR);
-					$postactionmessages[] = 'Failed to get a valid value for "amount paid" (' . $FinalPaymentAmt . ') or "payment type id" (' . $paymentTypeId . ') to record the payment of order ' . $tmptag['ORD'] . '. May be payment was already recorded.';
-					$ispostactionok = -1;
-				}
-			} else {
-				dol_syslog("stancer invoice module is not enabled", LOG_ERR);
-				$postactionmessages[] = 'Invoice module is not enable';
+			// Invoice, validation, payment and bank line in one transaction: a failure
+			// leaves nothing behind, a reload or a late return finds the payment and adds nothing
+			$invoice = null;
+			$billMessages = array();
+			$resBill = stancerProcessOriginPayment($object, array(
+				'payment_id' => $stancerPaymentId,
+				'amount' => $FinalPaymentAmt,
+				'currency' => $currencyCodeType,
+				'date' => $now,
+				'payment_type_id' => (int) $paymentTypeId,
+				'partial' => $partialPayment,
+				'ipaddress' => $ipaddress,
+			), $invoice, $billMessages);
+			$postactionmessages = array_merge($postactionmessages, $billMessages);
+			if ($resBill < 0) {
+				dol_syslog("stancer paymentback payment " . $stancerPaymentId . " of order " . $object->ref . " not billed (" . $resBill . "): " . implode(' | ', $billMessages), LOG_ERR);
 				$ispostactionok = -1;
+				$error++;
+			} else {
+				$ispostactionok = 1;
 			}
 		} else {
 			dol_syslog("stancer paymentback order " . $tmptag['ORD'] . " was not found (fetch returned $result), payment not recorded", LOG_ERR, 0, '_payment');
@@ -821,146 +680,37 @@ if ($ispaymentok) {
 		}
 		// 1 found, 0 not found, <0 error: -1 is truthy, test the sign
 		if ($result > 0) {
-			$FinalPaymentAmt = $_SESSION["FinalPaymentAmt"];
+			// The amount Stancer really captured, not the one the payment page put in session
+			$FinalPaymentAmt = stancerResolveReturnAmount($paymentData, $_SESSION["FinalPaymentAmt"] ?? 0, $stancerPaymentId);
 			$paymentType = $_SESSION["paymentType"] ?? '';
 			if (empty($paymentType)) {
 				$paymentType = 'CB';
 			}
 			$paymentTypeId = dol_getIdFromCode($db, $paymentType, 'c_paiement', 'code', 'id', 1);
+			// Same as the order branch: the payment row knows whether this was a
+			// deposit, the session only helps for rows predating that column.
+			$partialPayment = stancerResolveReturnPartialPayment($sp, $_SESSION["partialPayment"] ?? null);
 
-			// Mark propal as signed/billed
-			if ($propal->status == Propal::STATUS_VALIDATED) {
-				$propal->closeProposal($user, Propal::STATUS_SIGNED, 'Paiement Stancer');
-			}
-
-			// Auto create invoice if option is enabled
-			if (getDolGlobalString('STANCER_AUTO_INVOICE_ON_PROPAL_PAID') && stancerIsModEnabled('invoice')) {
-				dol_syslog("stancerPaymentBack propal: auto create invoice enabled", LOG_DEBUG, 0, '_payment');
-
-				// Same as the order branch: the payment row knows whether this was a
-				// deposit, the session only helps for rows predating that column.
-				$partialPayment = stancerResolveReturnPartialPayment($sp, $_SESSION["partialPayment"] ?? null);
-
-				// Check if deposit invoice should be created
-				if (
-					$partialPayment == 1
-					&& getDolGlobalString('STANCER_CB_PROPAL_PARTIAL_PAY') != ''
-					&& isset($propal->deposit_percent) && $propal->deposit_percent > 0 && $propal->deposit_percent < 100
-				) {
-					// Create deposit invoice from propal
-					$FinalPaymentAmt = ($propal->total_ttc * $propal->deposit_percent / 100);
-					dol_syslog("stancerPaymentBack propal: create deposit invoice, amount=" . $FinalPaymentAmt, LOG_DEBUG, 0, '_payment');
-					// @phpstan-ignore-next-line
-					$result = Facture::createDepositFromOrigin($propal, $now, (int) $propal->cond_reglement_id, $user, 0, true);
-				} else {
-					// Create full invoice from propal
-					$result = stancerCreateInvoiceFromPropal($db, $user, $propalid);
-				}
-				if (is_object($result) && $result->id > 0) {
-					$invoice = $result;
-					dol_syslog("stancerPaymentBack invoice from propal created, id=" . $invoice->id, LOG_DEBUG, 0, '_payment');
-
-					// Validate the invoice if needed
-					if ($invoice->status != Facture::STATUS_VALIDATED && $invoice->status != Facture::STATUS_CLOSED) {
-						$invoiceValidate = $invoice->validate($user);
-						if (is_numeric($invoiceValidate) && $invoiceValidate <= 0) {
-							dol_syslog("stancer validate invoice ref=" . $invoice->ref . ", validate code is = " . $invoiceValidate . " let me try without trigger", LOG_ERR);
-							$invoiceValidate = $invoice->validate($user, '', 0, 1, 0);
-						}
-					} else {
-						$invoiceValidate = 1;
-					}
-
-					if ($invoiceValidate > 0) {
-						dol_syslog("stancerPaymentBack invoice validated ok", LOG_DEBUG, 0, '_payment');
-
-						// Set payment method and bank account. setBankAccount() writes fk_account
-						// unconditionally, so an unset constant would wipe the bank account
-						// already carried by the invoice. Same guard as the other branches.
-						$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
-						$paymentmethodId = dol_getIdFromCode($db, 'CB', 'c_paiement', 'code', 'id', 1);
-						$invoice->setPaymentMethods($paymentmethodId);
-						if ($bankaccountid > 0) {
-							$invoice->setBankAccount($bankaccountid);
-						} else {
-							dol_syslog("stancer STANCER_BANK_ACCOUNT_FOR_PAYMENTS is not set, bank account of invoice " . $invoice->ref . " left unchanged", LOG_WARNING, 0, '_payment');
-						}
-
-						// Create payment
-						$paiement = new Paiement($db);
-						$paiement->datepaye = $now;
-						if ($currencyCodeType == $conf->currency) {
-							$paiement->amounts = array($invoice->id => $FinalPaymentAmt);
-						} else {
-							$paiement->multicurrency_amounts = array($invoice->id => $FinalPaymentAmt);
-						}
-						$paiement->paiementid = $paymentTypeId;
-						$paiement->num_payment = $stancerPaymentId;
-						$paiement->note_public = 'Online payment ' . dol_print_date($now, 'standard') . ' from ' . $ipaddress . ' (propal ' . $propal->ref . ')';
-						$paiement->ext_payment_id = $TRANSACTIONID;
-						$paiement->ext_payment_site = 'stancer';
-
-						$paiement_id = $paiement->create($user, 1);
-						if ($paiement_id < 0) {
-							dol_syslog("stancer Failed to create payment for propal invoice: " . $paiement->error, LOG_ERR);
-							$postactionmessages[] = $paiement->error . ' ' . implode("<br>\n", array_filter($paiement->errors, 'strlen'));
-							$ispostactionok = -1;
-							$error++;
-						} else {
-							dol_syslog("stancerPaymentBack Payment created id=" . $paiement_id, LOG_DEBUG, 0, '_payment');
-
-							// Add payment to bank
-							if (!$error && isModEnabled('bank')) {
-								$bankaccountid = getDolGlobalInt('STANCER_BANK_ACCOUNT_FOR_PAYMENTS');
-								if ($bankaccountid > 0) {
-									$label = '(CustomerInvoicePayment)';
-									$result = $paiement->addPaymentToBank($user, 'payment', $label, $bankaccountid, '', '');
-									if ($result < 0) {
-										dol_syslog("stancer Failed to add payment to bank: " . $paiement->error, LOG_ERR);
-										$postactionmessages[] = $paiement->error . ' ' . implode("<br>\n", array_filter($paiement->errors, 'strlen'));
-										$ispostactionok = -1;
-										$error++;
-									}
-								}
-							}
-
-							// Mark invoice as paid if configured
-							if (!$error && getDolGlobalString('STANCER_CB_AS_PAID')) {
-								$invoice->fetch($invoice->id);
-								if (stancerInvoiceIsFullyPaid($invoice)) {
-									$invoice->setPaid($user);
-								} else {
-									dol_syslog("stancer paymentback invoice " . $invoice->ref . " not closed as paid, payments do not cover the total", LOG_WARNING, 0, '_payment');
-								}
-							}
-
-							// Send invoice by mail if configured
-							if (!$error && getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_CB')) {
-								stancerSendInvoiceMailModele(getDolGlobalString('STANCER_AUTO_MAIL_INVOICES_CB_MAILTYPE', ''), $invoice, 'BILL_PAYED_SENTBYMAIL');
-							}
-
-							if (!$error) {
-								// The proposal is paid through the invoice made from it: the event goes on that invoice
-								stancerAddPaymentResultEvent($invoice, true, (string) $stancerPaymentId, '', '', '', $now);
-							}
-
-							$postactionmessages[] = 'Invoice ' . $invoice->ref . ' created and paid from propal ' . $propal->ref;
-						}
-					} else {
-						dol_syslog("stancer Failed to validate invoice from propal " . $tmptag['PRO'], LOG_ERR);
-						$postactionmessages[] = 'Failed to validate invoice from propal ' . $tmptag['PRO'];
-						$ispostactionok = -1;
-						$error++;
-					}
-				} else {
-					dol_syslog("stancer Failed to create invoice from propal " . $tmptag['PRO'] . ", result=$result", LOG_ERR);
-					$postactionmessages[] = 'Failed to create invoice from propal ' . $tmptag['PRO'];
-					$ispostactionok = -1;
-					$error++;
-				}
-			} else {
-				// No auto invoice, just mark the propal as paid/signed
-				$postactionmessages[] = 'Propal ' . $propal->ref . ' marked as signed. No invoice created (auto invoice disabled).';
+			// Signs the proposal, then bills it in one transaction when the automatic
+			// invoice is on: a reload or a late return finds the payment and adds nothing
+			$invoice = null;
+			$billMessages = array();
+			$resBill = stancerProcessOriginPayment($propal, array(
+				'payment_id' => $stancerPaymentId,
+				'amount' => $FinalPaymentAmt,
+				'currency' => $currencyCodeType,
+				'date' => $now,
+				'payment_type_id' => (int) $paymentTypeId,
+				'partial' => $partialPayment,
+				'ipaddress' => $ipaddress,
+			), $invoice, $billMessages);
+			$postactionmessages = array_merge($postactionmessages, $billMessages);
+			if ($resBill < 0) {
+				dol_syslog("stancer paymentback payment " . $stancerPaymentId . " of propal " . $propal->ref . " not billed (" . $resBill . "): " . implode(' | ', $billMessages), LOG_ERR);
+				$ispostactionok = -1;
+				$error++;
+			} elseif ($resBill > 0) {
+				$ispostactionok = 1;
 			}
 		} else {
 			$postactionmessages[] = 'Propal paid ' . $tmptag['PRO'] . ' was not found';

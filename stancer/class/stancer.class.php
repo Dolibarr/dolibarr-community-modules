@@ -251,6 +251,98 @@ class Stancer extends CommonObject
 	}
 
 	/**
+	 * Number of invoices waiting to be collected for one payment mode type, read with
+	 * the very selection the scheduled job uses, whether or not that payment mode is
+	 * enabled in the setup.
+	 *
+	 * @param	string		$mode					Payment mode type of llx_societe_rib ('ban' or 'card')
+	 * @param	int			$idpaiement				Id of the payment mode of the invoices (c_paiement)
+	 * @param	int|null	$thirdparty_id			Restrict to one thirdparty
+	 * @param	int			$companypaymentmodeid	Restrict to one payment mode of llx_societe_rib, 0 for all
+	 * @return	int									Number of distinct invoices, -1 on SQL error (reason in $this->error)
+	 */
+	public function countInvoicesToProcess($mode, $idpaiement, $thirdparty_id = null, $companypaymentmodeid = 0)
+	{
+		$resql = $this->db->query($this->sqlInvoicesToProcess($mode, (int) $idpaiement, (int) $thirdparty_id, (int) $companypaymentmodeid));
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			dol_syslog("stancer countInvoicesToProcess mode=" . $mode . " sql error: " . $this->error, LOG_ERR);
+			return -1;
+		}
+		// One invoice comes back once per Stancer payment mode of its thirdparty
+		$ids = array();
+		while ($obj = $this->db->fetch_object($resql)) {
+			$ids[(int) $obj->rowid] = 1;
+		}
+		$this->db->free($resql);
+
+		return count($ids);
+	}
+
+	/**
+	 * Number of Stancer payment modes (SEPA mandates or saved cards) registered on the
+	 * thirdparties of the current entity.
+	 *
+	 * @param	string	$mode	Payment mode type of llx_societe_rib ('ban' or 'card')
+	 * @return	int				Number of payment modes, -1 on SQL error (reason in $this->error)
+	 */
+	public function countStancerPaymentModes($mode)
+	{
+		$sql = "SELECT COUNT(sr.rowid) as nb";
+		$sql .= " FROM " . MAIN_DB_PREFIX . "societe_rib as sr, " . MAIN_DB_PREFIX . "societe as s";
+		$sql .= " WHERE s.rowid = sr.fk_soc";
+		$sql .= " AND sr.type = '" . $this->db->escape($mode) . "'";
+		$sql .= " AND sr.stancer_account <> ''";
+		$sql .= " AND sr.stancer_object_ref <> ''";
+		$sql .= " AND s.entity IN (" . getEntity('societe') . ")";
+		$resql = $this->db->query($sql);
+		if (!$resql) {
+			$this->error = $this->db->lasterror();
+			dol_syslog("stancer countStancerPaymentModes mode=" . $mode . " sql error: " . $this->error, LOG_ERR);
+			return -1;
+		}
+		$obj = $this->db->fetch_object($resql);
+		$this->db->free($resql);
+
+		return (int) $obj->nb;
+	}
+
+	/**
+	 * A payment mode disabled in the setup is skipped by the scheduled job: say so when
+	 * invoices are waiting for it, they would otherwise never be collected and nothing
+	 * would tell (cron result 0, empty output).
+	 *
+	 * @param	string		$mode					Payment mode type of llx_societe_rib ('ban' or 'card')
+	 * @param	int			$idpaiement				Id of the payment mode of the invoices (c_paiement), 0 when missing
+	 * @param	string		$langkey				Translation key of the message, %s = number of invoices
+	 * @param	int|null	$thirdparty_id			Restrict to one thirdparty
+	 * @param	int			$companypaymentmodeid	Restrict to one payment mode of llx_societe_rib, 0 for all
+	 * @param	string[]	$failures				Output, receives the message
+	 * @return	int									1 when invoices are waiting or cannot be counted, 0 otherwise
+	 */
+	private function reportWaitingInvoicesOfDisabledMode($mode, $idpaiement, $langkey, $thirdparty_id, $companypaymentmodeid, array &$failures)
+	{
+		global $langs;
+
+		if (empty($idpaiement)) {
+			// No such payment mode in the dictionary: no invoice can carry it
+			return 0;
+		}
+		$nb = $this->countInvoicesToProcess($mode, $idpaiement, $thirdparty_id, $companypaymentmodeid);
+		if ($nb < 0) {
+			$failures[] = $langs->transnoentitiesnoconv('StancerTakePaymentSelectionError', $this->error);
+			return 1;
+		}
+		if ($nb > 0) {
+			dol_syslog("stancer doTakePaymentStancer mode=" . $mode . " is disabled in the setup while " . $nb . " invoice(s) wait for it", LOG_ERR);
+			$failures[] = $langs->transnoentitiesnoconv($langkey, (string) $nb);
+			return 1;
+		}
+
+		return 0;
+	}
+
+	/**
 	 * Take payment for every validated and unpaid invoice matching a payment mode.
 	 * Invoices are selected on their Dolibarr payment mode and on the existence of a
 	 * Stancer mandate of the requested type in llx_societe_rib.
@@ -527,24 +619,51 @@ class Stancer extends CommonObject
 
 			dol_syslog("stancer doTakePaymentStancer maxnbofinvoicetotry=".$maxnbofinvoicetotry." noemailtocustomeriferror=".$noemailtocustomeriferror, LOG_DEBUG);
 
+			// Every reason why invoices were not collected: they end in $this->error and
+			// make the job fail, so the scheduled job list shows them
+			$failures = array();
+			$this->errors = array();
+			$sepaEnabled = (getDolGlobalString('STANCER_ENABLE_SEPA', '') != '');
+			$cardEnabled = (getDolGlobalString('STANCER_ENABLE_CB', '') != '');
+			$nbSepa = 0;
+			$nbCard = 0;
+
 			//paiements SEPA
-			if (getDolGlobalString('STANCER_ENABLE_SEPA', '') != '') {
-				$idpaiementpre = dol_getIdFromCode($this->db, 'PRE', 'c_paiement', 'code', 'id', 1);
+			$idpaiementpre = dol_getIdFromCode($this->db, 'PRE', 'c_paiement', 'code', 'id', 1);
+			if ($sepaEnabled) {
 				if ($idpaiementpre) {
-					$this->processInvoicesForPaymentMode('ban', $idpaiementpre, $invoiceprocessed, $invoiceprocessedok, $invoiceprocessedko, $invoiceprocessedinfoSEPA, $invoiceprocessedSEPAwaitingduedate, 0, $thirdparty_id, $isautomatic, $companypaymentmodeid);
+					$before = count($invoiceprocessed);
+					$this->error = '';
+					$res = $this->processInvoicesForPaymentMode('ban', $idpaiementpre, $invoiceprocessed, $invoiceprocessedok, $invoiceprocessedko, $invoiceprocessedinfoSEPA, $invoiceprocessedSEPAwaitingduedate, 0, $thirdparty_id, $isautomatic, $companypaymentmodeid);
+					$nbSepa = count($invoiceprocessed) - $before;
+					if ($res > 0) {
+						$error += $res;
+						$failures[] = $langs->transnoentitiesnoconv('StancerTakePaymentSelectionError', ($this->error != '' ? $this->error : implode(', ', $this->errors)));
+					}
 				} else {
 					dol_syslog("stancer doTakePaymentStancer there is no id for code=PRE", LOG_DEBUG);
 				}
+			} else {
+				$error += $this->reportWaitingInvoicesOfDisabledMode('ban', (int) $idpaiementpre, 'StancerTakePaymentSepaDisabledWaiting', $thirdparty_id, $companypaymentmodeid, $failures);
 			}
 
 			//paiements CB
-			if (getDolGlobalString('STANCER_ENABLE_CB', '') != '') {
-				$idpaiementcard = dol_getIdFromCode($this->db, 'CB', 'c_paiement', 'code', 'id', 1);
+			$idpaiementcard = dol_getIdFromCode($this->db, 'CB', 'c_paiement', 'code', 'id', 1);
+			if ($cardEnabled) {
 				if ($idpaiementcard) {
-					$this->processInvoicesForPaymentMode('card', $idpaiementcard, $invoiceprocessed, $invoiceprocessedok, $invoiceprocessedko, $invoiceprocessedinfoCB, $invoiceprocessedwaitingduedate, 0, $thirdparty_id, $isautomatic, $companypaymentmodeid);
+					$before = count($invoiceprocessed);
+					$this->error = '';
+					$res = $this->processInvoicesForPaymentMode('card', $idpaiementcard, $invoiceprocessed, $invoiceprocessedok, $invoiceprocessedko, $invoiceprocessedinfoCB, $invoiceprocessedwaitingduedate, 0, $thirdparty_id, $isautomatic, $companypaymentmodeid);
+					$nbCard = count($invoiceprocessed) - $before;
+					if ($res > 0) {
+						$error += $res;
+						$failures[] = $langs->transnoentitiesnoconv('StancerTakePaymentSelectionError', ($this->error != '' ? $this->error : implode(', ', $this->errors)));
+					}
 				} else {
 					dol_syslog("stancer doTakePaymentStancer there is no id for code=CB", LOG_DEBUG);
 				}
+			} else {
+				$error += $this->reportWaitingInvoicesOfDisabledMode('card', (int) $idpaiementcard, 'StancerTakePaymentCardDisabledWaiting', $thirdparty_id, $companypaymentmodeid, $failures);
 			}
 
 			$listeFactureOKLink = $listeFactureKOLink = $listeFactureMailLink = $listeFactureInfoLink = $invoiceprocessedSEPAwaitingduedateLink = "";
@@ -604,7 +723,24 @@ class Stancer extends CommonObject
 			} elseif (@count($invoiceprocessedko) > 1) {
 				$message .= $langs->transnoentitiesnoconv("StancerdoTakePaymentStancerResultMessageBP", (string) count($invoiceprocessedko), $listeFactureKOLink);
 			}
-			$this->output = $message;
+
+			// Always say what was looked at: an empty output must never read as "all is fine"
+			$disabledLabel = $langs->transnoentitiesnoconv('StancerTakePaymentModeDisabled');
+			$summary = $langs->transnoentitiesnoconv(
+				'StancerTakePaymentSummary',
+				(string) count($invoiceprocessed),
+				($sepaEnabled ? (string) $nbSepa : $disabledLabel),
+				($cardEnabled ? (string) $nbCard : $disabledLabel)
+			);
+			$this->output = $summary . (empty($message) ? '' : "<br />" . $message);
+
+			if (count($failures) > 0) {
+				$this->error = implode("<br />", $failures);
+				$this->errors = array();
+				dol_syslog("stancer doTakePaymentStancer failed: " . implode(' | ', $failures), LOG_ERR);
+			} else {
+				$this->error = '';
+			}
 
 			return $error;
 		} finally {

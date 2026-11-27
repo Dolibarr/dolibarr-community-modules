@@ -702,6 +702,76 @@ class CIIProtocolTest extends CommonClassTest
 	}
 
 	/**
+	 * A received document carrying several payment means: the accounts it announces (BT-84, BT-85,
+	 * BT-86) are all read, in document order, the same account written twice is kept once, and a
+	 * payment means without an IBAN - a cash payment - announces no account at all. Issue #1031.
+	 *
+	 * @return void
+	 */
+	public function testThePayeeBankAccountsAreReadFromTheDocument()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+		$accounts = $protocol->parsePayeeBankAccounts($this->documentWithPayeeBankAccounts());
+
+		$this->assertCount(2, $accounts, 'the cash payment means and the repeated account must not add an entry');
+
+		$this->assertSame('FR76 3000 6000 0112 3456 7890 189', $accounts[0]['iban'], 'the IBAN is kept as the document writes it');
+		$this->assertSame('AGRIFRPPXXX', $accounts[0]['bic'], 'BT-86 comes from the financial institution of the same payment means');
+		$this->assertSame('ACME SAS', $accounts[0]['accountName'], 'BT-85');
+
+		$this->assertSame('DE89370400440532013000', $accounts[1]['iban'], 'the second account of the document');
+		$this->assertSame('', $accounts[1]['bic'], 'that payment means carries no BIC');
+
+		// parseInvoiceHeader() keeps the first account only, which is what the rest of the import reads
+		$header = $protocol->parseInvoiceHeader($this->documentWithPayeeBankAccounts());
+		$this->assertSame('FR76 3000 6000 0112 3456 7890 189', $header['iban']);
+	}
+
+	/**
+	 * A document with four payment means: one full account, the same IBAN again written without
+	 * spaces, a second account, and a cash payment.
+	 *
+	 * @return string	CII document
+	 */
+	private function documentWithPayeeBankAccounts(): string
+	{
+		return '<?xml version="1.0" encoding="UTF-8"?>
+<rsm:CrossIndustryInvoice xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100" xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100" xmlns:udt="urn:un:unece:uncefact:data:standard:UnqualifiedDataType:100">
+	<rsm:SupplyChainTradeTransaction>
+		<ram:ApplicableHeaderTradeSettlement>
+			<ram:SpecifiedTradeSettlementPaymentMeans>
+				<ram:TypeCode>58</ram:TypeCode>
+				<ram:PayeePartyCreditorFinancialAccount>
+					<ram:IBANID>FR76 3000 6000 0112 3456 7890 189</ram:IBANID>
+					<ram:AccountName>ACME SAS</ram:AccountName>
+				</ram:PayeePartyCreditorFinancialAccount>
+				<ram:PayeeSpecifiedCreditorFinancialInstitution>
+					<ram:BICID>AGRIFRPPXXX</ram:BICID>
+				</ram:PayeeSpecifiedCreditorFinancialInstitution>
+			</ram:SpecifiedTradeSettlementPaymentMeans>
+			<ram:SpecifiedTradeSettlementPaymentMeans>
+				<ram:TypeCode>30</ram:TypeCode>
+				<ram:PayeePartyCreditorFinancialAccount>
+					<ram:IBANID>FR7630006000011234567890189</ram:IBANID>
+				</ram:PayeePartyCreditorFinancialAccount>
+			</ram:SpecifiedTradeSettlementPaymentMeans>
+			<ram:SpecifiedTradeSettlementPaymentMeans>
+				<ram:TypeCode>31</ram:TypeCode>
+				<ram:PayeePartyCreditorFinancialAccount>
+					<ram:IBANID>DE89370400440532013000</ram:IBANID>
+				</ram:PayeePartyCreditorFinancialAccount>
+			</ram:SpecifiedTradeSettlementPaymentMeans>
+			<ram:SpecifiedTradeSettlementPaymentMeans>
+				<ram:TypeCode>10</ram:TypeCode>
+			</ram:SpecifiedTradeSettlementPaymentMeans>
+		</ram:ApplicableHeaderTradeSettlement>
+	</rsm:SupplyChainTradeTransaction>
+</rsm:CrossIndustryInvoice>';
+	}
+
+	/**
 	 * What the second argument buys, on the timezone the defect was reported from: left out,
 	 * dol_stringtotime() answers midnight UTC, which idate() writes as the day before.
 	 *
@@ -1161,6 +1231,39 @@ class CIIProtocolTest extends CommonClassTest
 		$line['prodsellerid'] = '';
 		$node = $this->callBuildLineItem($protocol, $doc, $this->baseLineData());
 		$this->assertSame(0, $node->getElementsByTagName('ram:SellerAssignedID')->length, 'no reference, no BT-155');
+	}
+
+	/**
+	 * The buyer's order line (BT-132) is the first child of the line trade agreement, before the prices
+	 * the schema puts after it, and carries its LineID only. BASIC has no such element (issue #1192).
+	 *
+	 * @return void
+	 */
+	public function testTheBuyerOrderLineIsWrittenBeforeThePrices()
+	{
+		global $db;
+
+		$protocol = new CIIProtocol($db);
+		$doc = new DOMDocument('1.0', 'UTF-8');
+		$method = new ReflectionMethod(CIIProtocol::class, 'buildLineItem');
+		$method->setAccessible(true);
+
+		$line = $this->baseLineData();
+		$line['buyerorderlineid'] = '0020';
+		foreach (array('EN16931', 'EXTENDED') as $profile) {
+			$node = $method->invoke($protocol, $doc, $line, $profile);
+			$agreement = $node->getElementsByTagName('ram:SpecifiedLineTradeAgreement')->item(0);
+			$this->assertSame(array('ram:BuyerOrderReferencedDocument', 'ram:NetPriceProductTradePrice'), $this->childElementNames($agreement), $profile);
+			$order = $agreement->getElementsByTagName('ram:BuyerOrderReferencedDocument')->item(0);
+			$this->assertSame(array('ram:LineID'), $this->childElementNames($order), $profile . ': the LineID only');
+			$this->assertSame('0020', $order->getElementsByTagName('ram:LineID')->item(0)->nodeValue, $profile);
+		}
+
+		$node = $method->invoke($protocol, $doc, $line, 'BASIC');
+		$this->assertSame(0, $node->getElementsByTagName('ram:BuyerOrderReferencedDocument')->length, 'no BT-132 in BASIC');
+
+		$node = $method->invoke($protocol, $doc, $this->baseLineData(), 'EN16931');
+		$this->assertSame(0, $node->getElementsByTagName('ram:BuyerOrderReferencedDocument')->length, 'no order line, no BT-132');
 	}
 
 	/**
@@ -1772,6 +1875,118 @@ class CIIProtocolTest extends CommonClassTest
 		$this->assertEmpty($discount->fk_invoice_supplier_line, 'and freed');
 
 		$this->assertSame($id, SupplierInvoiceHelper::findIdByRef($rebuilt->ref_supplier, $socid), 'and no second invoice carries the document');
+	}
+
+	/**
+	 * The files saved by the reception start with the reference of the draft, as the upload form names
+	 * them by default, so the validation renames them with the final reference (#1174), and the received
+	 * XML is still found under its new name.
+	 *
+	 * @return void
+	 */
+	public function testReceivedFilesTakeTheReferenceOfTheInvoiceAtValidation()
+	{
+		global $db, $user;
+
+		$this->importLinesAsFreeLinesWithTheDefaultUploadNaming();
+		$this->createFixtureSeller();
+		$xml = str_replace('EINV994-0001', 'EINV1174-' . strtoupper(bin2hex(random_bytes(4))), (string) file_get_contents(__DIR__ . '/fixtures/received_documents/cii_rounding_amount.xml'));
+
+		$result = (new CIIProtocol($db))->createSupplierInvoiceFromSource($xml, null, 'test1174');
+		$id = (int) ($result['res'] ?? 0);
+		$this->assertGreaterThan(0, $id, 'import: ' . strip_tags((string) ($result['message'] ?? '')));
+		$this->createdInvoiceIds[] = $id;
+
+		$invoice = new FactureFournisseur($db);
+		$invoice->fetch($id);
+		$draftRef = dol_sanitizeFileName($invoice->ref);
+		$draftFiles = $this->namesOfTheFilesOf($invoice);
+		$this->assertNotEmpty($draftFiles, 'the import attached the document');
+		foreach ($draftFiles as $name) {
+			$this->assertSame(0, strpos($name, $draftRef . '-'), $name . ' starts with the reference of the draft');
+		}
+
+		$this->assertGreaterThan(0, $invoice->validate($user), (string) $invoice->error);
+		$validated = new FactureFournisseur($db);
+		$validated->fetch($id);
+		$this->assertStringNotContainsString('PROV', $validated->ref);
+		$expected = array();
+		foreach ($draftFiles as $name) {
+			$expected[] = $validated->ref . substr($name, strlen($draftRef));
+		}
+		$this->assertSame($expected, $this->namesOfTheFilesOf($validated), 'the validation renamed them with the final reference');
+
+		$xmlFile = (new EInvoicing($db))->getSupplierEInvoiceXmlFilePath($validated);
+		$this->assertSame($validated->ref . '-' . dol_sanitizeFileName($validated->ref_supplier . '_einvoice.xml'), basename($xmlFile), 'the received XML is found under its new name');
+	}
+
+	/**
+	 * A document received before #1174 keeps the name it was saved under: received again, it is written
+	 * over that file rather than beside it, and the received XML is still found.
+	 *
+	 * @return void
+	 */
+	public function testAFileSavedBeforeThePrefixKeepsItsName()
+	{
+		global $conf, $db;
+
+		$this->importLinesAsFreeLinesWithTheDefaultUploadNaming();
+		$this->createFixtureSeller();
+		$xml = str_replace('EINV994-0001', 'EINV1174-' . strtoupper(bin2hex(random_bytes(4))), (string) file_get_contents(__DIR__ . '/fixtures/received_documents/cii_rounding_amount.xml'));
+
+		$protocol = new CIIProtocol($db);
+		$first = $protocol->createSupplierInvoiceFromSource($xml, null, 'test1174');
+		$id = (int) ($first['res'] ?? 0);
+		$this->assertGreaterThan(0, $id, 'first import: ' . strip_tags((string) ($first['message'] ?? '')));
+		$this->createdInvoiceIds[] = $id;
+
+		// The name the reception gave before #1174
+		$invoice = new FactureFournisseur($db);
+		$invoice->fetch($id);
+		$dir = $conf->fournisseur->facture->dir_output . '/' . get_exdir($invoice->id, 2, 0, 0, $invoice, 'invoice_supplier') . dol_sanitizeFileName($invoice->ref);
+		$legacyName = dol_sanitizeFileName($invoice->ref_supplier . '_einvoice.xml');
+		$this->assertTrue(dol_move($dir . '/' . dol_sanitizeFileName($invoice->ref) . '-' . $legacyName, $dir . '/' . $legacyName, '0', 1), 'the XML is given its former name');
+
+		$again = $protocol->createSupplierInvoiceFromSource($xml, null, 'test1174');
+		$this->assertSame($id, (int) ($again['res'] ?? 0), 'the same invoice: ' . strip_tags((string) ($again['message'] ?? '')));
+		$this->assertSame(array($legacyName), $this->namesOfTheFilesOf($invoice), 'written over the former file, not beside it');
+		$this->assertSame($dir . '/' . $legacyName, (new EInvoicing($db))->getSupplierEInvoiceXmlFilePath($invoice));
+	}
+
+	/**
+	 * Lines imported as free lines, which every instance can do, and the upload naming of the core left
+	 * to its default.
+	 *
+	 * @return void
+	 */
+	private function importLinesAsFreeLinesWithTheDefaultUploadNaming()
+	{
+		global $conf;
+
+		foreach (array('EINVOICING_IMPORT_AS_FREE_LINES', 'EINVOICING_PRODUCTS_AUTO_GENERATION', 'MAIN_DISABLE_SUGGEST_REF_AS_PREFIX', 'MAIN_DOC_UPLOAD_NOT_RENAME_BY_DEFAULT') as $name) {
+			$this->savedConstants[$name] = isset($conf->global->$name) ? $conf->global->$name : null;
+		}
+		$conf->global->EINVOICING_IMPORT_AS_FREE_LINES = 1;
+		$conf->global->EINVOICING_PRODUCTS_AUTO_GENERATION = 0;
+		unset($conf->global->MAIN_DISABLE_SUGGEST_REF_AS_PREFIX);
+		unset($conf->global->MAIN_DOC_UPLOAD_NOT_RENAME_BY_DEFAULT);
+	}
+
+	/**
+	 * Names of the files in the directory of a supplier invoice, sorted.
+	 *
+	 * @param	FactureFournisseur	$invoice	Supplier invoice
+	 * @return	string[]						File names
+	 */
+	private function namesOfTheFilesOf(FactureFournisseur $invoice)
+	{
+		global $conf;
+
+		$dir = $conf->fournisseur->facture->dir_output . '/' . get_exdir($invoice->id, 2, 0, 0, $invoice, 'invoice_supplier') . dol_sanitizeFileName($invoice->ref);
+		$names = array_column(dol_dir_list($dir, 'files'), 'name');
+		sort($names);
+
+		return $names;
 	}
 
 	/**
