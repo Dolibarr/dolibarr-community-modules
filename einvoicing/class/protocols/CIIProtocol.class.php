@@ -805,9 +805,9 @@ class CIIProtocol extends AbstractProtocol
 				$extraParamsInsertColumn=",extraparams";
 				$extraParamsInsertValue=",'".json_encode(array('einvoicing'=>array("OriginModuleId" => (string) SupplierInvoiceHelper::EINVOICING_EXTRAPARAMS)))."'";
 			}
-			$sql = "INSERT INTO ".MAIN_DB_PREFIX."facture_fourn_det (fk_facture_fourn, special_code, fk_remise_except".$this->db->escape($extraParamsInsertColumn).")";
+			$sql = "INSERT INTO ".MAIN_DB_PREFIX."facture_fourn_det (fk_facture_fourn, special_code, fk_remise_except".$extraParamsInsertColumn.")";
 			/** @phan-suppress-next-line PhanUndeclaredProperty */
-			$sql .= " VALUES (".((int) $supplierInvoice->id).", ".((int) $supplierInvoice->lines[$i]->special_code).", ".($supplierInvoice->lines[$i]->fk_remise_except > 0 ? ((int) $supplierInvoice->lines[$i]->fk_remise_except) : 'NULL').$this->db->escape($extraParamsInsertValue).")";
+			$sql .= " VALUES (".((int) $supplierInvoice->id).", ".((int) $supplierInvoice->lines[$i]->special_code).", ".($supplierInvoice->lines[$i]->fk_remise_except > 0 ? ((int) $supplierInvoice->lines[$i]->fk_remise_except) : 'NULL').$extraParamsInsertValue.")";
 
 			$resql_insert = $this->db->query($sql);
 			if ($resql_insert) {
