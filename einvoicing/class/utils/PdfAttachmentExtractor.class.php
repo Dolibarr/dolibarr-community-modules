@@ -374,9 +374,16 @@ class PdfAttachmentExtractor extends tcpdi_parser
 			if ($filter === 'Crypt' || !in_array($filter, $available)) {
 				return null;							// an encrypted or exotic stream is not ours to read
 			}
-			$stream = TCPDF_FILTERS::decodeFilter($filter, $stream);
-			if (!is_string($stream)) {
-				return null;
+			if ($filter=='FlateDecode') {
+				$stream = $this::decodeFilterFlateDecode($stream);
+				if (!is_string($stream)) {
+					return null;
+				}
+			} else {
+				$stream = TCPDF_FILTERS::decodeFilter($filter, $stream);
+				if (!is_string($stream)) {
+					return null;
+				}
 			}
 		}
 
@@ -501,5 +508,37 @@ class PdfAttachmentExtractor extends tcpdi_parser
 		}
 
 		return (is_array($element) && $element[0] == PDF_TYPE_ARRAY) ? $element[1] : array();
+	}
+
+	/**
+	 * FlateDecode
+	 *
+	 * Decompresses data encoded using the zlib/deflate compression method, reproducing the original text or binary data.
+	 *
+	 * @param string $data  Data to decode
+	 * @return non-empty-string data string
+	 *
+	 * @throws \Exception
+	 */
+	public static function decodeFilterFlateDecode($data)
+	{
+		// initialize string to return
+		$decoded = @gzuncompress($data);
+		if (false === $decoded) {
+			// Some producers (PDFsharp-extended for example) end the zlib stream without its Adler-32
+			// checksum, which gzuncompress() refuses. inflate_add() returns what it inflated anyway.
+			// The compress.zlib:// wrapper trick cannot be used: master.inc.php unregisters it.
+			// Issue: https://github.com/smalot/pdfparser/issues/592
+			$context = @inflate_init(ZLIB_ENCODING_DEFLATE);
+			if (false !== $context) {
+				$decoded = @inflate_add($context, $data, ZLIB_SYNC_FLUSH);
+			}
+		}
+
+		if (!(is_string($decoded)) || '' === $decoded) {
+			// If the decoded string is empty, that means decoding failed.
+			throw new \Exception('decodeFilterFlateDecode: invalid data');
+		}
+		return $decoded;
 	}
 }
