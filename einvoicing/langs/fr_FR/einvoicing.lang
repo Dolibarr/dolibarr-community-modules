@@ -454,13 +454,6 @@ FlowTypeSupplierInvoice=Facture du fournisseur
 FlowTypeSupplierInvoiceLC=cycle de vie de la facture fournisseur
 EInvoiceExcludeLCShort=Masquer LC
 EInvoiceExcludeLifecycleFlows=Masquer les flux du cycle de vie (LC)
-PaTotalsOnInvoice=Totaux vs Plateforme Agréée (HT / TVA / TTC)
-PaTotalHT=Total HT (Plateforme Agréée)
-PaTotalVAT=Total TVA (Plateforme Agréée)
-PaTotalTTC=Total TTC (Plateforme Agréée)
-PaTotalVsDoli=%s (Plateforme Agréée) / %s (facture)
-PaTotalsUnavailable=Les totaux transmis par la Plateforme Agréée ne sont pas disponibles
-PaTotalsMismatchCannotValidate=Les totaux HT, TVA et TTC ne sont pas identiques aux montants transmis par la Plateforme Agréée
 
 # Generation page of the developer tools (admin/setup_devtools.php)
 MyCompany=Ma société
