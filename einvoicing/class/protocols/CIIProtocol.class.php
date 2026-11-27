@@ -803,11 +803,11 @@ class CIIProtocol extends AbstractProtocol
 			if ((float) DOL_VERSION >= 22) {
 				//Always identify lines that are created by the eInvoicing module with extraparams
 				$extra_params_insert_column=",extraparams";
-				$extra_params_insert_value=json_encode(array('einvoicing'=>array("OriginModuleId" => (string) SupplierInvoiceHelper::EINVOICING_EXTRAPARAMS)));
+				$extra_params_insert_value=",'".$this->db->escape(json_encode(array('einvoicing'=>array("OriginModuleId" => (string) SupplierInvoiceHelper::EINVOICING_EXTRAPARAMS))))."'";
 			}
-			$sql = 'INSERT INTO '.MAIN_DB_PREFIX.'facture_fourn_det (fk_facture_fourn, special_code, fk_remise_except'.$this->db->escape($extra_params_insert_column).')';
+			$sql = "INSERT INTO ".MAIN_DB_PREFIX."facture_fourn_det (fk_facture_fourn, special_code, fk_remise_except".$this->db->escape($extra_params_insert_column).")";
 			/** @phan-suppress-next-line PhanUndeclaredProperty */
-			$sql .= " VALUES (".((int) $supplierInvoice->id).", ".((int) $supplierInvoice->lines[$i]->special_code).", ".($supplierInvoice->lines[$i]->fk_remise_except > 0 ? ((int) $supplierInvoice->lines[$i]->fk_remise_except) : 'NULL').','."'".$this->db->escape($extra_params_insert_value)."'".')';
+			$sql .= " VALUES (".((int) $supplierInvoice->id).", ".((int) $supplierInvoice->lines[$i]->special_code).", ".($supplierInvoice->lines[$i]->fk_remise_except > 0 ? ((int) $supplierInvoice->lines[$i]->fk_remise_except) : 'NULL').$extra_params_insert_value.")";
 
 			$resql_insert = $this->db->query($sql);
 			if ($resql_insert) {
