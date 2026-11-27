@@ -131,6 +131,27 @@ class PdfAttachmentExtractorTest extends CommonClassTest
 	}
 
 	/**
+	 * A Factur-X whose XML stream is zlib-framed deflate with no Adler-32 checksum at its end, as
+	 * PDFsharp-extended writes it, is read: gzuncompress() refuses such a stream, so the extractor
+	 * must fall back to another way of inflating it.
+	 *
+	 * @return	void
+	 */
+	public function testAFlateStreamWithoutChecksumIsRead()
+	{
+		$sample = dirname(__FILE__) . '/../samples/INVTEST-no_adler32.facturx.pdf';
+		$this->assertFileExists($sample, 'The Factur-X sample without checksum is missing');
+
+		$xml = PdfAttachmentExtractor::getInvoiceXmlFromFile($sample);
+
+		$this->assertNotEmpty($xml, 'Nothing was extracted from the Factur-X sample without checksum');
+		$dom = new DOMDocument();
+		$this->assertTrue($dom->loadXML($xml), 'What was extracted is not parsable XML');
+		$this->assertSame('CrossIndustryInvoice', $dom->documentElement->localName, 'What was extracted is not a CII invoice');
+		$this->assertSame((string) file_get_contents(dirname(__FILE__) . '/../samples/SPECIMEN-doli_ok.cii.xml'), $xml, 'The invoice read back is not the one that was embedded');
+	}
+
+	/**
 	 * A PDF carrying no invoice is refused, rather than answered with something empty that the rest
 	 * of the reception would take for a document.
 	 *

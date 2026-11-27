@@ -525,16 +525,13 @@ class PdfAttachmentExtractor extends tcpdi_parser
 		// initialize string to return
 		$decoded = @gzuncompress($data);
 		if (false === $decoded) {
-			// If gzuncompress() failed, try again using the compress.zlib://
-			// wrapper to decode it in a file-based context.
-			// See: https://www.php.net/manual/en/function.gzuncompress.php#79042
+			// Some producers (PDFsharp-extended for example) end the zlib stream without its Adler-32
+			// checksum, which gzuncompress() refuses. inflate_add() returns what it inflated anyway.
+			// The compress.zlib:// wrapper trick cannot be used: master.inc.php unregisters it.
 			// Issue: https://github.com/smalot/pdfparser/issues/592
-			$ztmp = tmpfile();
-			if (false !== $ztmp) {
-				fwrite($ztmp, "\x1f\x8b\x08\x00\x00\x00\x00\x00".$data);
-				$file = stream_get_meta_data($ztmp)['uri'];
-				$decoded = file_get_contents('compress.zlib://'.$file);
-				fclose($ztmp);
+			$context = @inflate_init(ZLIB_ENCODING_DEFLATE);
+			if (false !== $context) {
+				$decoded = @inflate_add($context, $data, ZLIB_SYNC_FLUSH);
 			}
 		}
 
