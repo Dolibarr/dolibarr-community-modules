@@ -575,16 +575,20 @@ class PdfAttachmentExtractor extends tcpdi_parser
 	 */
 	public function extractObjectStream($key)
 	{
-		$object = $this->getObjectVal(array(PDF_TYPE_OBJREF, $key[0], $key[1]));
-		if ($object[0] !== PDF_TYPE_STREAM || !isset($object[1][1]['/First'][1])) {
-			return;		// not an object stream, the parent skips it as well
-		}
-		$stream = $this->decodeStream($object[1][1], $object[2][1]);
-		$first = (int) $object[1][1]['/First'][1];
-		$pairs = preg_split('/\s+/', trim(substr($stream[0], 0, $first)));
-		$pairCount = count($pairs);
-		for ($i = 1; $i < $pairCount; $i += 2) {
-			$this->objstreamobjs[$pairs[$i - 1]] = array($key, (int) $pairs[$i] + $first);
+		if ((float) DOL_VERSION <= 21.0) {
+			$object = $this->getObjectVal(array(PDF_TYPE_OBJREF, $key[0], $key[1]));
+			if ($object[0] !== PDF_TYPE_STREAM || !isset($object[1][1]['/First'][1])) {
+				return;        // not an object stream, the parent skips it as well
+			}
+			$stream = $this->decodeStream($object[1][1], $object[2][1]);
+			$first = (int) $object[1][1]['/First'][1];
+			$pairs = preg_split('/\s+/', trim(substr($stream[0], 0, $first)));
+			$pairCount = count($pairs);
+			for ($i = 1; $i < $pairCount; $i += 2) {
+				$this->objstreamobjs[$pairs[$i - 1]] = array($key, (int) $pairs[$i] + $first);
+			}
+		} else {
+			parent::extractObjectStream($key);
 		}
 	}
 
