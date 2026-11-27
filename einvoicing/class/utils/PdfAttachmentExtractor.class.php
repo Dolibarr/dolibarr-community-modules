@@ -370,28 +370,6 @@ class PdfAttachmentExtractor extends tcpdi_parser
 	}
 
 	/**
-	 * List the objects an object stream holds, in place of the parent which splits its header on spaces only
-	 * while a PDF may separate the pairs with any white space.
-	 *
-	 * @param	array{0:int|string,1:int|string}	$key	Number and generation of the object stream
-	 * @return	void
-	 */
-	public function extractObjectStream($key)
-	{
-		$object = $this->getObjectVal(array(PDF_TYPE_OBJREF, $key[0], $key[1]));
-		if ($object[0] !== PDF_TYPE_STREAM || !isset($object[1][1]['/First'][1])) {
-			return;		// not an object stream, the parent skips it as well
-		}
-		$stream = $this->decodeStream($object[1][1], $object[2][1]);
-		$first = (int) $object[1][1]['/First'][1];
-		$pairs = preg_split('/\s+/', trim(substr($stream[0], 0, $first)));
-		$pairCount = count($pairs);
-		for ($i = 1; $i < $pairCount; $i += 2) {
-			$this->objstreamobjs[$pairs[$i - 1]] = array($key, (int) $pairs[$i] + $first);
-		}
-	}
-
-	/**
 	 * Return every file embedded in the container, keyed by its declared name.
 	 *
 	 * @return	array<string,string>		Name => raw content, empty when the PDF carries none
