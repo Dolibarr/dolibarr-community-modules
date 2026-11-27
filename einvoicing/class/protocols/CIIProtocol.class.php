@@ -341,7 +341,7 @@ class CIIProtocol extends AbstractProtocol
 			'linePeriodStart' => './ram:SpecifiedLineTradeSettlement/ram:BillingSpecifiedPeriod/ram:StartDateTime/udt:DateTimeString',
 			'linePeriodEnd' => './ram:SpecifiedLineTradeSettlement/ram:BillingSpecifiedPeriod/ram:EndDateTime/udt:DateTimeString',
 
-			'additionalRefDocs' => '__MULTI__./ram:SpecifiedLineTradeSettlement/ram:AdditionalReferencedDocument',
+			'additionalRefDocs' => '__MULTI__./ram:SpecifiedLineTradeSettlement/ram:AdditionalReferencedDocument|./ram:SpecifiedLineTradeSettlement/ram:InvoiceReferencedDocument',
 
 			'isDepositLine' => false,
 			'depositInvoiceRef' => 'NA',
@@ -798,6 +798,22 @@ class CIIProtocol extends AbstractProtocol
 		$rang = (int) $supplierInvoice->line_max();
 
 		foreach ($supplierInvoice->lines as $i => $val) {
+			// A deposit deduction line carries fk_remise_except: delegate to insert_discount() so Dolibarr
+			// inserts the negative (DEPOSIT) line AND calls DiscountAbsolute::link_to_invoice() to mark the credit consumed.
+			if (!empty($supplierInvoice->lines[$i]->fk_remise_except) && $supplierInvoice->lines[$i]->fk_remise_except > 0) {
+				$currentSupplierInvoice = new FactureFournisseur($this->db);
+				if ($currentSupplierInvoice->fetch((int) $supplierInvoice->id) <= 0) {
+					return false;
+				}
+				$res = $currentSupplierInvoice->insert_discount((int) $supplierInvoice->lines[$i]->fk_remise_except);
+				if ($res < 0) {
+					dol_syslog(__METHOD__ . ' Failed to insert deposit discount ' . ((int) $supplierInvoice->lines[$i]->fk_remise_except) . ' into supplier invoice ' . ((int) $supplierInvoice->id) . ': ' . $currentSupplierInvoice->error, LOG_ERR);
+					return false;
+				}
+				$rang = (int) $supplierInvoice->line_max();
+				continue;
+			}
+
 			$sql = 'INSERT INTO '.MAIN_DB_PREFIX.'facture_fourn_det (fk_facture_fourn, special_code, fk_remise_except)';
 			/** @phan-suppress-next-line PhanUndeclaredProperty */
 			$sql .= " VALUES (".((int) $supplierInvoice->id).", ".((int) $supplierInvoice->lines[$i]->special_code).", ".($supplierInvoice->lines[$i]->fk_remise_except > 0 ? ((int) $supplierInvoice->lines[$i]->fk_remise_except) : 'NULL').')';
@@ -1826,12 +1842,12 @@ class CIIProtocol extends AbstractProtocol
 							continue;
 						}
 
-						// Unqualified, and the document declares a deposit still to attach: stepping over it
-						// would import an invoice short of its deduction. The flow is postponed - nothing is
-						// stored, syncFlow() rolls back, and the next run takes it again, the way BG-3 is
-						// already handled at document level. An invoice the vendor cashed in himself
-						// announces no deposit here, and waiting for one would wait for ever.
-						if ($this->depositAnnouncedByDocument($parsedHeader) > 0) {
+						// Unqualified, and the document declares a deposit still to attach (either via BT-113 or via
+						// an explicit EXT-FR-FE-BG-06 deposit reference TypeCode 386 on a non-already-paid framework):
+						// stepping over it would import an invoice short of its deduction. The flow is postponed.
+						$framework = strtoupper(trim((string) ($parsedHeader['businessProcessId'] ?? '')));
+						$isAlreadyPaidFramework = in_array($framework, array('B2', 'S2', 'M2'), true);
+						if ($this->depositAnnouncedByDocument($parsedHeader) > 0 || ((string) $lineRefDocType === '386' && !$isAlreadyPaidFramework)) {
 							return $this->postponeForMissingLineDocument((string) $lineRefDocId, (string) $parsedLine['lineid'], (int) $parsedLine['supplierId'], $parsedHeader);
 						}
 
@@ -1855,7 +1871,8 @@ class CIIProtocol extends AbstractProtocol
 						if ($linkedObject->type == FactureFournisseur::TYPE_DEPOSIT) {
 							$is_deposit_line = 1;
 
-							$depositDiscountRes = $this->getOrCreateDepositDiscount($linkedObject);
+							$expectedTvaTx = isset($parsedLine['rateApplicablePercent']) ? (float) $parsedLine['rateApplicablePercent'] : null;
+							$depositDiscountRes = $this->getOrCreateDepositDiscount($linkedObject, $expectedTvaTx, $remise_already_used_line_level_ids);
 							if ($depositDiscountRes['res'] < 0) {
 								return $depositDiscountRes;
 							}
@@ -2832,6 +2849,10 @@ class CIIProtocol extends AbstractProtocol
 						'name' => $this->getXPathValue($xpath, 'ram:Name', $n),
 						'referenceTypeCode' => $this->getXPathValue($xpath, 'ram:ReferenceTypeCode', $n),
 						'uriid' => $this->getXPathValue($xpath, 'ram:URIID', $n),
+						'issueDate' => $this->normDate(
+							$this->getXPathValue($xpath, 'ram:FormattedIssueDateTime/qdt:DateTimeString', $n)
+								?? $this->getXPathValue($xpath, 'ram:IssueDateTime/udt:DateTimeString', $n)
+						),
 					];
 					break;
 
@@ -5172,30 +5193,64 @@ class CIIProtocol extends AbstractProtocol
 	}
 
 	/**
-	 * Get an existing Dolibarr discount exception linked to a deposit (acompte) supplier invoice,
+	 * Get an existing available Dolibarr discount exception linked to a deposit (acompte) supplier invoice,
 	 * or create it by grouping the deposit invoice's lines by VAT rate.
 	 *
 	 * Shared by both the line-level and document-level deposit handling blocks of
 	 * doCreateSupplierInvoiceFromSource(), in both CIIProtocol and FacturXProtocol (which inherits
 	 * this method): the exact same logic was duplicated 4 times before being extracted here.
 	 *
-	 * @param FactureFournisseur $linkedObject The deposit (TYPE_DEPOSIT) supplier invoice referenced by the final invoice
+	 * @param FactureFournisseur $linkedObject       The deposit (TYPE_DEPOSIT) supplier invoice referenced by the final invoice
+	 * @param ?float             $expectedTvaTx      Optional VAT rate expected by the referencing line, to pick the matching discount
+	 * @param int[]              $excludeDiscountIds Discount row IDs already queued at line level in the current import
 	 * @return array{res:int<-1,1>, message?:string, fkRemise?:int} 'res' 1 on success with 'fkRemise', -1 on error with 'message'
 	 *
 	 * @phan-suppress PhanDeprecatedProperty  Same as createHeaderDiscounts(): DiscountAbsolute::create()
 	 *               reads amount_*, multicurrency_amount_* and fk_soc only, from Dolibarr 18 to the
 	 *               development branch.
 	 */
-	protected function getOrCreateDepositDiscount(FactureFournisseur $linkedObject)
+	protected function getOrCreateDepositDiscount(FactureFournisseur $linkedObject, $expectedTvaTx = null, array $excludeDiscountIds = array())
 	{
 		global $db, $user;
 
-		// Check if deposit line is already converted to a reduction otherwise we convert it
-		$discountcheck = new DiscountAbsolute($db);
-		$result = $discountcheck->fetch(0, 0, $linkedObject->id);
-		if ($result > 0) {
-			// Deposit already converted so reuse existing discount
-			return ['res' => 1, 'fkRemise' => $discountcheck->id];
+		// Check if deposit invoice already has converted discounts: reuse only an unconsumed row matching VAT rate.
+		$sql = 'SELECT rowid, tva_tx, fk_invoice_supplier, fk_invoice_supplier_line';
+		$sql .= ' FROM ' . MAIN_DB_PREFIX . 'societe_remise_except';
+		$sql .= ' WHERE entity IN (' . getEntity('invoice') . ')';
+		$sql .= ' AND fk_invoice_supplier_source = ' . ((int) $linkedObject->id);
+		$sql .= ' ORDER BY rowid ASC';
+
+		$resql = $db->query($sql);
+		if (!$resql) {
+			return ['res' => -1, 'message' => 'Database error looking up deposit discount for supplier invoice ' . $linkedObject->ref . ': ' . $db->lasterror()];
+		}
+
+		$existingRows = array();
+		while ($obj = $db->fetch_object($resql)) {
+			$existingRows[] = $obj;
+		}
+
+		if (!empty($existingRows)) {
+			$availableRows = array();
+			foreach ($existingRows as $row) {
+				$rowId = (int) $row->rowid;
+				$isConsumed = ((int) ($row->fk_invoice_supplier_line ?? 0) > 0) || ((int) ($row->fk_invoice_supplier ?? 0) > 0);
+				if (!$isConsumed && !in_array($rowId, $excludeDiscountIds, true)) {
+					$availableRows[] = $row;
+				}
+			}
+
+			if ($expectedTvaTx !== null) {
+				foreach ($availableRows as $row) {
+					if (abs((float) $row->tva_tx - (float) $expectedTvaTx) < 0.001) {
+						return ['res' => 1, 'fkRemise' => (int) $row->rowid];
+					}
+				}
+			} elseif (!empty($availableRows)) {
+				return ['res' => 1, 'fkRemise' => (int) $availableRows[0]->rowid];
+			}
+
+			return ['res' => -1, 'message' => 'No available deposit discount for supplier invoice ' . $linkedObject->ref . ' (deposit already consumed or no matching VAT rate)'];
 		}
 
 		// Loop on each vat rate
@@ -5236,12 +5291,17 @@ class CIIProtocol extends AbstractProtocol
 		}
 
 		$fkRemise = 0;
+		$matchedFkRemise = 0;
 		$discount = new DiscountAbsolute($db);
 		$discount->description = '(DEPOSIT)';
 		$discount->discount_type = 1; // Supplier discount
 		$discount->fk_soc = $linkedObject->socid;
 		$discount->socid = $linkedObject->socid;
 		$discount->fk_invoice_supplier_source = $linkedObject->id;
+		if (!empty($linkedObject->multicurrency_code)) {
+			$discount->multicurrency_code = $linkedObject->multicurrency_code;
+			$discount->multicurrency_tx = $linkedObject->multicurrency_tx;
+		}
 		foreach ($amount_ht as $tva_tx => $xxx) {  // @phan-suppress-current-line PhanEmptyForeach
 			$discount->amount_ht = abs((float) $amount_ht[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
 			$discount->amount_tva = abs((float) $amount_tva[$tva_tx]);  // @phan-suppress-current-line PhanTypeInvalidDimOffset
@@ -5266,6 +5326,16 @@ class CIIProtocol extends AbstractProtocol
 				return ['res' => -1, 'message' => 'Failed to create discount for deposit line: ' . $discount->error];
 			}
 			$fkRemise = $result;
+			if ($expectedTvaTx !== null && abs((float) $discount->tva_tx - (float) $expectedTvaTx) < 0.001) {
+				$matchedFkRemise = $result;
+			}
+		}
+
+		if ($expectedTvaTx !== null) {
+			if ($matchedFkRemise <= 0) {
+				return ['res' => -1, 'message' => 'No deposit discount matching VAT rate ' . $expectedTvaTx . '% was found on supplier invoice ' . $linkedObject->ref];
+			}
+			return ['res' => 1, 'fkRemise' => $matchedFkRemise];
 		}
 
 		return ['res' => 1, 'fkRemise' => $fkRemise];

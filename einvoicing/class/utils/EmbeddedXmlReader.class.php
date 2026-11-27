@@ -50,9 +50,9 @@ class EmbeddedXmlReader
 	}
 
 	/**
-	 * Parse an XML string and return all AdditionalReferencedDocument entries
-	 * for a given line ID, with their IssuerAssignedID, TypeCode, ReferenceTypeCode and IssueDate
-	 * (if available).
+	 * Parse an XML string and return all AdditionalReferencedDocument and line-level
+	 * InvoiceReferencedDocument (EXT-FR-FE-BG-06) entries for a given line ID, with their
+	 * IssuerAssignedID, TypeCode, ReferenceTypeCode and IssueDate (if available).
 	 *
 	 * @param string|int $lineid        Line ID to look up
 	 *
@@ -77,7 +77,7 @@ class EmbeddedXmlReader
 		$xpath->registerNamespace('qdt', 'urn:un:unece:uncefact:data:standard:QualifiedDataType:100');
 
 		$query = sprintf(
-			'//ram:IncludedSupplyChainTradeLineItem[ram:AssociatedDocumentLineDocument/ram:LineID[normalize-space(.)="%s"]]/ram:SpecifiedLineTradeSettlement/ram:AdditionalReferencedDocument',
+			'//ram:IncludedSupplyChainTradeLineItem[ram:AssociatedDocumentLineDocument/ram:LineID[normalize-space(.)="%s"]]/ram:SpecifiedLineTradeSettlement/*[self::ram:AdditionalReferencedDocument or self::ram:InvoiceReferencedDocument]',
 			addslashes((string) $lineid)
 		);
 

@@ -151,6 +151,44 @@ class EmbeddedXmlReaderTest extends PHPUnit\Framework\TestCase
 	}
 
 	/**
+	 * Line-level InvoiceReferencedDocument (EXT-FR-FE-BG-06) used by Method 1 deposit reprise lines
+	 * must be read alongside AdditionalReferencedDocument.
+	 *
+	 * @return void
+	 */
+	public function testReadsLineLevelInvoiceReferencedDocumentForDepositReprise()
+	{
+		$xml = '<?xml version="1.0" encoding="UTF-8"?>
+<rsm:CrossIndustryInvoice
+	xmlns:rsm="urn:un:unece:uncefact:data:standard:CrossIndustryInvoice:100"
+	xmlns:ram="urn:un:unece:uncefact:data:standard:ReusableAggregateBusinessInformationEntity:100"
+	xmlns:qdt="urn:un:unece:uncefact:data:standard:QualifiedDataType:100">
+	<rsm:SupplyChainTradeTransaction>
+		<ram:IncludedSupplyChainTradeLineItem>
+			<ram:AssociatedDocumentLineDocument><ram:LineID>3</ram:LineID></ram:AssociatedDocumentLineDocument>
+			<ram:SpecifiedLineTradeSettlement>
+				<ram:InvoiceReferencedDocument>
+					<ram:IssuerAssignedID>DEP-2026-001</ram:IssuerAssignedID>
+					<ram:TypeCode>386</ram:TypeCode>
+					<ram:FormattedIssueDateTime>
+						<qdt:DateTimeString format="102">20261126</qdt:DateTimeString>
+					</ram:FormattedIssueDateTime>
+				</ram:InvoiceReferencedDocument>
+			</ram:SpecifiedLineTradeSettlement>
+		</ram:IncludedSupplyChainTradeLineItem>
+	</rsm:SupplyChainTradeTransaction>
+</rsm:CrossIndustryInvoice>';
+
+		$reader = new EmbeddedXmlReader($xml);
+		$docs = $reader->getLineAdditionalReferencedDocuments('3');
+
+		$this->assertCount(1, $docs);
+		$this->assertSame('DEP-2026-001', $docs[0]['IssuerAssignedID']);
+		$this->assertSame('386', $docs[0]['typeCode']);
+		$this->assertSame('2026-11-26', $docs[0]['issueDate']);
+	}
+
+	/**
 	 * Nothing was embedded in the received PDF, or what was embedded is not XML.
 	 *
 	 * @return void
