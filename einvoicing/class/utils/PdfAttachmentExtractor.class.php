@@ -530,7 +530,7 @@ class PdfAttachmentExtractor extends tcpdi_parser
 			// See: https://www.php.net/manual/en/function.gzuncompress.php#79042
 			// Issue: https://github.com/smalot/pdfparser/issues/592
 			$ztmp = tmpfile();
-			if (false != $ztmp) {
+			if (false !== $ztmp) {
 				fwrite($ztmp, "\x1f\x8b\x08\x00\x00\x00\x00\x00".$data);
 				$file = stream_get_meta_data($ztmp)['uri'];
 				$decoded = file_get_contents('compress.zlib://'.$file);
