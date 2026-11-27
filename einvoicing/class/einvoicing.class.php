@@ -2477,7 +2477,35 @@ class EInvoicing
 				$url = DOL_URL_ROOT . '/fourn/facture/agenda.php?id=' . ((int) $object->id) . '&search_agenda_label=EINVOICING';
 			}
 
-			$resprints .= '<a href="' . $url . '" title="'.$langs->trans("History").'"><i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>';
+			$toolTipsControlAmount = "";
+			if ($provider) {
+				dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
+				if (SupplierInvoiceHelper::isEInvoice((int) $object->id)) {
+					$comparison = SupplierInvoiceHelper::checkPaHeaderTotals($object, false);
+
+					//$s='<strong>'.$langs->trans('PaTotalsOnInvoice').'</strong><br>';
+					$s='';
+					if (!empty($comparison['unavailable']) || empty($comparison['pa'])) {
+						$s .= '<span class="opacitymedium">'.$langs->trans('PaTotalsUnavailable').'</span>';
+					} else {
+						$class = !empty($comparison['identical']) ? 'ok' : 'error';
+						$s .= '<span class="'.$class.'">';
+						$s .= $langs->trans('PaTotalHT').': '.price($comparison['pa']['total_ht']).' / '.price($comparison['doli']['total_ht']);
+						$s .= '<br>'.$langs->trans('PaTotalVAT').': '.price($comparison['pa']['total_tva']).' / '.price($comparison['doli']['total_tva']);
+						$s .= '<br>'.$langs->trans('PaTotalTTC').': '.price($comparison['pa']['total_ttc']).' / '.price($comparison['doli']['total_ttc']);
+						$s .= '</span>';
+						if (empty($comparison['identical'])) {
+							$s .= '<br><span class="error">'.$langs->trans('PaTotalsMismatchCannotValidate').'</span>';
+						}
+					}
+					//$resprints .= '<div class="inline-block">';
+					//$resprints .= $s;
+					$toolTipsControlAmount = $form->textwithtooltip('', $s, 2, 1, img_picto('', 'bell', 'class="red paddingleft paddingright"'), '', 3, '', 0, 'pricediffinfo');
+					//$resprints .= '</div>';
+				}
+			}
+
+			$resprints .= '<a href="' . $url . '" title="'.$langs->trans("History").'"><i class="marginleftonly fas fa-calendar-alt infobox-action"></i></a>'.$toolTipsControlAmount;
 		}
 
 		$resprints .= '</td>';
@@ -2686,28 +2714,6 @@ class EInvoicing
                     </script>';
 				}
 			}
-		}
-
-		dol_include_once('einvoicing/class/utils/SupplierInvoiceHelper.class.php');
-		if (SupplierInvoiceHelper::isEInvoice((int) $object->id)) {
-			$comparison = SupplierInvoiceHelper::checkPaHeaderTotals($object, false);
-			$resprints .= '<tr class="treinvoicing_collapseseparator">';
-			$resprints .= '<td>'.$langs->trans('PaTotalsOnInvoice').'</td>';
-			$resprints .= '<td>';
-			if (!empty($comparison['unavailable']) || empty($comparison['pa'])) {
-				$resprints .= '<span class="opacitymedium">'.$langs->trans('PaTotalsUnavailable').'</span>';
-			} else {
-				$class = !empty($comparison['identical']) ? 'ok' : 'error';
-				$resprints .= '<span class="'.$class.'">';
-				$resprints .= $langs->trans('PaTotalHT').': '.price($comparison['pa']['total_ht']).' / '.price($comparison['doli']['total_ht']);
-				$resprints .= '<br>'.$langs->trans('PaTotalVAT').': '.price($comparison['pa']['total_tva']).' / '.price($comparison['doli']['total_tva']);
-				$resprints .= '<br>'.$langs->trans('PaTotalTTC').': '.price($comparison['pa']['total_ttc']).' / '.price($comparison['doli']['total_ttc']);
-				$resprints .= '</span>';
-				if (empty($comparison['identical'])) {
-					$resprints .= '<br><span class="error">'.$langs->trans('PaTotalsMismatchCannotValidate').'</span>';
-				}
-			}
-			$resprints .= '</td></tr>';
 		}
 
 		return $resprints;

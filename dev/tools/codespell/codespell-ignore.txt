@@ -105,6 +105,8 @@ blacklists
 confirmactionxxx
 ConfirmActionXxx
 paHt
+despatch
+Despatch
 
 # String in french text to keep
 signifiant
