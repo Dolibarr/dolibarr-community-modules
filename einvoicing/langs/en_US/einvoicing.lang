@@ -456,6 +456,13 @@ FlowTypeSupplierInvoice=Supplier invoice
 FlowTypeSupplierInvoiceLC=Supplier invoice lifecycle
 EInvoiceExcludeLCShort=Hide LC
 EInvoiceExcludeLifecycleFlows=Hide lifecycle flows (LC)
+PaTotalsOnInvoice=Totals vs Access Point (excl. VAT / VAT / incl. VAT)
+PaTotalHT=Total excl. VAT (Access Point)
+PaTotalVAT=Total VAT (Access Point)
+PaTotalTTC=Total incl. VAT (Access Point)
+PaTotalVsDoli=%s (Access Point) / %s (invoice)
+PaTotalsUnavailable=Access Point totals are not available
+PaTotalsMismatchCannotValidate=Totals (excl. VAT, VAT, incl. VAT) do not match the amounts transmitted by the Access Point
 
 # Generation page of the developer tools (admin/setup_devtools.php)
 MyCompany=My company
